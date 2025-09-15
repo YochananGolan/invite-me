@@ -1,0 +1,23 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html[dir='rtl'] {
+  direction: rtl;
+}
+
+body {
+  font-family: theme('fontFamily.sans');
+}
+
+/* Event details form modal styling */
+.event-form {
+  background-color: #FFF9E8; /* light warm background similar to homepage accent */
+  border: 2px solid #D1B45B; /* primary accent border */
+  border-radius: 0.75rem; /* rounded-lg */
+  /* Create two additional border lines using inset box-shadows */
+  box-shadow:
+    0 10px 25px rgba(0,0,0,0.1), /* drop shadow */
+    inset 0 0 0 4px #FFEEC0,      /* inner light border */
+    inset 0 0 0 8px #D1B45B;      /* second inner border (primary color) */
+}
