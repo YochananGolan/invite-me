@@ -12,10 +12,11 @@ export default function RsvpPage() {
   useEffect(() => {
     (async () => {
       try {
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
-        if (!user) {
+        // Check localStorage instead of Supabase auth
+        const userId = localStorage.getItem('user_id');
+        const userEmail = localStorage.getItem('user_email');
+        
+        if (!userId || !userEmail) {
           setError('יש להתחבר כדי לראות נתוני אורחים');
           setLoading(false);
           return;
@@ -24,7 +25,7 @@ export default function RsvpPage() {
         const { data, error: guestErr } = await supabase
           .from('invited_guests')
           .select('*')
-          .eq('user_id', user.id)
+          .eq('user_id', userId)
           .order('created_at', { ascending: false })
           .limit(1)
           .single();
@@ -52,7 +53,7 @@ export default function RsvpPage() {
           const { data: ev } = await supabase
             .from('events')
             .select('invitation_path')
-            .eq('user_id', user.id)
+            .eq('user_id', userId)
             .not('invitation_path', 'is', null)
             .order('created_at', { ascending: false })
             .limit(1)
@@ -81,7 +82,7 @@ export default function RsvpPage() {
   return (
     <>
       <Head>
-        <title>InviteMe | אישורי הגעה</title>
+        <title>Meet-M | אישורי הגעה</title>
       </Head>
       <NavBar />
       <main className="container mx-auto py-20 px-4 text-center">

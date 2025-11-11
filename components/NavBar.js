@@ -3,12 +3,10 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabaseClient';
 
 const links = [
-  { name: 'הזמנה דיגיטאלית', href: '/#' },
-  { name: 'מתנות באשראי', href: '/#' },
-  { name: 'צור קשר', href: '/#' },
+  { name: 'צור קשר', href: '/contact' },
 ];
 
-export default function NavBar() {
+export default function NavBar({ onAuthClick }) {
   const [session, setSession] = useState(null);
 
   useEffect(() => {
@@ -34,36 +32,52 @@ export default function NavBar() {
   return (
     <nav className="w-full bg-white shadow-sm">
       <div className="container mx-auto flex items-center justify-between py-4 px-6">
-        {/* Navigation Links */}
-        <ul className="hidden md:flex flex-row space-x-10 space-x-reverse">
-          {links.map((link) => (
-            <li key={link.name}>
-              <Link href={link.href} className="text-primary font-medium border border-primary rounded-full px-4 py-1 hover:bg-primary hover:text-white transition-colors">
-                {link.name}
-              </Link>
-            </li>
-          ))}
+        {/* Left Side - Auth Buttons */}
+        <div className="hidden md:flex flex-row space-x-4 space-x-reverse">
           {session && (
-            <li key="logout">
+            <button
+              onClick={() => supabase.auth.signOut()}
+              className="text-primary font-medium border border-primary rounded-full px-4 py-1 hover:bg-primary hover:text-white transition-colors"
+            >
+              התנתק
+            </button>
+          )}
+          {session && (
+                  <div className="flex items-center">
+                    <span className="whitespace-nowrap text-white font-medium bg-green-600 rounded-full px-6 py-3">משתמש מחובר: {session.user?.email}</span>
+                  </div>
+          )}
+          {!session && (
+            <>
               <button
-                onClick={() => supabase.auth.signOut()}
-                className="text-primary font-medium border border-primary rounded-full px-4 py-1 hover:bg-primary hover:text-white transition-colors"
+                onClick={() => onAuthClick('sign_up')}
+                className="text-white font-medium bg-green-600 rounded-full px-6 py-3 hover:bg-green-700 transition-colors"
               >
-                התנתק
+                הרשמה חינם
               </button>
-            </li>
+              <button
+                onClick={() => onAuthClick('sign_in')}
+                className="bg-[#FCE6AC] text-primary border border-primary rounded-full px-6 py-3 font-medium hover:bg-[#FCE6AC]/90 transition-colors"
+              >
+                כניסה
+              </button>
+            </>
           )}
-          {session && (
-            <li key="user" className="flex items-center text-gray-700">
-              <span className="whitespace-nowrap">משתמש: {session.user?.email}</span>
-            </li>
-          )}
-        </ul>
+        </div>
 
-        {/* Logo - Left Side */}
-        <Link href="/" className="order-last flex items-center" passHref>
+        {/* Center - Contact Button */}
+        <div className="flex justify-center">
+          {links.map((link) => (
+            <Link key={link.name} href={link.href} className="text-white font-medium bg-blue-600 rounded-full px-6 py-3 hover:bg-blue-700 transition-colors">
+              {link.name}
+            </Link>
+          ))}
+        </div>
+
+        {/* Logo - Right Side */}
+        <Link href="/" className="flex items-center" passHref>
           <span className="text-2xl md:text-3xl font-medium px-3 py-1 bg-[#FCE6AC] text-primary border border-primary rounded-md ring-2 ring-primary ring-offset-2 ring-offset-[#FCE6AC]">
-            Invite&nbsp;Me
+            Meet-M
           </span>
         </Link>
       </div>

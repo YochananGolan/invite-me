@@ -3,10 +3,55 @@ import { supabase } from '../lib/supabaseClient';
 import { Auth } from '@supabase/auth-ui-react';
 import { ThemeSupa } from '@supabase/auth-ui-shared';
 
-export default function AuthModal() {
-  const [open, setOpen] = useState(true);
-  const [view, setView] = useState('sign_in');
+export default function AuthModal({ initialMode = 'sign_in', open = false, onClose = () => {} }) {
+  const [view, setView] = useState(initialMode);
   const [successMsg, setSuccessMsg] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
+  const [lastEmail, setLastEmail] = useState('');
+
+  // Handle custom registration with additional fields
+  const handleSignUp = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setErrorMsg('');
+    
+    try {
+      const password = e.target.password.value;
+      const confirmPassword = e.target.confirmPassword.value;
+      
+      if (password !== confirmPassword) {
+        throw new Error('הסיסמאות אינן תואמות');
+      }
+      
+      const { data, error } = await supabase.auth.signUp({
+        email: e.target.email.value,
+        password: password,
+        options: {
+          data: {
+            first_name: firstName,
+            last_name: lastName,
+            phone: phone
+          }
+        }
+      });
+      
+      if (error) throw error;
+      
+      setSuccessMsg('נרשמת בהצלחה! בדוק את האימייל שלך לאימות');
+      setFirstName('');
+      setLastName('');
+      setPhone('');
+      e.target.reset();
+    } catch (error) {
+      setErrorMsg('שגיאה בהרשמה: ' + error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Close modal automatically after successful sign-in / sign-up
   useEffect(() => {
@@ -14,68 +59,236 @@ export default function AuthModal() {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_IN' && session) {
-        if (view === 'sign_up') {
-          // registration completed
-          setSuccessMsg('נרשמת בהצלחה!');
-          setView('sign_in');
-        } else {
-          setOpen(false);
+        // Save email to localStorage for autofill on next login
+        if (session.user?.email) {
+          try {
+            localStorage.setItem('last_login_email', session.user.email);
+          } catch (e) {
+            console.error('Failed to save email to localStorage:', e);
+          }
         }
+        onClose();
       }
     });
     return () => subscription.unsubscribe();
   }, []);
+
+  // sync view when parent changes initialMode
+  useEffect(() => {
+    setView(initialMode);
+  }, [initialMode]);
+
+  // Load last email from localStorage when modal opens
+  useEffect(() => {
+    if (open && view === 'sign_in') {
+      try {
+        const saved = localStorage.getItem('last_login_email');
+        if (saved) setLastEmail(saved);
+      } catch (e) {
+        console.error('Failed to load email from localStorage:', e);
+      }
+    }
+  }, [open, view]);
 
   // Parent component will hide/show modal based on session state.
 
   return (
     open && (
       <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-        <div className="bg-white rounded-lg p-8 w-full max-w-md shadow-xl relative">
+        {/* Confetti background layer */}
+        <div
+          aria-hidden
+          className="absolute inset-0 pointer-events-none opacity-80"
+          style={{
+            backgroundImage:
+              'radial-gradient(#f87171 1.2px, transparent 1.2px), radial-gradient(#60a5fa 1.2px, transparent 1.2px), radial-gradient(#34d399 1.2px, transparent 1.2px), radial-gradient(#fbbf24 1.2px, transparent 1.2px)',
+            backgroundSize: '28px 28px, 32px 32px, 36px 36px, 30px 30px',
+            backgroundPosition: '0 0, 8px 12px, 16px 6px, 20px 18px'
+          }}
+        />
 
-          {/* Toggle Sign In / Sign Up */}
-          <div className="flex justify-center mb-6">
-            <button
-              onClick={() => setView('sign_in')}
-              className={`px-4 py-2 w-1/2 border-b-2 ${view === 'sign_in' ? 'border-primary text-primary font-bold' : 'border-transparent text-gray-500'}`}
-            >
-              כניסה
-            </button>
-            <button
-              onClick={() => setView('sign_up')}
-              className={`px-4 py-2 w-1/2 border-b-2 ${view === 'sign_up' ? 'border-primary text-primary font-bold' : 'border-transparent text-gray-500'}`}
-            >
-              הרשמה
-            </button>
+        <div className="relative bg-white/95 backdrop-blur-sm rounded-2xl p-8 w-full max-w-md shadow-2xl">
+          {/* Close Button */}
+          <button
+            onClick={onClose}
+            aria-label="סגור"
+            className="absolute top-2 left-2 text-3xl text-gray-500 hover:text-gray-700 focus:outline-none leading-none w-8 h-8 flex items-center justify-center"
+          >
+            &times;
+          </button>
+
+          {/* Heading (single-purpose screen - no mode toggle) */}
+          <div className="text-center mb-6">
+            <div className="text-4xl font-extrabold text-gray-900 tracking-tight">
+              {view === 'sign_up' ? 'הרשמה' : 'כניסה'}
+            </div>
+            {view === 'sign_up' && (
+              <div className="mt-1 text-base text-gray-500">פתחו חשבון חדש והתחילו להזמין בקלות</div>
+            )}
           </div>
           {successMsg && (
             <p className="text-green-600 text-center mb-4 font-medium">{successMsg}</p>
           )}
 
-          <Auth
-            supabaseClient={supabase}
-            appearance={{ theme: ThemeSupa }}
-            view={view}
-            onViewChange={(v) => setView(v)}
-            localization={{
-              variables: {
-                sign_in: {
-                  email_label: 'אימייל',
-                  password_label: 'סיסמה',
-                  link_text: 'אין לך חשבון? הירשם',
+          <div className="border-2 border-purple-200 rounded-2xl p-6 bg-white/95 shadow-lg">
+            {view === 'sign_up' ? (
+              <form onSubmit={handleSignUp} className="space-y-4">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-lg font-bold text-gray-800 mb-2">
+                      שם פרטי *
+                    </label>
+                    <input
+                      type="text"
+                      name="firstName"
+                      value={firstName}
+                      onChange={(e) => setFirstName(e.target.value)}
+                      required
+                      className="w-full h-12 rounded-xl border-2 border-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-lg px-3 shadow-sm font-medium"
+                      placeholder="הכנס שם פרטי"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-lg font-bold text-gray-800 mb-2">
+                      שם משפחה *
+                    </label>
+                    <input
+                      type="text"
+                      name="lastName"
+                      value={lastName}
+                      onChange={(e) => setLastName(e.target.value)}
+                      required
+                      className="w-full h-12 rounded-xl border-2 border-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-lg px-3 shadow-sm font-medium"
+                      placeholder="הכנס שם משפחה"
+                    />
+                  </div>
+                </div>
+                
+                <div>
+                  <label className="block text-lg font-bold text-gray-800 mb-2">
+                    אימייל *
+                  </label>
+                  <input
+                    type="email"
+                    name="email"
+                    required
+                    className="w-full h-12 rounded-xl border-2 border-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-lg px-3 shadow-sm font-medium"
+                    placeholder="הכנס כתובת אימייל"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-lg font-bold text-gray-800 mb-2">
+                    מספר נייד
+                  </label>
+                  <input
+                    type="tel"
+                    name="phone"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    className="w-full h-12 rounded-xl border-2 border-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-lg px-3 shadow-sm font-medium"
+                    placeholder="הכנס מספר נייד"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-lg font-bold text-gray-800 mb-2">
+                    סיסמה *
+                  </label>
+                  <input
+                    type="password"
+                    name="password"
+                    required
+                    className="w-full h-12 rounded-xl border-2 border-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-lg px-3 shadow-sm font-medium"
+                    placeholder="הכנס סיסמה"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-lg font-bold text-gray-800 mb-2">
+                    אימות סיסמה *
+                  </label>
+                  <input
+                    type="password"
+                    name="confirmPassword"
+                    required
+                    className="w-full h-12 rounded-xl border-2 border-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-lg px-3 shadow-sm font-medium"
+                    placeholder="הכנס שוב את הסיסמה"
+                  />
+                </div>
+                
+                {errorMsg && (
+                  <div className="text-red-600 text-base font-medium">{errorMsg}</div>
+                )}
+                
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full h-12 rounded-xl bg-purple-600 hover:bg-purple-700 disabled:bg-purple-400 text-white font-semibold shadow-sm text-base"
+                >
+                  {loading ? 'מעבד...' : 'לחץ להודעת אימות לאימייל'}
+                </button>
+              </form>
+            ) : (
+              <div className="rounded-2xl border-2 border-gray-400 p-5 bg-white shadow-sm signin-strong">
+                {lastEmail && (
+                  <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <p className="text-sm text-gray-700 mb-1">האימייל האחרון שהוזן:</p>
+                    <p className="text-base font-semibold text-blue-700">{lastEmail}</p>
+                  </div>
+                )}
+                <Auth
+                  supabaseClient={supabase}
+                  appearance={{
+                theme: ThemeSupa,
+                variables: {
+                  default: {
+                    colors: {
+                      brand: '#7c3aed', // purple-600
+                      brandAccent: '#6d28d9',
+                      inputBorder: '#e5e7eb',
+                      inputText: '#111827',
+                      messageText: '#ef4444'
+                    },
+                    radii: {
+                      inputBorderRadius: '12px',
+                      buttonBorderRadius: '12px'
+                    }
+                  }
                 },
-                sign_up: {
-                  email_label: 'אימייל',
-                  password_label: 'סיסמה',
-                  password_confirm_label: 'אימות סיסמה',
-                  button_label: 'לחץ להודעת אימות לאימייל',
-                  link_text: 'כבר יש לך חשבון? כניסה',
+                className: {
+                  container: 'space-y-3',
+                  label: 'text-lg font-bold text-gray-800',
+                  input: 'h-12 rounded-xl border-2 border-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-lg shadow-sm font-medium',
+                  button: 'h-12 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-semibold shadow-sm text-base',
+                  anchor: 'text-purple-700 hover:text-purple-800 font-medium text-base',
+                  message: 'text-base'
+                }
+              }}
+                view={view}
+                onViewChange={(v) => setView(v)}
+                localization={{
+                variables: {
+                  sign_in: {
+                    email_label: 'אימייל',
+                    password_label: 'סיסמה',
+                    link_text: '',
+                  },
+                  sign_up: {
+                    email_label: 'אימייל',
+                    password_label: 'סיסמה',
+                    password_confirm_label: 'אימות סיסמה',
+                    button_label: 'לחץ להודעת אימות לאימייל',
+                    link_text: '',
+                  },
                 },
-              },
-            }}
-            providers={[]}
-            magicLink={false}
-          />
+              }}
+                providers={[]}
+                magicLink={false}
+                />
+              </div>
+            )}
+          </div>
         </div>
       </div>
     )

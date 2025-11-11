@@ -3,7 +3,10 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev -p 3000",
+    "dev:clean": "powershell -ExecutionPolicy Bypass -File ./free-port-3000.ps1",
+    "dev:clean-bat": "start-dev.bat",
+    "free-port": "powershell -ExecutionPolicy Bypass -File ./free-port-3000.ps1",
     "build": "next build",
     "start": "next start"
   },
@@ -14,11 +17,13 @@
     "@supabase/supabase-js": "^2.55.0",
     "class-variance-authority": "^0.7.1",
     "date-fns": "^4.1.0",
+    "html2canvas": "^1.4.1",
     "next": "latest",
     "nodemailer": "^6.9.4",
     "react": "^18.2.0",
     "react-datepicker": "^8.4.0",
-    "react-dom": "^18.2.0"
+    "react-dom": "^18.2.0",
+    "xlsx": "^0.18.5"
   },
   "overrides": {
     "react": "^18.2.0",
