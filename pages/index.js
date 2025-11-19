@@ -94,6 +94,10 @@ export default function Home({ session }) {
                   <li className="flex items-center"><span className="text-green-500 mr-2">✓</span> <strong>חיסכון משמעותי</strong> - אין צורך במעצב או הדפסות</li>
                   <li className="flex items-center"><span className="text-green-500 mr-2">✓</span> <strong>מעקב בזמן אמת</strong> - מי מגיע, מי לא, כמה אוכל להזמין</li>
                   <li className="flex items-center"><span className="text-green-500 mr-2">✓</span> <strong>עובד על כל מכשיר</strong> - מחשב, טאבלט, סמארטפון</li>
+                  <li className="flex items-center">
+                    <span className="text-green-500 mr-2">✓</span>
+                    <strong>הזמנות ללא הגבלה</strong> – אפשרות לרכוש חבילות תוספת אורחים מעבר לתקרה הרגילה ולהזמין כמה שצריך
+                  </li>
                 </ul>
               </div>
               <div className="space-y-3">
@@ -106,7 +110,7 @@ export default function Home({ session }) {
                     </li>
                     <li>הזמנות מעוצבות מקצועית</li>
                     <li>שליחה אוטומטית לכל האורחים</li>
-                    <li>שליחת הודעות SMS ב-3 סבבים</li>
+                    <li>שליחת הודעות SMS ב-2 סבבים</li>
                     <li>מעקב אחר אישורי הגעה</li>
                     <li>הצגת דוחות סיכום מתעדכנים בזמן אמת בדף הבית</li>
                   </ol>
@@ -116,6 +120,7 @@ export default function Home({ session }) {
                     <li>דוחות מפורטים + ייצוא ל-Excel</li>
                     <li>שמירת אירועי עבר בארכיון</li>
                     <li>הצגת מפת אזור האירוע</li>
+                    <li>ניווט ישיר לאולם האירועים</li>
                   </ol>
                 </div>
               </div>

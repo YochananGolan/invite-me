@@ -11,7 +11,6 @@ export default function AuthModal({ initialMode = 'sign_in', open = false, onClo
   const [phone, setPhone] = useState('');
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
-  const [lastEmail, setLastEmail] = useState('');
 
   // Handle custom registration with additional fields
   const handleSignUp = async (e) => {
@@ -77,18 +76,6 @@ export default function AuthModal({ initialMode = 'sign_in', open = false, onClo
   useEffect(() => {
     setView(initialMode);
   }, [initialMode]);
-
-  // Load last email from localStorage when modal opens
-  useEffect(() => {
-    if (open && view === 'sign_in') {
-      try {
-        const saved = localStorage.getItem('last_login_email');
-        if (saved) setLastEmail(saved);
-      } catch (e) {
-        console.error('Failed to load email from localStorage:', e);
-      }
-    }
-  }, [open, view]);
 
   // Parent component will hide/show modal based on session state.
 
@@ -231,12 +218,6 @@ export default function AuthModal({ initialMode = 'sign_in', open = false, onClo
               </form>
             ) : (
               <div className="rounded-2xl border-2 border-gray-400 p-5 bg-white shadow-sm signin-strong">
-                {lastEmail && (
-                  <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                    <p className="text-sm text-gray-700 mb-1">האימייל האחרון שהוזן:</p>
-                    <p className="text-base font-semibold text-blue-700">{lastEmail}</p>
-                  </div>
-                )}
                 <Auth
                   supabaseClient={supabase}
                   appearance={{

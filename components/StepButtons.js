@@ -186,12 +186,143 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick }, re
 
   // Pricing plan selection modal
   const [showPricingPlan, setShowPricingPlan] = useState(false);
+  React.useEffect(() => {
+    if (!showPricingPlan) {
+      setPlanAddOnMode(false);
+      setPlanSelectionError('');
+    }
+  }, [showPricingPlan]);
+  const getPlanBaseLimit = React.useCallback((plan) => {
+    switch(plan){
+      case 'basic':
+      case 'free':
+        return 50;
+      case 'standard':
+        return 200;
+      case 'premium':
+        return 350;
+      case 'luxury':
+        return 500;
+      case 'elite':
+        return 650;
+      case 'supreme':
+        return 1000;
+      default:
+        return 0;
+    }
+  },[]);
+
   const [selectedPlan, setSelectedPlan] = useState(() => {
     if (typeof window === 'undefined') return null;
     try {
       return localStorage.getItem('selectedPlan') || null;
     } catch(e) { return null; }
   });
+
+  const getPlanLabel = React.useCallback((plan) => {
+    switch(plan){
+      case 'basic':
+      case 'free':
+        return 'מסלול א';
+      case 'standard':
+        return 'מסלול ב';
+      case 'premium':
+        return 'מסלול ג';
+      case 'luxury':
+        return 'מסלול ד';
+      case 'elite':
+        return 'מסלול ה';
+      case 'supreme':
+        return 'מסלול ו';
+      default:
+        return plan || '';
+    }
+  },[]);
+
+const [additionalPackages, setAdditionalPackages] = useState(() => {
+  if (typeof window === 'undefined') return [];
+  try {
+    const stored = localStorage.getItem('additionalPackages');
+    if (!stored) return [];
+    const parsed = JSON.parse(stored);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch(e) { return []; }
+});
+const [planLimitWarningError, setPlanLimitWarningError] = useState('');
+const [planAddOnMode, setPlanAddOnMode] = useState(false);
+const [planSelectionError, setPlanSelectionError] = useState('');
+const [planWarningSuppressed, setPlanWarningSuppressed] = useState(false);
+
+  React.useEffect(() => {
+    try {
+      localStorage.setItem('additionalPackages', JSON.stringify(additionalPackages));
+    } catch (e) {
+      console.warn('Failed to persist additionalPackages', e);
+    }
+  }, [additionalPackages]);
+
+  React.useEffect(() => {
+    if (!showPricingPlan) {
+      if (planWarningSuppressed) {
+        const totalGuests = guestSummary.adults + guestSummary.children;
+        const baseLimit = getPlanBaseLimit(selectedPlan);
+        const extraCapacity = additionalPackages.reduce((sum, planId) => sum + getPlanBaseLimit(planId), 0);
+        const totalLimit = (baseLimit || 0) + extraCapacity;
+        if (totalGuests > totalLimit) {
+          setShowPlanLimitWarning(true);
+        }
+        setPlanWarningSuppressed(false);
+      }
+      setPlanSelectionError('');
+    }
+  }, [showPricingPlan, planWarningSuppressed, guestSummary.adults, guestSummary.children, selectedPlan, additionalPackages, getPlanBaseLimit]);
+
+const basePlanLimit = getPlanBaseLimit(selectedPlan);
+const additionalCapacity = additionalPackages.reduce((sum, planId) => sum + getPlanBaseLimit(planId), 0);
+const totalPlanCapacity = (basePlanLimit || 0) + additionalCapacity;
+const totalGuestsCount = guestSummary.adults + guestSummary.children;
+const basePlanOverCapacity = basePlanLimit ? totalGuestsCount > basePlanLimit : false;
+const activePlanDescription =
+  selectedPlan === 'basic' || selectedPlan === 'free'
+    ? 'מסלול א - חינמי לאירועים קטנים עם כל הפיצ\'רים הבסיסיים'
+    : selectedPlan === 'standard'
+      ? 'מסלול ב - מקצועי עם תמיכה מלאה ועיצובים מתקדמים'
+      : selectedPlan === 'premium'
+        ? 'מסלול ג - כולל את כל הפיצ\'רים ותמיכה 24/7'
+        : selectedPlan === 'luxury'
+          ? 'מסלול ד - מתאים לאירועים גדולים מאוד עם יכולות מתקדמות'
+          : selectedPlan === 'elite'
+            ? 'מסלול ה - מעטפת מלאה לאירועים ענקיים'
+            : selectedPlan === 'supreme'
+              ? ''
+              : '';
+const additionalPackageCounts = React.useMemo(() => {
+  return additionalPackages.reduce((acc, planId) => {
+    acc[planId] = (acc[planId] || 0) + 1;
+    return acc;
+  }, {});
+}, [additionalPackages]);
+
+const handleAddPackagePlan = React.useCallback((plan) => {
+  if (plan === 'basic' || plan === 'free') {
+    setPlanSelectionError('לא ניתן להוסיף חבילה למסלול החינמי.');
+    return;
+  }
+  setAdditionalPackages((prev) => [...prev, plan]);
+  setPlanSelectionError('');
+  setPlanAddOnMode(false);
+  setShowPricingPlan(false);
+}, []);
+
+const handleOpenAddonModal = React.useCallback(() => {
+  const hasPaidPlan = selectedPlan && selectedPlan !== 'basic' && selectedPlan !== 'free';
+  setPlanLimitWarningError('');
+  setPlanSelectionError(hasPaidPlan ? '' : 'בחר מסלול בתשלום כדי להמשיך ולהוסיף אורחים.');
+  setPlanAddOnMode(Boolean(hasPaidPlan));
+  setPlanWarningSuppressed(true);
+  setShowPlanLimitWarning(false);
+  setShowPricingPlan(true);
+}, [selectedPlan]);
 
   // --- Share message state ---
   // Share modal state removed – reverting to direct WhatsApp share
@@ -1009,6 +1140,11 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick }, re
   
   // --- Plan limit warning state ---
   const [showPlanLimitWarning, setShowPlanLimitWarning] = useState(false);
+React.useEffect(() => {
+  if (!showPlanLimitWarning) {
+    setPlanLimitWarningError('');
+  }
+}, [showPlanLimitWarning]);
 
   // Compute totals for report (only for guests, not summary rows)
   const totalReportAdults = reportGuests.reduce((sum, g) => {
@@ -1362,16 +1498,18 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick }, re
     setShowGuestListModal(false);
     setShowReportModal(false);
     setSelectedEventForReport(null);
+    setSelectedPlan(null);
+    setAdditionalPackages([]);
     
     try { localStorage.setItem('newEventStarted','1'); } catch(e){}
     try{ localStorage.removeItem('selectedDesign'); }catch{}
     try{ localStorage.removeItem('finishedSteps'); }catch{} // Clear finished steps from local storage
     try{ localStorage.removeItem('selectedEventType'); }catch{} // Clear selected event type from local storage
+    try{ localStorage.removeItem('selectedPlan'); }catch{}
+    try{ localStorage.removeItem('additionalPackages'); }catch{}
     
-    // If pricing plan already selected, go to event types. Otherwise, show pricing plan first
-    if (!selectedPlan) {
-      setShowPricingPlan(true);
-    }
+    // Force the user to pick a pricing plan for the new event
+    setShowPricingPlan(true);
 
     if (showDeletionMessage) {
       setShowDeletionSuccess(true);
@@ -1379,9 +1517,20 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick }, re
   };
 
   const handleSelectPlan = (plan) => {
+    setPlanSelectionError('');
+    setPlanAddOnMode(false);
+    if(plan !== selectedPlan){
+      setAdditionalPackages([]);
+      try { localStorage.removeItem('additionalPackages'); } catch(e){}
+    }
     setSelectedPlan(plan);
     try { localStorage.setItem('selectedPlan', plan); } catch(e){}
     setShowPricingPlan(false);
+    if (!selectedEventType) {
+      setShowEventTypes(true);
+      setStepErrorMsg('');
+      setClickedStepName('');
+    }
   };
 
   // Check if there's an existing event in progress
@@ -1648,6 +1797,7 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick }, re
         setFinishedSteps([]);
         setNewEventStarted(false);
         setCurrentEventId(null);
+        setSelectedPlan(null);
         
         // Reset guest data and reports
         setGuestSummary({ approved: 0, adults: 0, children: 0 });
@@ -2020,35 +2170,30 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick }, re
   React.useEffect(() => {
     if (!selectedPlan || !currentEventId) {
       setShowPlanLimitWarning(false);
+      setPlanAddOnMode(false);
       return;
     }
     
     const totalGuests = guestSummary.adults + guestSummary.children;
-    let planLimit = 0;
-    
-    if (selectedPlan === 'basic' || selectedPlan === 'free') {
-      planLimit = 50;
-    } else if (selectedPlan === 'standard') {
-      planLimit = 300;
-    } else if (selectedPlan === 'premium') {
-      planLimit = 1000;
-    } else if (selectedPlan === 'luxury') {
-      planLimit = 2000;
-    } else if (selectedPlan === 'elite') {
-      planLimit = 3000;
-    } else {
+    const baseLimit = getPlanBaseLimit(selectedPlan);
+    const extraCapacity = additionalPackages.reduce((sum, planId) => sum + getPlanBaseLimit(planId), 0);
+    if (!baseLimit && extraCapacity === 0) {
       // No plan selected, no limit check
       setShowPlanLimitWarning(false);
+      setPlanAddOnMode(false);
       return;
     }
+    const totalLimit = (baseLimit || 0) + extraCapacity;
     
     // Show warning if total guests exceed plan limit
-    if (totalGuests > planLimit) {
+    if (totalGuests > totalLimit) {
       setShowPlanLimitWarning(true);
+      setPlanAddOnMode(true);
     } else {
       setShowPlanLimitWarning(false);
+      setPlanAddOnMode(false);
     }
-  }, [selectedPlan, guestSummary.adults, guestSummary.children, currentEventId]);
+  }, [selectedPlan, guestSummary.adults, guestSummary.children, currentEventId, additionalPackages, getPlanBaseLimit]);
 
   // helper to open guest report with fresh data
   const openGuestReport = async () => {
@@ -2139,29 +2284,45 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick }, re
       {showPlanLimitWarning && (
         <div className="fixed inset-0 flex items-center justify-center bg-black/70 z-[100]">
           <div className="bg-white rounded-lg p-8 w-full max-w-2xl mx-4 text-center shadow-2xl">
+            {(() => {
+              const totalGuests = guestSummary.adults + guestSummary.children;
+              const baseLimit = getPlanBaseLimit(selectedPlan);
+              const effectiveLimit = (baseLimit || 0) + additionalCapacity;
+              const deficit = Math.max(0, totalGuests - effectiveLimit);
+              const canAddPackage = Boolean(selectedPlan && selectedPlan !== 'basic' && selectedPlan !== 'free');
+              
+              return (
             <div className="mb-6">
               <div className="text-6xl mb-4">⚠️</div>
               <h2 className="text-3xl font-bold text-red-600 mb-4">חריגה ממסגרת המסלול!</h2>
               <p className="text-xl text-gray-700 mb-4">
-                מספר האורחים המוזמנים חורג ממגבלת המסלול הנבחר
+                מספר האורחים המוזמנים ({totalGuests}) חורג מהמכסה הנוכחית ({effectiveLimit})
               </p>
               <div className="bg-red-50 border-2 border-red-400 rounded-lg p-4 mb-4">
                 <p className="text-lg font-bold text-red-800">
-                  עליך לשדרג את המסלול כדי להמשיך
+                  {canAddPackage && deficit > 0
+                    ? `חסרים ${deficit} אורחים לעומת חבילת המסלול.`
+                    : canAddPackage
+                      ? 'הגעת למכסה המקסימלית של החבילה הנבחרת.'
+                      : 'יש לבחור מסלול בתשלום כדי להמשיך.'}
                 </p>
+                {planLimitWarningError && (
+                  <p className="text-base font-semibold text-red-600 mt-2">
+                    {planLimitWarningError}
+                  </p>
+                )}
+              </div>
+              <div className="flex justify-center gap-4 flex-wrap">
+                <button
+                  onClick={handleOpenAddonModal}
+                  className="bg-green-600 text-white border-2 border-green-700 rounded-full px-8 py-4 font-bold text-lg hover:bg-green-700 transition-all shadow-lg"
+                >
+                  {canAddPackage ? 'הוסף חבילת מסלול נוספת' : 'בחר מסלול בתשלום'}
+                </button>
               </div>
             </div>
-            <div className="flex justify-center gap-4">
-              <button
-                onClick={() => {
-                  setShowPlanLimitWarning(false);
-                  setShowPricingPlan(true);
-                }}
-                className="bg-red-600 text-white border-2 border-red-700 rounded-full px-8 py-4 font-bold text-lg hover:bg-red-700 transition-all shadow-lg"
-              >
-                שדרג מסלול
-              </button>
-            </div>
+              );
+            })()}
           </div>
         </div>
       )}
@@ -2305,7 +2466,7 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick }, re
                 )}
                 {formData.date && (
                   <div className="bg-green-100 border-2 border-green-600 rounded-lg p-3 mt-3 mb-2">
-                    <p className="text-green-800 font-bold text-lg text-center">
+                    <p className="text-green-800 font-bold text-2xl text-center">
                       {(() => {
                         const eventDate = new Date(formData.date);
                         const today = new Date();
@@ -2377,37 +2538,55 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick }, re
                 <div className="mt-3">
                   <div className="bg-white p-3 rounded-lg border border-yellow-200 mb-3">
                     <div className="text-lg font-bold text-yellow-700 mb-1">
-                      {selectedPlan === 'basic' || selectedPlan === 'free' ? 'מסלול בסיסי' : 
-                       selectedPlan === 'standard' ? 'מסלול סטנדרט' : 
-                       selectedPlan === 'premium' ? 'מסלול פרימיום' : 
-                       selectedPlan === 'luxury' ? 'מסלול יוקרתי' : 
-                       selectedPlan === 'elite' ? 'מסלול אלפיון' : 'לא נבחר מסלול'}
+                      {selectedPlan === 'basic' || selectedPlan === 'free' ? 'מסלול א' : 
+                       selectedPlan === 'standard' ? 'מסלול ב' : 
+                       selectedPlan === 'premium' ? 'מסלול ג' : 
+                       selectedPlan === 'luxury' ? 'מסלול ד' : 
+                       selectedPlan === 'elite' ? 'מסלול ה' : 
+                       selectedPlan === 'supreme' ? 'מסלול ו' : 'לא נבחר מסלול'}
                     </div>
                     <div className="text-base text-gray-700 font-semibold">
                       {selectedPlan === 'basic' || selectedPlan === 'free' ? 'חינם - עד 50 אורחים' : 
-                       selectedPlan === 'standard' ? '149₪ - מ 51 עד 300 אורחים' : 
-                       selectedPlan === 'premium' ? '199₪ - מ 301 עד 1000 אורחים' : 
-                       selectedPlan === 'luxury' ? '249₪ - מ 1001 עד 2000 אורחים' : 
-                       selectedPlan === 'elite' ? '349₪ - מ 2001 עד 3000 אורחים' : ''}
+                       selectedPlan === 'standard' ? '149₪ - מ 51 עד 200 אורחים' : 
+                       selectedPlan === 'premium' ? '199₪ - מ 201 עד 350 אורחים' : 
+                       selectedPlan === 'luxury' ? '259₪ - מ 351 עד 500 אורחים' : 
+                       selectedPlan === 'elite' ? '349₪ - מ 501 עד 650 אורחים' : 
+                       selectedPlan === 'supreme' ? '499₪ - מ 651 עד 1000 אורחים' : ''}
                     </div>
+                    {additionalPackages.length > 0 && totalPlanCapacity && (
+                      <div className="mt-2 text-sm font-semibold text-yellow-700 space-y-1">
+                        <div className="text-base md:text-lg leading-relaxed">
+                          חבילות נוספות שנרכשו:
+                          {Object.entries(additionalPackageCounts).map(([planId, count]) => (
+                            <span key={planId} className="inline-flex items-center gap-1 mx-1 px-2 py-1 bg-yellow-100 border border-yellow-300 rounded-full text-sm md:text-base">
+                              <span className="font-semibold">{getPlanLabel(planId)} × {count}</span>
+                              <span className="text-xs md:text-sm text-yellow-600">
+                                (+{count * getPlanBaseLimit(planId)} אורחים)
+                              </span>
+                            </span>
+                          ))}
+                        </div>
+                        <div className="text-base md:text-lg font-bold">סה״כ כיסוי: {totalPlanCapacity} אורחים</div>
+                      </div>
+                    )}
                   </div>
                   
-                  <div className="bg-white p-2 rounded-lg border border-yellow-200 mb-2">
-                    <div className="text-base text-gray-700 text-right leading-relaxed">
-                      {selectedPlan === 'basic' || selectedPlan === 'free' ? 'מסלול חינמי לאירועים קטנים עם כל הפיצ\'רים הבסיסיים' : 
-                       selectedPlan === 'standard' ? 'מסלול מקצועי עם תמיכה מלאה ועיצובים מתקדמים' : 
-                       selectedPlan === 'premium' ? 'מסלול פרימיום עם כל הפיצ\'רים ותמיכה 24/7' : 
-                       selectedPlan === 'luxury' ? 'מסלול יוקרתי לאירועים גדולים מאוד עם כל הפיצ\'רים המתקדמים' : 
-                       selectedPlan === 'elite' ? 'מסלול אלפיון לאירועים ענקיים עם מעטפת מלאה' : ''}
+                  {activePlanDescription && (
+                    <div className="bg-white p-2 rounded-lg border border-yellow-200 mb-2">
+                      <div className="text-base text-gray-700 text-right leading-relaxed">
+                        {activePlanDescription}
+                      </div>
                     </div>
-                  </div>
+                  )}
 
-                  <button 
-                    onClick={() => setShowPricingPlan(true)}
-                    className="w-full bg-yellow-600 text-white border-2 border-yellow-700 rounded-lg px-3 py-2 text-sm font-bold hover:bg-yellow-700 transition-all shadow-lg"
-                  >
-                    החלפת מסלול
-                  </button>
+                  {!planAddOnMode && !basePlanOverCapacity && (
+                    <button 
+                      onClick={() => setShowPricingPlan(true)}
+                      className="w-full bg-gradient-to-r from-purple-600 via-fuchsia-600 to-pink-600 text-white border-2 border-purple-800 rounded-lg px-3 py-2 text-lg font-extrabold uppercase tracking-wide hover:from-purple-500 hover:to-pink-500 transition-all shadow-2xl"
+                    >
+                      החלפת מסלול
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
@@ -2430,17 +2609,20 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick }, re
                 <div className="space-y-2 mt-3">
                   <div className="bg-white p-2 rounded-lg text-right">
                     <div className="text-base font-bold text-green-600">
-                      אישרו הגעה: {guestStatusSummary.approved}
+                      אישרו הגעה:
+                      <span className="text-2xl text-green-700 px-2">{guestStatusSummary.approved}</span>
                     </div>
                   </div>
                   <div className="bg-white p-2 rounded-lg text-right">
                     <div className="text-base font-bold text-red-600">
-                      לא אישרו: {guestStatusSummary.rejected}
+                      לא אישרו:
+                      <span className="text-2xl text-red-700 px-2">{guestStatusSummary.rejected}</span>
                     </div>
                   </div>
                   <div className="bg-white p-2 rounded-lg text-right border-2 border-orange-200">
                     <div className="text-base font-bold text-orange-600">
-                      טרם הגיבו: {guestStatusSummary.pending}
+                      טרם הגיבו:
+                      <span className="text-2xl text-orange-700 px-2">{guestStatusSummary.pending}</span>
                     </div>
                   </div>
                 </div>
@@ -2474,9 +2656,9 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick }, re
                     </thead>
                     <tbody>
                       <tr>
-                        <td className="p-2 border text-center font-bold text-green-600">{guestSummary.adults}</td>
-                        <td className="p-2 border text-center font-bold text-orange-600">{guestSummary.children}</td>
-                        <td className="p-2 border text-center font-bold text-purple-600">{guestSummary.adults + guestSummary.children}</td>
+                        <td className="p-2 border text-center font-bold text-2xl text-green-600">{guestSummary.adults}</td>
+                        <td className="p-2 border text-center font-bold text-2xl text-orange-600">{guestSummary.children}</td>
+                        <td className="p-2 border text-center font-bold text-2xl text-purple-600">{guestSummary.adults + guestSummary.children}</td>
                       </tr>
                     </tbody>
                   </table>
@@ -2485,34 +2667,16 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick }, re
                   <div className="space-y-1">
                     {selectedPlan && (() => {
                       const totalGuests = guestSummary.adults + guestSummary.children;
-                      let planLimit = 0;
-                      let remainingGuests = 0;
-                      
-                      if (selectedPlan === 'basic' || selectedPlan === 'free') {
-                        planLimit = 50;
-                        remainingGuests = Math.max(0, planLimit - totalGuests);
-                      } else if (selectedPlan === 'standard') {
-                        planLimit = 300;
-                        remainingGuests = Math.max(0, planLimit - totalGuests);
-                      } else if (selectedPlan === 'premium') {
-                        planLimit = 1000;
-                        remainingGuests = Math.max(0, planLimit - totalGuests);
-                      } else if (selectedPlan === 'luxury') {
-                        planLimit = 2000;
-                        remainingGuests = Math.max(0, planLimit - totalGuests);
-                      } else if (selectedPlan === 'elite') {
-                        planLimit = 3000;
-                        remainingGuests = Math.max(0, planLimit - totalGuests);
-                      } else {
-                        // No plan selected, no limit check
-                        setShowPlanLimitWarning(false);
-                        return;
-                      }
+                      const baseLimit = getPlanBaseLimit(selectedPlan);
+                      const extraCapacity = additionalPackages.reduce((sum, planId) => sum + getPlanBaseLimit(planId), 0);
+                      if (!baseLimit && extraCapacity === 0) return null;
+                      const planLimit = (baseLimit || 0) + extraCapacity;
+                      const remainingGuests = Math.max(0, planLimit - totalGuests);
                       
                       return (
                         <div className="bg-yellow-50 p-2 rounded-lg text-right border-2 border-yellow-400 mt-1">
                           <div className="text-base font-bold text-yellow-800 mb-1">
-                            יתרת אורחים אפשריים:
+                            <span>יתרת אורחים:</span>
                           </div>
                           <table className="w-full text-right border text-base mt-1">
                             <thead>
@@ -2539,14 +2703,14 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick }, re
                             </thead>
                             <tbody>
                               <tr>
-                                <td className="p-2 border text-center font-bold">
+                                <td className="p-2 border text-center font-bold text-2xl">
                                   {planLimit === Infinity ? 'ללא הגבלה' : planLimit}
                                 </td>
-                                <td className="p-2 border text-center font-bold">{totalGuests}</td>
+                                <td className="p-2 border text-center font-bold text-2xl">{totalGuests}</td>
                                 <td className={`p-2 border text-center text-red-700 font-extrabold ${
                                   (planLimit !== Infinity && totalGuests > planLimit)
                                     ? 'text-3xl' 
-                                    : 'text-base'
+                                    : 'text-2xl'
                                 }`}>
                                   {remainingGuests === Infinity ? 'ללא הגבלה' : (planLimit !== Infinity && totalGuests > planLimit) ? `-${totalGuests - planLimit}` : remainingGuests}
                                 </td>
@@ -2573,36 +2737,36 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick }, re
                 display: 'flex',
                 flexDirection: 'column'
               }}>
-                <div className="flex items-center justify-center gap-2 mb-2 flex-shrink-0">
-                  <span className="text-xl">📊</span>
-                  <h3 className="text-base font-bold text-orange-800">דוח סיכום שולחנות</h3>
+                <div className="flex items-center justify-center gap-3 mb-3 flex-shrink-0">
+                  <span className="text-2xl">📊</span>
+                  <h3 className="text-lg font-extrabold text-orange-900 tracking-wide">דוח סיכום שולחנות</h3>
                 </div>
                 <div className="mt-3 overflow-x-auto flex-grow">
-                  <table className="w-full text-right border text-xs min-w-full">
+                  <table className="w-full text-right border text-sm min-w-full">
                     <thead>
                       <tr className="bg-white">
-                        <th className="p-1 border font-bold text-center">מס.שולחן</th>
-                        <th className="p-1 border font-bold text-center">בוגרים</th>
-                        <th className="p-1 border font-bold text-center">ילדים</th>
-                        <th className="p-1 border font-bold text-center">סה"כ</th>
+                        <th className="p-2 border font-bold text-center text-orange-800">מס. שולחן</th>
+                        <th className="p-2 border font-bold text-center text-green-700">בוגרים</th>
+                        <th className="p-2 border font-bold text-center text-purple-700">ילדים</th>
+                        <th className="p-2 border font-bold text-center text-blue-700">סה"כ</th>
                       </tr>
                     </thead>
                     <tbody>
                       {tableSummary.map((row, idx) => (
                         <tr key={`table-${row.table_number}-${idx}`} className={idx % 2 === 0 ? 'bg-white' : 'bg-orange-100'}>
-                          <td className="p-1 border text-center">{row.table_number}</td>
-                          <td className="p-1 border text-center">{row.adults}</td>
-                          <td className="p-1 border text-center">{row.children}</td>
-                          <td className="p-1 border text-center font-bold">{row.total}</td>
+                          <td className="p-2 border text-center font-semibold text-orange-800 text-xl">{row.table_number}</td>
+                        <td className="p-2 border text-center font-semibold text-green-700 text-xl">{row.adults}</td>
+                        <td className="p-2 border text-center font-semibold text-purple-700 text-xl">{row.children}</td>
+                        <td className="p-2 border text-center font-bold text-blue-700 text-2xl">{row.total}</td>
                         </tr>
                       ))}
                     </tbody>
                     <tfoot>
                       <tr className="bg-orange-200 font-bold">
-                        <td className="p-1 border text-center">סה"כ</td>
-                        <td className="p-1 border text-center">{tableSummary.reduce((sum, r) => sum + r.adults, 0)}</td>
-                        <td className="p-1 border text-center">{tableSummary.reduce((sum, r) => sum + r.children, 0)}</td>
-                        <td className="p-1 border text-center">{tableSummary.reduce((sum, r) => sum + r.total, 0)}</td>
+                        <td className="p-2 border text-center text-orange-900 text-xl">סה"כ</td>
+                        <td className="p-2 border text-center text-green-800 text-xl">{tableSummary.reduce((sum, r) => sum + r.adults, 0)}</td>
+                        <td className="p-2 border text-center text-purple-800 text-xl">{tableSummary.reduce((sum, r) => sum + r.children, 0)}</td>
+                        <td className="p-2 border text-center text-blue-800 text-2xl">{tableSummary.reduce((sum, r) => sum + r.total, 0)}</td>
                       </tr>
                     </tfoot>
                   </table>
@@ -2836,9 +3000,12 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick }, re
                 <label className="block mb-1 font-medium">טלפון</label>
                 <input type="tel" placeholder="טלפון" value={guestData.guestPhone} onChange={(e) => setGuestData({ ...guestData, guestPhone: e.target.value })} className={`w-full border rounded-md p-2 ${guestErrors.guestPhone ? 'border-red-500' : ''}`} />
               </div>
-              <div className="flex justify-center pt-4">
+              <div className="flex flex-col sm:flex-row justify-center gap-3 pt-4">
                 <button type="button" onClick={handleSendInvitation} className="bg-primary text-white border border-primary rounded-full px-8 py-3 font-medium hover:bg-primary/90 transition-all">
                   שלח הזמנה בוואטסאפ
+                </button>
+                <button type="button" onClick={handleSendInvitationSms} className="bg-blue-600 text-white border border-blue-700 rounded-full px-8 py-3 font-medium hover:bg-blue-700 transition-all">
+                  שלח הזמנה ב-SMS
                 </button>
               </div>
             </form>
@@ -4567,8 +4734,8 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick }, re
             >
               &times;
             </button>
-            <h2 className="text-xl md:text-2xl font-bold mb-2 text-center text-primary">תיאור תהליך יצירת אירוע ב-Meet-M</h2>
-            <p className="text-center text-gray-600 text-sm mb-2">לחץ על כל שלב כדי לראות פרטים נוספים</p>
+            <h2 className="text-2xl md:text-3xl font-bold mb-3 text-center text-primary">תיאור תהליך יצירת אירוע ב-Meet-M</h2>
+            <p className="text-center text-gray-600 text-base mb-3">לחץ על כל שלב כדי לראות פרטים נוספים</p>
             <div className="border-b-2 border-primary mb-3"></div>
             
             {/* Flow Steps - Horizontal Layout */}
@@ -4577,17 +4744,17 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick }, re
               
               {/* Column 1: Getting Started */}
               <div className="space-y-2">
-                <h3 className="text-lg font-bold text-primary text-right mb-2 pr-2">התחלה:</h3>
+                <h3 className="text-xl font-bold text-primary text-right mb-3 pr-2">התחלה:</h3>
                 
                 {/* Step 0.5: New Event Confirmation */}
                 <div 
                   onClick={() => setSelectedFlowStep(0.5)}
                   className={`border-2 ${selectedFlowStep === 0.5 ? 'border-primary bg-[#FFF9E8]' : 'border-gray-300'} rounded-lg p-4 cursor-pointer hover:border-primary hover:shadow-lg transition-all flex items-center gap-3`}
                 >
-                  <div className="text-3xl flex-shrink-0">✅</div>
+                  <div className="text-4xl flex-shrink-0">✅</div>
                   <div className="flex-1 text-right">
-                    <h3 className="text-base font-bold text-primary">פתיחת אירוע חדש</h3>
-                    <p className="text-sm text-gray-600">אישור ואיפוס המערכת לאירוע חדש</p>
+                    <h3 className="text-lg font-bold text-primary">פתיחת אירוע חדש</h3>
+                    <p className="text-base text-gray-600">אישור ואיפוס המערכת לאירוע חדש</p>
                   </div>
                 </div>
                 
@@ -4596,27 +4763,27 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick }, re
                   onClick={() => setSelectedFlowStep(0)}
                   className={`border-2 ${selectedFlowStep === 0 ? 'border-primary bg-[#FFF9E8]' : 'border-gray-300'} rounded-lg p-4 cursor-pointer hover:border-primary hover:shadow-lg transition-all flex items-center gap-3`}
                 >
-                  <div className="text-3xl flex-shrink-0">💰</div>
+                  <div className="text-4xl flex-shrink-0">💰</div>
                   <div className="flex-1 text-right">
-                    <h3 className="text-base font-bold text-primary">בחירת מסלול</h3>
-                    <p className="text-sm text-gray-600">בחר את החבילה המתאימה לאירוע שלך</p>
+                    <h3 className="text-lg font-bold text-primary">בחירת מסלול</h3>
+                    <p className="text-base text-gray-600">בחר את החבילה המתאימה לאירוע שלך</p>
                   </div>
                 </div>
               </div>
 
               {/* Column 2: Event Setup */}
               <div className="space-y-2">
-                <h3 className="text-lg font-bold text-primary text-right mb-2 pr-2">הגדרת האירוע:</h3>
+                <h3 className="text-xl font-bold text-primary text-right mb-3 pr-2">הגדרת האירוע:</h3>
 
                 {/* Step 1: Event Type */}
                 <div 
                   onClick={() => setSelectedFlowStep(1)}
                   className={`border-2 ${selectedFlowStep === 1 ? 'border-primary bg-[#FFF9E8]' : 'border-gray-300'} rounded-lg p-4 cursor-pointer hover:border-primary hover:shadow-lg transition-all flex items-center gap-3`}
                 >
-                  <div className="text-3xl flex-shrink-0">🎉</div>
+                  <div className="text-4xl flex-shrink-0">🎉</div>
                   <div className="flex-1 text-right">
-                    <h3 className="text-base font-bold text-primary">שלב 1: סוג אירוע</h3>
-                    <p className="text-sm text-gray-600">חתונה, בר מצווה, יום הולדת ועוד</p>
+                    <h3 className="text-lg font-bold text-primary">שלב 1: סוג אירוע</h3>
+                    <p className="text-base text-gray-600">חתונה, בר מצווה, יום הולדת ועוד</p>
                   </div>
                 </div>
 
@@ -4625,10 +4792,10 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick }, re
                   onClick={() => setSelectedFlowStep(2)}
                   className={`border-2 ${selectedFlowStep === 2 ? 'border-primary bg-[#FFF9E8]' : 'border-gray-300'} rounded-lg p-4 cursor-pointer hover:border-primary hover:shadow-lg transition-all flex items-center gap-3`}
                 >
-                  <div className="text-3xl flex-shrink-0">📝</div>
+                  <div className="text-4xl flex-shrink-0">📝</div>
                   <div className="flex-1 text-right">
-                    <h3 className="text-base font-bold text-primary">שלב 2: פרטי האירוע</h3>
-                    <p className="text-sm text-gray-600">תאריך, שעה, מקום ופרטים נוספים</p>
+                    <h3 className="text-lg font-bold text-primary">שלב 2: פרטי האירוע</h3>
+                    <p className="text-base text-gray-600">תאריך, שעה, מקום ופרטים נוספים</p>
                   </div>
                 </div>
 
@@ -4637,27 +4804,27 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick }, re
                   onClick={() => setSelectedFlowStep(3)}
                   className={`border-2 ${selectedFlowStep === 3 ? 'border-primary bg-[#FFF9E8]' : 'border-gray-300'} rounded-lg p-4 cursor-pointer hover:border-primary hover:shadow-lg transition-all flex items-center gap-3`}
                 >
-                  <div className="text-3xl flex-shrink-0">🎨</div>
+                  <div className="text-4xl flex-shrink-0">🎨</div>
                   <div className="flex-1 text-right">
-                    <h3 className="text-base font-bold text-primary">שלב 3: עיצוב הזמנה</h3>
-                    <p className="text-sm text-gray-600">בחר מתוך 21 תבניות מעוצבות</p>
+                    <h3 className="text-lg font-bold text-primary">שלב 3: עיצוב הזמנה</h3>
+                    <p className="text-base text-gray-600">בחר מתוך 21 תבניות מעוצבות</p>
                   </div>
                 </div>
               </div>
 
               {/* Column 3: Management and Tracking */}
               <div className="space-y-2">
-                <h3 className="text-lg font-bold text-primary text-right mb-2 pr-2">ניהול ומעקב:</h3>
+                <h3 className="text-xl font-bold text-primary text-right mb-3 pr-2">ניהול ומעקב:</h3>
 
                 {/* Step 4: Send Invitations */}
                 <div 
                   onClick={() => setSelectedFlowStep(4)}
                   className={`border-2 ${selectedFlowStep === 4 ? 'border-primary bg-[#FFF9E8]' : 'border-gray-300'} rounded-lg p-4 cursor-pointer hover:border-primary hover:shadow-lg transition-all flex items-center gap-3`}
                 >
-                  <div className="text-3xl flex-shrink-0">📱</div>
+                  <div className="text-4xl flex-shrink-0">📱</div>
                   <div className="flex-1 text-right">
-                    <h3 className="text-base font-bold text-primary">שלב 4: שליחת הזמנות</h3>
-                    <p className="text-sm text-gray-600">שליחה אוטומטית מקובץ ל SMS</p>
+                    <h3 className="text-lg font-bold text-primary">שלב 4: שליחת הזמנות</h3>
+                    <p className="text-base text-gray-600">שליחה אוטומטית מקובץ ל SMS</p>
                   </div>
                 </div>
 
@@ -4666,10 +4833,10 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick }, re
                   onClick={() => setSelectedFlowStep(5)}
                   className={`border-2 ${selectedFlowStep === 5 ? 'border-primary bg-[#FFF9E8]' : 'border-gray-300'} rounded-lg p-4 cursor-pointer hover:border-primary hover:shadow-lg transition-all flex items-center gap-3`}
                 >
-                  <div className="text-3xl flex-shrink-0">📊</div>
+                  <div className="text-4xl flex-shrink-0">📊</div>
                   <div className="flex-1 text-right">
-                    <h3 className="text-base font-bold text-primary">שלב 5: דוחות</h3>
-                    <p className="text-sm text-gray-600">מעקב אישורי הגעה ויצוא לאקסל</p>
+                    <h3 className="text-lg font-bold text-primary">שלב 5: דוחות</h3>
+                    <p className="text-base text-gray-600">מעקב אישורי הגעה ויצוא לאקסל</p>
                   </div>
                 </div>
               </div>
@@ -4678,7 +4845,7 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick }, re
             
             {/* Step Details Box */}
             {selectedFlowStep !== null && (
-              <div className="bg-[#FFF9E8] border-2 border-primary rounded-lg p-4 mt-3 text-right relative max-h-[35vh] overflow-y-auto">
+              <div className="bg-[#FFF9E8] border-2 border-primary rounded-lg p-5 mt-3 text-right relative max-h-[35vh] overflow-y-auto">
                 <button 
                   onClick={() => setSelectedFlowStep(null)} 
                   className="absolute top-2 left-2 text-xl text-gray-500 hover:text-gray-700 font-bold transition-colors"
@@ -4686,7 +4853,7 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick }, re
                 >
                   &times;
                 </button>
-                <h3 className="text-base font-bold text-primary mb-3">
+                <h3 className="text-lg font-bold text-primary mb-3">
                   {selectedFlowStep === 0 && '💰 בחירת מסלול תמחור'}
                   {selectedFlowStep === 0.5 && '✅ פתיחת אירוע חדש'}
                   {selectedFlowStep === 1 && '🎉 שלב 1: בחירת סוג אירוע'}
@@ -4698,55 +4865,56 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick }, re
                 
                 {selectedFlowStep === 0 && (
                   <div className="space-y-2">
-                    <p className="text-gray-700 text-sm leading-snug">בשלב זה תבחר את המסלול המתאים לאירוע שלך:</p>
-                    <ul className="list-disc list-inside space-y-1 mr-3 text-sm">
-                      <li><strong>מסלול בסיסי (חינם)</strong> - עד 50 אורחים</li>
-                      <li><strong>מסלול סטנדרט (149₪)</strong> - מ 51 עד 300 אורחים</li>
-                      <li><strong>מסלול פרימיום (199₪)</strong> - מ 301 עד 1000 אורחים</li>
-                      <li><strong>מסלול יוקרתי (249₪)</strong> - מ 1001 עד 2000 אורחים</li>
-                      <li><strong>מסלול אלפיון (349₪)</strong> - מ 2001 עד 3000 אורחים</li>
+                    <p className="text-gray-700 text-base leading-relaxed">בשלב זה תבחר את המסלול המתאים לאירוע שלך:</p>
+                    <ul className="list-disc list-inside space-y-1.5 mr-3 text-base">
+                      <li><strong>מסלול א (חינם)</strong> - עד 50 אורחים</li>
+                      <li><strong>מסלול ב (149₪)</strong> - מ 51 עד 200 אורחים</li>
+                      <li><strong>מסלול ג (199₪)</strong> - מ 201 עד 350 אורחים</li>
+                      <li><strong>מסלול ד (259₪)</strong> - מ 351 עד 500 אורחים</li>
+                      <li><strong>מסלול ה (349₪)</strong> - מ 501 עד 650 אורחים</li>
+                      <li><strong>מסלול ו (499₪)</strong> - מ 651 עד 1000 אורחים</li>
                     </ul>
-                    <p className="text-gray-600 text-xs mt-2">המחירים הם חד פעמיים לכל אירוע</p>
+                    <p className="text-gray-600 text-sm mt-2">המחירים הם חד פעמיים לכל אירוע</p>
                   </div>
                 )}
                 
                 {selectedFlowStep === 0.5 && (
                   <div className="space-y-2">
-                    <p className="text-gray-700 text-sm leading-snug">בשלב זה המערכת מתכוננת לאירוע חדש:</p>
-                    <ul className="list-disc list-inside space-y-1 mr-3 text-sm">
+                    <p className="text-gray-700 text-base leading-relaxed">בשלב זה המערכת מתכוננת לאירוע חדש:</p>
+                    <ul className="list-disc list-inside space-y-1.5 mr-3 text-base">
                       <li><strong>אישור יצירת אירוע</strong> - מודל אישור</li>
                       <li><strong>איפוס מלא</strong> - ניקוי כל הנתונים</li>
                       <li><strong>איפוס טפסים</strong> - חזרה למצב התחלתי</li>
                       <li><strong>מחיקת עיצוב קודם</strong> - איפוס העיצוב</li>
                       <li><strong>הכנה לאירוע חדש</strong> - המערכת מוכנה</li>
                     </ul>
-                    <p className="text-gray-600 text-xs mt-2">ניתן ליצור אירוע חדש רק לאחר ארכיון האירוע הקודם</p>
+                    <p className="text-gray-600 text-sm mt-2">ניתן ליצור אירוע חדש רק לאחר ארכיון האירוע הקודם</p>
                   </div>
                 )}
                 
                 {selectedFlowStep === 1 && (
                   <div className="space-y-2">
-                    <p className="text-gray-700 text-sm leading-snug">בשלב זה תבחר את סוג האירוע שלך מתוך 10 אפשרויות:</p>
-                    <ul className="list-disc list-inside space-y-1 mr-3 text-sm">
+                    <p className="text-gray-700 text-base leading-relaxed">בשלב זה תבחר את סוג האירוע שלך מתוך 10 אפשרויות:</p>
+                    <ul className="list-disc list-inside space-y-1.5 mr-3 text-base">
                       <li>חתונה, חינה, מסיבת אירוסין, הפרשת חלה - טקסים לשמחת המשפחה</li>
                       <li>בר/בת מצווה - חגיגת בגרות</li>
                       <li>ברית/בריתה - טקס ברית מילה או שמות</li>
                       <li>יום הולדת, אירוע עסקי</li>
                     </ul>
-                    <p className="text-gray-600 text-xs mt-2">בחירת סוג האירוע תתאים את השדות בשלבים הבאים</p>
+                    <p className="text-gray-600 text-sm mt-2">בחירת סוג האירוע תתאים את השדות בשלבים הבאים</p>
                   </div>
                 )}
                 
                 {selectedFlowStep === 2 && (
                   <div className="space-y-2">
-                    <p className="text-gray-700 text-sm leading-snug">בשלב זה תמלא את כל הפרטים החשובים לאירוע:</p>
-                    <ul className="list-disc list-inside space-y-1 mr-3 text-sm">
+                    <p className="text-gray-700 text-base leading-relaxed">בשלב זה תמלא את כל הפרטים החשובים לאירוע:</p>
+                    <ul className="list-disc list-inside space-y-1.5 mr-3 text-base">
                       <li><strong>פרטים אישיים</strong> - שמות והורים</li>
                       <li><strong>תאריך ושעה</strong> - תאריך עתידי חובה</li>
                       <li><strong>שעת חופה</strong> - רק לחתונה</li>
                       <li><strong>מיקום</strong> - שם האולם וכתובת</li>
                     </ul>
-                    <p className="text-gray-600 text-xs mt-2">הפרטים נשמרים ויופיעו בהזמנה</p>
+                    <p className="text-gray-600 text-sm mt-2">הפרטים נשמרים ויופיעו בהזמנה</p>
                   </div>
                 )}
                 
@@ -4759,7 +4927,7 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick }, re
                       <li><strong>צפייה מקדימה</strong> - ראה איך ההזמנה תיראה לפני השמירה</li>
                       <li><strong>שמירה בענן</strong> - ההזמנה נשמרת ב-Supabase Storage</li>
                     </ul>
-                    <p className="text-gray-600 text-sm mt-3">תוכל לשנות את העיצוב בכל שלב של התהליך</p>
+                    <p className="text-gray-600 text-base mt-3">תוכל לשנות את העיצוב בכל שלב של התהליך</p>
                   </div>
                 )}
                 
@@ -4773,7 +4941,7 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick }, re
                       <li><strong>קישור RSVP ייחודי</strong> - כל אורח מקבל קישור אישי לאישור הגעה</li>
                       <li><strong>ניהול רשימת אורחים</strong> - צפייה, חיפוש ועריכת אורחים</li>
                     </ul>
-                    <p className="text-gray-600 text-sm mt-3">ניתן לשלוח הזמנות לכמה שיותר אורחים</p>
+                    <p className="text-gray-600 text-base mt-3">ניתן לשלוח הזמנות לכמה שיותר אורחים</p>
                   </div>
                 )}
                 
@@ -4787,7 +4955,7 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick }, re
                       <li><strong>יצוא לאקסל</strong> - הורדת כל הנתונים לקובץ Excel מסודר</li>
                       <li><strong>ארכיון אירועים</strong> - גישה לדוחות של אירועים קודמים</li>
                     </ul>
-                    <p className="text-gray-600 text-sm mt-3">עדכון בזמן אמת - הדוחות מתעדכנים אוטומטית</p>
+                    <p className="text-gray-600 text-base mt-3">עדכון בזמן אמת - הדוחות מתעדכנים אוטומטית</p>
                   </div>
                 )}
               </div>
@@ -4816,17 +4984,27 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick }, re
       {/* Pricing Plan Selection Modal */}
       {showPricingPlan && (
         <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50 overflow-y-auto">
-          <div className="relative bg-white rounded-lg p-6 sm:p-8 w-full max-w-[95vw] mx-4 my-8">
+          <div className="relative bg-white rounded-lg p-6 sm:p-8 w-full max-w-[98vw] mx-4 my-8">
             <button onClick={()=>setShowPricingPlan(false)} className="absolute top-4 left-4 text-3xl text-gray-500 hover:text-gray-700" aria-label="סגור">&times;</button>
-            <h2 className="text-2xl md:text-3xl font-bold mb-8 text-center text-primary">בחר את המסלול המתאים לאירוע שלך</h2>
+            <h2 className="text-2xl md:text-3xl font-bold mb-4 text-center text-primary">בחר את המסלול המתאים לאירוע שלך</h2>
+            {planAddOnMode && (
+              <div className="text-center text-sm font-semibold text-primary mb-4">
+                בחר חבילת הרחבה בתשלום כדי להוסיף עוד אורחים למכסה.
+              </div>
+            )}
+            {planSelectionError && (
+              <div className="mb-4 bg-red-50 border-2 border-red-300 rounded-lg p-3 text-red-700 font-semibold text-sm text-center">
+                {planSelectionError}
+              </div>
+            )}
             
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 2xl:grid-cols-5 gap-4 sm:gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-6 gap-4 sm:gap-6">
               {/* Free Plan - Up to 50 guests */}
               <div className="border-2 border-gray-300 rounded-lg p-6 hover:border-primary transition-all hover:shadow-lg text-center">
-                <h3 className="text-xl font-bold mb-2 text-primary">מסלול בסיסי</h3>
+                <h3 className="text-xl font-bold mb-2 text-primary">מסלול א</h3>
                 <p className="text-gray-600 mb-4">מתאים לאירועים קטנים</p>
                 <div className="mb-4">
-                  <span className="text-4xl font-bold text-primary">חינם</span>
+                  <span className="text-base md:text-xl font-bold text-primary">חינם</span>
                 </div>
                 <div className="mb-6 text-right">
                   <p className="text-base md:text-xl font-semibold text-primary mb-3 whitespace-nowrap tracking-wide">✓ עד 50 אורחים</p>
@@ -4839,28 +5017,29 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick }, re
                   <p className="text-gray-600 mb-2">✓ ניהול העדפות מזון ואלרגיות</p>
                   <p className="text-gray-600 mb-2">✓ דוחות מפורטים + ייצוא ל-Excel</p>
                   <p className="text-gray-600 mb-2">✓ שמירת אירועי עבר בארכיון</p>
-                  <p className="text-gray-600 mb-2">✓ הצגת מפת אזור האירוע</p>
+                  <p className="text-gray-600 mb-2">✓ הצגת מפת אזור האירוע + ניווט לאולם</p>
                 </div>
                 <button
-                  onClick={() => handleSelectPlan('free')}
-                  className={`w-full ${selectedPlan === 'free' ? 'bg-primary text-white' : 'bg-[#FCE6AC] text-primary'} border border-primary rounded-full px-6 py-3 font-medium hover:bg-primary hover:text-white transition-all`}
+                  onClick={() => planAddOnMode ? handleAddPackagePlan('free') : handleSelectPlan('free')}
+                  disabled={planAddOnMode}
+                  className={`w-full ${planAddOnMode ? 'bg-gray-300 text-gray-600 cursor-not-allowed' : selectedPlan === 'free' ? 'bg-primary text-white' : 'bg-[#FCE6AC] text-primary hover:bg-primary hover:text-white'} border border-primary rounded-full px-6 py-3 font-medium transition-all`}
                 >
-                  בחר מסלול זה
+                  {planAddOnMode ? 'לא זמין להרחבה' : 'בחר מסלול זה'}
                 </button>
               </div>
 
-              {/* Standard Plan - 51-300 guests */}
+              {/* Standard Plan - 51-200 guests */}
               <div className="border-2 border-primary rounded-lg p-6 hover:shadow-xl transition-all text-center relative bg-[#FFF9E8]">
                 <div className="absolute top-0 right-1/2 transform translate-x-1/2 -translate-y-1/2 bg-primary text-white px-4 py-1 rounded-full text-sm font-medium">
                   מומלץ
                 </div>
-                <h3 className="text-xl font-bold mb-2 text-primary">מסלול סטנדרט</h3>
+                <h3 className="text-xl font-bold mb-2 text-primary">מסלול ב</h3>
                 <p className="text-gray-600 mb-4">מתאים לרוב האירועים</p>
                 <div className="mb-4">
-                  <span className="text-4xl font-bold text-primary">149 ₪</span>
+                  <span className="text-base md:text-xl font-bold text-primary">149 ₪</span>
                 </div>
                 <div className="mb-6 text-right">
-                  <p className="text-base md:text-xl font-semibold text-primary mb-3 whitespace-nowrap tracking-wide">✓ מ 51 עד 300 אורחים</p>
+                  <p className="text-base md:text-xl font-semibold text-primary mb-3 whitespace-nowrap tracking-wide">✓ מ 51 עד 200 אורחים</p>
                   <p className="text-gray-600 mb-2">✓ הזמנות מעוצבות מקצועית</p>
                   <p className="text-gray-600 mb-2">✓ שליחה אוטומטית לכל האורחים</p>
                   <p className="text-gray-600 mb-2">✓ שליחת הודעות SMS ב-3 סבבים</p>
@@ -4870,25 +5049,25 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick }, re
                   <p className="text-gray-600 mb-2">✓ ניהול העדפות מזון ואלרגיות</p>
                   <p className="text-gray-600 mb-2">✓ דוחות מפורטים + ייצוא ל-Excel</p>
                   <p className="text-gray-600 mb-2">✓ שמירת אירועי עבר בארכיון</p>
-                  <p className="text-gray-600 mb-2">✓ הצגת מפת אזור האירוע</p>
+                  <p className="text-gray-600 mb-2">✓ הצגת מפת אזור האירוע + ניווט לאולם</p>
                 </div>
                 <button
-                  onClick={() => handleSelectPlan('standard')}
-                  className={`w-full ${selectedPlan === 'standard' ? 'bg-primary text-white' : 'bg-[#FCE6AC] text-primary'} border border-primary rounded-full px-6 py-3 font-medium hover:bg-primary hover:text-white transition-all`}
+                  onClick={() => planAddOnMode ? handleAddPackagePlan('standard') : handleSelectPlan('standard')}
+                  className={`w-full ${planAddOnMode ? 'bg-green-600 text-white hover:bg-green-700' : selectedPlan === 'standard' ? 'bg-primary text-white' : 'bg-[#FCE6AC] text-primary hover:bg-primary hover:text-white'} border border-primary rounded-full px-6 py-3 font-medium transition-all`}
                 >
-                  בחר מסלול זה
+                  {planAddOnMode ? 'הוסף חבילת מסלול ב' : 'בחר מסלול זה'}
                 </button>
               </div>
 
-              {/* Premium Plan - 300+ guests */}
+              {/* Premium Plan - 201-350 guests */}
               <div className="border-2 border-gray-300 rounded-lg p-6 hover:border-primary transition-all hover:shadow-lg text-center">
-                <h3 className="text-xl font-bold mb-2 text-primary">מסלול פרימיום</h3>
+                <h3 className="text-xl font-bold mb-2 text-primary">מסלול ג</h3>
                 <p className="text-gray-600 mb-4">לאירועים גדולים</p>
                 <div className="mb-4">
-                  <span className="text-4xl font-bold text-primary">199 ₪</span>
+                  <span className="text-base md:text-xl font-bold text-primary">199 ₪</span>
                 </div>
                 <div className="mb-6 text-right">
-                  <p className="text-base md:text-xl font-semibold text-primary mb-3 whitespace-nowrap tracking-wide">✓ מ 301 עד 1000 אורחים</p>
+                  <p className="text-base md:text-xl font-semibold text-primary mb-3 whitespace-nowrap tracking-wide">✓ מ 201 עד 350 אורחים</p>
                   <p className="text-gray-600 mb-2">✓ הזמנות מעוצבות מקצועית</p>
                   <p className="text-gray-600 mb-2">✓ שליחה אוטומטית לכל האורחים</p>
                   <p className="text-gray-600 mb-2">✓ שליחת הודעות SMS ב-3 סבבים</p>
@@ -4898,25 +5077,25 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick }, re
                   <p className="text-gray-600 mb-2">✓ ניהול העדפות מזון ואלרגיות</p>
                   <p className="text-gray-600 mb-2">✓ דוחות מפורטים + ייצוא ל-Excel</p>
                   <p className="text-gray-600 mb-2">✓ שמירת אירועי עבר בארכיון</p>
-                  <p className="text-gray-600 mb-2">✓ הצגת מפת אזור האירוע</p>
+                  <p className="text-gray-600 mb-2">✓ הצגת מפת אזור האירוע + ניווט לאולם</p>
                 </div>
                 <button
-                  onClick={() => handleSelectPlan('premium')}
-                  className={`w-full ${selectedPlan === 'premium' ? 'bg-primary text-white' : 'bg-[#FCE6AC] text-primary'} border border-primary rounded-full px-6 py-3 font-medium hover:bg-primary hover:text-white transition-all`}
+                  onClick={() => planAddOnMode ? handleAddPackagePlan('premium') : handleSelectPlan('premium')}
+                  className={`w-full ${planAddOnMode ? 'bg-green-600 text-white hover:bg-green-700' : selectedPlan === 'premium' ? 'bg-primary text-white' : 'bg-[#FCE6AC] text-primary hover:bg-primary hover:text-white'} border border-primary rounded-full px-6 py-3 font-medium transition-all`}
                 >
-                  בחר מסלול זה
+                  {planAddOnMode ? 'הוסף חבילת מסלול ג' : 'בחר מסלול זה'}
                 </button>
               </div>
 
-              {/* Luxury Plan - 1001-2000 guests */}
+              {/* Luxury Plan - 351-500 guests */}
               <div className="border-2 border-gray-300 rounded-lg p-6 hover:border-primary transition-all hover:shadow-lg text-center">
-                <h3 className="text-xl font-bold mb-2 text-primary">מסלול יוקרתי</h3>
+                <h3 className="text-xl font-bold mb-2 text-primary">מסלול ד</h3>
                 <p className="text-gray-600 mb-4">לאירועים גדולים מאוד</p>
                 <div className="mb-4">
-                  <span className="text-4xl font-bold text-primary">249 ₪</span>
+                  <span className="text-base md:text-xl font-bold text-primary">259 ₪</span>
                 </div>
                 <div className="mb-6 text-right">
-                  <p className="text-base md:text-xl font-semibold text-primary mb-3 whitespace-nowrap tracking-wide">✓ מ 1001 עד 2000 אורחים</p>
+                  <p className="text-base md:text-xl font-semibold text-primary mb-3 whitespace-nowrap tracking-wide">✓ מ 351 עד 500 אורחים</p>
                   <p className="text-gray-600 mb-2">✓ הזמנות מעוצבות מקצועית</p>
                   <p className="text-gray-600 mb-2">✓ שליחה אוטומטית לכל האורחים</p>
                   <p className="text-gray-600 mb-2">✓ שליחת הודעות SMS ב-3 סבבים</p>
@@ -4926,25 +5105,25 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick }, re
                   <p className="text-gray-600 mb-2">✓ ניהול העדפות מזון ואלרגיות</p>
                   <p className="text-gray-600 mb-2">✓ דוחות מפורטים + ייצוא ל-Excel</p>
                   <p className="text-gray-600 mb-2">✓ שמירת אירועי עבר בארכיון</p>
-                  <p className="text-gray-600 mb-2">✓ הצגת מפת אזור האירוע</p>
+                  <p className="text-gray-600 mb-2">✓ הצגת מפת אזור האירוע + ניווט לאולם</p>
                 </div>
                 <button
-                  onClick={() => handleSelectPlan('luxury')}
-                  className={`w-full ${selectedPlan === 'luxury' ? 'bg-primary text-white' : 'bg-[#FCE6AC] text-primary'} border border-primary rounded-full px-6 py-3 font-medium hover:bg-primary hover:text-white transition-all`}
+                  onClick={() => planAddOnMode ? handleAddPackagePlan('luxury') : handleSelectPlan('luxury')}
+                  className={`w-full ${planAddOnMode ? 'bg-green-600 text-white hover:bg-green-700' : selectedPlan === 'luxury' ? 'bg-primary text-white' : 'bg-[#FCE6AC] text-primary hover:bg-primary hover:text-white'} border border-primary rounded-full px-6 py-3 font-medium transition-all`}
                 >
-                  בחר מסלול זה
+                  {planAddOnMode ? 'הוסף חבילת מסלול ד' : 'בחר מסלול זה'}
                 </button>
               </div>
 
-              {/* Elite Plan - 2001-3000 guests */}
+              {/* Elite Plan - 501-650 guests */}
               <div className="border-2 border-gray-300 rounded-lg p-6 hover:border-primary transition-all hover:shadow-lg text-center">
-                <h3 className="text-xl font-bold mb-2 text-primary">מסלול אלפיון</h3>
+                <h3 className="text-xl font-bold mb-2 text-primary">מסלול ה</h3>
                 <p className="text-gray-600 mb-4">לאירועים ענקיים</p>
                 <div className="mb-4">
-                  <span className="text-4xl font-bold text-primary">349 ₪</span>
+                  <span className="text-base md:text-xl font-bold text-primary">349 ₪</span>
                 </div>
                 <div className="mb-6 text-right">
-                  <p className="text-base md:text-xl font-semibold text-primary mb-3 whitespace-nowrap tracking-wide">✓ מ 2001 עד 3000 אורחים</p>
+                  <p className="text-base md:text-xl font-semibold text-primary mb-3 whitespace-nowrap tracking-wide">✓ מ 501 עד 650 אורחים</p>
                   <p className="text-gray-600 mb-2">✓ הזמנות מעוצבות מקצועית</p>
                   <p className="text-gray-600 mb-2">✓ שליחה אוטומטית לכל האורחים</p>
                   <p className="text-gray-600 mb-2">✓ שליחת הודעות SMS ב-3 סבבים</p>
@@ -4954,13 +5133,41 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick }, re
                   <p className="text-gray-600 mb-2">✓ ניהול העדפות מזון ואלרגיות</p>
                   <p className="text-gray-600 mb-2">✓ דוחות מפורטים + ייצוא ל-Excel</p>
                   <p className="text-gray-600 mb-2">✓ שמירת אירועי עבר בארכיון</p>
-                  <p className="text-gray-600 mb-2">✓ הצגת מפת אזור האירוע</p>
+                  <p className="text-gray-600 mb-2">✓ הצגת מפת אזור האירוע + ניווט לאולם</p>
                 </div>
                 <button
-                  onClick={() => handleSelectPlan('elite')}
-                  className={`w-full ${selectedPlan === 'elite' ? 'bg-primary text-white' : 'bg-[#FCE6AC] text-primary'} border border-primary rounded-full px-6 py-3 font-medium hover:bg-primary hover:text-white transition-all`}
+                  onClick={() => planAddOnMode ? handleAddPackagePlan('elite') : handleSelectPlan('elite')}
+                  className={`w-full ${planAddOnMode ? 'bg-green-600 text-white hover:bg-green-700' : selectedPlan === 'elite' ? 'bg-primary text-white' : 'bg-[#FCE6AC] text-primary hover:bg-primary hover:text-white'} border border-primary rounded-full px-6 py-3 font-medium transition-all`}
                 >
-                  בחר מסלול זה
+                  {planAddOnMode ? 'הוסף חבילת מסלול ה' : 'בחר מסלול זה'}
+                </button>
+              </div>
+
+              {/* Supreme Plan - 651-1000 guests */}
+              <div className="border-2 border-gray-300 rounded-lg p-6 hover:border-primary transition-all hover:shadow-lg text-center">
+                <h3 className="text-xl font-bold mb-2 text-primary">מסלול ו</h3>
+                <p className="text-gray-600 mb-4">לאירועים עצומים</p>
+                <div className="mb-4">
+                  <span className="text-base md:text-xl font-bold text-primary">499 ₪</span>
+                </div>
+                <div className="mb-6 text-right">
+                  <p className="text-base md:text-xl font-semibold text-primary mb-3 whitespace-nowrap tracking-wide">✓ מ 651 עד 1000 אורחים</p>
+                  <p className="text-gray-600 mb-2">✓ הזמנות מעוצבות מקצועית</p>
+                  <p className="text-gray-600 mb-2">✓ שליחה אוטומטית לכל האורחים</p>
+                  <p className="text-gray-600 mb-2">✓ שליחת הודעות SMS ב-3 סבבים</p>
+                  <p className="text-gray-600 mb-2">✓ מעקב אישורי הגעה</p>
+                  <p className="text-gray-600 mb-2">✓ הצגת דוחות סיכום מתעדכנים בזמן אמת בדף הבית</p>
+                  <p className="text-gray-600 mb-2">✓ ניהול פרטי אורחים</p>
+                  <p className="text-gray-600 mb-2">✓ ניהול העדפות מזון ואלרגיות</p>
+                  <p className="text-gray-600 mb-2">✓ דוחות מפורטים + ייצוא ל-Excel</p>
+                  <p className="text-gray-600 mb-2">✓ שמירת אירועי עבר בארכיון</p>
+                  <p className="text-gray-600 mb-2">✓ הצגת מפת אזור האירוע + ניווט לאולם</p>
+                </div>
+                <button
+                  onClick={() => planAddOnMode ? handleAddPackagePlan('supreme') : handleSelectPlan('supreme')}
+                  className={`w-full ${planAddOnMode ? 'bg-green-600 text-white hover:bg-green-700' : selectedPlan === 'supreme' ? 'bg-primary text-white' : 'bg-[#FCE6AC] text-primary hover:bg-primary hover:text-white'} border border-primary rounded-full px-6 py-3 font-medium transition-all`}
+                >
+                  {planAddOnMode ? 'הוסף חבילת מסלול ו' : 'בחר מסלול זה'}
                 </button>
               </div>
             </div>

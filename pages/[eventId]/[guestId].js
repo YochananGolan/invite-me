@@ -1,5 +1,5 @@
 import { useRouter } from 'next/router';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 
 export default function GuestPage() {
@@ -36,6 +36,28 @@ export default function GuestPage() {
   const [showMap, setShowMap] = useState(false);
   const [eventDetails, setEventDetails] = useState(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
+
+  const wazeUrl = useMemo(() => {
+    if (!eventDetails) return null;
+
+    const explicitUrl = eventDetails.hall_location_url || eventDetails.hallLocationUrl || eventDetails.wazeLink;
+    if (explicitUrl && /^https?:\/\//i.test(explicitUrl)) {
+      return explicitUrl;
+    }
+
+    const locationParts = [
+      eventDetails.hallName,
+      eventDetails.hallAddress,
+      eventDetails.hallCity,
+    ]
+      .filter(Boolean)
+      .join(' ');
+
+    if (!locationParts) return null;
+
+    const encoded = encodeURIComponent(locationParts);
+    return `https://www.waze.com/ul?q=${encoded}&navigate=yes`;
+  }, [eventDetails]);
 
   const updateMeal = (cat, field, val) => {
     setSpecialMeals((prev) => ({
@@ -379,9 +401,8 @@ export default function GuestPage() {
               const encodedAddress = encodeURIComponent(venueAddress);
               window.open(`https://www.google.com/maps/search/?api=1&query=${encodedAddress}`, '_blank');
             }}
-            className="bg-blue-600 text-white px-8 py-3 rounded-full hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
+            className="bg-blue-600 text-white px-8 py-3 rounded-full hover:bg-blue-700 transition-colors font-semibold"
           >
-            <span>🗺️</span>
             מפת הגעה לאולם
           </button>
           
@@ -536,10 +557,24 @@ export default function GuestPage() {
         </div>
       )}
 
-      <div className="w-full max-w-xl rounded-lg bg-white p-3 shadow-sm text-right text-sm mt-1 flex-shrink-0">
-        <h1 className="mb-6 text-2xl font-bold text-primary">אישור הגעה</h1>
+      {wazeUrl && (
+        <div className="flex justify-center mb-3">
+          <a
+            href={wazeUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 rounded-full bg-blue-600 text-white px-5 py-2 text-lg font-medium shadow hover:bg-blue-700 transition-colors"
+          >
+            <span role="img" aria-label="Waze">🧭</span>
+            ניווט לאולם ב-Waze
+          </a>
+        </div>
+      )}
 
-        <p className="mb-4 text-lg font-medium">
+      <div className="w-full max-w-xl rounded-lg bg-white px-3 pb-1 pt-0 shadow-sm text-right text-sm mt-1 flex-shrink-0">
+        <h1 className="mb-4 text-2xl font-bold text-primary">אישור הגעה</h1>
+
+        <p className="mb-1 text-base font-medium">
           {attending === null && (
             <>היי {guest.first_name}, נשמח לדעת אם את/ה מגיע/ה לאירוע שלנו.</>
           )}
@@ -552,10 +587,10 @@ export default function GuestPage() {
         </p>
 
         {attending === null ? (
-          <div className="flex justify-center gap-6 mb-4 flex-nowrap">
+          <div className="flex justify-center gap-4 mt-2 flex-nowrap">
             {/* Green "מגיעים" button on the right (first in markup for RTL) */}
             <button
-              className="rounded-full bg-green-600 text-white border border-green-700 px-32 py-3 text-xl font-medium hover:bg-green-700 flex items-center justify-center gap-3 flex-row-reverse whitespace-nowrap"
+              className="rounded-full bg-green-600 text-white border border-green-700 px-20 py-2 text-base font-medium hover:bg-green-700 flex items-center justify-center gap-2 flex-row-reverse whitespace-nowrap"
               onClick={() => {
                 setAttending(true);
                 setShowDetailsModal(true);
@@ -567,7 +602,7 @@ export default function GuestPage() {
 
             {/* Red "לא מגיעים" button on the left */}
             <button
-              className="rounded-full bg-red-600 text-white border border-red-700 px-28 py-3 text-xl font-medium hover:bg-red-700 flex items-center justify-center gap-3 flex-row-reverse"
+              className="rounded-full bg-red-600 text-white border border-red-700 px-16 py-2 text-base font-medium hover:bg-red-700 flex items-center justify-center gap-2 flex-row-reverse"
               onClick={() => {
                 setAttending(false);
                 saveStatus(false);
@@ -617,14 +652,15 @@ export default function GuestPage() {
                   <p className="text-gray-600 mb-4">{guest?.hall_address || 'כתובת לא זמינה'}</p>
                   <button
                     onClick={() => {
-                      const venueAddress = guest?.hall_address || 'ישראל';
-                      const encodedAddress = encodeURIComponent(venueAddress);
-                      window.open(`https://www.google.com/maps/search/?api=1&query=${encodedAddress}`, '_blank');
+                      const targetUrl = wazeUrl || (guest?.hall_address
+                        ? `https://www.waze.com/ul?q=${encodeURIComponent(guest.hall_address)}&navigate=yes&zoom=17&lang=heb`
+                        : 'https://www.waze.com/ul?ll=31.771959,35.217018&navigate=yes&zoom=7&lang=heb');
+                      window.open(targetUrl, '_blank');
                     }}
                     className="bg-blue-600 text-white px-8 py-3 rounded-full hover:bg-blue-700 transition-colors flex items-center gap-2 mx-auto"
                   >
-                    <span>🚗</span>
-                    פתח מפה ב-Google Maps
+                    <span role="img" aria-label="ניווט">🧭</span>
+                    פתח ניווט ב-Waze
                   </button>
                 </div>
               </div>
