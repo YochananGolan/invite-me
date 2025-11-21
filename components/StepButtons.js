@@ -3376,15 +3376,20 @@ React.useEffect(() => {
       {showDesignChooser && (
         <div className="fixed inset-0 bg-black/50 z-50">
           <div className="w-full h-full bg-white flex flex-col">
-            <div className="flex items-center justify-between p-4 border-b">
-              <h2 className="text-2xl font-bold">בחר עיצוב הזמנה</h2>
-              <button onClick={() => setShowDesignChooser(false)} className="text-3xl text-gray-500 hover:text-gray-700">&times;</button>
+            <div className="p-4 border-b">
+              <div className="flex items-start gap-2">
+                <h2 className="flex-1 text-2xl font-bold text-center border-b-2 border-primary pb-1 mb-4">
+                  עיצוב הזמנה.
+                </h2>
+                <button onClick={() => setShowDesignChooser(false)} className="text-3xl text-gray-500 hover:text-gray-700">&times;</button>
+              </div>
             </div>
             
             {/* Main content area - split into two columns */}
             <div className="flex-1 flex overflow-hidden">
               {/* Left side - Text editing section */}
               <div className="w-1/2 border-r overflow-y-auto p-6">
+                <h3 className="text-xl font-semibold text-primary mb-4 text-center">א. עצב טקסט הזמנה.</h3>
                 {/* Styled Container */}
                 <div className="bg-[#FFF9E8] border-2 border-primary rounded-lg p-4 shadow-sm space-y-4">
               {/* Font chooser */}
@@ -3524,10 +3529,11 @@ React.useEffect(() => {
 
               {/* Right side - Background images section */}
               <div className="w-1/2 overflow-y-auto p-6">
+                <h3 className="text-xl font-semibold text-primary mb-4 text-center">ב. לחץ לבחירת הזמנה.</h3>
                 {designImages.length === 0 ? (
                   <p className="text-center text-gray-600 mt-10">לא נמצאו תמונות בתיקייה /public/images</p>
                 ) : (
-                  <div className="grid grid-cols-1 gap-4 sm:gap-6">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
                     {designImages.map((src) => {
                       // Improved comparison logic to handle different path formats
                       const isSelected = (()=>{ 
