@@ -383,36 +383,13 @@ export default function GuestPage() {
   if (saved) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 p-6 text-center space-y-6">
-        <h1 className="text-3xl font-bold text-green-700">הנתונים נשמרו בהצלחה!</h1>
+        <h1 className="text-3xl sm:text-4xl font-bold text-green-700">תודה רבה!</h1>
+        <p className="text-xl sm:text-2xl text-gray-700">אישור ההגעה נשלח בהצלחה</p>
         {guest?.table_number && (
-          <div className="text-2xl font-extrabold text-primary bg-[#FCE6AC] border border-primary rounded-full px-6 py-3 inline-block">
+          <div className="text-2xl font-extrabold text-primary bg-[#FCE6AC] border border-primary rounded-full px-6 py-3 inline-block mt-4">
             שים לב מקומך באולם : שולחן מספר {guest.table_number}
           </div>
         )}
-        
-        <div className="flex flex-col gap-4">
-          <button
-            onClick={() => {
-              console.log('Map button clicked');
-              console.log('Guest data:', guest);
-              console.log('Event details:', eventDetails);
-              const venueAddress = eventDetails?.hallAddress || eventDetails?.hall_address || 'ישראל';
-              console.log('Venue address:', venueAddress);
-              const encodedAddress = encodeURIComponent(venueAddress);
-              window.open(`https://www.google.com/maps/search/?api=1&query=${encodedAddress}`, '_blank');
-            }}
-            className="bg-blue-600 text-white px-8 py-3 rounded-full hover:bg-blue-700 transition-colors font-semibold"
-          >
-            מפת הגעה לאולם
-          </button>
-          
-          <button
-            onClick={() => router.push('/')}
-            className="bg-primary text-white px-8 py-3 rounded-full hover:bg-primary/90 transition-colors"
-          >
-            סגור
-          </button>
-        </div>
       </div>
     );
   }
