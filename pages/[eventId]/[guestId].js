@@ -682,197 +682,12 @@ export default function GuestPage() {
 
       {/* Details Modal - opens when clicking "מגיעים" */}
       {showDetailsModal && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50 p-2">
-          <div className="relative bg-white rounded-lg w-full max-w-6xl h-[98vh] flex flex-col">
-            <button 
-              onClick={() => {
-                // Reset attending state when closing modal, so user can choose again
-                setAttending(null);
-                setShowDetailsModal(false);
-                // Reset form fields to default values
-                setAdults(1);
-                setChildren(0);
-                setSpecialMeals({
-                  vegetarian: { adults: 0, children: 0 },
-                  vegan: { adults: 0, children: 0 },
-                  glatt: { adults: 0, children: 0 },
-                  celiac: { adults: 0, children: 0 },
-                });
-                setAllergies([{ description: '', adults: 0, children: 0 }]);
-                setFormError('');
-              }} 
-              className="absolute top-2 left-2 text-2xl text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-full w-8 h-8 flex items-center justify-center font-bold transition-all z-10" 
-              aria-label="סגור"
-            >
-              &times;
-            </button>
-            
-            <div className="p-3 border-b flex-shrink-0">
-              <h2 className="text-2xl font-bold text-center text-primary">פירוט אישור הגעה</h2>
-              <p className="text-center text-gray-600 text-base mt-1">מעולה! אנא עדכן/י את מספר המשתתפים (בוגרים וילדים) שיגיעו יחד איתך.</p>
-            </div>
-            
-            <div className="flex-1 p-4 flex flex-col min-h-0">
-              {/* Error message - displayed at top of modal */}
-              {formError && (
-                <div className="bg-red-100 border-2 border-red-500 rounded-lg p-4 mb-4 text-right flex-shrink-0">
-                  <div className="flex items-center justify-center">
-                    <span className="text-red-600 text-2xl mr-2">✗</span>
-                    <p className="text-red-600 text-lg font-medium">{formError}</p>
-                  </div>
-                </div>
-              )}
-              
-              {/* participant counts - prominent section */}
-              <div className="bg-blue-50 border-2 border-blue-200 rounded-lg p-3 mb-3 flex-shrink-0">
-                <h3 className="text-xl font-bold text-blue-800 mb-2 text-center">מספר משתתפים</h3>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="mb-1 block font-bold text-lg text-blue-900">סה"כ בוגרים</label>
-                    <input
-                      type="number"
-                      min="0"
-                      className="w-full rounded-md border-2 border-blue-300 p-2 text-xl text-center font-semibold focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-                      value={adults}
-                      onChange={(e) => {
-                        setAdults(Number(e.target.value));
-                        if (formError) setFormError('');
-                      }}
-                    />
-                  </div>
-                  <div>
-                    <label className="mb-1 block font-bold text-lg text-blue-900">סה"כ ילדים</label>
-                    <input
-                      type="number"
-                      min="0"
-                      className="w-full rounded-md border-2 border-blue-300 p-2 text-xl text-center font-semibold focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-                      value={children}
-                      onChange={(e) => {
-                        setChildren(Number(e.target.value));
-                        if (formError) setFormError('');
-                      }}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* special meals */}
-              <h2 className="mb-2 text-xl font-bold flex-shrink-0">מנות מיוחדות</h2>
-              <table className="mb-3 w-full text-right border flex-shrink-0">
-                <thead>
-                  <tr className="bg-gray-50">
-                    <th className="border p-2 text-base">קטגוריה</th>
-                    <th className="border p-2 text-base">בוגרים</th>
-                    <th className="border p-2 text-base">ילדים</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {mealCategories.map((c) => (
-                    <tr key={c.key} className="odd:bg-white even:bg-gray-50">
-                      <td className="border p-2 font-medium text-lg">{c.label}</td>
-                      <td className="border p-2">
-                        <input
-                          type="number"
-                          min="0"
-                          className="w-full rounded-md border p-1.5 text-base text-center"
-                          value={specialMeals[c.key].adults}
-                          onChange={(e) => updateMeal(c.key, 'adults', Number(e.target.value))}
-                        />
-                      </td>
-                      <td className="border p-2">
-                        <input
-                          type="number"
-                          min="0"
-                          className="w-full rounded-md border p-1.5 text-base text-center"
-                          value={specialMeals[c.key].children}
-                          onChange={(e) => updateMeal(c.key, 'children', Number(e.target.value))}
-                        />
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-
-              {/* allergies */}
-              <div className="mb-2 flex items-center justify-between flex-shrink-0">
-                <h3 className="text-lg font-bold">אלרגיות נוספות</h3>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm">להוספת אלרגיה לחץ</span>
-                  <button
-                    onClick={addAllergy}
-                    className="flex h-8 w-8 items-center justify-center rounded-full bg-green-600 text-white hover:bg-green-700 text-lg font-bold"
-                  >
-                    +
-                  </button>
-                </div>
-              </div>
-              <div className="flex-1 min-h-0 flex flex-col">
-                <table className="w-full text-right border">
-                  <thead className="sticky top-0 bg-gray-100 z-10">
-                    <tr>
-                      <th className="border p-2 text-base">תיאור</th>
-                      <th className="border p-2 text-base">בוגרים</th>
-                      <th className="border p-2 text-base">ילדים</th>
-                      <th className="border p-2 text-base"></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {allergies.map((a, idx) => (
-                      <tr key={idx} className="odd:bg-white even:bg-gray-50">
-                        <td className="border p-2">
-                          <input
-                            type="text"
-                            className="w-full rounded-md border p-1.5 text-lg"
-                            value={a.description}
-                            onChange={(e) => updateAllergy(idx, 'description', e.target.value)}
-                            placeholder="תיאור האלרגיה"
-                          />
-                        </td>
-                        <td className="border p-2 text-center">
-                          <input
-                            type="number"
-                            min="0"
-                            className="w-full rounded-md border p-1.5 text-base text-center max-w-[80px] mx-auto"
-                            value={a.adults}
-                            onChange={(e) => updateAllergy(idx, 'adults', Number(e.target.value))}
-                          />
-                        </td>
-                        <td className="border p-2 text-center">
-                          <input
-                            type="number"
-                            min="0"
-                            className="w-full rounded-md border p-1.5 text-base text-center max-w-[80px] mx-auto"
-                            value={a.children}
-                            onChange={(e) => updateAllergy(idx, 'children', Number(e.target.value))}
-                          />
-                        </td>
-                        <td className="border p-2 text-center">
-                          <button onClick={() => removeAllergy(idx)} className="text-red-600 text-lg hover:text-red-800">❌</button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-            
-            <div className="p-4 border-t bg-gray-50 flex justify-center gap-6 flex-shrink-0">
-              <button
-                className="rounded-full bg-green-600 px-16 py-4 font-medium text-white hover:bg-green-700 transition-colors text-xl"
-                onClick={async () => {
-                  const success = await handleSave();
-                  // Only close modal if save was successful (no errors)
-                  if (success) {
-                    setShowDetailsModal(false);
-                  }
-                  // If there's an error, the modal stays open and shows the error message
-                }}
-              >
-                שלח אישור
-              </button>
+        <div className="fixed inset-0 bg-black/50 z-50 overflow-y-auto">
+          <div className="min-h-screen flex items-center justify-center p-2 sm:p-4">
+            <div className="relative bg-white rounded-lg w-full max-w-6xl my-4 flex flex-col max-h-[95vh]">
               <button
                 onClick={() => {
-                  // Reset attending state when canceling, so user can choose again
+                  // Reset attending state when closing modal, so user can choose again
                   setAttending(null);
                   setShowDetailsModal(false);
                   // Reset form fields to default values
@@ -887,10 +702,218 @@ export default function GuestPage() {
                   setAllergies([{ description: '', adults: 0, children: 0 }]);
                   setFormError('');
                 }}
-                className="bg-red-600 text-white px-12 py-4 rounded-full hover:bg-red-700 transition-colors font-medium text-xl"
+                className="absolute top-2 left-2 text-2xl text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-full w-10 h-10 flex items-center justify-center font-bold transition-all z-10 touch-manipulation"
+                aria-label="סגור"
               >
-                ביטול
+                &times;
               </button>
+
+              <div className="p-3 sm:p-4 border-b flex-shrink-0">
+                <h2 className="text-xl sm:text-2xl font-bold text-center text-primary">פירוט אישור הגעה</h2>
+                <p className="text-center text-gray-600 text-sm sm:text-base mt-1">מעולה! אנא עדכן/י את מספר המשתתפים (בוגרים וילדים) שיגיעו יחד איתך.</p>
+              </div>
+
+              <div className="flex-1 p-3 sm:p-4 overflow-y-auto">
+                {/* Error message - displayed at top of modal */}
+                {formError && (
+                  <div className="bg-red-100 border-2 border-red-500 rounded-lg p-3 sm:p-4 mb-3 sm:mb-4 text-right">
+                    <div className="flex items-center justify-center">
+                      <span className="text-red-600 text-xl sm:text-2xl mr-2">✗</span>
+                      <p className="text-red-600 text-sm sm:text-lg font-medium">{formError}</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* participant counts - prominent section */}
+                <div className="bg-blue-50 border-2 border-blue-200 rounded-lg p-3 sm:p-4 mb-3 sm:mb-4">
+                  <h3 className="text-lg sm:text-xl font-bold text-blue-800 mb-2 text-center">מספר משתתפים</h3>
+                  <div className="grid grid-cols-2 gap-3 sm:gap-4">
+                    <div>
+                      <label className="mb-1 block font-bold text-base sm:text-lg text-blue-900">סה"כ בוגרים</label>
+                      <input
+                        type="number"
+                        min="0"
+                        className="w-full rounded-md border-2 border-blue-300 p-2 sm:p-3 text-lg sm:text-xl text-center font-semibold focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                        value={adults}
+                        onChange={(e) => {
+                          setAdults(Number(e.target.value));
+                          if (formError) setFormError('');
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1 block font-bold text-base sm:text-lg text-blue-900">סה"כ ילדים</label>
+                      <input
+                        type="number"
+                        min="0"
+                        className="w-full rounded-md border-2 border-blue-300 p-2 sm:p-3 text-lg sm:text-xl text-center font-semibold focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                        value={children}
+                        onChange={(e) => {
+                          setChildren(Number(e.target.value));
+                          if (formError) setFormError('');
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* special meals */}
+                <h2 className="mb-2 text-lg sm:text-xl font-bold">מנות מיוחדות</h2>
+                <div className="overflow-x-auto mb-3 sm:mb-4">
+                  <table className="w-full text-right border min-w-[300px]">
+                    <thead>
+                      <tr className="bg-gray-50">
+                        <th className="border p-2 text-sm sm:text-base">קטגוריה</th>
+                        <th className="border p-2 text-sm sm:text-base w-20 sm:w-24">בוגרים</th>
+                        <th className="border p-2 text-sm sm:text-base w-20 sm:w-24">ילדים</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {mealCategories.map((c) => (
+                        <tr key={c.key} className="odd:bg-white even:bg-gray-50">
+                          <td className="border p-2 font-medium text-sm sm:text-lg">{c.label}</td>
+                          <td className="border p-2">
+                            <input
+                              type="number"
+                              min="0"
+                              className="w-full rounded-md border p-1.5 text-sm sm:text-base text-center max-w-[60px] sm:max-w-[80px] mx-auto"
+                              value={specialMeals[c.key].adults}
+                              onChange={(e) => updateMeal(c.key, 'adults', Number(e.target.value))}
+                            />
+                          </td>
+                          <td className="border p-2">
+                            <input
+                              type="number"
+                              min="0"
+                              className="w-full rounded-md border p-1.5 text-sm sm:text-base text-center max-w-[60px] sm:max-w-[80px] mx-auto"
+                              value={specialMeals[c.key].children}
+                              onChange={(e) => updateMeal(c.key, 'children', Number(e.target.value))}
+                            />
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* allergies */}
+                <div className="mb-2 flex items-center justify-between">
+                  <h3 className="text-base sm:text-lg font-bold">אלרגיות נוספות</h3>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs sm:text-sm">להוספת אלרגיה לחץ</span>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      addAllergy();
+                    }}
+                    onTouchEnd={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      addAllergy();
+                    }}
+                    className="flex h-10 w-10 items-center justify-center rounded-full bg-green-600 text-white hover:bg-green-700 active:bg-green-800 text-xl font-bold touch-manipulation"
+                    style={{ WebkitTapHighlightColor: 'transparent' }}
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+                <div className="overflow-x-auto mb-4">
+                  <table className="w-full text-right border min-w-[300px]">
+                    <thead className="sticky top-0 bg-gray-100 z-10">
+                      <tr>
+                        <th className="border p-2 text-sm sm:text-base">תיאור</th>
+                        <th className="border p-2 text-sm sm:text-base w-16 sm:w-20">בוגרים</th>
+                        <th className="border p-2 text-sm sm:text-base w-16 sm:w-20">ילדים</th>
+                        <th className="border p-2 text-sm sm:text-base w-10 sm:w-12"></th>
+                      </tr>
+                    </thead>
+                  <tbody>
+                    {allergies.map((a, idx) => (
+                      <tr key={idx} className="odd:bg-white even:bg-gray-50">
+                        <td className="border p-2">
+                          <input
+                            type="text"
+                            className="w-full rounded-md border p-1.5 text-sm md:text-lg"
+                            value={a.description}
+                            onChange={(e) => updateAllergy(idx, 'description', e.target.value)}
+                            placeholder="תיאור האלרגיה"
+                          />
+                        </td>
+                        <td className="border p-2 text-center">
+                          <input
+                            type="number"
+                            min="0"
+                            className="w-full rounded-md border p-1.5 text-sm md:text-base text-center max-w-[60px] md:max-w-[80px] mx-auto"
+                            value={a.adults}
+                            onChange={(e) => updateAllergy(idx, 'adults', Number(e.target.value))}
+                          />
+                        </td>
+                        <td className="border p-2 text-center">
+                          <input
+                            type="number"
+                            min="0"
+                            className="w-full rounded-md border p-1.5 text-sm md:text-base text-center max-w-[60px] md:max-w-[80px] mx-auto"
+                            value={a.children}
+                            onChange={(e) => updateAllergy(idx, 'children', Number(e.target.value))}
+                          />
+                        </td>
+                        <td className="border p-2 text-center">
+                          <button
+                            type="button"
+                            onClick={() => removeAllergy(idx)}
+                            className="text-red-600 text-lg hover:text-red-800 touch-manipulation p-1"
+                          >
+                            ❌
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div className="p-3 sm:p-4 border-t bg-gray-50 flex flex-col sm:flex-row justify-center gap-3 sm:gap-6 flex-shrink-0">
+                <button
+                  type="button"
+                  className="rounded-full bg-green-600 px-12 sm:px-16 py-3 sm:py-4 font-medium text-white hover:bg-green-700 active:bg-green-800 transition-colors text-lg sm:text-xl touch-manipulation"
+                  onClick={async () => {
+                    const success = await handleSave();
+                    // Only close modal if save was successful (no errors)
+                    if (success) {
+                      setShowDetailsModal(false);
+                    }
+                    // If there's an error, the modal stays open and shows the error message
+                  }}
+                >
+                  שלח אישור
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    // Reset attending state when canceling, so user can choose again
+                    setAttending(null);
+                    setShowDetailsModal(false);
+                    // Reset form fields to default values
+                    setAdults(1);
+                    setChildren(0);
+                    setSpecialMeals({
+                      vegetarian: { adults: 0, children: 0 },
+                      vegan: { adults: 0, children: 0 },
+                      glatt: { adults: 0, children: 0 },
+                      celiac: { adults: 0, children: 0 },
+                    });
+                    setAllergies([{ description: '', adults: 0, children: 0 }]);
+                    setFormError('');
+                  }}
+                  className="bg-red-600 text-white px-10 sm:px-12 py-3 sm:py-4 rounded-full hover:bg-red-700 active:bg-red-800 transition-colors font-medium text-lg sm:text-xl touch-manipulation"
+                >
+                  ביטול
+                </button>
+              </div>
             </div>
           </div>
         </div>
