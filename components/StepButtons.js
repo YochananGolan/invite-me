@@ -696,6 +696,16 @@ const handleOpenAddonModal = React.useCallback(() => {
     '/images/עיצוב-הזמנה-19.jpg',
     '/images/עיצוב-הזמנה-20.jpg',
     '/images/עיצוב-הזמנה-21.jpg',
+    '/images/תמונה חדשה 1.jpg',
+    '/images/תמונה חדשה 2.jpg',
+    '/images/תמונה חדשה 3.jpg',
+    '/images/תמונה חדשה 4.jpg',
+    '/images/תמונה חדשה 5.jpg',
+    '/images/תמונה חדשה 6.jpg',
+    '/images/תמונה חדשה 7.jpg',
+    '/images/תמונה חדשה 8.jpg',
+    '/images/תמונה חדשה 9.jpg',
+    '/images/תמונה חדשה 10.jpg',
   ];
 
   const [selectedDesign, setSelectedDesign] = useState(null);
