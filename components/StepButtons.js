@@ -5,6 +5,7 @@ import he from 'date-fns/locale/he';
 import 'react-datepicker/dist/react-datepicker.css';
 import * as XLSX from 'xlsx';
 import { format } from 'date-fns';
+import { useToast } from './Toast';
 
 // Register Hebrew locale for datepicker
 registerLocale('he', he);
@@ -55,6 +56,7 @@ const fieldLabels = {
 };
 
 const StepButtons = forwardRef(function StepButtons({ session, onAuthClick }, ref) {
+  const { addToast } = useToast();
   const steps = ['צור אירוע חדש', '📅 שלב 1 - סוג אירוע', '📝 שלב 2 - פרטי האירוע', '🎨 שלב 3 - עיצוב הזמנה', '📤 שלב 4 - שליחת הזמנה לאורח', '📊 שלב 5 - דוחו"ת אישורי הגעה'];
   const eventTypes = ['חתונה', 'חינה', 'מסיבת אירוסין', 'בר מצווה', 'בת מצווה', 'ברית', 'בריתה', 'יום הולדת', 'אירוע עסקי', 'הפרשת חלה'];
   const times = Array.from({ length: (24 - 8) * 2 }, (_, i) => {
@@ -179,6 +181,13 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick }, re
   const [showArchiveList,setShowArchiveList]=useState(false);
   const [archiveEvents,setArchiveEvents]=useState([]);
   const [archiveLoading,setArchiveLoading]=useState(false);
+
+  // Excel import preview modal
+  const [showExcelPreview, setShowExcelPreview] = useState(false);
+  const [showExcelInstructions, setShowExcelInstructions] = useState(false);
+  const [excelPreviewData, setExcelPreviewData] = useState([]);
+  const [excelErrors, setExcelErrors] = useState([]);
+  const [isSavingExcelGuests, setIsSavingExcelGuests] = useState(false);
 
   // Process flow diagram modal
   const [showFlowDiagram, setShowFlowDiagram] = useState(false);
@@ -1394,29 +1403,234 @@ React.useEffect(() => {
       const wb = XLSX.read(data, { type: 'array' });
       const ws = wb.Sheets[wb.SheetNames[0]];
       const rows = XLSX.utils.sheet_to_json(ws, { header: 1 });
-      // Expect header row: first_name,last_name,phone,table_number
-      const header = rows[0] || [];
-      const idx = (name) => header.indexOf(name);
+
+      // Column positions are fixed: A=שם פרטי, B=שם משפחה, C=מס׳ שולחן, D=טלפון
+      // First row is header (skipped), data starts from row 2
+      const firstNameIdx = 0; // Column A
+      const lastNameIdx = 1;  // Column B
+      const tableIdx = 2;     // Column C (optional)
+      const phoneIdx = 3;     // Column D
+
       const imported = [];
+      const errors = [];
+
       for (let i = 1; i < rows.length; i++) {
         const r = rows[i];
-        if (!r.length) continue;
-        imported.push({
-          guestFirstName: r[idx('first_name')] || '',
-          guestLastName: r[idx('last_name')] || '',
-          guestPhone: r[idx('phone')] || '',
-          guestTable: r[idx('table_number')] || '',
-        });
+        if (!r || !r.length) continue;
+
+        // Skip completely empty rows
+        const hasAnyData = r.some(cell => cell !== undefined && cell !== null && cell.toString().trim() !== '');
+        if (!hasAnyData) continue;
+
+        // Get raw phone and normalize it (add leading 0 for Israeli numbers if missing)
+        let rawPhone = (r[phoneIdx] || '').toString().trim();
+        let digitsOnly = rawPhone.replace(/\D/g, '');
+        // Israeli mobile numbers: if 9 digits starting with 5, add leading 0
+        if (digitsOnly.length === 9 && digitsOnly.startsWith('5')) {
+          digitsOnly = '0' + digitsOnly;
+        }
+
+        const guest = {
+          guestFirstName: (r[firstNameIdx] || '').toString().trim(),
+          guestLastName: (r[lastNameIdx] || '').toString().trim(),
+          guestPhone: digitsOnly,
+          guestTable: (r[tableIdx] || '').toString().trim(),
+          rowNumber: i + 1,
+        };
+
+        // Validate guest data
+        const rowErrors = [];
+        if (!guest.guestFirstName) rowErrors.push('שם פרטי חסר (עמודה A)');
+        if (!guest.guestLastName) rowErrors.push('שם משפחה חסר (עמודה B)');
+        if (!guest.guestTable) rowErrors.push('מס׳ שולחן חסר (עמודה C)');
+        if (!guest.guestPhone) {
+          rowErrors.push('טלפון חסר (עמודה D)');
+        } else if (guest.guestPhone.length !== 10) {
+          rowErrors.push(`טלפון לא תקין (${guest.guestPhone.length} ספרות במקום 10)`);
+        }
+
+        guest.errors = rowErrors;
+        imported.push(guest);
+        if (rowErrors.length > 0) {
+          errors.push({ row: i + 1, errors: rowErrors });
+        }
       }
+
       if (imported.length) {
-        setSentGuests((prev) => [...prev, ...imported]);
-        alert(`יובאו ${imported.length} אורחים.`);
+        setExcelPreviewData(imported);
+        setExcelErrors(errors);
+        setShowExcelPreview(true);
+
+        // Show summary toast
+        if (errors.length > 0) {
+          addToast(`נמצאו ${imported.length} שורות, ${errors.length} עם שגיאות`, 'warning');
+        } else {
+          addToast(`נמצאו ${imported.length} אורחים תקינים`, 'success');
+        }
       } else {
-        alert('לא נמצאו אורחים בקובץ. ודא שיש שורת כותרות: first_name,last_name,phone,table_number');
+        addToast('לא נמצאו אורחים בקובץ', 'error', 6000);
       }
       e.target.value = '';
     };
     reader.readAsArrayBuffer(file);
+  };
+
+  const handleSaveExcelGuests = async (sendSms = false) => {
+    // Filter out guests with errors
+    const validGuests = excelPreviewData.filter(g => !g.errors || g.errors.length === 0);
+
+    if (validGuests.length === 0) {
+      addToast('אין אורחים תקינים לשמירה. נא לתקן את השגיאות תחילה.', 'error');
+      return;
+    }
+
+    setIsSavingExcelGuests(true);
+
+    try {
+      // Get current user and event
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        addToast('יש להתחבר כדי לשמור אורחים', 'error');
+        setIsSavingExcelGuests(false);
+        return;
+      }
+
+      const { data: evRow } = await supabase
+        .from('events')
+        .select('id')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+
+      if (!evRow) {
+        addToast('לא נמצא אירוע פעיל. יש ליצור אירוע תחילה.', 'error');
+        setIsSavingExcelGuests(false);
+        return;
+      }
+
+      // Prepare guests for bulk insert
+      const guestsToInsert = validGuests.map(g => ({
+        user_id: user.id,
+        event_id: evRow.id,
+        first_name: g.guestFirstName.trim(),
+        last_name: g.guestLastName.trim(),
+        phone: g.guestPhone.toString().trim(),
+        email: null,
+        total_guests: 1,
+        adults: 1,
+        children: 0,
+        table_number: g.guestTable.toString().trim() || null,
+        status: 'pending',
+      }));
+
+      // Bulk insert
+      const { data: insertedGuests, error } = await supabase
+        .from('invited_guests')
+        .insert(guestsToInsert)
+        .select();
+
+      if (error) throw error;
+
+      // Send SMS to all guests if requested
+      if (sendSms && insertedGuests && insertedGuests.length > 0) {
+        const smsGuests = insertedGuests.map(g => {
+          const inviteLink = `${window.location.origin}/${evRow.id}/${g.id}`;
+          return {
+            phone: g.phone,
+            firstName: g.first_name,
+            lastName: g.last_name,
+            inviteLink,
+          };
+        });
+
+        // Build SMS message with invitation text and RSVP link
+        const smsMessage = `${invitationText}\n\nשלום {firstName},\nלאישור השתתפות לחצו על הקישור:\n{inviteLink}`;
+
+        try {
+          const smsResponse = await fetch('/api/send-sms', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              guests: smsGuests.map(g => ({
+                ...g,
+                message: smsMessage.replace('{inviteLink}', g.inviteLink),
+              })),
+              message: smsMessage,
+            }),
+          });
+
+          const smsResult = await smsResponse.json();
+
+          if (smsResult.success) {
+            addToast(`נשמרו ${validGuests.length} אורחים ונשלחו ${smsResult.sent} הודעות SMS בהצלחה!`, 'success');
+          } else {
+            addToast(`נשמרו ${validGuests.length} אורחים. נשלחו ${smsResult.sent} הודעות, ${smsResult.failed} נכשלו.`, 'warning');
+          }
+        } catch (smsError) {
+          console.error('SMS sending error:', smsError);
+          addToast(`נשמרו ${validGuests.length} אורחים, אך אירעה שגיאה בשליחת ה-SMS.`, 'warning');
+        }
+      } else {
+        addToast(`נשמרו בהצלחה ${validGuests.length} אורחים למסד הנתונים!`, 'success');
+      }
+
+      // Add to local state as well
+      setSentGuests((prev) => [...prev, ...validGuests]);
+
+      // Close preview modal
+      setShowExcelPreview(false);
+      setExcelPreviewData([]);
+      setExcelErrors([]);
+      setIsSavingExcelGuests(false);
+
+    } catch (error) {
+      console.error('Error saving guests:', error);
+      addToast('אירעה שגיאה בשמירת האורחים: ' + error.message, 'error');
+      setIsSavingExcelGuests(false);
+    }
+  };
+
+  const handleRemoveExcelRow = (index) => {
+    setExcelPreviewData(prev => prev.filter((_, i) => i !== index));
+    // Recalculate errors
+    const newErrors = excelPreviewData
+      .filter((_, i) => i !== index)
+      .filter(g => g.errors && g.errors.length > 0)
+      .map((g, idx) => ({ row: g.rowNumber, errors: g.errors }));
+    setExcelErrors(newErrors);
+  };
+
+  const handleEditExcelRow = (index, field, value) => {
+    setExcelPreviewData(prev => {
+      const updated = [...prev];
+      updated[index][field] = value;
+
+      // Re-validate the row
+      const guest = updated[index];
+      const rowErrors = [];
+      if (!guest.guestFirstName.trim()) rowErrors.push('שם פרטי חסר');
+      if (!guest.guestLastName.trim()) rowErrors.push('שם משפחה חסר');
+      if (!guest.guestPhone.toString().trim()) {
+        rowErrors.push('טלפון חסר');
+      } else {
+        const digitsOnly = guest.guestPhone.toString().replace(/\D/g, '');
+        if (digitsOnly.length !== 10) {
+          rowErrors.push('טלפון לא תקין (נדרש 10 ספרות)');
+        }
+      }
+      updated[index].errors = rowErrors;
+
+      return updated;
+    });
+
+    // Recalculate error summary
+    setTimeout(() => {
+      const errors = excelPreviewData
+        .filter(g => g.errors && g.errors.length > 0)
+        .map(g => ({ row: g.rowNumber, errors: g.errors }));
+      setExcelErrors(errors);
+    }, 0);
   };
 
   // ----- New Event helper -----
@@ -2979,13 +3193,22 @@ React.useEffect(() => {
         </div>
       )}
 
+      {/* Hidden file input for Excel upload */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".xlsx,.xls"
+        onChange={handleExcelImport}
+        style={{ display: 'none' }}
+      />
+
       {showGuestForm && (
         <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50">
           <div className="relative bg-white rounded-lg p-6 w-full max-w-md max-h-[90vh] overflow-y-auto event-form">
             <button onClick={() => setShowGuestForm(false)} className="absolute top-2 left-2 text-4xl leading-none w-8 h-8 flex items-center justify-center text-gray-500 hover:text-gray-700">&times;</button>
             <div className="flex flex-row-reverse items-center mb-4 gap-6 ml-10">
               <button
-                onClick={() => fileInputRef.current.click()}
+                onClick={() => setShowExcelInstructions(true)}
                 className="mr-auto text-primary font-medium border border-primary rounded-full px-4 py-1 ring-2 ring-primary ring-offset-2 ring-offset-white hover:bg-primary hover:text-white transition-colors whitespace-nowrap text-base"
               >
                 ייבוא קובץ אקסל
@@ -3055,6 +3278,235 @@ React.useEffect(() => {
             <div className="flex justify-center gap-4">
               <button onClick={confirmDelete} className="bg-red-600 text-white px-6 py-2 rounded-md hover:bg-red-700">מחיקה</button>
               <button onClick={cancelDelete} className="border border-gray-400 px-6 py-2 rounded-md hover:bg-gray-100">ביטול</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Excel Instructions Modal */}
+      {showExcelInstructions && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50 p-4">
+          <div className="relative bg-white rounded-lg p-6 w-full max-w-lg">
+            <button
+              onClick={() => setShowExcelInstructions(false)}
+              className="absolute top-2 left-2 text-3xl text-gray-500 hover:text-gray-700"
+            >
+              &times;
+            </button>
+            <h2 className="text-xl font-bold text-primary text-center mb-4">הנחיות לייבוא קובץ אקסל</h2>
+
+            <div className="space-y-4 text-right">
+              <p className="text-gray-700">
+                הקובץ צריך להכיל <strong>4 עמודות</strong> בסדר הבא:
+              </p>
+
+              <div className="bg-gray-50 rounded-lg p-3 border overflow-x-auto">
+                <table className="w-full text-sm border-collapse">
+                  <thead>
+                    <tr className="bg-green-100">
+                      <th className="border border-gray-300 px-3 py-2 text-center font-bold text-primary">A</th>
+                      <th className="border border-gray-300 px-3 py-2 text-center font-bold text-primary">B</th>
+                      <th className="border border-gray-300 px-3 py-2 text-center font-bold text-primary">C</th>
+                      <th className="border border-gray-300 px-3 py-2 text-center font-bold text-primary">D</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr className="bg-gray-100">
+                      <td className="border border-gray-300 px-3 py-2 text-center font-medium">שם פרטי</td>
+                      <td className="border border-gray-300 px-3 py-2 text-center font-medium">שם משפחה</td>
+                      <td className="border border-gray-300 px-3 py-2 text-center font-medium">מס׳ שולחן</td>
+                      <td className="border border-gray-300 px-3 py-2 text-center font-medium">טלפון</td>
+                    </tr>
+                    <tr>
+                      <td className="border border-gray-300 px-3 py-2 text-center text-gray-600">ישראל</td>
+                      <td className="border border-gray-300 px-3 py-2 text-center text-gray-600">ישראלי</td>
+                      <td className="border border-gray-300 px-3 py-2 text-center text-gray-600">1</td>
+                      <td className="border border-gray-300 px-3 py-2 text-center text-gray-600">0501234567</td>
+                    </tr>
+                    <tr>
+                      <td className="border border-gray-300 px-3 py-2 text-center text-gray-600">שרה</td>
+                      <td className="border border-gray-300 px-3 py-2 text-center text-gray-600">כהן</td>
+                      <td className="border border-gray-300 px-3 py-2 text-center text-gray-600">2</td>
+                      <td className="border border-gray-300 px-3 py-2 text-center text-gray-600">0529876543</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm">
+                <p className="text-blue-800">
+                  <strong>שם העמודות לא משנה</strong> - רק הסדר חשוב. השורה הראשונה היא שורת כותרות.
+                </p>
+              </div>
+
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-sm">
+                <p className="text-yellow-800">
+                  <strong>שימו לב:</strong> מספר הטלפון צריך להכיל 10 ספרות (לדוגמה: 0501234567)
+                </p>
+              </div>
+
+              <div className="flex justify-center gap-4 pt-4">
+                <button
+                  onClick={() => {
+                    setShowExcelInstructions(false);
+                    fileInputRef.current.click();
+                  }}
+                  className="bg-primary text-white px-6 py-3 rounded-full font-medium hover:bg-primary/90 transition-all"
+                >
+                  בחר קובץ אקסל
+                </button>
+                <button
+                  onClick={() => setShowExcelInstructions(false)}
+                  className="border border-gray-400 px-6 py-3 rounded-full font-medium hover:bg-gray-100 transition-all"
+                >
+                  ביטול
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Excel Preview Modal */}
+      {showExcelPreview && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50 p-4">
+          <div className="relative bg-white rounded-lg p-6 w-full max-w-6xl max-h-[90vh] overflow-hidden flex flex-col">
+            <button
+              onClick={() => {
+                setShowExcelPreview(false);
+                setExcelPreviewData([]);
+                setExcelErrors([]);
+              }}
+              className="absolute top-2 left-2 text-3xl text-gray-500 hover:text-gray-700 z-10"
+            >
+              &times;
+            </button>
+
+            <h2 className="text-2xl font-bold text-center mb-4 text-primary">תצוגה מקדימה - ייבוא אורחים מאקסל</h2>
+
+            {/* Error Summary */}
+            {excelErrors.length > 0 && (
+              <div className="bg-red-50 border border-red-300 rounded-lg p-4 mb-4">
+                <h3 className="font-bold text-red-700 mb-2">נמצאו {excelErrors.length} שורות עם שגיאות:</h3>
+                <ul className="text-sm text-red-600 list-disc list-inside">
+                  {excelErrors.slice(0, 5).map((err, idx) => (
+                    <li key={idx}>שורה {err.row}: {err.errors.join(', ')}</li>
+                  ))}
+                  {excelErrors.length > 5 && <li>...ועוד {excelErrors.length - 5} שגיאות</li>}
+                </ul>
+                <p className="text-sm text-red-600 mt-2">רק שורות תקינות יישמרו למסד הנתונים.</p>
+              </div>
+            )}
+
+            {/* Stats */}
+            <div className="flex gap-4 mb-4 justify-center">
+              <div className="bg-blue-50 border border-blue-300 rounded-lg px-4 py-2">
+                <span className="font-bold text-blue-700">סה"כ שורות:</span> {excelPreviewData.length}
+              </div>
+              <div className="bg-green-50 border border-green-300 rounded-lg px-4 py-2">
+                <span className="font-bold text-green-700">תקינות:</span> {excelPreviewData.filter(g => !g.errors || g.errors.length === 0).length}
+              </div>
+              {excelErrors.length > 0 && (
+                <div className="bg-red-50 border border-red-300 rounded-lg px-4 py-2">
+                  <span className="font-bold text-red-700">שגיאות:</span> {excelErrors.length}
+                </div>
+              )}
+            </div>
+
+            {/* Table */}
+            <div className="overflow-auto flex-1 border border-gray-300 rounded-lg">
+              <table className="w-full text-right" dir="rtl">
+                <thead className="bg-primary text-white sticky top-0">
+                  <tr>
+                    <th className="p-2 border-b border-gray-300">#</th>
+                    <th className="p-2 border-b border-gray-300">שם פרטי</th>
+                    <th className="p-2 border-b border-gray-300">שם משפחה</th>
+                    <th className="p-2 border-b border-gray-300">מספר שולחן</th>
+                    <th className="p-2 border-b border-gray-300">טלפון</th>
+                    <th className="p-2 border-b border-gray-300">סטטוס</th>
+                    <th className="p-2 border-b border-gray-300">פעולות</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {excelPreviewData.map((guest, idx) => (
+                    <tr
+                      key={idx}
+                      className={`${guest.errors && guest.errors.length > 0 ? 'bg-red-50' : 'bg-white'} hover:bg-gray-50 border-b`}
+                    >
+                      <td className="p-2 text-center">{idx + 1}</td>
+                      <td className="p-2">
+                        <input
+                          type="text"
+                          value={guest.guestFirstName}
+                          onChange={(e) => handleEditExcelRow(idx, 'guestFirstName', e.target.value)}
+                          className="w-full border rounded px-2 py-1"
+                        />
+                      </td>
+                      <td className="p-2">
+                        <input
+                          type="text"
+                          value={guest.guestLastName}
+                          onChange={(e) => handleEditExcelRow(idx, 'guestLastName', e.target.value)}
+                          className="w-full border rounded px-2 py-1"
+                        />
+                      </td>
+                      <td className="p-2">
+                        <input
+                          type="text"
+                          value={guest.guestTable}
+                          onChange={(e) => handleEditExcelRow(idx, 'guestTable', e.target.value)}
+                          className="w-full border rounded px-2 py-1"
+                        />
+                      </td>
+                      <td className="p-2">
+                        <input
+                          type="text"
+                          value={guest.guestPhone}
+                          onChange={(e) => handleEditExcelRow(idx, 'guestPhone', e.target.value)}
+                          className="w-full border rounded px-2 py-1"
+                        />
+                      </td>
+                      <td className="p-2 text-center">
+                        {guest.errors && guest.errors.length > 0 ? (
+                          <span className="text-red-600 text-xs">{guest.errors.join(', ')}</span>
+                        ) : (
+                          <span className="text-green-600 font-bold">✓</span>
+                        )}
+                      </td>
+                      <td className="p-2 text-center">
+                        <button
+                          onClick={() => handleRemoveExcelRow(idx)}
+                          className="text-red-600 hover:text-red-800 font-bold"
+                          title="מחק שורה"
+                        >
+                          🗑️
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex justify-center gap-4 mt-6 flex-wrap">
+              <button
+                onClick={() => handleSaveExcelGuests(true)}
+                disabled={isSavingExcelGuests || excelPreviewData.filter(g => !g.errors || g.errors.length === 0).length === 0}
+                className="bg-primary text-white px-8 py-3 rounded-full font-medium hover:bg-primary/90 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isSavingExcelGuests ? 'שומר ושולח...' : `שמור ושלח SMS ל-${excelPreviewData.filter(g => !g.errors || g.errors.length === 0).length} אורחים`}
+              </button>
+              <button
+                onClick={() => {
+                  setShowExcelPreview(false);
+                  setExcelPreviewData([]);
+                  setExcelErrors([]);
+                }}
+                className="border border-gray-400 px-8 py-3 rounded-full font-medium hover:bg-gray-100 transition-all"
+              >
+                ביטול
+              </button>
             </div>
           </div>
         </div>

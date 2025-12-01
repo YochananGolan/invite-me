@@ -2,6 +2,7 @@ import '../styles/globals.css';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import { supabase } from '../lib/supabaseClient';
+import { ToastProvider } from '../components/Toast';
 
 function MyApp({ Component, pageProps }) {
   const [session, setSession] = useState(null);
@@ -212,9 +213,11 @@ function MyApp({ Component, pageProps }) {
   if (loading) return null;
 
   return (
-    <div dir="rtl">
-      <Component {...pageProps} session={session} />
-    </div>
+    <ToastProvider>
+      <div dir="rtl">
+        <Component {...pageProps} session={session} />
+      </div>
+    </ToastProvider>
   );
 }
 
