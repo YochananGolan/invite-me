@@ -6,6 +6,9 @@ import 'react-datepicker/dist/react-datepicker.css';
 import * as XLSX from 'xlsx';
 import { format } from 'date-fns';
 import { useToast } from './Toast';
+import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid, LabelList } from 'recharts';
+
+const RADIAN = Math.PI / 180;
 
 // Register Hebrew locale for datepicker
 registerLocale('he', he);
@@ -114,6 +117,75 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick }, re
     glatt: { adults: 0, children: 0, total: 0 },
     allergy: { adults: 0, children: 0, total: 0 }
   });
+  const statusChartData = React.useMemo(() => ([
+    { key: 'approved', name: 'אישרו הגעה', value: guestStatusSummary.approved, color: '#16a34a' },
+    { key: 'pending', name: 'טרם הגיבו', value: guestStatusSummary.pending, color: '#facc15' },
+    { key: 'rejected', name: 'לא אישרו', value: guestStatusSummary.rejected, color: '#dc2626' }
+  ]), [guestStatusSummary]);
+  const hasStatusData = statusChartData.some(item => item.value > 0);
+  const guestSummaryChartData = React.useMemo(() => ([
+    { key: 'adults', name: 'מבוגרים', value: guestSummary.adults, color: '#16a34a' },
+    { key: 'children', name: 'ילדים', value: guestSummary.children, color: '#f97316' },
+    { key: 'total', name: 'סה״כ', value: guestSummary.adults + guestSummary.children, color: '#7c3aed' }
+  ]), [guestSummary]);
+  const hasGuestSummaryData = guestSummaryChartData.some(item => item.value > 0);
+  const renderGuestSummaryLabel = React.useCallback(({
+    x,
+    y,
+    width,
+    height,
+    value,
+    index
+  }) => {
+    if (value === undefined || value === null) return null;
+    const dataItem = guestSummaryChartData[index];
+    const isDarkBar = dataItem?.key === 'adults' || dataItem?.key === 'total';
+    const insideBar = (height ?? 0) >= 24;
+    const labelX = x + (width ?? 0) / 2;
+    const labelY = insideBar ? y + (height ?? 0) / 2 : (y ?? 0) - 6;
+    const color = insideBar ? (isDarkBar ? '#FFFFFF' : '#111827') : '#111827';
+    return (
+      <text
+        x={labelX}
+        y={labelY}
+        fill={color}
+        textAnchor="middle"
+        dominantBaseline={insideBar ? 'middle' : 'baseline'}
+        fontWeight="700"
+        fontSize="14"
+      >
+        {value}
+      </text>
+    );
+  }, [guestSummaryChartData]);
+  const renderStatusLabel = React.useCallback(({
+    cx,
+    cy,
+    midAngle,
+    innerRadius,
+    outerRadius,
+    index,
+    value
+  }) => {
+    if (!value) return null;
+    const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
+    const x = cx + radius * Math.cos(-midAngle * RADIAN);
+    const y = cy + radius * Math.sin(-midAngle * RADIAN);
+    const slice = statusChartData[index];
+    const color = slice?.key === 'approved' || slice?.key === 'rejected' ? '#FFFFFF' : '#1f2937';
+    return (
+      <text
+        x={x}
+        y={y}
+        fill={color}
+        textAnchor={x >= cx ? 'start' : 'end'}
+        dominantBaseline="central"
+        style={{ fontWeight: 700, fontSize: '14px' }}
+      >
+        {value}
+      </text>
+    );
+  }, [statusChartData]);
 
   const markStepDone=(idx)=>{
     console.log('markStepDone called with idx:', idx);
@@ -2657,12 +2729,274 @@ React.useEffect(() => {
           </div>
         </div>
       )}
+      {/* Top Summary Graphs */}
+      <div className="w-full px-4 mt-10">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {currentEventId && (
+            <div className="w-full">
+              <div className="bg-purple-50 p-3 text-center shadow-lg w-full" style={{
+                border: '3px solid #D4AF37',
+                outline: '2px solid #B8860B',
+                outlineOffset: '2px',
+                borderRadius: '8px',
+                minHeight: '280px'
+              }}>
+                <div className="flex items-center justify-center gap-2 mb-2">
+                  <span className="text-xl">📊</span>
+                  <h3 className="text-base font-bold text-purple-800">סטטוס אישורי הגעה</h3>
+                </div>
+                <div className="bg-white rounded-lg text-right p-2 mt-3">
+                  {hasStatusData ? (
+                    <div className="h-60">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie
+                            data={statusChartData}
+                            dataKey="value"
+                            nameKey="name"
+                            innerRadius={55}
+                            outerRadius={95}
+                            paddingAngle={3}
+                            labelLine={false}
+                            label={renderStatusLabel}
+                          >
+                            {statusChartData.map((item) => (
+                              <Cell key={item.key} fill={item.color} />
+                            ))}
+                          </Pie>
+                          <Tooltip
+                            formatter={(value, name) => [`${value}`, name]}
+                            wrapperStyle={{ direction: 'rtl', textAlign: 'right' }}
+                          />
+                          <Legend
+                            iconType="circle"
+                            wrapperStyle={{ direction: 'rtl', textAlign: 'right', color: '#111827' }}
+                            formatter={(value) => (
+                              <span style={{ color: '#111827', fontWeight: 600 }}>{value}</span>
+                            )}
+                          />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </div>
+                  ) : (
+                    <div className="py-10 text-sm text-gray-500">אין נתונים להצגה עדיין</div>
+                  )}
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-3 text-base">
+                  <div className="bg-white p-2 rounded-lg border border-green-100 text-right">
+                    <div className="text-sm font-semibold text-green-600">אישרו הגעה</div>
+                    <div className="text-2xl font-bold text-green-700">{guestStatusSummary.approved}</div>
+                  </div>
+                  <div className="bg-white p-2 rounded-lg border border-yellow-200 text-right">
+                    <div className="text-sm font-semibold text-black">טרם הגיבו</div>
+                    <div className="text-2xl font-bold text-black">{guestStatusSummary.pending}</div>
+                  </div>
+                  <div className="bg-white p-2 rounded-lg border border-red-100 text-right">
+                    <div className="text-sm font-semibold text-red-600">לא אישרו</div>
+                    <div className="text-2xl font-bold text-red-700">{guestStatusSummary.rejected}</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {currentEventId && (
+            <div className="w-full">
+              <div className="bg-blue-50 p-3 text-center shadow-lg w-full" style={{
+                border: '3px solid #D4AF37',
+                outline: '2px solid #B8860B',
+                outlineOffset: '2px',
+                borderRadius: '8px',
+                minHeight: '280px'
+              }}>
+                <div className="flex items-center justify-center gap-2 mb-2">
+                  <span className="text-xl">👥</span>
+                  <h3 className="text-base font-bold text-blue-800">סיכום כל האורחים המוזמנים</h3>
+                </div>
+                <div className="mt-1">
+                  <div className="bg-white p-3 rounded-lg border border-blue-100">
+                    {hasGuestSummaryData ? (
+                      <div className="h-56">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart
+                            data={guestSummaryChartData}
+                            margin={{ top: 16, right: 20, left: -10, bottom: 8 }}
+                          >
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                            <XAxis
+                              dataKey="name"
+                              stroke="#1f2937"
+                              tick={{ fontSize: 16, fontWeight: 600 }}
+                              interval={0}
+                            />
+                            <YAxis hide />
+                            <Tooltip
+                              formatter={(value, name) => [`${value}`, name]}
+                              wrapperStyle={{ direction: 'rtl', textAlign: 'right' }}
+                            />
+                            <Bar dataKey="value" radius={[8, 8, 0, 0]} maxBarSize={60}>
+                              {guestSummaryChartData.map((item) => (
+                                <Cell key={item.key} fill={item.color} />
+                              ))}
+                              <LabelList dataKey="value" content={renderGuestSummaryLabel} />
+                            </Bar>
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+                    ) : (
+                      <div className="py-10 text-sm text-gray-500 text-center">אין נתונים להצגה עדיין</div>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-3 text-base">
+                    <div className="bg-white p-2 rounded-lg border border-green-100 text-right">
+                      <div className="text-sm font-semibold text-green-600">מבוגרים</div>
+                      <div className="text-2xl font-bold text-green-700">{guestSummary.adults}</div>
+                    </div>
+                    <div className="bg-white p-2 rounded-lg border border-orange-100 text-right">
+                      <div className="text-sm font-semibold text-orange-600">ילדים</div>
+                      <div className="text-2xl font-bold text-orange-700">{guestSummary.children}</div>
+                    </div>
+                    <div className="bg-white p-2 rounded-lg border border-purple-100 text-right">
+                      <div className="text-sm font-semibold text-purple-600">סה"כ</div>
+                      <div className="text-2xl font-bold text-purple-700">{guestSummary.adults + guestSummary.children}</div>
+                    </div>
+                  </div>
+                  
+                </div>
+              </div>
+            </div>
+          )}
+
+          {currentEventId && selectedPlan && (() => {
+            const totalGuests = guestSummary.adults + guestSummary.children;
+            const baseLimit = getPlanBaseLimit(selectedPlan);
+            const extraCapacity = additionalPackages.reduce((sum, planId) => sum + getPlanBaseLimit(planId), 0);
+            if (!baseLimit && extraCapacity === 0) return null;
+            const planLimit = (baseLimit || 0) + extraCapacity;
+            const isUnlimitedPlan = planLimit === Infinity;
+            const remainingGuestsRaw = isUnlimitedPlan ? Infinity : planLimit - totalGuests;
+            const remainingGuests = remainingGuestsRaw === Infinity ? Infinity : Math.max(0, remainingGuestsRaw);
+            const overCapacity = remainingGuestsRaw !== Infinity && remainingGuestsRaw < 0 ? Math.abs(remainingGuestsRaw) : 0;
+            const capacityChartData = isUnlimitedPlan ? [] : [
+              { key: 'limit', name: 'סך מסלול', value: planLimit, color: '#facc15' },
+              { key: 'total', name: 'סך אורחים', value: totalGuests, color: '#7c3aed' },
+              {
+                key: overCapacity > 0 ? 'over' : 'remaining',
+                name: overCapacity > 0 ? 'חריגה' : 'יתרה',
+                value: overCapacity > 0 ? overCapacity : remainingGuests,
+                color: overCapacity > 0 ? '#dc2626' : '#22c55e'
+              }
+            ];
+            const hasCapacityChartData = capacityChartData.some(item => Number.isFinite(item.value) && item.value > 0);
+            const renderCapacityLabel = ({ x, y, width, height, value, index }) => {
+              if (!value) return null;
+              const dataItem = capacityChartData[index];
+              const isDarkBar = ['total', 'over', 'remaining'].includes(dataItem?.key);
+              const insideBar = (height ?? 0) >= 24;
+              const labelX = x + (width ?? 0) / 2;
+              const labelY = insideBar ? y + (height ?? 0) / 2 : (y ?? 0) - 6;
+              const color = insideBar ? (isDarkBar ? '#FFFFFF' : '#111827') : '#111827';
+              return (
+                <text
+                  x={labelX}
+                  y={labelY}
+                  fill={color}
+                  textAnchor="middle"
+                  dominantBaseline={insideBar ? 'middle' : 'baseline'}
+                  fontWeight="700"
+                  fontSize="14"
+                >
+                  {value}
+                </text>
+              );
+            };
+
+            return (
+              <div className="w-full">
+                <div className="bg-yellow-50 p-3 text-center shadow-lg w-full" style={{
+                  border: '3px solid #D4AF37',
+                  outline: '2px solid #B8860B',
+                  outlineOffset: '2px',
+                  borderRadius: '8px',
+                  minHeight: '280px'
+                }}>
+                  <div className="flex items-center justify-center gap-2 mb-2">
+                    <span className="text-xl">📈</span>
+                    <h3 className="text-base font-bold text-yellow-800">יתרת אורחים</h3>
+                  </div>
+                  {isUnlimitedPlan ? (
+                    <div className="bg-white p-4 rounded-lg border border-yellow-200 text-base font-semibold text-yellow-700 mt-2">
+                      המסלול הנוכחי מאפשר מספר אורחים ללא הגבלה 🚀
+                    </div>
+                  ) : (
+                    <>
+                      <div className="bg-white p-3 rounded-lg border border-yellow-200 mt-2">
+                        {hasCapacityChartData ? (
+                          <div className="h-56">
+                            <ResponsiveContainer width="100%" height="100%">
+                              <BarChart
+                                data={capacityChartData}
+                                margin={{ top: 16, right: 20, left: -10, bottom: 8 }}
+                              >
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                                <XAxis
+                                  dataKey="name"
+                                  stroke="#1f2937"
+                                  tick={{ fontSize: 16, fontWeight: 600 }}
+                                  interval={0}
+                                />
+                                <YAxis hide />
+                                <Tooltip
+                                  formatter={(value, name) => [`${value}`, name]}
+                                  wrapperStyle={{ direction: 'rtl', textAlign: 'right' }}
+                                />
+                                <Bar dataKey="value" radius={[8, 8, 0, 0]} maxBarSize={60}>
+                                  {capacityChartData.map((item) => (
+                                    <Cell key={item.key} fill={item.color} />
+                                  ))}
+                                  <LabelList dataKey="value" content={renderCapacityLabel} />
+                                </Bar>
+                              </BarChart>
+                            </ResponsiveContainer>
+                          </div>
+                        ) : (
+                          <div className="py-10 text-sm text-gray-500 text-center">אין נתונים להצגה עדיין</div>
+                        )}
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-3 text-base">
+                        <div className="bg-white p-2 rounded-lg border border-yellow-100 text-right">
+                          <div className="text-sm font-semibold text-yellow-600">סך מסלול</div>
+                          <div className="text-2xl font-bold text-yellow-800">{planLimit}</div>
+                        </div>
+                        <div className="bg-white p-2 rounded-lg border border-purple-100 text-right">
+                          <div className="text-sm font-semibold text-purple-600">סך אורחים</div>
+                          <div className="text-2xl font-bold text-purple-700">{totalGuests}</div>
+                        </div>
+                        <div className={`bg-white p-2 rounded-lg border ${overCapacity > 0 ? 'border-red-200' : 'border-green-200'} text-right`}>
+                          <div className={`text-sm font-semibold ${overCapacity > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                            {overCapacity > 0 ? 'חריגה' : 'יתרה'}
+                          </div>
+                          <div className={`text-2xl font-bold ${overCapacity > 0 ? 'text-red-700' : 'text-green-700'}`}>
+                            {overCapacity > 0 ? `-${overCapacity}` : remainingGuests}
+                          </div>
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
+        </div>
+      </div>
       {/* Status and Summary Tables */}
-      <div className="w-full px-4 mb-0 mt-4" style={{ marginBottom: '200px' }}>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
+      <div className="w-full px-4 mb-0 mt-12" style={{ marginBottom: '200px' }}>
+        <div className="grid grid-cols-1 lg:grid-cols-6 gap-6">
           
           {/* First Column - Event Status */}
-          <div className="w-full">
+          <div className="w-full lg:col-span-2">
             {currentEventId ? (
               <div className="bg-green-50 p-3 text-center shadow-lg w-full" style={{
                 border: '3px solid #D4AF37',
@@ -2747,7 +3081,7 @@ React.useEffect(() => {
 
           {/* Second Column - Active Plan */}
           {selectedPlan && (
-            <div className="w-full">
+            <div className="w-full lg:col-span-2">
               <div className="bg-yellow-50 p-3 text-center shadow-lg w-full" style={{
                 border: '3px solid #D4AF37',
                 outline: '2px solid #B8860B',
@@ -2816,143 +3150,14 @@ React.useEffect(() => {
             </div>
           )}
 
-          {/* Third Column - Guest Status Summary */}
-          {currentEventId && (
-            <div className="w-full">
-              <div className="bg-purple-50 p-3 text-center shadow-lg w-full" style={{
-                border: '3px solid #D4AF37',
-                outline: '2px solid #B8860B',
-                outlineOffset: '2px',
-                borderRadius: '8px',
-                minHeight: '280px'
-              }}>
-                <div className="flex items-center justify-center gap-2 mb-2">
-                  <span className="text-xl">📊</span>
-                  <h3 className="text-base font-bold text-purple-800">סטטוס אישורי הגעה</h3>
-                </div>
-                <div className="space-y-2 mt-3">
-                  <div className="bg-white p-2 rounded-lg text-right">
-                    <div className="text-base font-bold text-green-600">
-                      אישרו הגעה:
-                      <span className="text-2xl text-green-700 px-2">{guestStatusSummary.approved}</span>
-                    </div>
-                  </div>
-                  <div className="bg-white p-2 rounded-lg text-right">
-                    <div className="text-base font-bold text-red-600">
-                      לא אישרו:
-                      <span className="text-2xl text-red-700 px-2">{guestStatusSummary.rejected}</span>
-                    </div>
-                  </div>
-                  <div className="bg-white p-2 rounded-lg text-right border-2 border-orange-200">
-                    <div className="text-base font-bold text-orange-600">
-                      טרם הגיבו:
-                      <span className="text-2xl text-orange-700 px-2">{guestStatusSummary.pending}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
 
-          {/* Fourth Column - Guest Summary */}
-          {currentEventId && (
-            <div className="w-full">
-              <div className="bg-blue-50 p-3 text-center shadow-lg w-full" style={{
-                border: '3px solid #D4AF37',
-                outline: '2px solid #B8860B',
-                outlineOffset: '2px',
-                borderRadius: '8px',
-                minHeight: '280px'
-              }}>
-                <div className="flex items-center justify-center gap-2 mb-2">
-                  <span className="text-xl">👥</span>
-                  <h3 className="text-base font-bold text-blue-800">סיכום כל האורחים המוזמנים</h3>
-                </div>
-                <div className="mt-1">
-                  {/* Table at the top */}
-                  <table className="w-full text-right border text-base mb-1">
-                    <thead>
-                      <tr className="bg-white">
-                        <th className="p-2 border font-bold text-green-600 text-center">מבוגרים</th>
-                        <th className="p-2 border font-bold text-orange-600 text-center">ילדים</th>
-                        <th className="p-2 border font-bold text-purple-600 text-center">סה"כ</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr>
-                        <td className="p-2 border text-center font-bold text-2xl text-green-600">{guestSummary.adults}</td>
-                        <td className="p-2 border text-center font-bold text-2xl text-orange-600">{guestSummary.children}</td>
-                        <td className="p-2 border text-center font-bold text-2xl text-purple-600">{guestSummary.adults + guestSummary.children}</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                  
-                  {/* Summary section below */}
-                  <div className="space-y-1">
-                    {selectedPlan && (() => {
-                      const totalGuests = guestSummary.adults + guestSummary.children;
-                      const baseLimit = getPlanBaseLimit(selectedPlan);
-                      const extraCapacity = additionalPackages.reduce((sum, planId) => sum + getPlanBaseLimit(planId), 0);
-                      if (!baseLimit && extraCapacity === 0) return null;
-                      const planLimit = (baseLimit || 0) + extraCapacity;
-                      const remainingGuests = Math.max(0, planLimit - totalGuests);
-                      
-                      return (
-                        <div className="bg-yellow-50 p-2 rounded-lg text-right border-2 border-yellow-400 mt-1">
-                          <div className="text-base font-bold text-yellow-800 mb-1">
-                            <span>יתרת אורחים:</span>
-                          </div>
-                          <table className="w-full text-right border text-base mt-1">
-                            <thead>
-                              <tr className="bg-white">
-                                <th className="p-2 border font-bold text-center text-xs" style={{lineHeight: '1.3'}}>
-                                  <div className="flex flex-col">
-                                    <span>מגבלת</span>
-                                    <span>מסלול</span>
-                                  </div>
-                                </th>
-                                <th className="p-2 border font-bold text-center text-xs" style={{lineHeight: '1.3'}}>
-                                  <div className="flex flex-col">
-                                    <span>סה"כ</span>
-                                    <span>אורחים</span>
-                                  </div>
-                                </th>
-                                <th className="p-2 border font-bold text-center text-xs" style={{lineHeight: '1.3'}}>
-                                  <div className="flex flex-col">
-                                    <span>יתרה</span>
-                                    <span>אפשרית</span>
-                                  </div>
-                                </th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              <tr>
-                                <td className="p-2 border text-center font-bold text-2xl">
-                                  {planLimit === Infinity ? 'ללא הגבלה' : planLimit}
-                                </td>
-                                <td className="p-2 border text-center font-bold text-2xl">{totalGuests}</td>
-                                <td className={`p-2 border text-center text-red-700 font-extrabold ${
-                                  (planLimit !== Infinity && totalGuests > planLimit)
-                                    ? 'text-3xl' 
-                                    : 'text-2xl'
-                                }`}>
-                                  {remainingGuests === Infinity ? 'ללא הגבלה' : (planLimit !== Infinity && totalGuests > planLimit) ? `-${totalGuests - planLimit}` : remainingGuests}
-                                </td>
-                              </tr>
-                            </tbody>
-                          </table>
-                        </div>
-                      );
-                    })()}
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
+          {/* Fourth Column - Guest Summary (rendered above) */}
+
+          {/* Plan capacity summary (rendered above) */}
 
           {/* Fifth Column - Table Summary Report */}
           {currentEventId && tableSummary.length > 0 && (
-            <div className="w-full">
+            <div className="w-full lg:col-span-2">
               <div className="bg-orange-50 p-3 text-center shadow-lg w-full" style={{
                 border: '3px solid #D4AF37',
                 outline: '2px solid #B8860B',
