@@ -6,6 +6,7 @@ import 'react-datepicker/dist/react-datepicker.css';
 import * as XLSX from 'xlsx';
 import { format } from 'date-fns';
 import { useToast } from './Toast';
+import TranzilaPayment from './TranzilaPayment';
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid, LabelList } from 'recharts';
 
 const RADIAN = Math.PI / 180;
@@ -273,24 +274,20 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick }, re
       setPlanSelectionError('');
     }
   }, [showPricingPlan]);
+
+  // Payment modal state
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [pendingPlan, setPendingPlan] = useState(null);
+  const [pendingAddonCount, setPendingAddonCount] = useState(1);
+  const [paymentAmount, setPaymentAmount] = useState(0);
+  const [paymentPlanName, setPaymentPlanName] = useState('');
   const getPlanBaseLimit = React.useCallback((plan) => {
-    switch(plan){
-      case 'basic':
-      case 'free':
-        return 50;
-      case 'standard':
-        return 200;
-      case 'premium':
-        return 350;
-      case 'luxury':
-        return 500;
-      case 'elite':
-        return 650;
-      case 'supreme':
-        return 1000;
-      default:
-        return 0;
+    // Everyone starts with free tier (50 guests)
+    // Addon packages provide 100 guests each
+    if (plan === 'addon') {
+      return 100;
     }
+    return 50; // Free tier default
   },[]);
 
   const [selectedPlan, setSelectedPlan] = useState(() => {
@@ -365,7 +362,7 @@ const totalGuestsCount = guestSummary.adults + guestSummary.children;
 const basePlanOverCapacity = basePlanLimit ? totalGuestsCount > basePlanLimit : false;
 const activePlanDescription =
   selectedPlan === 'basic' || selectedPlan === 'free'
-    ? 'מסלול א - חינמי לאירועים קטנים עם כל הפיצ\'רים הבסיסיים'
+    ? 'מסלול א - 49₪ לאירועים קטנים עם כל הפיצ\'רים הבסיסיים'
     : selectedPlan === 'standard'
       ? 'מסלול ב - מקצועי עם תמיכה מלאה ועיצובים מתקדמים'
       : selectedPlan === 'premium'
@@ -384,16 +381,8 @@ const additionalPackageCounts = React.useMemo(() => {
   }, {});
 }, [additionalPackages]);
 
-const handleAddPackagePlan = React.useCallback((plan) => {
-  if (plan === 'basic' || plan === 'free') {
-    setPlanSelectionError('לא ניתן להוסיף חבילה למסלול החינמי.');
-    return;
-  }
-  setAdditionalPackages((prev) => [...prev, plan]);
-  setPlanSelectionError('');
-  setPlanAddOnMode(false);
-  setShowPricingPlan(false);
-}, []);
+// No longer needed - removed complex plan selection
+// Users just purchase addon packages as needed
 
 const handleOpenAddonModal = React.useCallback(() => {
   const hasPaidPlan = selectedPlan && selectedPlan !== 'basic' && selectedPlan !== 'free';
@@ -627,6 +616,31 @@ const handleOpenAddonModal = React.useCallback(() => {
         .limit(1)
         .single();
 
+      // Check capacity before adding guest
+      const { data: existingGuests } = await supabase
+        .from('invited_guests')
+        .select('adults, children')
+        .eq('event_id', evRow.id);
+
+      const currentGuestCount = (existingGuests || []).reduce((sum, g) => sum + (g.adults || 0) + (g.children || 0), 0);
+      const totalAfterAdd = currentGuestCount + 1; // Adding 1 guest
+
+      const freeLimit = 50;
+      const addonCount = additionalPackages.filter(p => p === 'addon').length;
+      const totalCapacity = freeLimit + (addonCount * 100);
+
+      if (totalAfterAdd > totalCapacity) {
+        // Capacity exceeded - show payment popup
+        setGuestSummary({
+          approved: 0,
+          adults: totalAfterAdd,
+          children: 0
+        });
+        setShowPlanLimitWarning(true);
+        setGuestErrorMsg(`אין מספיק מקום! יש לך ${currentGuestCount} אורחים, המכסה: ${totalCapacity}`);
+        return;
+      }
+
       const { data: newGuest, error } = await supabase
         .from('invited_guests')
         .insert([
@@ -721,6 +735,31 @@ const handleOpenAddonModal = React.useCallback(() => {
         .order('created_at', { ascending: false })
         .limit(1)
         .single();
+
+      // Check capacity before adding guest
+      const { data: existingGuests } = await supabase
+        .from('invited_guests')
+        .select('adults, children')
+        .eq('event_id', evRow.id);
+
+      const currentGuestCount = (existingGuests || []).reduce((sum, g) => sum + (g.adults || 0) + (g.children || 0), 0);
+      const totalAfterAdd = currentGuestCount + 1; // Adding 1 guest
+
+      const freeLimit = 50;
+      const addonCount = additionalPackages.filter(p => p === 'addon').length;
+      const totalCapacity = freeLimit + (addonCount * 100);
+
+      if (totalAfterAdd > totalCapacity) {
+        // Capacity exceeded - show payment popup
+        setGuestSummary({
+          approved: 0,
+          adults: totalAfterAdd,
+          children: 0
+        });
+        setShowPlanLimitWarning(true);
+        setGuestErrorMsg(`אין מספיק מקום! יש לך ${currentGuestCount} אורחים, המכסה: ${totalCapacity}`);
+        return;
+      }
 
       const { data: newGuest, error } = await supabase
         .from('invited_guests')
@@ -1581,6 +1620,47 @@ React.useEffect(() => {
         return;
       }
 
+      // Check capacity before saving
+      const { data: existingGuests } = await supabase
+        .from('invited_guests')
+        .select('adults, children')
+        .eq('event_id', evRow.id);
+
+      const currentGuestCount = (existingGuests || []).reduce((sum, g) => sum + (g.adults || 0) + (g.children || 0), 0);
+      const newGuestsToAdd = validGuests.length; // Each guest in Excel = 1 person
+      const totalAfterSave = currentGuestCount + newGuestsToAdd;
+
+      // Calculate current capacity
+      const freeLimit = 50;
+      const addonCount = additionalPackages.filter(p => p === 'addon').length;
+      const totalCapacity = freeLimit + (addonCount * 100);
+
+      console.log('Capacity check:', {
+        current: currentGuestCount,
+        adding: newGuestsToAdd,
+        total: totalAfterSave,
+        capacity: totalCapacity
+      });
+
+      // Check if we'll exceed capacity
+      if (totalAfterSave > totalCapacity) {
+        setIsSavingExcelGuests(false);
+        setShowExcelPreview(false);
+
+        // Update guest summary to trigger the warning modal
+        setGuestSummary({
+          approved: 0,
+          adults: totalAfterSave,
+          children: 0
+        });
+
+        // Show capacity warning modal
+        setShowPlanLimitWarning(true);
+
+        addToast(`אין מספיק מקום! יש לך ${currentGuestCount} אורחים, מנסה להוסיף ${newGuestsToAdd}. המכסה: ${totalCapacity}`, 'error', 8000);
+        return;
+      }
+
       // Prepare guests for bulk insert
       const guestsToInsert = validGuests.map(g => ({
         user_id: user.id,
@@ -1803,30 +1883,165 @@ React.useEffect(() => {
     try{ localStorage.removeItem('selectedEventType'); }catch{} // Clear selected event type from local storage
     try{ localStorage.removeItem('selectedPlan'); }catch{}
     try{ localStorage.removeItem('additionalPackages'); }catch{}
-    
-    // Force the user to pick a pricing plan for the new event
+
+    // Clear selected plan - user must choose and pay
+    setSelectedPlan(null);
+    try { localStorage.removeItem('selectedPlan'); } catch(e){}
+
+    // Show pricing plan modal first, then event type selection
     setShowPricingPlan(true);
+    setPlanAddOnMode(false); // Ensure we're in plan selection mode, not addon mode
 
     if (showDeletionMessage) {
       setShowDeletionSuccess(true);
     }
   };
 
+  // Get price for each plan
+  const getPlanPrice = (plan) => {
+    switch(plan) {
+      case 'free':
+      case 'basic':
+        return 49;
+      case 'standard':
+        return 149;
+      case 'premium':
+        return 199;
+      case 'luxury':
+        return 259;
+      default:
+        return 49;
+    }
+  };
+
+  // Get plan display name
+  const getPlanDisplayName = (plan) => {
+    switch(plan) {
+      case 'free':
+      case 'basic':
+        return 'מסלול א - 49₪';
+      case 'standard':
+        return 'מסלול ב - 149₪';
+      case 'premium':
+        return 'מסלול ג - 199₪';
+      case 'luxury':
+        return 'מסלול ד - 259₪';
+      default:
+        return plan;
+    }
+  };
+
+  // Get allowed guests for a plan
+  const getPlanGuestLimit = (plan) => {
+    switch(plan) {
+      case 'free':
+      case 'basic':
+        return 50;
+      case 'standard':
+        return 200;
+      case 'premium':
+        return 350;
+      case 'luxury':
+        return 500;
+      default:
+        return 50;
+    }
+  };
+
+  // Handle plan selection in pricing modal
   const handleSelectPlan = (plan) => {
-    setPlanSelectionError('');
-    setPlanAddOnMode(false);
-    if(plan !== selectedPlan){
-      setAdditionalPackages([]);
-      try { localStorage.removeItem('additionalPackages'); } catch(e){}
-    }
-    setSelectedPlan(plan);
-    try { localStorage.setItem('selectedPlan', plan); } catch(e){}
+    const price = getPlanPrice(plan);
+
+    // All plans now require payment
+    setPendingPlan(plan);
+    setPaymentAmount(price);
+    setPaymentPlanName(getPlanDisplayName(plan));
     setShowPricingPlan(false);
-    if (!selectedEventType) {
+    setShowPaymentModal(true);
+  };
+
+  // Handle adding package plan (for addon mode)
+  const handleAddPackagePlan = (plan) => {
+    // Add the selected plan to additional packages
+    setAdditionalPackages((prev) => [...prev, plan]);
+    setShowPricingPlan(false);
+  };
+
+  // Helper function to get addon package price (100 guests for 100 shekel)
+  const getAddonPrice = () => {
+    return 100;
+  };
+
+  // Helper function to get addon display name
+  const getAddonDisplayName = () => {
+    return 'חבילת הרחבה - 100 מוזמנים נוספים';
+  };
+
+  // Purchase addon capacity (100 guests for 100 shekel)
+  const handlePurchaseAddon = () => {
+    const totalGuests = guestSummary.adults + guestSummary.children;
+    const freeLimit = 50;
+    const addonCount = additionalPackages.filter(p => p === 'addon').length;
+    const totalLimit = freeLimit + (addonCount * 100);
+    const guestsNeeded = totalGuests - totalLimit;
+    const packagesNeeded = Math.max(1, Math.ceil(guestsNeeded / 100));
+    const totalCost = packagesNeeded * 100;
+
+    setPendingPlan('addon');
+    setPendingAddonCount(packagesNeeded); // Store how many packages to add
+    setPaymentAmount(totalCost);
+    setPaymentPlanName(packagesNeeded === 1 ? getAddonDisplayName() : `${packagesNeeded} חבילות הרחבה - ${packagesNeeded * 100} מוזמנים נוספים`);
+    setShowPaymentModal(true);
+    setShowPlanLimitWarning(false);
+  };
+
+  // Handle successful payment
+  const handlePaymentSuccess = (transactionData) => {
+    console.log('Payment successful:', transactionData);
+
+    // Handle plan purchase (ב, ג, ד)
+    if (pendingPlan && pendingPlan !== 'addon') {
+      setSelectedPlan(pendingPlan);
+      try { localStorage.setItem('selectedPlan', pendingPlan); } catch(e){}
+
+      const planDisplayName = getPlanDisplayName(pendingPlan);
+      addToast(`התשלום בוצע בהצלחה! ${planDisplayName} הופעל`, 'success');
+
+      // Close payment modal and show event types
+      setShowPaymentModal(false);
       setShowEventTypes(true);
-      setStepErrorMsg('');
-      setClickedStepName('');
     }
+    // Handle addon packages (100 guests for 100 shekel each)
+    else if (pendingPlan === 'addon') {
+      const newAddons = Array(pendingAddonCount).fill('addon');
+      setAdditionalPackages((prev) => [...prev, ...newAddons]);
+      setPlanSelectionError('');
+
+      const totalGuestsAdded = pendingAddonCount * 100;
+      addToast(`התשלום בוצע בהצלחה! ${totalGuestsAdded} מקומות נוספים נוספו לאירוע שלך.`, 'success');
+
+      setShowPaymentModal(false);
+    }
+
+    // Clear pending state
+    setPendingPlan(null);
+    setPendingAddonCount(1);
+  };
+
+  // Handle payment failure
+  const handlePaymentFailure = (errorData) => {
+    console.log('Payment failed:', errorData);
+
+    // Show error message
+    addToast('התשלום נכשל. אנא נסה שוב או בחר מסלול אחר.', 'error');
+
+    // Close payment modal and show pricing modal again
+    setShowPaymentModal(false);
+    setShowPricingPlan(true);
+
+    // Clear pending state
+    setPendingPlan(null);
+    setPendingAddonCount(1);
   };
 
   // Check if there's an existing event in progress
@@ -2576,47 +2791,79 @@ React.useEffect(() => {
 
   return (
     <>
-      {/* Plan Limit Warning Modal */}
+      {/* Capacity Limit Warning Modal */}
       {showPlanLimitWarning && (
         <div className="fixed inset-0 flex items-center justify-center bg-black/70 z-[100]">
           <div className="bg-white rounded-lg p-8 w-full max-w-2xl mx-4 text-center shadow-2xl">
             {(() => {
               const totalGuests = guestSummary.adults + guestSummary.children;
-              const baseLimit = getPlanBaseLimit(selectedPlan);
-              const effectiveLimit = (baseLimit || 0) + additionalCapacity;
-              const deficit = Math.max(0, totalGuests - effectiveLimit);
-              const canAddPackage = Boolean(selectedPlan && selectedPlan !== 'basic' && selectedPlan !== 'free');
-              
+              const freeLimit = 50;
+              const addonCount = additionalPackages.filter(p => p === 'addon').length;
+              const totalLimit = freeLimit + (addonCount * 100);
+              const guestsNeeded = totalGuests - totalLimit;
+              const packagesNeeded = Math.ceil(guestsNeeded / 100);
+              const totalCost = packagesNeeded * 100;
+
               return (
-            <div className="mb-6">
-              <div className="text-6xl mb-4">⚠️</div>
-              <h2 className="text-3xl font-bold text-red-600 mb-4">חריגה ממסגרת המסלול!</h2>
-              <p className="text-xl text-gray-700 mb-4">
-                מספר האורחים המוזמנים ({totalGuests}) חורג מהמכסה הנוכחית ({effectiveLimit})
-              </p>
-              <div className="bg-red-50 border-2 border-red-400 rounded-lg p-4 mb-4">
-                <p className="text-lg font-bold text-red-800">
-                  {canAddPackage && deficit > 0
-                    ? `חסרים ${deficit} אורחים לעומת חבילת המסלול.`
-                    : canAddPackage
-                      ? 'הגעת למכסה המקסימלית של החבילה הנבחרת.'
-                      : 'יש לבחור מסלול בתשלום כדי להמשיך.'}
-                </p>
-                {planLimitWarningError && (
-                  <p className="text-base font-semibold text-red-600 mt-2">
-                    {planLimitWarningError}
+                <div className="mb-6">
+                  <div className="text-6xl mb-4">🎉</div>
+                  <h2 className="text-3xl font-bold text-primary mb-4">מספר האורחים עולה על המכסה!</h2>
+                  <p className="text-xl text-gray-700 mb-6">
+                    יש לך <strong className="text-primary">{totalGuests} אורחים</strong> מוזמנים
                   </p>
-                )}
-              </div>
-              <div className="flex justify-center gap-4 flex-wrap">
-                <button
-                  onClick={handleOpenAddonModal}
-                  className="bg-green-600 text-white border-2 border-green-700 rounded-full px-8 py-4 font-bold text-lg hover:bg-green-700 transition-all shadow-lg"
-                >
-                  {canAddPackage ? 'הוסף חבילת מסלול נוספת' : 'בחר מסלול בתשלום'}
-                </button>
-              </div>
-            </div>
+
+                  <div className="bg-blue-50 border-2 border-blue-300 rounded-lg p-6 mb-6">
+                    <div className="flex items-center justify-center gap-4 mb-4">
+                      <div className="text-center">
+                        <div className="text-4xl font-bold text-primary">{totalLimit}</div>
+                        <div className="text-sm text-gray-600">מכסה נוכחית</div>
+                      </div>
+                      <div className="text-3xl text-gray-400">→</div>
+                      <div className="text-center">
+                        <div className="text-4xl font-bold text-green-600">{totalGuests}</div>
+                        <div className="text-sm text-gray-600">אורחים מוזמנים</div>
+                      </div>
+                    </div>
+                    <div className="text-center text-gray-700 mb-4">
+                      <p className="text-lg font-semibold">
+                        נדרשים עוד <strong className="text-red-600">{guestsNeeded}</strong> מקומות
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-300 rounded-lg p-6 mb-6">
+                    <h3 className="text-xl font-bold text-green-800 mb-3">💰 הצעה מיוחדת</h3>
+                    <div className="text-center mb-4">
+                      <div className="text-5xl font-bold text-green-600 mb-2">₪100</div>
+                      <div className="text-lg text-gray-700">עבור 100 מוזמנים נוספים</div>
+                    </div>
+                    <div className="bg-white rounded-lg p-4 mb-4">
+                      <p className="text-gray-700">
+                        <strong>מספר חבילות נדרשות:</strong> {packagesNeeded}<br/>
+                        <strong>סה"כ לתשלום:</strong> <span className="text-2xl font-bold text-green-600">₪{totalCost}</span>
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-center gap-4 flex-wrap">
+                    <button
+                      onClick={handlePurchaseAddon}
+                      className="bg-gradient-to-r from-green-600 to-emerald-600 text-white border-2 border-green-700 rounded-full px-10 py-5 font-bold text-xl hover:from-green-700 hover:to-emerald-700 transition-all shadow-lg transform hover:scale-105"
+                    >
+                      🛒 רכוש {packagesNeeded} {packagesNeeded === 1 ? 'חבילה' : 'חבילות'} (₪{totalCost})
+                    </button>
+                    <button
+                      onClick={() => setShowPlanLimitWarning(false)}
+                      className="bg-gray-200 text-gray-700 border-2 border-gray-300 rounded-full px-8 py-4 font-medium text-lg hover:bg-gray-300 transition-all"
+                    >
+                      ביטול
+                    </button>
+                  </div>
+
+                  <p className="text-sm text-gray-500 mt-4">
+                    * תשלום חד פעמי לאירוע • ללא מנויים
+                  </p>
+                </div>
               );
             })()}
           </div>
@@ -2842,12 +3089,12 @@ React.useEffect(() => {
                        selectedPlan === 'supreme' ? 'מסלול ו' : 'לא נבחר מסלול'}
                     </div>
                     <div className="text-base text-gray-700 font-semibold">
-                      {selectedPlan === 'basic' || selectedPlan === 'free' ? 'חינם - עד 50 אורחים' : 
-                       selectedPlan === 'standard' ? '149₪ - מ 51 עד 200 אורחים' : 
-                       selectedPlan === 'premium' ? '199₪ - מ 201 עד 350 אורחים' : 
-                       selectedPlan === 'luxury' ? '259₪ - מ 351 עד 500 אורחים' : 
-                       selectedPlan === 'elite' ? '349₪ - מ 501 עד 650 אורחים' : 
-                       selectedPlan === 'supreme' ? '499₪ - מ 651 עד 1000 אורחים' : ''}
+                      {selectedPlan === 'basic' || selectedPlan === 'free' ? '49₪ - עד 50 מוזמנים' :
+                       selectedPlan === 'standard' ? '149₪ - מ 51 עד 200 מוזמנים' :
+                       selectedPlan === 'premium' ? '199₪ - מ 201 עד 350 מוזמנים' :
+                       selectedPlan === 'luxury' ? '259₪ - מ 351 עד 500 מוזמנים' :
+                       selectedPlan === 'elite' ? '349₪ - מ 501 עד 650 מוזמנים' :
+                       selectedPlan === 'supreme' ? '499₪ - מ 651 עד 1000 מוזמנים' : ''}
                     </div>
                     {additionalPackages.length > 0 && totalPlanCapacity && (
                       <div className="mt-2 text-sm font-semibold text-yellow-700 space-y-1">
@@ -5526,12 +5773,10 @@ React.useEffect(() => {
                   <div className="space-y-2">
                     <p className="text-gray-700 text-base leading-relaxed">בשלב זה תבחר את המסלול המתאים לאירוע שלך:</p>
                     <ul className="list-disc list-inside space-y-1.5 mr-3 text-base">
-                      <li><strong>מסלול א (חינם)</strong> - עד 50 אורחים</li>
-                      <li><strong>מסלול ב (149₪)</strong> - מ 51 עד 200 אורחים</li>
-                      <li><strong>מסלול ג (199₪)</strong> - מ 201 עד 350 אורחים</li>
-                      <li><strong>מסלול ד (259₪)</strong> - מ 351 עד 500 אורחים</li>
-                      <li><strong>מסלול ה (349₪)</strong> - מ 501 עד 650 אורחים</li>
-                      <li><strong>מסלול ו (499₪)</strong> - מ 651 עד 1000 אורחים</li>
+                      <li><strong>מסלול א (49₪)</strong> - עד 50 מוזמנים</li>
+                      <li><strong>מסלול ב (149₪)</strong> - מ 51 עד 200 מוזמנים</li>
+                      <li><strong>מסלול ג (199₪)</strong> - מ 201 עד 350 מוזמנים</li>
+                      <li><strong>מסלול ד (259₪)</strong> - מ 351 עד 500 מוזמנים</li>
                     </ul>
                     <p className="text-gray-600 text-sm mt-2">המחירים הם חד פעמיים לכל אירוע</p>
                   </div>
@@ -5642,9 +5887,10 @@ React.useEffect(() => {
 
       {/* Pricing Plan Selection Modal */}
       {showPricingPlan && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50 overflow-y-auto">
-          <div className="relative bg-white rounded-lg p-6 sm:p-8 w-full max-w-[98vw] mx-4 my-8">
-            <button onClick={()=>setShowPricingPlan(false)} className="absolute top-4 left-4 text-3xl text-gray-500 hover:text-gray-700" aria-label="סגור">&times;</button>
+        <div className="fixed inset-0 bg-black/50 z-50 overflow-y-auto">
+          <div className="min-h-screen flex items-center justify-center p-4">
+            <div className="relative bg-white rounded-lg p-6 sm:p-8 w-full max-w-[98vw] my-8">
+            <button onClick={()=>{setShowPricingPlan(false); if(!planAddOnMode) setShowEventTypes(true);}} className="absolute top-4 left-4 text-3xl text-gray-500 hover:text-gray-700" aria-label="סגור">&times;</button>
             <h2 className="text-2xl md:text-3xl font-bold mb-4 text-center text-primary">בחר את המסלול המתאים לאירוע שלך</h2>
             {planAddOnMode && (
               <div className="text-center text-sm font-semibold text-primary mb-4">
@@ -5657,16 +5903,16 @@ React.useEffect(() => {
               </div>
             )}
             
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-6 gap-4 sm:gap-6">
-              {/* Free Plan - Up to 50 guests */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-4 gap-4 sm:gap-6">
+              {/* Plan A - Up to 50 guests */}
               <div className="border-2 border-gray-300 rounded-lg p-6 hover:border-primary transition-all hover:shadow-lg text-center">
                 <h3 className="text-xl font-bold mb-2 text-primary">מסלול א</h3>
                 <p className="text-gray-600 mb-4">מתאים לאירועים קטנים</p>
                 <div className="mb-4">
-                  <span className="text-base md:text-xl font-bold text-primary">חינם</span>
+                  <span className="text-base md:text-xl font-bold text-primary">49 ₪</span>
                 </div>
                 <div className="mb-6 text-right">
-                  <p className="text-base md:text-xl font-semibold text-primary mb-3 whitespace-nowrap tracking-wide">✓ עד 50 אורחים</p>
+                  <p className="text-base md:text-xl font-semibold text-primary mb-3 whitespace-nowrap tracking-wide">✓ עד 50 מוזמנים</p>
                   <p className="text-gray-600 mb-2">✓ הזמנות מעוצבות מקצועית</p>
                   <p className="text-gray-600 mb-2">✓ שליחה אוטומטית לכל האורחים</p>
                   <p className="text-gray-600 mb-2">✓ שליחת הודעות SMS ב-3 סבבים</p>
@@ -5698,7 +5944,7 @@ React.useEffect(() => {
                   <span className="text-base md:text-xl font-bold text-primary">149 ₪</span>
                 </div>
                 <div className="mb-6 text-right">
-                  <p className="text-base md:text-xl font-semibold text-primary mb-3 whitespace-nowrap tracking-wide">✓ מ 51 עד 200 אורחים</p>
+                  <p className="text-base md:text-xl font-semibold text-primary mb-3 whitespace-nowrap tracking-wide">✓ מ 51 עד 200 מוזמנים</p>
                   <p className="text-gray-600 mb-2">✓ הזמנות מעוצבות מקצועית</p>
                   <p className="text-gray-600 mb-2">✓ שליחה אוטומטית לכל האורחים</p>
                   <p className="text-gray-600 mb-2">✓ שליחת הודעות SMS ב-3 סבבים</p>
@@ -5726,7 +5972,7 @@ React.useEffect(() => {
                   <span className="text-base md:text-xl font-bold text-primary">199 ₪</span>
                 </div>
                 <div className="mb-6 text-right">
-                  <p className="text-base md:text-xl font-semibold text-primary mb-3 whitespace-nowrap tracking-wide">✓ מ 201 עד 350 אורחים</p>
+                  <p className="text-base md:text-xl font-semibold text-primary mb-3 whitespace-nowrap tracking-wide">✓ מ 201 עד 350 מוזמנים</p>
                   <p className="text-gray-600 mb-2">✓ הזמנות מעוצבות מקצועית</p>
                   <p className="text-gray-600 mb-2">✓ שליחה אוטומטית לכל האורחים</p>
                   <p className="text-gray-600 mb-2">✓ שליחת הודעות SMS ב-3 סבבים</p>
@@ -5754,7 +6000,7 @@ React.useEffect(() => {
                   <span className="text-base md:text-xl font-bold text-primary">259 ₪</span>
                 </div>
                 <div className="mb-6 text-right">
-                  <p className="text-base md:text-xl font-semibold text-primary mb-3 whitespace-nowrap tracking-wide">✓ מ 351 עד 500 אורחים</p>
+                  <p className="text-base md:text-xl font-semibold text-primary mb-3 whitespace-nowrap tracking-wide">✓ מ 351 עד 500 מוזמנים</p>
                   <p className="text-gray-600 mb-2">✓ הזמנות מעוצבות מקצועית</p>
                   <p className="text-gray-600 mb-2">✓ שליחה אוטומטית לכל האורחים</p>
                   <p className="text-gray-600 mb-2">✓ שליחת הודעות SMS ב-3 סבבים</p>
@@ -5773,68 +6019,29 @@ React.useEffect(() => {
                   {planAddOnMode ? 'הוסף חבילת מסלול ד' : 'בחר מסלול זה'}
                 </button>
               </div>
-
-              {/* Elite Plan - 501-650 guests */}
-              <div className="border-2 border-gray-300 rounded-lg p-6 hover:border-primary transition-all hover:shadow-lg text-center">
-                <h3 className="text-xl font-bold mb-2 text-primary">מסלול ה</h3>
-                <p className="text-gray-600 mb-4">לאירועים ענקיים</p>
-                <div className="mb-4">
-                  <span className="text-base md:text-xl font-bold text-primary">349 ₪</span>
-                </div>
-                <div className="mb-6 text-right">
-                  <p className="text-base md:text-xl font-semibold text-primary mb-3 whitespace-nowrap tracking-wide">✓ מ 501 עד 650 אורחים</p>
-                  <p className="text-gray-600 mb-2">✓ הזמנות מעוצבות מקצועית</p>
-                  <p className="text-gray-600 mb-2">✓ שליחה אוטומטית לכל האורחים</p>
-                  <p className="text-gray-600 mb-2">✓ שליחת הודעות SMS ב-3 סבבים</p>
-                  <p className="text-gray-600 mb-2">✓ מעקב אישורי הגעה</p>
-                  <p className="text-gray-600 mb-2">✓ הצגת דוחות סיכום מתעדכנים בזמן אמת בדף הבית</p>
-                  <p className="text-gray-600 mb-2">✓ ניהול פרטי אורחים</p>
-                  <p className="text-gray-600 mb-2">✓ ניהול העדפות מזון ואלרגיות</p>
-                  <p className="text-gray-600 mb-2">✓ דוחות מפורטים + ייצוא ל-Excel</p>
-                  <p className="text-gray-600 mb-2">✓ שמירת אירועי עבר בארכיון</p>
-                  <p className="text-gray-600 mb-2">✓ הצגת מפת אזור האירוע + ניווט לאולם</p>
-                </div>
-                <button
-                  onClick={() => planAddOnMode ? handleAddPackagePlan('elite') : handleSelectPlan('elite')}
-                  className={`w-full ${planAddOnMode ? 'bg-green-600 text-white hover:bg-green-700' : selectedPlan === 'elite' ? 'bg-primary text-white' : 'bg-[#FCE6AC] text-primary hover:bg-primary hover:text-white'} border border-primary rounded-full px-6 py-3 font-medium transition-all`}
-                >
-                  {planAddOnMode ? 'הוסף חבילת מסלול ה' : 'בחר מסלול זה'}
-                </button>
-              </div>
-
-              {/* Supreme Plan - 651-1000 guests */}
-              <div className="border-2 border-gray-300 rounded-lg p-6 hover:border-primary transition-all hover:shadow-lg text-center">
-                <h3 className="text-xl font-bold mb-2 text-primary">מסלול ו</h3>
-                <p className="text-gray-600 mb-4">לאירועים עצומים</p>
-                <div className="mb-4">
-                  <span className="text-base md:text-xl font-bold text-primary">499 ₪</span>
-                </div>
-                <div className="mb-6 text-right">
-                  <p className="text-base md:text-xl font-semibold text-primary mb-3 whitespace-nowrap tracking-wide">✓ מ 651 עד 1000 אורחים</p>
-                  <p className="text-gray-600 mb-2">✓ הזמנות מעוצבות מקצועית</p>
-                  <p className="text-gray-600 mb-2">✓ שליחה אוטומטית לכל האורחים</p>
-                  <p className="text-gray-600 mb-2">✓ שליחת הודעות SMS ב-3 סבבים</p>
-                  <p className="text-gray-600 mb-2">✓ מעקב אישורי הגעה</p>
-                  <p className="text-gray-600 mb-2">✓ הצגת דוחות סיכום מתעדכנים בזמן אמת בדף הבית</p>
-                  <p className="text-gray-600 mb-2">✓ ניהול פרטי אורחים</p>
-                  <p className="text-gray-600 mb-2">✓ ניהול העדפות מזון ואלרגיות</p>
-                  <p className="text-gray-600 mb-2">✓ דוחות מפורטים + ייצוא ל-Excel</p>
-                  <p className="text-gray-600 mb-2">✓ שמירת אירועי עבר בארכיון</p>
-                  <p className="text-gray-600 mb-2">✓ הצגת מפת אזור האירוע + ניווט לאולם</p>
-                </div>
-                <button
-                  onClick={() => planAddOnMode ? handleAddPackagePlan('supreme') : handleSelectPlan('supreme')}
-                  className={`w-full ${planAddOnMode ? 'bg-green-600 text-white hover:bg-green-700' : selectedPlan === 'supreme' ? 'bg-primary text-white' : 'bg-[#FCE6AC] text-primary hover:bg-primary hover:text-white'} border border-primary rounded-full px-6 py-3 font-medium transition-all`}
-                >
-                  {planAddOnMode ? 'הוסף חבילת מסלול ו' : 'בחר מסלול זה'}
-                </button>
-              </div>
             </div>
 
-            <p className="text-center text-gray-500 text-sm mt-6">* המחירים הם חד פעמיים לאירוע</p>
+            <div className="mt-6 space-y-2">
+              <p className="text-center text-gray-500 text-sm">* המחירים הם חד פעמיים לאירוע</p>
+              <div className="bg-blue-50 border-2 border-blue-200 rounded-lg p-4 text-center">
+                <p className="text-blue-800 font-bold text-base mb-1">💡 צריך יותר מ-500 מוזמנים?</p>
+                <p className="text-blue-700 text-sm">ניתן לרכוש חבילות הרחבה של 100 מוזמנים נוספים ב-100 ₪ בלבד!</p>
+              </div>
+            </div>
+            </div>
           </div>
         </div>
       )}
+
+      {/* Tranzila Payment Modal */}
+      <TranzilaPayment
+        isOpen={showPaymentModal}
+        onClose={() => setShowPaymentModal(false)}
+        amount={paymentAmount}
+        planName={paymentPlanName}
+        onSuccess={handlePaymentSuccess}
+        onFailure={handlePaymentFailure}
+      />
 
       {/* Archive events list modal */}
       {showArchiveList && (
