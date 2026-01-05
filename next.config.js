@@ -8,8 +8,15 @@ module.exports = {
     NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
   },
   images: {
-    domains: ['images.unsplash.com'],
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'images.unsplash.com',
+      },
+    ],
   },
+  // Turbopack configuration (Next.js 16+)
+  turbopack: {},
   webpack: (config) => {
     // Ensure only one copy of React is bundled to avoid invalid hook errors
     config.resolve.alias = {
