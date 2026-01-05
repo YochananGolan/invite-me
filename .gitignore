@@ -1,3 +1,13 @@
 node_modules/
 .next/
 
+# Environment variables - NEVER commit these!
+.env
+.env.local
+.env*.local
+
+# Temp files
+NUL
+
+# IDE and editor files
+.claude/
