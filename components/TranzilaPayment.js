@@ -8,81 +8,30 @@ export default function TranzilaPayment({
   onSuccess,
   onFailure
 }) {
-  console.log('🎨 TranzilaPayment rendering. isOpen:', isOpen, 'amount:', amount);
-
-  const [isLoading, setIsLoading] = useState(true);
+  const [isIframeLoading, setIsIframeLoading] = useState(true);
+  const [isHandshakeLoading, setIsHandshakeLoading] = useState(false);
   const [handshakeToken, setHandshakeToken] = useState(null);
+  const [handshakeMode, setHandshakeMode] = useState('handshake');
+  const [handshakeDetails, setHandshakeDetails] = useState(null);
   const [handshakeError, setHandshakeError] = useState(null);
+  const [handshakeAttempt, setHandshakeAttempt] = useState(0);
   const iframeRef = useRef(null);
   const formRef = useRef(null);
 
-  // Store callbacks in refs to avoid re-running effect when they change
-  const onSuccessRef = useRef(onSuccess);
-  const onFailureRef = useRef(onFailure);
-  const onCloseRef = useRef(onClose);
-
   useEffect(() => {
-    onSuccessRef.current = onSuccess;
-    onFailureRef.current = onFailure;
-    onCloseRef.current = onClose;
-  }, [onSuccess, onFailure, onClose]);
-
-  // Get handshake token when modal opens
-  useEffect(() => {
-    console.log('🔄 TranzilaPayment effect running. isOpen:', isOpen);
-
     if (!isOpen) {
-      setIsLoading(true);
+      setIsIframeLoading(true);
+      setIsHandshakeLoading(false);
       setHandshakeToken(null);
+      setHandshakeMode('handshake');
+      setHandshakeDetails(null);
       setHandshakeError(null);
-      return;
+      setHandshakeAttempt(0);
     }
+  }, [isOpen]);
 
-    // Call handshake API
-    const getHandshake = async () => {
-      try {
-        setIsLoading(true);
-        setHandshakeError(null);
-
-        console.log('🤝 Requesting handshake for amount:', amount);
-
-        const response = await fetch('/api/tranzila/handshake', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ amount }),
-        });
-
-        const data = await response.json();
-
-        if (!response.ok || !data.success) {
-          throw new Error(data.message || 'Failed to create handshake');
-        }
-
-        console.log('✅ Handshake successful. Token:', data.thtk);
-        setHandshakeToken(data.thtk);
-
-      } catch (error) {
-        console.error('❌ Handshake failed:', error);
-        setHandshakeError(error.message);
-        setIsLoading(false);
-      }
-    };
-
-    getHandshake();
-  }, [isOpen, amount]);
-
-  // Auto-submit form after handshake succeeds
   useEffect(() => {
-    if (!handshakeToken || !isOpen) return;
-
-    const timer = setTimeout(() => {
-      if (formRef.current) {
-        console.log('🚀 Auto-submitting payment form with handshake token');
-        formRef.current.submit();
-      }
-    }, 100);
+    if (!isOpen) return;
 
     // Listen for messages from Tranzila iframe
     const handleMessage = (event) => {
@@ -91,26 +40,208 @@ export default function TranzilaPayment({
 
       console.log('Received message from iframe:', event.data);
 
-      // Handle Tranzila response
-      if (event.data && typeof event.data === 'object') {
-        if (event.data.success || event.data.Response === '000') {
-          // Payment successful
-          onSuccessRef.current && onSuccessRef.current(event.data);
-          onCloseRef.current();
-        } else if (event.data.error || event.data.Response) {
-          // Payment failed
-          onFailureRef.current && onFailureRef.current(event.data);
-        }
+      const data = event.data;
+
+      if (!data || typeof data !== 'object') {
+        return;
+      }
+
+      if (data.closePayment) {
+        onClose();
+        return;
+      }
+
+      if (data.retryPayment) {
+        setHandshakeToken(null);
+        setHandshakeDetails(null);
+        setHandshakeError(null);
+        setIsIframeLoading(true);
+        setIsHandshakeLoading(false);
+        setHandshakeAttempt((prev) => prev + 1);
+        return;
+      }
+
+      if (data.success || data.Response === '000') {
+        onSuccess && onSuccess(data);
+        onClose();
+        return;
+      }
+
+      if (data.error || data.Response) {
+        onFailure && onFailure(data);
       }
     };
 
     window.addEventListener('message', handleMessage);
 
     return () => {
-      clearTimeout(timer);
       window.removeEventListener('message', handleMessage);
     };
-  }, [handshakeToken, isOpen]);
+  }, [isOpen, onSuccess, onFailure, onClose]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    let isCancelled = false;
+
+    const amountValue = Number(amount);
+
+    const initiateHandshake = async () => {
+      if (Number.isNaN(amountValue) || amountValue <= 0) {
+        const message = 'סכום העסקה אינו תקין עבור תשלום ב-Tranzila.';
+        console.error(message, { amount });
+        setHandshakeError(message);
+        onFailure &&
+          onFailure({
+            error: true,
+            reason: 'invalid_amount',
+            message
+          });
+        return;
+      }
+
+      setHandshakeMode('handshake');
+      setIsHandshakeLoading(true);
+      setIsIframeLoading(true);
+      setHandshakeError(null);
+      setHandshakeToken(null);
+      setHandshakeDetails(null);
+
+      try {
+        const response = await fetch('/api/tranzila/handshake', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          cache: 'no-store',
+          body: JSON.stringify({
+            amount: amountValue,
+            description: planName
+          })
+        });
+
+        let payload = null;
+
+        try {
+          payload = await response.json();
+        } catch (jsonError) {
+          console.warn('Failed to parse Tranzila handshake response as JSON', jsonError);
+        }
+
+        if (!response.ok) {
+          const message =
+            payload?.error ||
+            payload?.message ||
+            'שגיאה בחיבור למסוף Tranzila. בדוק את הגדרות ההתחברות ונסה שוב.';
+
+          console.error('Tranzila handshake request returned an error response', {
+            status: response.status,
+            payload
+          });
+
+          if (!isCancelled) {
+            setHandshakeError(message);
+            onFailure &&
+              onFailure({
+                error: true,
+                reason: 'handshake_failed',
+                message
+              });
+          }
+
+          return;
+        }
+
+        if (!payload?.token && !payload?.mock) {
+          throw new Error('Handshake response missing token');
+        }
+
+        const isMockHandshake = Boolean(payload?.mock);
+
+        console.log('Tranzila handshake ready', {
+          sum: payload?.sum,
+          hasToken: Boolean(payload?.token),
+          mock: isMockHandshake
+        });
+
+        if (isCancelled) {
+          return;
+        }
+
+        if (isMockHandshake) {
+          console.warn(
+            'Tranzila handshake is running in mocked development mode. Configure environment variables for real payments.',
+            payload
+          );
+          setHandshakeMode('legacy');
+          setHandshakeToken(null);
+          setHandshakeDetails(payload);
+        } else {
+          setHandshakeMode('handshake');
+          setHandshakeToken(payload.token);
+          setHandshakeDetails(payload);
+        }
+      } catch (error) {
+        console.error('Failed to initialize Tranzila handshake', error);
+
+        if (isCancelled) {
+          return;
+        }
+
+        const message =
+          error?.message ||
+          'שגיאה בחיבור למסוף Tranzila. אנא נסה שוב או פנה לתמיכה.';
+
+        setHandshakeError(message);
+
+        onFailure &&
+          onFailure({
+            error: true,
+            reason: 'handshake_failed',
+            message
+          });
+      } finally {
+        if (!isCancelled) {
+          setIsHandshakeLoading(false);
+        }
+      }
+    };
+
+    initiateHandshake();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [isOpen, amount, planName, onFailure, handshakeAttempt]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const isReadyToSubmit =
+      handshakeMode === 'handshake'
+        ? Boolean(handshakeToken)
+        : handshakeMode === 'legacy'
+        ? Boolean(handshakeDetails)
+        : false;
+
+    if (!isReadyToSubmit) return;
+
+    const timer = setTimeout(() => {
+      if (formRef.current) {
+        console.log(
+          'Submitting payment form to Tranzila iframe',
+          handshakeMode === 'legacy'
+            ? { mode: 'legacy', reason: handshakeDetails?.message }
+            : { mode: 'handshake' }
+        );
+        formRef.current.submit();
+      }
+    }, 150);
+
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [isOpen, handshakeToken, handshakeMode, handshakeDetails]);
 
   if (!isOpen) return null;
 
@@ -129,7 +260,8 @@ export default function TranzilaPayment({
     terminal: terminalName,
     url: tranzilaUrl,
     amount,
-    planName
+    planName,
+    handshakeMode
   });
 
   // Success and failure URLs - these should point to your API routes
@@ -171,6 +303,18 @@ export default function TranzilaPayment({
             </div>
           </div>
 
+          {handshakeMode === 'legacy' && (
+            <div className="mb-4 bg-amber-50 border border-amber-200 rounded-lg p-4 text-right">
+              <p className="font-semibold text-amber-900 mb-1">מצב תשלום להרצה</p>
+              <p className="text-sm text-amber-800">
+                התשלום פועל במצב בדיקות עם מסוף Tranzila לדוגמה. כדי לאפשר סליקה אמיתית, הגדר ערכי TRANZILA_TERMINAL ו-TRANZILA_TERMINAL_PASSWORD בקובץ ‎.env.local ולאחר מכן הפעל מחדש את השרת.
+              </p>
+              {handshakeDetails?.message && (
+                <p className="text-xs text-amber-700 mt-2">{handshakeDetails.message}</p>
+              )}
+            </div>
+          )}
+
           {/* Form for iframe submission */}
           <form
             ref={formRef}
@@ -180,12 +324,27 @@ export default function TranzilaPayment({
             className="hidden"
           >
             {/* Hidden fields */}
-            <input type="hidden" name="sum" value={amount} />
+            <input
+              type="hidden"
+              name="sum"
+              value={`${handshakeDetails?.sum ?? amount}`}
+            />
+            <input type="hidden" name="supplier" value={terminalName} />
             <input type="hidden" name="currency" value="1" />
             <input type="hidden" name="cred_type" value="1" />
             <input type="hidden" name="tranmode" value="A" />
+            {handshakeMode === 'handshake' && (
+              <>
+                <input type="hidden" name="new_process" value="1" />
+                <input type="hidden" name="thtk" value={handshakeToken || ''} />
+              </>
+            )}
             <input type="hidden" name="buttonLabel" value="שלם עכשיו" />
-            <input type="hidden" name="success_url_address" value={successUrl} />
+            <input
+              type="hidden"
+              name="success_url_address"
+              value={successUrl}
+            />
             <input type="hidden" name="fail_url_address" value={failUrl} />
             <input type="hidden" name="notify_url_address" value={notifyUrl} />
             <input type="hidden" name="pdesc" value={planName} />
@@ -196,41 +355,54 @@ export default function TranzilaPayment({
             <input type="hidden" name="nologo" value="1" />
             <input type="hidden" name="bit_pay" value="1" />
             <input type="hidden" name="google_pay" value="1" />
-
-            {/* Handshake parameters - required for fraud prevention */}
-            {handshakeToken && (
-              <>
-                <input type="hidden" name="thtk" value={handshakeToken} />
-                <input type="hidden" name="new_process" value="1" />
-              </>
+            {handshakeDetails?.response?.index && (
+              <input
+                type="hidden"
+                name="index"
+                value={handshakeDetails.response.index}
+              />
             )}
           </form>
 
           {/* Iframe container */}
           <div className="relative bg-gray-50 rounded-lg border-2 border-gray-200" style={{ height: '600px' }}>
-            {/* Error state */}
-            {handshakeError && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center bg-white z-10 p-6">
-                <div className="text-red-600 text-6xl mb-4">⚠️</div>
-                <p className="text-red-600 font-bold text-xl mb-2">שגיאה באימות התשלום</p>
-                <p className="text-gray-600 text-center mb-4">{handshakeError}</p>
-                <button
-                  onClick={onClose}
-                  className="bg-red-600 text-white px-6 py-2 rounded-lg hover:bg-red-700 transition-colors"
-                >
-                  סגור
-                </button>
-              </div>
-            )}
-
-            {/* Loading state */}
-            {isLoading && !handshakeError && (
+            {(isHandshakeLoading || isIframeLoading) && !handshakeError && (
               <div className="absolute inset-0 flex flex-col items-center justify-center bg-white z-10">
                 <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-primary mb-4"></div>
                 <p className="text-gray-600 font-medium text-lg mb-2">
-                  {!handshakeToken ? 'מאבטח את פרטי התשלום...' : 'טוען טופס תשלום מאובטח...'}
+                  {isHandshakeLoading
+                    ? 'מתחבר למסוף Tranzila...'
+                    : 'טוען טופס תשלום מאובטח...'}
                 </p>
                 <p className="text-gray-500 text-sm">אנא המתן, הטופס ייטען בקרוב</p>
+              </div>
+            )}
+            {handshakeError && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center bg-white z-20 p-6">
+                <div className="text-4xl mb-4">⚠️</div>
+                <p className="text-gray-700 font-semibold text-lg mb-2 text-center">
+                  לא הצלחנו להתחבר למסוף התשלומים.
+                </p>
+                <p className="text-gray-600 text-center mb-4">
+                  {handshakeError}
+                </p>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => {
+                      setHandshakeAttempt((prev) => prev + 1);
+                      setHandshakeError(null);
+                    }}
+                    className="bg-primary text-white px-4 py-2 rounded-md hover:bg-primary/90 transition-colors"
+                  >
+                    נסה שוב
+                  </button>
+                  <button
+                    onClick={onClose}
+                    className="px-4 py-2 rounded-md border border-gray-300 hover:bg-gray-100 transition-colors"
+                  >
+                    סגור
+                  </button>
+                </div>
               </div>
             )}
             <iframe
@@ -239,7 +411,7 @@ export default function TranzilaPayment({
               className="w-full h-full rounded-lg"
               onLoad={() => {
                 // Only hide loading after iframe actually loads content
-                setTimeout(() => setIsLoading(false), 500);
+                setTimeout(() => setIsIframeLoading(false), 500);
               }}
               allow="payment"
               allowpaymentrequest="true"

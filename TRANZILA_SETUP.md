@@ -16,12 +16,24 @@ Add the following to your `.env.local` file:
 ```bash
 # Tranzila Configuration
 NEXT_PUBLIC_TRANZILA_TERMINAL=your_terminal_name_here
+TRANZILA_TERMINAL=your_terminal_name_here
+TRANZILA_TERMINAL_PASSWORD=your_terminal_password_here
+
+# Optional legacy alias supported by the API route.
+#TRANZILA_PW=your_terminal_password_here
 
 # Your existing Tranzila API key (if using direct API)
 # TRANZILLA_API_KEY is already configured in your .env.local
 ```
 
 **Important:** Replace `your_terminal_name_here` with your actual Tranzila terminal name.
+`TRANZILA_TERMINAL_PASSWORD` is provided by Tranzila support and is required for handshake
+requests. Store it only on the server side (never expose it to the browser).
+
+> 💡 **Development fallback:** When these variables are not defined and the app runs in development
+> mode, the `/api/tranzila/handshake` route automatically returns a mock response that uses Tranzila's
+> public test terminal (`jira`). This keeps the user flow working without performing real payments.
+> Configure the real terminal name and password to disable the mock mode and enable live transactions.
 
 ## Step 2: Database Setup
 
