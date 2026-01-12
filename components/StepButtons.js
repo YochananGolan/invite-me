@@ -608,6 +608,11 @@ const handleOpenAddonModal = React.useCallback(() => {
     try {
       // fetch latest event id for this user
       const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        setGuestErrorMsg('יש להתחבר כדי לשלוח הזמנות');
+        return;
+      }
+
       const { data: evRow } = await supabase
         .from('events')
         .select('id')
@@ -670,6 +675,12 @@ const handleOpenAddonModal = React.useCallback(() => {
       // Fetch invitation public URL
       try {
         const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          console.error('User session lost during invitation send');
+          setGuestErrorMsg('אירעה שגיאה בשליחת ההזמנה.');
+          return;
+        }
+
         const { data: ev } = await supabase
           .from('events')
           .select('invitation_path')
@@ -728,6 +739,11 @@ const handleOpenAddonModal = React.useCallback(() => {
     try {
       // create guest in DB (similar to WA function but without opening WA)
       const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        setGuestErrorMsg('יש להתחבר כדי לשלוח הזמנות');
+        return;
+      }
+
       const { data: evRow } = await supabase
         .from('events')
         .select('id')
@@ -1053,13 +1069,19 @@ const handleOpenAddonModal = React.useCallback(() => {
           invitation_path: designFile,
           hasDesignFile: !!designFile
         });
-        
+
+        // Calculate allowed guests based on plan and addons
+        const freeLimit = 50;
+        const addonCount = additionalPackages.filter(p => p === 'addon').length;
+        const totalAllowedGuests = freeLimit + (addonCount * 100);
+
         // Build update object - only include progress_step if it exists
         const updateData = {
           event_details: eventDetails,
           invitation_path: designFile,
+          allowed_guests: totalAllowedGuests,
         };
-        
+
         // Try to update progress_step, but don't fail if column doesn't exist
         try {
           updateData.progress_step = progress;
@@ -1083,6 +1105,7 @@ const handleOpenAddonModal = React.useCallback(() => {
               .update({
                 event_details: eventDetails,
                 invitation_path: designFile,
+                allowed_guests: totalAllowedGuests,
               })
               .eq('id', currentEventId)
               .select('id, invitation_path, event_details')
@@ -1132,11 +1155,17 @@ const handleOpenAddonModal = React.useCallback(() => {
           }
         }
       } else {
+        // Calculate allowed guests based on plan and addons
+        const freeLimit = 50;
+        const addonCount = additionalPackages.filter(p => p === 'addon').length;
+        const totalAllowedGuests = freeLimit + (addonCount * 100);
+
         const payload = {
           user_id: user?.id || null,
           event_type: selectedEventType,
           event_details: eventDetails,
           invitation_path: designFile,
+          allowed_guests: totalAllowedGuests,
         };
 
         console.debug('[StepButtons] Inserting event', payload);
@@ -1996,7 +2025,7 @@ React.useEffect(() => {
   };
 
   // Handle successful payment
-  const handlePaymentSuccess = (transactionData) => {
+  const handlePaymentSuccess = async (transactionData) => {
     console.log('Payment successful:', transactionData);
 
     // Handle plan purchase (ב, ג, ד)
@@ -2019,6 +2048,28 @@ React.useEffect(() => {
 
       const totalGuestsAdded = pendingAddonCount * 100;
       addToast(`התשלום בוצע בהצלחה! ${totalGuestsAdded} מקומות נוספים נוספו לאירוע שלך.`, 'success');
+
+      // Update allowed_guests in database for current event
+      if (currentEventId) {
+        try {
+          const freeLimit = 50;
+          const newAddonCount = additionalPackages.filter(p => p === 'addon').length + pendingAddonCount;
+          const newTotalAllowedGuests = freeLimit + (newAddonCount * 100);
+
+          const { error: updateError } = await supabase
+            .from('events')
+            .update({ allowed_guests: newTotalAllowedGuests })
+            .eq('id', currentEventId);
+
+          if (updateError) {
+            console.error('Failed to update allowed_guests in database:', updateError);
+          } else {
+            console.log(`✅ Updated allowed_guests to ${newTotalAllowedGuests} in database`);
+          }
+        } catch (err) {
+          console.error('Error updating allowed_guests:', err);
+        }
+      }
 
       setShowPaymentModal(false);
     }

@@ -17,13 +17,28 @@ export default async function handler(req, res) {
 
     // Get Tranzila credentials from environment variables
     const terminalName = process.env.NEXT_PUBLIC_TRANZILA_TERMINAL;
-    const terminalPassword = process.env.TRANZILA_TERMINAL_PASSWORD;
 
-    if (!terminalName || !terminalPassword) {
-      console.error('Missing Tranzila credentials in environment variables');
+    // Check for terminal password in multiple possible variable names
+    const terminalPassword =
+      process.env.TRANZILA_TERMINAL_PASSWORD ||
+      process.env.TRANZILA_PW ||
+      process.env.TRANZILA_API_KEY ||
+      process.env.TRANZILLA_API_KEY; // Legacy name with double L
+
+    if (!terminalName) {
+      console.error('Missing Tranzila terminal name');
       return res.status(500).json({
         error: 'Server configuration error',
-        message: 'Missing Tranzila credentials. Please set NEXT_PUBLIC_TRANZILA_TERMINAL and TRANZILA_TERMINAL_PASSWORD in .env.local'
+        message: 'Missing NEXT_PUBLIC_TRANZILA_TERMINAL in .env.local'
+      });
+    }
+
+    if (!terminalPassword) {
+      console.error('Missing Tranzila terminal password');
+      console.error('Checked variables: TRANZILA_TERMINAL_PASSWORD, TRANZILA_PW, TRANZILA_API_KEY, TRANZILLA_API_KEY');
+      return res.status(500).json({
+        error: 'Server configuration error',
+        message: 'Missing Tranzila terminal password. Add one of these to .env.local: TRANZILA_TERMINAL_PASSWORD=your_password or TRANZILA_PW=your_password'
       });
     }
 
@@ -33,7 +48,14 @@ export default async function handler(req, res) {
     handshakeUrl.searchParams.append('sum', amount);
     handshakeUrl.searchParams.append('TranzilaPW', terminalPassword);
 
-    console.log('Requesting handshake for amount:', amount, 'terminal:', terminalName);
+    console.log('Requesting handshake:', {
+      amount,
+      terminal: terminalName,
+      passwordSource: process.env.TRANZILA_TERMINAL_PASSWORD ? 'TRANZILA_TERMINAL_PASSWORD' :
+                      process.env.TRANZILA_PW ? 'TRANZILA_PW' :
+                      process.env.TRANZILA_API_KEY ? 'TRANZILA_API_KEY' :
+                      'TRANZILLA_API_KEY'
+    });
 
     // Call Tranzila handshake API
     const response = await fetch(handshakeUrl.toString(), {
@@ -46,15 +68,33 @@ export default async function handler(req, res) {
     const responseText = await response.text();
     console.log('Tranzila handshake response:', responseText);
 
-    // Parse response (Tranzila returns URL-encoded format)
-    const params = new URLSearchParams(responseText);
-    const thtk = params.get('thtk');
-    const error = params.get('error');
-    const errorMessage = params.get('message');
+    // Parse response (Tranzila returns JSON for errors, URL-encoded for success)
+    let thtk, error, errorMessage;
+
+    try {
+      // Try parsing as JSON first (error responses)
+      const jsonData = JSON.parse(responseText);
+
+      if (jsonData.error_code) {
+        // JSON error response
+        error = jsonData.error_code.toString();
+        errorMessage = jsonData.message || 'Handshake failed';
+      } else if (jsonData.thtk) {
+        // JSON success response (in case they return JSON)
+        thtk = jsonData.thtk;
+      }
+    } catch (e) {
+      // Not JSON, try URL-encoded format (success responses)
+      const params = new URLSearchParams(responseText);
+      thtk = params.get('thtk');
+      error = params.get('error');
+      errorMessage = params.get('message');
+    }
 
     if (error || !thtk) {
       console.error('Handshake failed:', { error, errorMessage, responseText });
       return res.status(400).json({
+        success: false,
         error: error || 'Handshake failed',
         message: errorMessage || 'Failed to create handshake token',
         details: responseText
