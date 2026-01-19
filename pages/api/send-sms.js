@@ -22,7 +22,7 @@ export default async function handler(req, res) {
   const errors = [];
 
   for (const guest of guests) {
-    const { phone, firstName, lastName } = guest;
+    const { phone, firstName, lastName, inviteLink } = guest;
 
     if (!phone) {
       errors.push({ guest, error: 'Missing phone number' });
@@ -37,11 +37,12 @@ export default async function handler(req, res) {
       formattedPhone = '972' + formattedPhone;
     }
 
-    // Personalize message with guest name
+    // Personalize message with guest name and invite link
     const personalizedMessage = message
       .replace(/{firstName}/g, firstName || '')
       .replace(/{lastName}/g, lastName || '')
-      .replace(/{fullName}/g, `${firstName || ''} ${lastName || ''}`.trim());
+      .replace(/{fullName}/g, `${firstName || ''} ${lastName || ''}`.trim())
+      .replace(/{inviteLink}/g, inviteLink || '');
 
     try {
       const response = await fetch('https://webapi.mymarketing.co.il/api/smscampaign/OperationalMessage', {
