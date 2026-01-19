@@ -282,12 +282,25 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick }, re
   const [paymentAmount, setPaymentAmount] = useState(0);
   const [paymentPlanName, setPaymentPlanName] = useState('');
   const getPlanBaseLimit = React.useCallback((plan) => {
-    // Everyone starts with free tier (50 guests)
-    // Addon packages provide 100 guests each
-    if (plan === 'addon') {
-      return 100;
+    switch(plan) {
+      case 'free':
+      case 'basic':
+        return 50;
+      case 'standard':
+        return 200;
+      case 'premium':
+        return 350;
+      case 'luxury':
+        return 500;
+      case 'elite':
+        return 650;
+      case 'supreme':
+        return 1000;
+      case 'addon':
+        return 100;
+      default:
+        return 50;
     }
-    return 50; // Free tier default
   },[]);
 
   const [selectedPlan, setSelectedPlan] = useState(() => {
@@ -707,7 +720,7 @@ const handleOpenAddonModal = React.useCallback(() => {
         const waNumber = digitsOnly;
         const waText = encodeURIComponent(
           `${invitationText}\n\n` +
-          `לאישור השתתפות לחצו על הקישור:\n${inviteLink}`
+          `לאישור הגעה:\n${inviteLink}`
         );
         const waWin = window.open(`https://wa.me/972${waNumber.slice(1)}?text=${waText}`, '_blank','noopener,noreferrer');
         if (waWin) waWin.opener = null; // prevent redirect effect
@@ -799,7 +812,7 @@ const handleOpenAddonModal = React.useCallback(() => {
       const inviteLink = `${window.location.origin}/${evRow?.id}/${newGuest.id}`;
 
       // Compose message
-      const smsBody = encodeURIComponent(`${invitationText}\n\nלאישור השתתפות לחצו על הקישור:\n${inviteLink}`);
+      const smsBody = encodeURIComponent(`${invitationText}\n\nלאישור הגעה:\n${inviteLink}`);
       const smsWin = window.open(`sms:972${digitsOnly.slice(1)}?body=${smsBody}`, '_blank', 'noopener,noreferrer');
       if(smsWin) smsWin.opener = null;
       setInvitationSent(true);
@@ -1071,9 +1084,9 @@ const handleOpenAddonModal = React.useCallback(() => {
         });
 
         // Calculate allowed guests based on plan and addons
-        const freeLimit = 50;
+        const basePlanLimit = getPlanBaseLimit(selectedPlan) || 50;
         const addonCount = additionalPackages.filter(p => p === 'addon').length;
-        const totalAllowedGuests = freeLimit + (addonCount * 100);
+        const totalAllowedGuests = basePlanLimit + (addonCount * 100);
 
         // Build update object - only include progress_step if it exists
         const updateData = {
@@ -1156,9 +1169,9 @@ const handleOpenAddonModal = React.useCallback(() => {
         }
       } else {
         // Calculate allowed guests based on plan and addons
-        const freeLimit = 50;
+        const basePlanLimit = getPlanBaseLimit(selectedPlan) || 50;
         const addonCount = additionalPackages.filter(p => p === 'addon').length;
-        const totalAllowedGuests = freeLimit + (addonCount * 100);
+        const totalAllowedGuests = basePlanLimit + (addonCount * 100);
 
         const payload = {
           user_id: user?.id || null,
@@ -1726,7 +1739,7 @@ React.useEffect(() => {
         });
 
         // Build SMS message with invitation text and RSVP link
-        const smsMessage = `${invitationText}\n\nשלום {firstName},\nלאישור השתתפות לחצו על הקישור:\n{inviteLink}`;
+        const smsMessage = `${invitationText}\n\nשלום {firstName},\nלאישור הגעה:\n{inviteLink}`;
 
         try {
           const smsResponse = await fetch('/api/send-sms', {
@@ -2946,6 +2959,13 @@ React.useEffect(() => {
                       setShowStepError(true);
                       return;
                     }
+                    if (!selectedPlan) {
+                      const msg = `עליך לבחור מסלול תמחור ולשלם לפני מעבר לשלב "${steps[idx]}"`;
+                      setStepErrorMsg(msg);
+                      setClickedStepName(steps[idx]);
+                      setShowStepError(true);
+                      return;
+                    }
                     setShowEventTypes(true);
                     setStepErrorMsg('');
                   }
@@ -2953,6 +2973,13 @@ React.useEffect(() => {
                 ? () => {
                     if (!hasActiveEvent()) {
                       const msg = `עליך ליצור אירוע חדש לפני מעבר לשלב "${steps[idx]}"`;
+                      setStepErrorMsg(msg);
+                      setClickedStepName(steps[idx]);
+                      setShowStepError(true);
+                      return;
+                    }
+                    if (!selectedPlan) {
+                      const msg = `עליך לבחור מסלול תמחור ולשלם לפני מעבר לשלב "${steps[idx]}"`;
                       setStepErrorMsg(msg);
                       setClickedStepName(steps[idx]);
                       setShowStepError(true);
@@ -2970,6 +2997,13 @@ React.useEffect(() => {
                       setShowStepError(true);
                       return;
                     }
+                    if (!selectedPlan) {
+                      const msg = `עליך לבחור מסלול תמחור ולשלם לפני מעבר לשלב "${steps[idx]}"`;
+                      setStepErrorMsg(msg);
+                      setClickedStepName(steps[idx]);
+                      setShowStepError(true);
+                      return;
+                    }
                     setShowDesignChooser(true);
                     setStepErrorMsg('');
                   }
@@ -2977,6 +3011,13 @@ React.useEffect(() => {
                 ? () => {
                     if (!hasActiveEvent()) {
                       const msg = `עליך ליצור אירוע חדש לפני מעבר לשלב "${steps[idx]}"`;
+                      setStepErrorMsg(msg);
+                      setClickedStepName(steps[idx]);
+                      setShowStepError(true);
+                      return;
+                    }
+                    if (!selectedPlan) {
+                      const msg = `עליך לבחור מסלול תמחור ולשלם לפני מעבר לשלב "${steps[idx]}"`;
                       setStepErrorMsg(msg);
                       setClickedStepName(steps[idx]);
                       setShowStepError(true);
@@ -3171,15 +3212,6 @@ React.useEffect(() => {
                         {activePlanDescription}
                       </div>
                     </div>
-                  )}
-
-                  {!planAddOnMode && !basePlanOverCapacity && (
-                    <button 
-                      onClick={() => setShowPricingPlan(true)}
-                      className="w-full bg-gradient-to-r from-purple-600 via-fuchsia-600 to-pink-600 text-white border-2 border-purple-800 rounded-lg px-3 py-2 text-lg font-extrabold uppercase tracking-wide hover:from-purple-500 hover:to-pink-500 transition-all shadow-2xl"
-                    >
-                      החלפת מסלול
-                    </button>
                   )}
                 </div>
               </div>
@@ -5941,7 +5973,7 @@ React.useEffect(() => {
         <div className="fixed inset-0 bg-black/50 z-50 overflow-y-auto">
           <div className="min-h-screen flex items-center justify-center p-4">
             <div className="relative bg-white rounded-lg p-6 sm:p-8 w-full max-w-[98vw] my-8">
-            <button onClick={()=>{setShowPricingPlan(false); if(!planAddOnMode) setShowEventTypes(true);}} className="absolute top-4 left-4 text-3xl text-gray-500 hover:text-gray-700" aria-label="סגור">&times;</button>
+            <button onClick={()=>setShowPricingPlan(false)} className="absolute top-4 left-4 text-3xl text-gray-500 hover:text-gray-700" aria-label="סגור">&times;</button>
             <h2 className="text-2xl md:text-3xl font-bold mb-4 text-center text-primary">בחר את המסלול המתאים לאירוע שלך</h2>
             {planAddOnMode && (
               <div className="text-center text-sm font-semibold text-primary mb-4">
