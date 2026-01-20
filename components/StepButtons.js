@@ -69,8 +69,6 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick }, re
     const minutes = totalHalfHours % 2 === 0 ? '00' : '30';
     return `${hours}:${minutes}`;
   });
-  const MESSAGE_LIMIT = 105;
-
   const [showEventTypes, setShowEventTypes] = useState(false);
   const [selectedEventType, setSelectedEventType] = useState('');
   const [showEventDetails, setShowEventDetails] = useState(false);
@@ -112,6 +110,10 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick }, re
 
   // ---- guest summary stats ----
   const [guestSummary, setGuestSummary] = useState({ approved: 0, adults: 0, children: 0 });
+  const [capacityWarningGuests, setCapacityWarningGuests] = useState({ adults: 0, children: 0, totalGuests: 0 });
+  const resetCapacityWarningGuests = React.useCallback(() => {
+    setCapacityWarningGuests({ adults: 0, children: 0, totalGuests: 0 });
+  }, []);
   const [messagesSentCount, setMessagesSentCount] = useState(0);
   const [guestStatusSummary, setGuestStatusSummary] = useState({ approved: 0, rejected: 0, pending: 0 });
   const [specialMealsSummary, setSpecialMealsSummary] = useState({ 
@@ -345,6 +347,7 @@ const [planLimitWarningError, setPlanLimitWarningError] = useState('');
 const [planAddOnMode, setPlanAddOnMode] = useState(false);
 const [planSelectionError, setPlanSelectionError] = useState('');
 const [planWarningSuppressed, setPlanWarningSuppressed] = useState(false);
+const [allowedGuestCapacity, setAllowedGuestCapacity] = useState(null);
 
   React.useEffect(() => {
     try {
@@ -396,6 +399,51 @@ const additionalPackageCounts = React.useMemo(() => {
   }, {});
 }, [additionalPackages]);
 
+const addonUnitSize = getPlanBaseLimit('addon') || 0;
+const basePlanCapacity = basePlanLimit || 0;
+const normalizedAllowedCapacity =
+  allowedGuestCapacity != null ? Math.max(allowedGuestCapacity, basePlanCapacity) : null;
+const extraCapacityFromServer =
+  normalizedAllowedCapacity != null
+    ? Math.max(0, normalizedAllowedCapacity - basePlanCapacity)
+    : null;
+const displayTotalPlanCapacity =
+  normalizedAllowedCapacity != null ? normalizedAllowedCapacity : totalPlanCapacity;
+const displayAdditionalCapacity =
+  extraCapacityFromServer != null ? extraCapacityFromServer : additionalCapacity;
+const displayTotalPlanCapacityValue = Math.max(
+  0,
+  Math.round(displayTotalPlanCapacity)
+);
+const displayAdditionalCapacityValue = Math.max(
+  0,
+  Math.round(displayAdditionalCapacity)
+);
+const computedAddonCountFromServer =
+  extraCapacityFromServer != null && addonUnitSize > 0
+    ? Math.floor(extraCapacityFromServer / addonUnitSize)
+    : 0;
+const fallbackAddonCount = additionalPackageCounts['addon'] || 0;
+const effectiveAddonCount =
+  extraCapacityFromServer != null ? computedAddonCountFromServer : fallbackAddonCount;
+const packageEntriesFromState = Object.entries(additionalPackageCounts)
+  .filter(([planId, count]) => planId !== 'addon' && count > 0)
+  .map(([planId, count]) => ({
+    id: planId,
+    label: planId === 'addon' ? 'חבילת הודעות נוספות' : getPlanLabel(planId) || planId,
+    count,
+    extra: getPlanBaseLimit(planId) * count,
+  }));
+const packageEntries = [...packageEntriesFromState];
+if (effectiveAddonCount > 0) {
+  packageEntries.push({
+    id: 'addon',
+    label: 'חבילת הודעות נוספות',
+    count: effectiveAddonCount,
+    extra: addonUnitSize * effectiveAddonCount,
+  });
+}
+
 // No longer needed - removed complex plan selection
 // Users just purchase addon packages as needed
 
@@ -406,8 +454,9 @@ const handleOpenAddonModal = React.useCallback(() => {
   setPlanAddOnMode(Boolean(hasPaidPlan));
   setPlanWarningSuppressed(true);
   setShowPlanLimitWarning(false);
+  resetCapacityWarningGuests();
   setShowPricingPlan(true);
-}, [selectedPlan]);
+}, [selectedPlan, resetCapacityWarningGuests]);
 
   // --- Share message state ---
   // Share modal state removed – reverting to direct WhatsApp share
@@ -642,7 +691,9 @@ const handleOpenAddonModal = React.useCallback(() => {
         .select('adults, children')
         .eq('event_id', evRow.id);
 
-      const currentGuestCount = (existingGuests || []).reduce((sum, g) => sum + (g.adults || 0) + (g.children || 0), 0);
+      const currentAdultsCount = (existingGuests || []).reduce((sum, g) => sum + (g.adults || 0), 0);
+      const currentChildrenCount = (existingGuests || []).reduce((sum, g) => sum + (g.children || 0), 0);
+      const currentGuestCount = currentAdultsCount + currentChildrenCount;
       const totalAfterAdd = currentGuestCount + 1; // Adding 1 guest
 
       const baseLimit = getPlanBaseLimit(selectedPlan) || 50;
@@ -654,10 +705,10 @@ const handleOpenAddonModal = React.useCallback(() => {
 
       if (totalAfterAdd > totalCapacity) {
         // Capacity exceeded - show payment popup
-        setGuestSummary({
-          approved: 0,
-          adults: totalAfterAdd,
-          children: 0
+        setCapacityWarningGuests({
+          adults: currentAdultsCount + 1,
+          children: currentChildrenCount,
+          totalGuests: totalAfterAdd,
         });
         setShowPlanLimitWarning(true);
         setGuestErrorMsg(`אין מספיק מקום! יש לך ${currentGuestCount} אורחים, המכסה: ${totalCapacity}`);
@@ -776,7 +827,9 @@ const handleOpenAddonModal = React.useCallback(() => {
         .select('adults, children')
         .eq('event_id', evRow.id);
 
-      const currentGuestCount = (existingGuests || []).reduce((sum, g) => sum + (g.adults || 0) + (g.children || 0), 0);
+      const currentAdultsCount = (existingGuests || []).reduce((sum, g) => sum + (g.adults || 0), 0);
+      const currentChildrenCount = (existingGuests || []).reduce((sum, g) => sum + (g.children || 0), 0);
+      const currentGuestCount = currentAdultsCount + currentChildrenCount;
       const totalAfterAdd = currentGuestCount + 1; // Adding 1 guest
 
       const baseLimit = getPlanBaseLimit(selectedPlan) || 50;
@@ -788,10 +841,10 @@ const handleOpenAddonModal = React.useCallback(() => {
 
       if (totalAfterAdd > totalCapacity) {
         // Capacity exceeded - show payment popup
-        setGuestSummary({
-          approved: 0,
-          adults: totalAfterAdd,
-          children: 0
+        setCapacityWarningGuests({
+          adults: currentAdultsCount + 1,
+          children: currentChildrenCount,
+          totalGuests: totalAfterAdd,
         });
         setShowPlanLimitWarning(true);
         setGuestErrorMsg(`אין מספיק מקום! יש לך ${currentGuestCount} אורחים, המכסה: ${totalCapacity}`);
@@ -1178,6 +1231,8 @@ const handleOpenAddonModal = React.useCallback(() => {
             });
           }
         }
+
+        setAllowedGuestCapacity(totalAllowedGuests);
       } else {
         // Calculate allowed guests based on plan and addons
         const basePlanLimit = getPlanBaseLimit(selectedPlan) || 50;
@@ -1201,6 +1256,7 @@ const handleOpenAddonModal = React.useCallback(() => {
         if(inserted){
           console.debug('[StepButtons] Insert success', inserted);
           setCurrentEventId(inserted.id);
+          setAllowedGuestCapacity(totalAllowedGuests);
         }
         if(insertErr){
           console.error('[StepButtons] Insert error', insertErr);
@@ -1682,7 +1738,9 @@ React.useEffect(() => {
         .select('adults, children')
         .eq('event_id', evRow.id);
 
-      const currentGuestCount = (existingGuests || []).reduce((sum, g) => sum + (g.adults || 0) + (g.children || 0), 0);
+      const currentAdultsCount = (existingGuests || []).reduce((sum, g) => sum + (g.adults || 0), 0);
+      const currentChildrenCount = (existingGuests || []).reduce((sum, g) => sum + (g.children || 0), 0);
+      const currentGuestCount = currentAdultsCount + currentChildrenCount;
       const newGuestsToAdd = validGuests.length; // Each guest in Excel = 1 person
       const totalAfterSave = currentGuestCount + newGuestsToAdd;
 
@@ -1706,11 +1764,11 @@ React.useEffect(() => {
         setIsSavingExcelGuests(false);
         setShowExcelPreview(false);
 
-        // Update guest summary to trigger the warning modal
-        setGuestSummary({
-          approved: 0,
-          adults: totalAfterSave,
-          children: 0
+        // Update warning state to show accurate totals in modal
+        setCapacityWarningGuests({
+          adults: currentAdultsCount + newGuestsToAdd,
+          children: currentChildrenCount,
+          totalGuests: totalAfterSave,
         });
 
         // Show capacity warning modal
@@ -1920,6 +1978,7 @@ React.useEffect(() => {
     
     // Reset guest data and reports (these are UI state only, data is preserved in DB)
     setGuestSummary({ approved: 0, adults: 0, children: 0 });
+    resetCapacityWarningGuests();
     setGuestStatusSummary({ approved: 0, rejected: 0, pending: 0 });
     setSpecialMealsSummary({ 
       veg: { adults: 0, children: 0, total: 0 },
@@ -2058,6 +2117,7 @@ React.useEffect(() => {
     setPaymentPlanName(packagesNeeded === 1 ? getAddonDisplayName() : `${packagesNeeded} חבילות הרחבה - ${packagesNeeded * 100} מוזמנים נוספים`);
     setShowPaymentModal(true);
     setShowPlanLimitWarning(false);
+    resetCapacityWarningGuests();
   };
 
   // Handle successful payment
@@ -2068,6 +2128,12 @@ React.useEffect(() => {
     if (pendingPlan && pendingPlan !== 'addon') {
       setSelectedPlan(pendingPlan);
       try { localStorage.setItem('selectedPlan', pendingPlan); } catch(e){}
+      const newBaseLimit = getPlanBaseLimit(pendingPlan) || 0;
+      const existingExtraCapacity = additionalPackages.reduce(
+        (sum, planId) => sum + getPlanBaseLimit(planId),
+        0
+      );
+      setAllowedGuestCapacity(newBaseLimit + existingExtraCapacity);
 
       const planDisplayName = getPlanDisplayName(pendingPlan);
       addToast(`התשלום בוצע בהצלחה! ${planDisplayName} הופעל`, 'success');
@@ -2096,6 +2162,7 @@ React.useEffect(() => {
           const addedCapacity = pendingAddonCount * getPlanBaseLimit('addon');
           const newTotalAllowedGuests =
             baseLimit + existingExtraCapacity + addedCapacity;
+          setAllowedGuestCapacity(newTotalAllowedGuests);
 
           const { error: updateError } = await supabase
             .from('events')
@@ -2161,12 +2228,13 @@ React.useEffect(() => {
         if(!user) return;
         const { data: ev } = await supabase
           .from('events')
-          .select('id,event_details')
+          .select('id,event_details,allowed_guests')
           .eq('user_id',user.id)
           .order('created_at',{ascending:false})
           .limit(1)
           .single();
         if(!ev) return;
+        setAllowedGuestCapacity(ev.allowed_guests ?? null);
         const details=typeof ev.event_details==='string'?JSON.parse(ev.event_details):ev.event_details||{};
         const dateStr=details.date||details.start_datetime;
         const parsedDate = parseEventDate(dateStr);
@@ -2189,7 +2257,7 @@ React.useEffect(() => {
       if(!user) return false;
       const { data: ev } = await supabase
         .from('events')
-        .select('id,event_details,status')
+        .select('id,event_details,status,allowed_guests')
         .eq('user_id',user.id)
         .neq('status','archived')
         .order('created_at',{ascending:false})
@@ -2353,6 +2421,7 @@ React.useEffect(() => {
       setShowGuestListModal(false);
       setDbGuests([]);
       setGuestSummary({ approved: 0, adults: 0, children: 0 });
+      resetCapacityWarningGuests();
       setGuestStatusSummary({ approved: 0, rejected: 0, pending: 0 });
       return;
     }
@@ -2401,6 +2470,7 @@ React.useEffect(() => {
         setNewEventStarted(false);
         setCurrentEventId(null);
         setSelectedPlan(null);
+        setAllowedGuestCapacity(null);
         
         // Reset guest data and reports
         setGuestSummary({ approved: 0, adults: 0, children: 0 });
@@ -2434,7 +2504,7 @@ React.useEffect(() => {
           
           const { data: ev } = await supabase
             .from('events')
-            .select('id, event_details')
+            .select('id, event_details, allowed_guests')
             .eq('user_id', user.id)
             .order('created_at', { ascending: false })
             .limit(1)
@@ -2456,6 +2526,7 @@ React.useEffect(() => {
               if (eventDate >= today) {
                 console.log('Found future event in database, restoring...', ev);
                 setCurrentEventId(ev.id);
+                setAllowedGuestCapacity(ev.allowed_guests ?? null);
                 setFormData(prev => ({ ...prev, ...details }));
                 
                 // Restore design if available
@@ -2501,6 +2572,7 @@ React.useEffect(() => {
       
       // Force reset all guest-related state
       setGuestSummary({ approved: 0, adults: 0, children: 0 });
+      resetCapacityWarningGuests();
       setGuestStatusSummary({ approved: 0, rejected: 0, pending: 0 });
       setApprovedGuests([]);
       setRejectedGuests([]);
@@ -2539,13 +2611,14 @@ React.useEffect(() => {
         if(!user) return;
         const { data: ev } = await supabase
           .from('events')
-          .select('id,event_details')
+          .select('id,event_details,allowed_guests')
           .eq('user_id', user.id)
           .order('created_at',{ascending:false})
           .limit(1)
           .maybeSingle();
         if(ev){
           setCurrentEventId(ev.id);
+          setAllowedGuestCapacity(ev.allowed_guests ?? null);
           // Parse event_details if it's a string
           const details = typeof ev.event_details === 'string' 
             ? JSON.parse(ev.event_details) 
@@ -2777,6 +2850,7 @@ React.useEffect(() => {
     if (!selectedPlan || !currentEventId) {
       setShowPlanLimitWarning(false);
       setPlanAddOnMode(false);
+      resetCapacityWarningGuests();
       return;
     }
     
@@ -2787,6 +2861,7 @@ React.useEffect(() => {
       // No plan selected, no limit check
       setShowPlanLimitWarning(false);
       setPlanAddOnMode(false);
+      resetCapacityWarningGuests();
       return;
     }
     const totalLimit = (baseLimit || 0) + extraCapacity;
@@ -2798,8 +2873,9 @@ React.useEffect(() => {
     } else {
       setShowPlanLimitWarning(false);
       setPlanAddOnMode(false);
+      resetCapacityWarningGuests();
     }
-  }, [selectedPlan, guestSummary.adults, guestSummary.children, currentEventId, additionalPackages, getPlanBaseLimit]);
+  }, [selectedPlan, guestSummary.adults, guestSummary.children, currentEventId, additionalPackages, getPlanBaseLimit, resetCapacityWarningGuests]);
 
   // helper to open guest report with fresh data
   const openGuestReport = async () => {
@@ -2809,7 +2885,8 @@ React.useEffect(() => {
       setSentGuests([]);
       setDbGuests([]);
       setReportGuests([]);
-      setGuestSummary({ approved: 0, adults: 0, children: 0 });
+    setGuestSummary({ approved: 0, adults: 0, children: 0 });
+    resetCapacityWarningGuests();
       setGuestStatusSummary({ approved: 0, rejected: 0, pending: 0 });
       setShowGuestListModal(true);
       return; 
@@ -2891,7 +2968,14 @@ React.useEffect(() => {
         <div className="fixed inset-0 flex items-center justify-center bg-black/70 z-[100]">
           <div className="bg-white rounded-lg p-8 w-full max-w-2xl mx-4 text-center shadow-2xl">
             {(() => {
-              const totalGuests = guestSummary.adults + guestSummary.children;
+              const warningTotals = capacityWarningGuests.totalGuests > 0
+                ? capacityWarningGuests
+                : {
+                    adults: guestSummary.adults,
+                    children: guestSummary.children,
+                    totalGuests: guestSummary.adults + guestSummary.children,
+                  };
+              const totalGuests = warningTotals.totalGuests ?? (warningTotals.adults + warningTotals.children);
               const baseLimit = getPlanBaseLimit(selectedPlan) || 50;
               const extraCapacity = additionalPackages.reduce(
                 (sum, planId) => sum + getPlanBaseLimit(planId),
@@ -2954,7 +3038,10 @@ React.useEffect(() => {
                       🛒 רכוש {packagesNeeded} {packagesNeeded === 1 ? 'חבילה' : 'חבילות'} (₪{totalCost})
                     </button>
                     <button
-                      onClick={() => setShowPlanLimitWarning(false)}
+                      onClick={() => {
+                        setShowPlanLimitWarning(false);
+                        resetCapacityWarningGuests();
+                      }}
                       className="bg-gray-200 text-gray-700 border-2 border-gray-300 rounded-full px-8 py-4 font-medium text-lg hover:bg-gray-300 transition-all"
                     >
                       ביטול
@@ -3204,48 +3291,66 @@ React.useEffect(() => {
                   <h3 className="text-lg font-bold text-yellow-800">מסלול פעיל</h3>
                 </div>
                 <div className="mt-3">
-                  <div className="bg-white p-3 rounded-lg border border-yellow-200 mb-3">
-                    <div className="text-lg font-bold text-yellow-700 mb-1">
-                      {selectedPlan === 'basic' || selectedPlan === 'free' ? 'מסלול א' : 
-                       selectedPlan === 'standard' ? 'מסלול ב' : 
-                       selectedPlan === 'premium' ? 'מסלול ג' : 
-                       selectedPlan === 'luxury' ? 'מסלול ד' : 
-                       selectedPlan === 'elite' ? 'מסלול ה' : 
-                       selectedPlan === 'supreme' ? 'מסלול ו' : 'לא נבחר מסלול'}
+                  <div className="bg-white p-3 rounded-lg border border-yellow-200 mb-3 space-y-3">
+                    <div>
+                      <div className="text-lg font-bold text-yellow-700 mb-1">
+                        {selectedPlan === 'basic' || selectedPlan === 'free' ? 'מסלול א' : 
+                         selectedPlan === 'standard' ? 'מסלול ב' : 
+                         selectedPlan === 'premium' ? 'מסלול ג' : 
+                         selectedPlan === 'luxury' ? 'מסלול ד' : 
+                         selectedPlan === 'elite' ? 'מסלול ה' : 
+                         selectedPlan === 'supreme' ? 'מסלול ו' : 'לא נבחר מסלול'}
+                      </div>
+                      <div className="text-base text-gray-700 font-semibold">
+                        {selectedPlan === 'basic' || selectedPlan === 'free' ? '5₪ - עד 5 מוזמנים' :
+                         selectedPlan === 'standard' ? '149₪ - מ 51 עד 200 מוזמנים' :
+                         selectedPlan === 'premium' ? '199₪ - מ 201 עד 350 מוזמנים' :
+                         selectedPlan === 'luxury' ? '259₪ - מ 351 עד 500 מוזמנים' :
+                         selectedPlan === 'elite' ? '349₪ - מ 501 עד 650 מוזמנים' :
+                         selectedPlan === 'supreme' ? '499₪ - מ 651 עד 1000 מוזמנים' : ''}
+                      </div>
                     </div>
-                    <div className="text-base text-gray-700 font-semibold">
-                      {selectedPlan === 'basic' || selectedPlan === 'free' ? '5₪ - עד 5 מוזמנים' :
-                       selectedPlan === 'standard' ? '149₪ - מ 51 עד 200 מוזמנים' :
-                       selectedPlan === 'premium' ? '199₪ - מ 201 עד 350 מוזמנים' :
-                       selectedPlan === 'luxury' ? '259₪ - מ 351 עד 500 מוזמנים' :
-                       selectedPlan === 'elite' ? '349₪ - מ 501 עד 650 מוזמנים' :
-                       selectedPlan === 'supreme' ? '499₪ - מ 651 עד 1000 מוזמנים' : ''}
-                    </div>
-                    {additionalPackages.length > 0 && totalPlanCapacity && (
-                      <div className="mt-2 text-sm font-semibold text-yellow-700 space-y-1">
-                        <div className="text-base md:text-lg leading-relaxed">
-                          חבילות נוספות שנרכשו:
-                          {Object.entries(additionalPackageCounts).map(([planId, count]) => (
-                            <span key={planId} className="inline-flex items-center gap-1 mx-1 px-2 py-1 bg-yellow-100 border border-yellow-300 rounded-full text-sm md:text-base">
-                              <span className="font-semibold">{getPlanLabel(planId)} × {count}</span>
-                              <span className="text-xs md:text-sm text-yellow-600">
-                                (+{count * getPlanBaseLimit(planId)} אורחים)
+                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                      <div className="text-sm font-semibold text-yellow-800 flex items-center justify-center gap-2 mb-2">
+                        <span className="text-lg">📦</span>
+                        <span>חבילות נוספות שנרכשו:</span>
+                      </div>
+                      {packageEntries.length > 0 ? (
+                        <div className="flex flex-wrap justify-center gap-2 mb-3">
+                          {packageEntries.map(({ id, label, count, extra }) => (
+                            <div key={id} className="flex items-center gap-2 bg-white border border-yellow-300 rounded-full px-3 py-1 shadow-sm">
+                              <span className="text-sm font-semibold text-yellow-700">
+                                {label} × {count}
                               </span>
-                            </span>
+                              {extra > 0 && (
+                                <span className="text-xs text-yellow-500">
+                                  {id === 'addon'
+                                    ? `+${extra} הודעות נוספות`
+                                    : `+${extra} אורחים נוספים`}
+                                </span>
+                              )}
+                            </div>
                           ))}
                         </div>
-                        <div className="text-base md:text-lg font-bold">סה״כ כיסוי: {totalPlanCapacity} אורחים</div>
+                      ) : displayAdditionalCapacityValue > 0 ? (
+                        <p className="text-sm text-yellow-700 text-center">
+                          הקיבולת הוגדלה ב-{displayAdditionalCapacityValue} באמצעות חבילות הרחבה.
+                        </p>
+                      ) : (
+                        <p className="text-sm text-yellow-700 text-center">לא נרכשו חבילות נוספות</p>
+                      )}
+                      <div className="text-base font-bold text-yellow-800">
+                        סה״כ כיסוי: {displayTotalPlanCapacityValue} אורחים (מתוכם {displayAdditionalCapacityValue} באמצעות חבילות הרחבה)
+                      </div>
+                    </div>
+                    {activePlanDescription && (
+                      <div className="bg-white p-2 rounded-lg border border-yellow-200">
+                        <div className="text-base text-gray-700 text-right leading-relaxed">
+                          {activePlanDescription}
+                        </div>
                       </div>
                     )}
                   </div>
-                  
-                  {activePlanDescription && (
-                    <div className="bg-white p-2 rounded-lg border border-yellow-200 mb-2">
-                      <div className="text-base text-gray-700 text-right leading-relaxed">
-                        {activePlanDescription}
-                      </div>
-                    </div>
-                  )}
                 </div>
               </div>
             )}
@@ -3433,7 +3538,7 @@ React.useEffect(() => {
               </div>
               {selectedPlan && (() => {
                 const messagesSent = messagesSentCount;
-                const messageLimit = MESSAGE_LIMIT;
+                const messageLimit = Math.max(displayTotalPlanCapacityValue, basePlanLimit || 0);
                 const remainingMessagesRaw = messageLimit - messagesSent;
                 const remainingMessages = Math.max(0, remainingMessagesRaw);
                 const overMessages = remainingMessagesRaw < 0 ? Math.abs(remainingMessagesRaw) : 0;

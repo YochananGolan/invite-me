@@ -59,6 +59,28 @@ export default function GuestPage() {
     return `https://www.waze.com/ul?q=${encoded}&navigate=yes`;
   }, [eventDetails]);
 
+  const googleMapQuery = useMemo(() => {
+    if (eventDetails) {
+      const locationParts = [eventDetails.hallName, eventDetails.hallAddress, eventDetails.hallCity]
+        .filter(Boolean)
+        .join(' ');
+      if (locationParts) return locationParts;
+    }
+    if (guest?.hall_address) return guest.hall_address;
+    if (guest?.hall_name) return guest.hall_name;
+    return '31.771959,35.217018'; // ירושלים כברירת מחדל
+  }, [eventDetails, guest?.hall_address, guest?.hall_name]);
+
+  const googleMapsLink = useMemo(
+    () => `https://www.google.com/maps?q=${encodeURIComponent(googleMapQuery)}`,
+    [googleMapQuery]
+  );
+
+  const googleMapsEmbedUrl = useMemo(
+    () => `${googleMapsLink}&output=embed`,
+    [googleMapsLink]
+  );
+
   const updateMeal = (cat, field, val) => {
     setSpecialMeals((prev) => ({
       ...prev,
@@ -337,7 +359,7 @@ export default function GuestPage() {
         .match({ id: guestId, event_id: eventId });
       if (updErr) throw updErr;
 
-      setSaved(true);
+      setSaved(attending ? 'approved' : 'rejected');
       setFormError('');
       return true; // Return true to indicate success
     } catch (e) {
@@ -370,7 +392,7 @@ export default function GuestPage() {
         .match({ id: guestId, event_id: eventId });
       if (updErr) throw updErr;
 
-      setSaved(true);
+      setSaved(isAttending ? 'approved' : 'rejected');
     } catch (e) {
       console.error('save status failed', e);
       alert('אירעה שגיאה בשמירת הסטטוס.');
@@ -381,11 +403,16 @@ export default function GuestPage() {
   if (error) return <p className="p-6 text-center text-red-600">{error}</p>;
 
   if (saved) {
+    const isApproved = saved === 'approved';
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 p-6 text-center space-y-6">
-        <h1 className="text-3xl sm:text-4xl font-bold text-green-700">תודה רבה!</h1>
-        <p className="text-xl sm:text-2xl text-gray-700">אישור ההגעה נשלח בהצלחה</p>
-        {guest?.table_number && (
+        <h1 className={`text-3xl sm:text-4xl font-bold ${isApproved ? 'text-green-700' : 'text-red-700'}`}>
+          {isApproved ? 'תודה רבה!' : 'תודה על העדכון!'}
+        </h1>
+        <p className="text-xl sm:text-2xl text-gray-700">
+          {isApproved ? 'אישור ההגעה נשלח בהצלחה' : '😔 מצטערים שלא תוכל/י להגיע הפעם – מקווים לראותך בקרוב'}
+        </p>
+        {isApproved && guest?.table_number && (
           <div className="text-2xl font-extrabold text-primary bg-[#FCE6AC] border border-primary rounded-full px-6 py-3 inline-block mt-4">
             שים לב מקומך באולם : שולחן מספר {guest.table_number}
           </div>
@@ -534,17 +561,28 @@ export default function GuestPage() {
         </div>
       )}
 
-      {wazeUrl && (
-        <div className="flex justify-center mb-3">
-          <a
-            href={wazeUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 rounded-full bg-blue-600 text-white px-5 py-2 text-lg font-medium shadow hover:bg-blue-700 transition-colors"
+      {(wazeUrl || guest?.hall_address) && (
+        <div className="flex justify-center mb-3 gap-3 flex-wrap">
+          {wazeUrl && (
+            <a
+              href={wazeUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 rounded-full bg-blue-600 text-white px-5 py-2 text-lg font-medium shadow hover:bg-blue-700 transition-colors"
+            >
+              <span role="img" aria-label="Waze">🧭</span>
+              ניווט לאולם ב-Waze
+            </a>
+          )}
+
+          <button
+            type="button"
+            onClick={() => setShowMap(true)}
+            className="inline-flex items-center gap-2 rounded-full bg-emerald-600 text-white px-5 py-2 text-lg font-medium shadow hover:bg-emerald-700 transition-colors"
           >
-            <span role="img" aria-label="Waze">🧭</span>
-            ניווט לאולם ב-Waze
-          </a>
+            <span role="img" aria-label="מפת האזור">🗺️</span>
+            מפת איזור האירוע
+          </button>
         </div>
       )}
 
@@ -599,7 +637,6 @@ export default function GuestPage() {
       </div>
 
       {/* Embedded Map Modal */}
-      {console.log('showMap state:', showMap)}
       {showMap && (
         <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50 p-4">
           <div className="relative bg-white rounded-lg w-full max-w-4xl h-[80vh] flex flex-col">
@@ -621,37 +658,31 @@ export default function GuestPage() {
               )}
             </div>
             
-            <div className="flex-1 relative bg-gray-100 flex items-center justify-center">
-              <div className="text-center space-y-4">
-                <div className="text-6xl">🗺️</div>
-                <div>
-                  <h3 className="text-xl font-bold text-gray-700 mb-2">מיקום האולם</h3>
-                  <p className="text-gray-600 mb-4">{guest?.hall_address || 'כתובת לא זמינה'}</p>
-                  <button
-                    onClick={() => {
-                      const targetUrl = wazeUrl || (guest?.hall_address
-                        ? `https://www.waze.com/ul?q=${encodeURIComponent(guest.hall_address)}&navigate=yes&zoom=17&lang=heb`
-                        : 'https://www.waze.com/ul?ll=31.771959,35.217018&navigate=yes&zoom=7&lang=heb');
-                      window.open(targetUrl, '_blank');
-                    }}
-                    className="bg-blue-600 text-white px-8 py-3 rounded-full hover:bg-blue-700 transition-colors flex items-center gap-2 mx-auto"
-                  >
-                    <span role="img" aria-label="ניווט">🧭</span>
-                    פתח ניווט ב-Waze
-                  </button>
-                </div>
-              </div>
+            <div className="flex-1 relative bg-gray-100 overflow-hidden rounded-b-lg">
+              <iframe
+                title="מפת הגעה לאולם"
+                src={googleMapsEmbedUrl}
+                className="w-full h-full border-0"
+                allowFullScreen
+                loading="lazy"
+                referrerPolicy="no-referrer-when-downgrade"
+              />
             </div>
             
-            <div className="p-4 border-t bg-gray-50">
-              <div className="flex justify-center">
-                <button
-                  onClick={() => setShowMap(false)}
-                  className="bg-gray-600 text-white px-8 py-3 rounded-full hover:bg-gray-700 transition-colors"
-                >
-                  סגור
-                </button>
-              </div>
+            <div className="p-4 border-t bg-gray-50 flex flex-col sm:flex-row gap-3 justify-center">
+              <button
+                onClick={() => window.open(googleMapsLink, '_blank')}
+                className="bg-blue-600 text-white px-8 py-3 rounded-full hover:bg-blue-700 transition-colors flex items-center gap-2 justify-center"
+              >
+                <span role="img" aria-label="מפת גוגל">📍</span>
+                פתח בגוגל מפות
+              </button>
+              <button
+                onClick={() => setShowMap(false)}
+                className="bg-gray-600 text-white px-8 py-3 rounded-full hover:bg-gray-700 transition-colors"
+              >
+                סגור
+              </button>
             </div>
           </div>
         </div>
