@@ -69,6 +69,7 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick }, re
     const minutes = totalHalfHours % 2 === 0 ? '00' : '30';
     return `${hours}:${minutes}`;
   });
+  const MESSAGE_LIMIT = 105;
 
   const [showEventTypes, setShowEventTypes] = useState(false);
   const [selectedEventType, setSelectedEventType] = useState('');
@@ -111,6 +112,7 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick }, re
 
   // ---- guest summary stats ----
   const [guestSummary, setGuestSummary] = useState({ approved: 0, adults: 0, children: 0 });
+  const [messagesSentCount, setMessagesSentCount] = useState(0);
   const [guestStatusSummary, setGuestStatusSummary] = useState({ approved: 0, rejected: 0, pending: 0 });
   const [specialMealsSummary, setSpecialMealsSummary] = useState({ 
     veg: { adults: 0, children: 0, total: 0 },
@@ -285,7 +287,7 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick }, re
     switch(plan) {
       case 'free':
       case 'basic':
-        return 50;
+        return 5;
       case 'standard':
         return 200;
       case 'premium':
@@ -299,7 +301,7 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick }, re
       case 'addon':
         return 100;
       default:
-        return 50;
+        return 5;
     }
   },[]);
 
@@ -375,7 +377,7 @@ const totalGuestsCount = guestSummary.adults + guestSummary.children;
 const basePlanOverCapacity = basePlanLimit ? totalGuestsCount > basePlanLimit : false;
 const activePlanDescription =
   selectedPlan === 'basic' || selectedPlan === 'free'
-    ? 'מסלול א - 49₪ לאירועים קטנים עם כל הפיצ\'רים הבסיסיים'
+    ? 'מסלול א - 5₪ לאירועים קטנים עם כל הפיצ\'רים הבסיסיים'
     : selectedPlan === 'standard'
       ? 'מסלול ב - מקצועי עם תמיכה מלאה ועיצובים מתקדמים'
       : selectedPlan === 'premium'
@@ -643,9 +645,12 @@ const handleOpenAddonModal = React.useCallback(() => {
       const currentGuestCount = (existingGuests || []).reduce((sum, g) => sum + (g.adults || 0) + (g.children || 0), 0);
       const totalAfterAdd = currentGuestCount + 1; // Adding 1 guest
 
-      const freeLimit = 50;
-      const addonCount = additionalPackages.filter(p => p === 'addon').length;
-      const totalCapacity = freeLimit + (addonCount * 100);
+      const baseLimit = getPlanBaseLimit(selectedPlan) || 50;
+      const extraCapacity = additionalPackages.reduce(
+        (sum, planId) => sum + getPlanBaseLimit(planId),
+        0
+      );
+      const totalCapacity = baseLimit + extraCapacity;
 
       if (totalAfterAdd > totalCapacity) {
         // Capacity exceeded - show payment popup
@@ -774,9 +779,12 @@ const handleOpenAddonModal = React.useCallback(() => {
       const currentGuestCount = (existingGuests || []).reduce((sum, g) => sum + (g.adults || 0) + (g.children || 0), 0);
       const totalAfterAdd = currentGuestCount + 1; // Adding 1 guest
 
-      const freeLimit = 50;
-      const addonCount = additionalPackages.filter(p => p === 'addon').length;
-      const totalCapacity = freeLimit + (addonCount * 100);
+      const baseLimit = getPlanBaseLimit(selectedPlan) || 50;
+      const extraCapacity = additionalPackages.reduce(
+        (sum, planId) => sum + getPlanBaseLimit(planId),
+        0
+      );
+      const totalCapacity = baseLimit + extraCapacity;
 
       if (totalAfterAdd > totalCapacity) {
         // Capacity exceeded - show payment popup
@@ -1085,8 +1093,11 @@ const handleOpenAddonModal = React.useCallback(() => {
 
         // Calculate allowed guests based on plan and addons
         const basePlanLimit = getPlanBaseLimit(selectedPlan) || 50;
-        const addonCount = additionalPackages.filter(p => p === 'addon').length;
-        const totalAllowedGuests = basePlanLimit + (addonCount * 100);
+        const extraCapacity = additionalPackages.reduce(
+          (sum, planId) => sum + getPlanBaseLimit(planId),
+          0
+        );
+        const totalAllowedGuests = basePlanLimit + extraCapacity;
 
         // Build update object - only include progress_step if it exists
         const updateData = {
@@ -1170,8 +1181,11 @@ const handleOpenAddonModal = React.useCallback(() => {
       } else {
         // Calculate allowed guests based on plan and addons
         const basePlanLimit = getPlanBaseLimit(selectedPlan) || 50;
-        const addonCount = additionalPackages.filter(p => p === 'addon').length;
-        const totalAllowedGuests = basePlanLimit + (addonCount * 100);
+        const extraCapacity = additionalPackages.reduce(
+          (sum, planId) => sum + getPlanBaseLimit(planId),
+          0
+        );
+        const totalAllowedGuests = basePlanLimit + extraCapacity;
 
         const payload = {
           user_id: user?.id || null,
@@ -1673,9 +1687,12 @@ React.useEffect(() => {
       const totalAfterSave = currentGuestCount + newGuestsToAdd;
 
       // Calculate current capacity
-      const freeLimit = 50;
-      const addonCount = additionalPackages.filter(p => p === 'addon').length;
-      const totalCapacity = freeLimit + (addonCount * 100);
+      const baseLimit = getPlanBaseLimit(selectedPlan) || 50;
+      const extraCapacity = additionalPackages.reduce(
+        (sum, planId) => sum + getPlanBaseLimit(planId),
+        0
+      );
+      const totalCapacity = baseLimit + extraCapacity;
 
       console.log('Capacity check:', {
         current: currentGuestCount,
@@ -1944,7 +1961,7 @@ React.useEffect(() => {
     switch(plan) {
       case 'free':
       case 'basic':
-        return 49;
+        return 5;
       case 'standard':
         return 149;
       case 'premium':
@@ -1961,7 +1978,7 @@ React.useEffect(() => {
     switch(plan) {
       case 'free':
       case 'basic':
-        return 'מסלול א - 49₪';
+        return 'מסלול א - 5₪';
       case 'standard':
         return 'מסלול ב - 149₪';
       case 'premium':
@@ -2022,11 +2039,17 @@ React.useEffect(() => {
   // Purchase addon capacity (100 guests for 100 shekel)
   const handlePurchaseAddon = () => {
     const totalGuests = guestSummary.adults + guestSummary.children;
-    const freeLimit = 50;
-    const addonCount = additionalPackages.filter(p => p === 'addon').length;
-    const totalLimit = freeLimit + (addonCount * 100);
-    const guestsNeeded = totalGuests - totalLimit;
-    const packagesNeeded = Math.max(1, Math.ceil(guestsNeeded / 100));
+    const baseLimit = getPlanBaseLimit(selectedPlan) || 50;
+    const extraCapacity = additionalPackages.reduce(
+      (sum, planId) => sum + getPlanBaseLimit(planId),
+      0
+    );
+    const totalLimit = baseLimit + extraCapacity;
+    const guestsNeeded = Math.max(0, totalGuests - totalLimit);
+    const packagesNeeded = Math.max(
+      1,
+      Math.ceil(guestsNeeded / getPlanBaseLimit('addon'))
+    );
     const totalCost = packagesNeeded * 100;
 
     setPendingPlan('addon');
@@ -2065,9 +2088,14 @@ React.useEffect(() => {
       // Update allowed_guests in database for current event
       if (currentEventId) {
         try {
-          const freeLimit = 50;
-          const newAddonCount = additionalPackages.filter(p => p === 'addon').length + pendingAddonCount;
-          const newTotalAllowedGuests = freeLimit + (newAddonCount * 100);
+          const baseLimit = getPlanBaseLimit(selectedPlan) || 50;
+          const existingExtraCapacity = additionalPackages.reduce(
+            (sum, planId) => sum + getPlanBaseLimit(planId),
+            0
+          );
+          const addedCapacity = pendingAddonCount * getPlanBaseLimit('addon');
+          const newTotalAllowedGuests =
+            baseLimit + existingExtraCapacity + addedCapacity;
 
           const { error: updateError } = await supabase
             .from('events')
@@ -2576,6 +2604,7 @@ React.useEffect(() => {
         };
         
         if(guests){
+          setMessagesSentCount(guests.length);
           guests.forEach(g => {
             
             // Count by status
@@ -2606,6 +2635,8 @@ React.useEffect(() => {
           specialMeals.vegan.total = specialMeals.vegan.adults + specialMeals.vegan.children;
           specialMeals.glatt.total = specialMeals.glatt.adults + specialMeals.glatt.children;
           specialMeals.allergy.total = specialMeals.allergy.adults + specialMeals.allergy.children;
+        } else {
+          setMessagesSentCount(0);
         }
         
         setGuestSummary(summary);
@@ -2861,11 +2892,17 @@ React.useEffect(() => {
           <div className="bg-white rounded-lg p-8 w-full max-w-2xl mx-4 text-center shadow-2xl">
             {(() => {
               const totalGuests = guestSummary.adults + guestSummary.children;
-              const freeLimit = 50;
-              const addonCount = additionalPackages.filter(p => p === 'addon').length;
-              const totalLimit = freeLimit + (addonCount * 100);
-              const guestsNeeded = totalGuests - totalLimit;
-              const packagesNeeded = Math.ceil(guestsNeeded / 100);
+              const baseLimit = getPlanBaseLimit(selectedPlan) || 50;
+              const extraCapacity = additionalPackages.reduce(
+                (sum, planId) => sum + getPlanBaseLimit(planId),
+                0
+              );
+              const totalLimit = baseLimit + extraCapacity;
+              const guestsNeeded = Math.max(0, totalGuests - totalLimit);
+              const packagesNeeded =
+                guestsNeeded === 0
+                  ? 1
+                  : Math.ceil(guestsNeeded / getPlanBaseLimit('addon'));
               const totalCost = packagesNeeded * 100;
 
               return (
@@ -3070,10 +3107,10 @@ React.useEffect(() => {
       )}
       {/* Status and Summary Tables */}
       <div className="w-full px-4 mb-0 mt-4" style={{ marginBottom: '200px' }}>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           
           {/* First Column - Event Status */}
-          <div className="w-full">
+          <div className="w-full flex flex-col gap-6">
             {currentEventId ? (
               <div className="bg-green-50 p-3 text-center shadow-lg w-full" style={{
                 border: '3px solid #D4AF37',
@@ -3154,11 +3191,7 @@ React.useEffect(() => {
                 </p>
               </div>
             )}
-          </div>
-
-          {/* Second Column - Active Plan */}
-          {selectedPlan && (
-            <div className="w-full">
+            {selectedPlan && (
               <div className="bg-yellow-50 p-3 text-center shadow-lg w-full" style={{
                 border: '3px solid #D4AF37',
                 outline: '2px solid #B8860B',
@@ -3181,7 +3214,7 @@ React.useEffect(() => {
                        selectedPlan === 'supreme' ? 'מסלול ו' : 'לא נבחר מסלול'}
                     </div>
                     <div className="text-base text-gray-700 font-semibold">
-                      {selectedPlan === 'basic' || selectedPlan === 'free' ? '49₪ - עד 50 מוזמנים' :
+                      {selectedPlan === 'basic' || selectedPlan === 'free' ? '5₪ - עד 5 מוזמנים' :
                        selectedPlan === 'standard' ? '149₪ - מ 51 עד 200 מוזמנים' :
                        selectedPlan === 'premium' ? '199₪ - מ 201 עד 350 מוזמנים' :
                        selectedPlan === 'luxury' ? '259₪ - מ 351 עד 500 מוזמנים' :
@@ -3215,12 +3248,126 @@ React.useEffect(() => {
                   )}
                 </div>
               </div>
+            )}
+          </div>
+
+          {/* Second Column - Guest Summary + Table Report */}
+          {currentEventId && (
+            <div className="w-full flex flex-col gap-6">
+              <div className="bg-blue-50 p-3 text-center shadow-lg w-full" style={{
+                border: '3px solid #D4AF37',
+                outline: '2px solid #B8860B',
+                outlineOffset: '2px',
+                borderRadius: '8px',
+                minHeight: '280px'
+              }}>
+                <div className="flex items-center justify-center gap-2 mb-2">
+                  <span className="text-xl">👥</span>
+                  <h3 className="text-base font-bold text-blue-800">סיכום כל האורחים המוזמנים</h3>
+                </div>
+                <div className="mt-1">
+                  <div className="bg-white p-3 rounded-lg border border-blue-100">
+                    {hasGuestSummaryData ? (
+                      <div className="h-56">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart
+                            data={guestSummaryChartData}
+                            margin={{ top: 16, right: 20, left: -10, bottom: 8 }}
+                          >
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                            <XAxis
+                              dataKey="name"
+                              stroke="#1f2937"
+                              tick={{ fontSize: 16, fontWeight: 600 }}
+                              interval={0}
+                            />
+                            <YAxis hide />
+                            <Tooltip
+                              formatter={(value, name) => [`${value}`, name]}
+                              wrapperStyle={{ direction: 'rtl', textAlign: 'right' }}
+                            />
+                            <Bar dataKey="value" radius={[8, 8, 0, 0]} maxBarSize={60}>
+                              {guestSummaryChartData.map((item) => (
+                                <Cell key={item.key} fill={item.color} />
+                              ))}
+                              <LabelList dataKey="value" content={renderGuestSummaryLabel} />
+                            </Bar>
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+                    ) : (
+                      <div className="py-10 text-sm text-gray-500 text-center">אין נתונים להצגה עדיין</div>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-3 text-base">
+                    <div className="bg-white p-2 rounded-lg border border-green-100 text-right">
+                      <div className="text-sm font-semibold text-green-600">מבוגרים</div>
+                      <div className="text-2xl font-bold text-green-700">{guestSummary.adults}</div>
+                    </div>
+                    <div className="bg-white p-2 rounded-lg border border-orange-100 text-right">
+                      <div className="text-sm font-semibold text-orange-600">ילדים</div>
+                      <div className="text-2ל font-bold text-orange-700">{guestSummary.children}</div>
+                    </div>
+                    <div className="bg-white p-2 rounded-lg border border-purple-100 text-right">
+                      <div className="text-sm font-semibold text-purple-600">סה"כ</div>
+                      <div className="text-2ל font-bold text-purple-700">{guestSummary.adults + guestSummary.children}</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {tableSummary.length > 0 && (
+                <div className="bg-orange-50 p-3 text-center shadow-lg w-full" style={{
+                  border: '3px solid #D4AF37',
+                  outline: '2px solid #B8860B',
+                  outlineOffset: '2px',
+                  borderRadius: '8px',
+                  display: 'flex',
+                  flexDirection: 'column'
+                }}>
+                  <div className="flex items-center justify-center gap-3 mb-3 flex-shrink-0">
+                    <span className="text-2xl">📊</span>
+                    <h3 className="text-lg font-extrabold text-orange-900 tracking-wide">דוח סיכום שולחנות</h3>
+                  </div>
+                  <div className="mt-3 overflow-x-auto flex-grow">
+                    <table className="w-full text-right border text-sm min-w-full">
+                      <thead>
+                        <tr className="bg-white">
+                          <th className="p-2 border font-bold text-center text-orange-800">מס. שולחן</th>
+                          <th className="p-2 border font-bold text-center text-green-700">בוגרים</th>
+                          <th className="p-2 border font-bold text-center text-purple-700">ילדים</th>
+                          <th className="p-2 border font-bold text-center text-blue-700">סה"כ</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {tableSummary.map((row, idx) => (
+                          <tr key={`table-${row.table_number}-${idx}`} className={idx % 2 === 0 ? 'bg-white' : 'bg-orange-100'}>
+                            <td className="p-2 border text-center font-semibold text-orange-800 text-xl">{row.table_number}</td>
+                            <td className="p-2 border text-center font-semibold text-green-700 text-xl">{row.adults}</td>
+                            <td className="p-2 border text-center font-semibold text-purple-700 text-xl">{row.children}</td>
+                            <td className="p-2 border text-center font-bold text-blue-700 text-2xl">{row.total}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot>
+                        <tr className="bg-orange-200 font-bold">
+                          <td className="p-2 border text-center text-orange-900 text-xl">סה"כ</td>
+                          <td className="p-2 border text-center text-green-800 text-xl">{tableSummary.reduce((sum, r) => sum + r.adults, 0)}</td>
+                          <td className="p-2 border text-center text-purple-800 text-xl">{tableSummary.reduce((sum, r) => sum + r.children, 0)}</td>
+                          <td className="p-2 border text-center text-blue-800 text-2xl">{tableSummary.reduce((sum, r) => sum + r.total, 0)}</td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
           {/* Third Column - Guest Status Summary */}
           {currentEventId && (
-            <div className="w-full">
+            <div className="w-full flex flex-col gap-6">
               <div className="bg-purple-50 p-3 text-center shadow-lg w-full" style={{
                 border: '3px solid #D4AF37',
                 outline: '2px solid #B8860B',
@@ -3284,244 +3431,118 @@ React.useEffect(() => {
                   </div>
                 </div>
               </div>
-            </div>
-          )}
-
-          {/* Fourth Column - Guest Summary */}
-          {currentEventId && (
-            <div className="w-full">
-              <div className="bg-blue-50 p-3 text-center shadow-lg w-full" style={{
-                border: '3px solid #D4AF37',
-                outline: '2px solid #B8860B',
-                outlineOffset: '2px',
-                borderRadius: '8px',
-                minHeight: '280px'
-              }}>
-                <div className="flex items-center justify-center gap-2 mb-2">
-                  <span className="text-xl">👥</span>
-                  <h3 className="text-base font-bold text-blue-800">סיכום כל האורחים המוזמנים</h3>
-                </div>
-                <div className="mt-1">
-                  <div className="bg-white p-3 rounded-lg border border-blue-100">
-                    {hasGuestSummaryData ? (
-                      <div className="h-56">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <BarChart
-                            data={guestSummaryChartData}
-                            margin={{ top: 16, right: 20, left: -10, bottom: 8 }}
-                          >
-                            <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                            <XAxis
-                              dataKey="name"
-                              stroke="#1f2937"
-                              tick={{ fontSize: 16, fontWeight: 600 }}
-                              interval={0}
-                            />
-                            <YAxis hide />
-                            <Tooltip
-                              formatter={(value, name) => [`${value}`, name]}
-                              wrapperStyle={{ direction: 'rtl', textAlign: 'right' }}
-                            />
-                            <Bar dataKey="value" radius={[8, 8, 0, 0]} maxBarSize={60}>
-                              {guestSummaryChartData.map((item) => (
-                                <Cell key={item.key} fill={item.color} />
-                              ))}
-                              <LabelList dataKey="value" content={renderGuestSummaryLabel} />
-                            </Bar>
-                          </BarChart>
-                        </ResponsiveContainer>
-                      </div>
-                    ) : (
-                      <div className="py-10 text-sm text-gray-500 text-center">אין נתונים להצגה עדיין</div>
-                    )}
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-3 text-base">
-                    <div className="bg-white p-2 rounded-lg border border-green-100 text-right">
-                      <div className="text-sm font-semibold text-green-600">מבוגרים</div>
-                      <div className="text-2xl font-bold text-green-700">{guestSummary.adults}</div>
+              {selectedPlan && (() => {
+                const messagesSent = messagesSentCount;
+                const messageLimit = MESSAGE_LIMIT;
+                const remainingMessagesRaw = messageLimit - messagesSent;
+                const remainingMessages = Math.max(0, remainingMessagesRaw);
+                const overMessages = remainingMessagesRaw < 0 ? Math.abs(remainingMessagesRaw) : 0;
+                const capacityChartData = [
+                  { key: 'limit', name: 'מגבלת הודעות', value: messageLimit, color: '#facc15' },
+                  { key: 'sent', name: 'הודעות שנשלחו', value: messagesSent, color: '#7c3aed' },
+                  {
+                    key: overMessages > 0 ? 'over' : 'remaining',
+                    name: overMessages > 0 ? 'חריגה' : 'יתרה',
+                    value: overMessages > 0 ? overMessages : remainingMessages,
+                    color: overMessages > 0 ? '#dc2626' : '#22c55e'
+                  }
+                ];
+                const hasCapacityChartData = capacityChartData.some(item => Number.isFinite(item.value) && item.value > 0);
+                const renderCapacityLabel = ({ x, y, width, height, value, index }) => {
+                  if (!value) return null;
+                  const dataItem = capacityChartData[index];
+                  const isDarkBar = ['sent', 'over', 'remaining'].includes(dataItem?.key);
+                  const insideBar = (height ?? 0) >= 24;
+                  const labelX = x + (width ?? 0) / 2;
+                  const labelY = insideBar ? y + (height ?? 0) / 2 : (y ?? 0) - 6;
+                  const color = insideBar ? (isDarkBar ? '#FFFFFF' : '#111827') : '#111827';
+                  return (
+                    <text
+                      x={labelX}
+                      y={labelY}
+                      fill={color}
+                      textAnchor="middle"
+                      dominantBaseline={insideBar ? 'middle' : 'baseline'}
+                      fontWeight="700"
+                      fontSize="14"
+                    >
+                      {value}
+                    </text>
+                  );
+                };
+                
+                return (
+                  <div className="bg-yellow-50 p-3 text-center shadow-lg w-full" style={{
+                    border: '3px solid #D4AF37',
+                    outline: '2px solid #B8860B',
+                    outlineOffset: '2px',
+                    borderRadius: '8px',
+                    minHeight: '280px'
+                  }}>
+                    <div className="flex items-center justify-center gap-2 mb-2">
+                      <span className="text-xl">📈</span>
+                      <h3 className="text-base font-bold text-yellow-800">יתרת הודעות</h3>
                     </div>
-                    <div className="bg-white p-2 rounded-lg border border-orange-100 text-right">
-                      <div className="text-sm font-semibold text-orange-600">ילדים</div>
-                      <div className="text-2xl font-bold text-orange-700">{guestSummary.children}</div>
-                    </div>
-                    <div className="bg-white p-2 rounded-lg border border-purple-100 text-right">
-                      <div className="text-sm font-semibold text-purple-600">סה"כ</div>
-                      <div className="text-2xl font-bold text-purple-700">{guestSummary.adults + guestSummary.children}</div>
-                    </div>
-                  </div>
-                  
-                  {/* Summary section below */}
-                  <div className="space-y-1 mt-2">
-                    {selectedPlan && (() => {
-                      const totalGuests = guestSummary.adults + guestSummary.children;
-                      const baseLimit = getPlanBaseLimit(selectedPlan);
-                      const extraCapacity = additionalPackages.reduce((sum, planId) => sum + getPlanBaseLimit(planId), 0);
-                      if (!baseLimit && extraCapacity === 0) return null;
-                      const planLimit = (baseLimit || 0) + extraCapacity;
-                      const isUnlimitedPlan = planLimit === Infinity;
-                      const remainingGuestsRaw = isUnlimitedPlan ? Infinity : planLimit - totalGuests;
-                      const remainingGuests = remainingGuestsRaw === Infinity ? Infinity : Math.max(0, remainingGuestsRaw);
-                      const overCapacity = remainingGuestsRaw !== Infinity && remainingGuestsRaw < 0 ? Math.abs(remainingGuestsRaw) : 0;
-                      const capacityChartData = isUnlimitedPlan ? [] : [
-                        { key: 'limit', name: 'מגבלת מסלול', value: planLimit, color: '#facc15' },
-                        { key: 'total', name: 'סה״כ אורחים', value: totalGuests, color: '#7c3aed' },
-                        {
-                          key: overCapacity > 0 ? 'over' : 'remaining',
-                          name: overCapacity > 0 ? 'חריגה' : 'יתרה',
-                          value: overCapacity > 0 ? overCapacity : remainingGuests,
-                          color: overCapacity > 0 ? '#dc2626' : '#22c55e'
-                        }
-                      ];
-                      const hasCapacityChartData = capacityChartData.some(item => Number.isFinite(item.value) && item.value > 0);
-                      const renderCapacityLabel = ({ x, y, width, height, value, index }) => {
-                        if (!value) return null;
-                        const dataItem = capacityChartData[index];
-                        const isDarkBar = ['total', 'over', 'remaining'].includes(dataItem?.key);
-                        const insideBar = (height ?? 0) >= 24;
-                        const labelX = x + (width ?? 0) / 2;
-                        const labelY = insideBar ? y + (height ?? 0) / 2 : (y ?? 0) - 6;
-                        const color = insideBar ? (isDarkBar ? '#FFFFFF' : '#111827') : '#111827';
-                        return (
-                          <text
-                            x={labelX}
-                            y={labelY}
-                            fill={color}
-                            textAnchor="middle"
-                            dominantBaseline={insideBar ? 'middle' : 'baseline'}
-                            fontWeight="700"
-                            fontSize="14"
-                          >
-                            {value}
-                          </text>
-                        );
-                      };
-                      
-                      return (
-                        <div className="bg-yellow-50 p-2 rounded-lg text-right border-2 border-yellow-400 mt-1">
-                          <div className="text-base font-bold text-yellow-800 mb-1">
-                            <span>יתרת אורחים:</span>
-                          </div>
-                          {isUnlimitedPlan ? (
-                            <div className="bg-white p-4 rounded-lg border border-yellow-200 text-base font-semibold text-yellow-700">
-                              המסלול הנוכחי מאפשר מספר אורחים ללא הגבלה 🚀
-                            </div>
-                          ) : (
-                            <>
-                              <div className="bg-white p-3 rounded-lg border border-yellow-200">
-                                {hasCapacityChartData ? (
-                                  <div className="h-56">
-                                    <ResponsiveContainer width="100%" height="100%">
-                                      <BarChart
-                                        data={capacityChartData}
-                                        margin={{ top: 16, right: 20, left: -10, bottom: 8 }}
-                                      >
-                                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                                        <XAxis
-                                          dataKey="name"
-                                          stroke="#1f2937"
-                                          tick={{ fontSize: 16, fontWeight: 600 }}
-                                          interval={0}
-                                        />
-                                        <YAxis hide />
-                                        <Tooltip
-                                          formatter={(value, name) => [`${value}`, name]}
-                                          wrapperStyle={{ direction: 'rtl', textAlign: 'right' }}
-                                        />
-                                        <Bar dataKey="value" radius={[8, 8, 0, 0]} maxBarSize={60}>
-                                          {capacityChartData.map((item) => (
-                                            <Cell key={item.key} fill={item.color} />
-                                          ))}
-                                          <LabelList dataKey="value" content={renderCapacityLabel} />
-                                        </Bar>
-                                      </BarChart>
-                                    </ResponsiveContainer>
-                                  </div>
-                                ) : (
-                                  <div className="py-10 text-sm text-gray-500 text-center">אין נתונים להצגה עדיין</div>
-                                )}
-                              </div>
 
-                              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-3 text-base">
-                                <div className="bg-white p-2 rounded-lg border border-yellow-100 text-right">
-                                  <div className="text-sm font-semibold text-yellow-600">מגבלת מסלול</div>
-                                  <div className="text-2xl font-bold text-yellow-800">{planLimit}</div>
-                                </div>
-                                <div className="bg-white p-2 rounded-lg border border-purple-100 text-right">
-                                  <div className="text-sm font-semibold text-purple-600">סה"כ אורחים</div>
-                                  <div className="text-2xl font-bold text-purple-700">{totalGuests}</div>
-                                </div>
-                                <div className={`bg-white p-2 rounded-lg border ${overCapacity > 0 ? 'border-red-200' : 'border-green-200'} text-right`}>
-                                  <div className={`text-sm font-semibold ${overCapacity > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                                    {overCapacity > 0 ? 'חריגה' : 'יתרה'}
-                                  </div>
-                                  <div className={`text-2xl font-bold ${overCapacity > 0 ? 'text-red-700' : 'text-green-700'}`}>
-                                    {overCapacity > 0 ? `-${overCapacity}` : remainingGuests}
-                                  </div>
-                                </div>
-                              </div>
-                            </>
-                          )}
+                    <div className="bg-white p-3 rounded-lg border border-yellow-200">
+                      {hasCapacityChartData ? (
+                        <div className="h-56">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <BarChart
+                              data={capacityChartData}
+                              margin={{ top: 16, right: 20, left: -10, bottom: 8 }}
+                            >
+                              <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                              <XAxis
+                                dataKey="name"
+                                stroke="#1f2937"
+                                tick={{ fontSize: 16, fontWeight: 600 }}
+                                interval={0}
+                              />
+                              <YAxis hide />
+                              <Tooltip
+                                formatter={(value, name) => [`${value}`, name]}
+                                wrapperStyle={{ direction: 'rtl', textAlign: 'right' }}
+                              />
+                              <Bar dataKey="value" radius={[8, 8, 0, 0]} maxBarSize={60}>
+                                {capacityChartData.map((item) => (
+                                  <Cell key={item.key} fill={item.color} />
+                                ))}
+                                <LabelList dataKey="value" content={renderCapacityLabel} />
+                              </Bar>
+                            </BarChart>
+                          </ResponsiveContainer>
                         </div>
-                      );
-                    })()}
+                      ) : (
+                        <div className="py-10 text-sm text-gray-500 text-center">אין נתונים להצגה עדיין</div>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-3 text-base">
+                      <div className="bg-white p-2 rounded-lg border border-yellow-100 text-right">
+                        <div className="text-sm font-semibold text-yellow-600">מגבלת הודעות</div>
+                        <div className="text-2xl font-bold text-yellow-800">{messageLimit}</div>
+                      </div>
+                      <div className="bg-white p-2 rounded-lg border border-purple-100 text-right">
+                            <div className="text-sm font-semibold text-purple-600">הודעות שנשלחו</div>
+                        <div className="text-2xl font-bold text-purple-700">{messagesSent}</div>
+                      </div>
+                      <div className={`bg-white p-2 rounded-lg border ${overMessages > 0 ? 'border-red-200' : 'border-green-200'} text-right`}>
+                        <div className={`text-sm font-semibold ${overMessages > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                          {overMessages > 0 ? 'חריגה' : 'יתרה'}
+                        </div>
+                        <div className={`text-2xl font-bold ${overMessages > 0 ? 'text-red-700' : 'text-green-700'}`}>
+                          {overMessages > 0 ? `-${overMessages}` : remainingMessages}
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Fifth Column - Table Summary Report */}
-          {currentEventId && tableSummary.length > 0 && (
-            <div className="w-full">
-              <div className="bg-orange-50 p-3 text-center shadow-lg w-full" style={{
-                border: '3px solid #D4AF37',
-                outline: '2px solid #B8860B',
-                outlineOffset: '2px',
-                borderRadius: '8px',
-                display: 'flex',
-                flexDirection: 'column'
-              }}>
-                <div className="flex items-center justify-center gap-3 mb-3 flex-shrink-0">
-                  <span className="text-2xl">📊</span>
-                  <h3 className="text-lg font-extrabold text-orange-900 tracking-wide">דוח סיכום שולחנות</h3>
-                </div>
-                <div className="mt-3 overflow-x-auto flex-grow">
-                  <table className="w-full text-right border text-sm min-w-full">
-                    <thead>
-                      <tr className="bg-white">
-                        <th className="p-2 border font-bold text-center text-orange-800">מס. שולחן</th>
-                        <th className="p-2 border font-bold text-center text-green-700">בוגרים</th>
-                        <th className="p-2 border font-bold text-center text-purple-700">ילדים</th>
-                        <th className="p-2 border font-bold text-center text-blue-700">סה"כ</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {tableSummary.map((row, idx) => (
-                        <tr key={`table-${row.table_number}-${idx}`} className={idx % 2 === 0 ? 'bg-white' : 'bg-orange-100'}>
-                          <td className="p-2 border text-center font-semibold text-orange-800 text-xl">{row.table_number}</td>
-                        <td className="p-2 border text-center font-semibold text-green-700 text-xl">{row.adults}</td>
-                        <td className="p-2 border text-center font-semibold text-purple-700 text-xl">{row.children}</td>
-                        <td className="p-2 border text-center font-bold text-blue-700 text-2xl">{row.total}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                    <tfoot>
-                      <tr className="bg-orange-200 font-bold">
-                        <td className="p-2 border text-center text-orange-900 text-xl">סה"כ</td>
-                        <td className="p-2 border text-center text-green-800 text-xl">{tableSummary.reduce((sum, r) => sum + r.adults, 0)}</td>
-                        <td className="p-2 border text-center text-purple-800 text-xl">{tableSummary.reduce((sum, r) => sum + r.children, 0)}</td>
-                        <td className="p-2 border text-center text-blue-800 text-2xl">{tableSummary.reduce((sum, r) => sum + r.total, 0)}</td>
-                      </tr>
-                    </tfoot>
-                  </table>
-                </div>
-              </div>
+                );
+              })()}
             </div>
           )}
 
 
-          
         </div>
       </div>
 
@@ -5856,7 +5877,7 @@ React.useEffect(() => {
                   <div className="space-y-2">
                     <p className="text-gray-700 text-base leading-relaxed">בשלב זה תבחר את המסלול המתאים לאירוע שלך:</p>
                     <ul className="list-disc list-inside space-y-1.5 mr-3 text-base">
-                      <li><strong>מסלול א (49₪)</strong> - עד 50 מוזמנים</li>
+                      <li><strong>מסלול א (5₪)</strong> - עד 5 מוזמנים</li>
                       <li><strong>מסלול ב (149₪)</strong> - מ 51 עד 200 מוזמנים</li>
                       <li><strong>מסלול ג (199₪)</strong> - מ 201 עד 350 מוזמנים</li>
                       <li><strong>מסלול ד (259₪)</strong> - מ 351 עד 500 מוזמנים</li>
@@ -5992,10 +6013,10 @@ React.useEffect(() => {
                 <h3 className="text-xl font-bold mb-2 text-primary">מסלול א</h3>
                 <p className="text-gray-600 mb-4">מתאים לאירועים קטנים</p>
                 <div className="mb-4">
-                  <span className="text-base md:text-xl font-bold text-primary">49 ₪</span>
+                  <span className="text-base md:text-xl font-bold text-primary">5 ₪</span>
                 </div>
                 <div className="mb-6 text-right">
-                  <p className="text-base md:text-xl font-semibold text-primary mb-3 whitespace-nowrap tracking-wide">✓ עד 50 מוזמנים</p>
+                  <p className="text-base md:text-xl font-semibold text-primary mb-3 whitespace-nowrap tracking-wide">✓ עד 5 מוזמנים</p>
                   <p className="text-gray-600 mb-2">✓ הזמנות מעוצבות מקצועית</p>
                   <p className="text-gray-600 mb-2">✓ שליחה אוטומטית לכל האורחים</p>
                   <p className="text-gray-600 mb-2">✓ שליחת הודעות SMS ב-3 סבבים</p>

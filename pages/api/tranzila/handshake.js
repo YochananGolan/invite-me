@@ -105,6 +105,7 @@ export default async function handler(req, res) {
     return res.status(200).json({
       success: true,
       thtk,
+      token: thtk, // alias for frontend expectations
       amount,
     });
 
