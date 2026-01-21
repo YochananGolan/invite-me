@@ -37,39 +37,37 @@ export default function GuestPage() {
   const [eventDetails, setEventDetails] = useState(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
 
-  const wazeUrl = useMemo(() => {
-    if (!eventDetails) return null;
-
-    const explicitUrl = eventDetails.hall_location_url || eventDetails.hallLocationUrl || eventDetails.wazeLink;
-    if (explicitUrl && /^https?:\/\//i.test(explicitUrl)) {
-      return explicitUrl;
+  const resolvedAddress = useMemo(() => {
+    if (guest?.hall_address?.trim()) {
+      return guest.hall_address.trim();
     }
+    if (eventDetails?.hall_address?.trim?.()) {
+      return eventDetails.hall_address.trim();
+    }
+    if (eventDetails?.hallAddress?.trim?.()) {
+      return eventDetails.hallAddress.trim();
+    }
+    if (guest?.hall_name?.trim()) {
+      return guest.hall_name.trim();
+    }
+    if (eventDetails?.hall_name?.trim?.()) {
+      return eventDetails.hall_name.trim();
+    }
+    if (eventDetails?.hallName?.trim?.()) {
+      return eventDetails.hallName.trim();
+    }
+    return '';
+  }, [guest?.hall_address, guest?.hall_name, eventDetails]);
 
-    const locationParts = [
-      eventDetails.hallName,
-      eventDetails.hallAddress,
-      eventDetails.hallCity,
-    ]
-      .filter(Boolean)
-      .join(' ');
-
-    if (!locationParts) return null;
-
-    const encoded = encodeURIComponent(locationParts);
-    return `https://www.waze.com/ul?q=${encoded}&navigate=yes`;
-  }, [eventDetails]);
+  const wazeUrl = useMemo(() => {
+    if (!resolvedAddress) return null;
+    const encoded = encodeURIComponent(resolvedAddress);
+    return `https://www.waze.com/ul?q=${encoded}&navigate=yes&zoom=17&lang=heb`;
+  }, [resolvedAddress]);
 
   const googleMapQuery = useMemo(() => {
-    if (eventDetails) {
-      const locationParts = [eventDetails.hallName, eventDetails.hallAddress, eventDetails.hallCity]
-        .filter(Boolean)
-        .join(' ');
-      if (locationParts) return locationParts;
-    }
-    if (guest?.hall_address) return guest.hall_address;
-    if (guest?.hall_name) return guest.hall_name;
-    return '31.771959,35.217018'; // ירושלים כברירת מחדל
-  }, [eventDetails, guest?.hall_address, guest?.hall_name]);
+    return resolvedAddress || '31.771959,35.217018';
+  }, [resolvedAddress]);
 
   const googleMapsLink = useMemo(
     () => `https://www.google.com/maps?q=${encodeURIComponent(googleMapQuery)}`,

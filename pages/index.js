@@ -104,10 +104,6 @@ export default function Home({ session }) {
                 <h3 className="text-xl font-bold text-primary">🎯 מה תקבל?</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-gray-700">
                   <ol className="space-y-2 list-decimal list-inside">
-                    <li>
-                      <strong className="text-green-700">עד 50 מוזמנים חינם</strong>
-                      <div className="text-sm text-gray-600">עם כל הפיצ'רים ללא הגבלה</div>
-                    </li>
                     <li>הזמנות מעוצבות מקצועית</li>
                     <li>שליחה אוטומטית לכל האורחים</li>
                     <li>שליחת הודעות SMS ב-2 סבבים</li>
