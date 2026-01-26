@@ -734,7 +734,8 @@ const handleOpenAddonModal = React.useCallback(() => {
         .single();
       if (error) throw error;
 
-      const inviteLink = `${window.location.origin}/${evRow?.id}/${newGuest.id}`;
+      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || (typeof window !== 'undefined' ? window.location.origin : 'https://invite-me-two.vercel.app');
+      const inviteLink = `${baseUrl}/${evRow?.id}/${newGuest.id}`;
 
       // Dev helper: log the RSVP link so it can be copied from the browser console
       if (process.env.NODE_ENV !== 'production') {
@@ -870,7 +871,8 @@ const handleOpenAddonModal = React.useCallback(() => {
         .single();
       if (error) throw error;
 
-      const inviteLink = `${window.location.origin}/${evRow?.id}/${newGuest.id}`;
+      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || (typeof window !== 'undefined' ? window.location.origin : 'https://invite-me-two.vercel.app');
+      const inviteLink = `${baseUrl}/${evRow?.id}/${newGuest.id}`;
 
       // Compose message
       const smsBody = encodeURIComponent(`${invitationText}\n\nלאישור הגעה:\n${inviteLink}`);
@@ -1803,8 +1805,9 @@ React.useEffect(() => {
 
       // Send SMS to all guests if requested
       if (sendSms && insertedGuests && insertedGuests.length > 0) {
+        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || (typeof window !== 'undefined' ? window.location.origin : 'https://invite-me-two.vercel.app');
         const smsGuests = insertedGuests.map(g => {
-          const inviteLink = `${window.location.origin}/${evRow.id}/${g.id}`;
+          const inviteLink = `${baseUrl}/${evRow.id}/${g.id}`;
           return {
             phone: g.phone,
             firstName: g.first_name,
