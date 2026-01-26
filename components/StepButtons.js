@@ -2252,6 +2252,15 @@ React.useEffect(() => {
           .single();
         if(!ev) return;
         setAllowedGuestCapacity(ev.allowed_guests ?? null);
+        // Restore selectedPlan from allowed_guests if not in localStorage
+        if (ev.allowed_guests && !selectedPlan) {
+          const inferredPlan = ev.allowed_guests <= 50 ? 'free' :
+                               ev.allowed_guests <= 200 ? 'standard' :
+                               ev.allowed_guests <= 350 ? 'premium' :
+                               ev.allowed_guests <= 500 ? 'luxury' : 'supreme';
+          setSelectedPlan(inferredPlan);
+          try { localStorage.setItem('selectedPlan', inferredPlan); } catch(e){}
+        }
         const details=typeof ev.event_details==='string'?JSON.parse(ev.event_details):ev.event_details||{};
         const dateStr=details.date||details.start_datetime;
         const parsedDate = parseEventDate(dateStr);
@@ -2544,6 +2553,15 @@ React.useEffect(() => {
                 console.log('Found future event in database, restoring...', ev);
                 setCurrentEventId(ev.id);
                 setAllowedGuestCapacity(ev.allowed_guests ?? null);
+                // Restore selectedPlan from allowed_guests if not in localStorage
+                if (ev.allowed_guests && !selectedPlan) {
+                  const inferredPlan = ev.allowed_guests <= 50 ? 'free' :
+                                       ev.allowed_guests <= 200 ? 'standard' :
+                                       ev.allowed_guests <= 350 ? 'premium' :
+                                       ev.allowed_guests <= 500 ? 'luxury' : 'supreme';
+                  setSelectedPlan(inferredPlan);
+                  try { localStorage.setItem('selectedPlan', inferredPlan); } catch(e){}
+                }
                 setFormData(prev => ({ ...prev, ...details }));
                 
                 // Restore design if available
@@ -2636,6 +2654,15 @@ React.useEffect(() => {
         if(ev){
           setCurrentEventId(ev.id);
           setAllowedGuestCapacity(ev.allowed_guests ?? null);
+          // Restore selectedPlan from allowed_guests if not in localStorage
+          if (ev.allowed_guests && !selectedPlan) {
+            const inferredPlan = ev.allowed_guests <= 50 ? 'free' :
+                                 ev.allowed_guests <= 200 ? 'standard' :
+                                 ev.allowed_guests <= 350 ? 'premium' :
+                                 ev.allowed_guests <= 500 ? 'luxury' : 'supreme';
+            setSelectedPlan(inferredPlan);
+            try { localStorage.setItem('selectedPlan', inferredPlan); } catch(e){}
+          }
           // Parse event_details if it's a string
           const details = typeof ev.event_details === 'string' 
             ? JSON.parse(ev.event_details) 
