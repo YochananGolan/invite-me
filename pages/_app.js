@@ -15,21 +15,29 @@ function MyApp({ Component, pageProps }) {
     const checkSession = () => {
       const userId = localStorage.getItem('user_id');
       const userEmail = localStorage.getItem('user_email');
-      
+
       if (userId && userEmail) {
-        // Create a mock session object
-        setSession({
-          user: {
-            id: userId,
-            email: userEmail
+        // Only update session if it's different to prevent unnecessary re-renders
+        setSession((prevSession) => {
+          if (prevSession?.user?.id === userId && prevSession?.user?.email === userEmail) {
+            return prevSession; // No change, keep same reference
           }
+          return {
+            user: {
+              id: userId,
+              email: userEmail
+            }
+          };
         });
       } else {
-        setSession(null);
+        setSession((prevSession) => {
+          if (prevSession === null) return null; // Already null, don't update
+          return null;
+        });
       }
       setLoading(false);
     };
-    
+
     // Also check Supabase auth state and sync to localStorage
     const checkAndSyncSupabaseAuth = async () => {
       try {
@@ -48,9 +56,9 @@ function MyApp({ Component, pageProps }) {
         checkSession();
       }
     };
-    
+
     checkAndSyncSupabaseAuth();
-    
+
     // Listen for Supabase auth changes and sync to localStorage
     const {
       data: { subscription },
@@ -66,14 +74,21 @@ function MyApp({ Component, pageProps }) {
         localStorage.removeItem('user_email');
         checkSession();
       }
+      // Don't update on other events to prevent unnecessary refreshes
     });
-    
+
     // Listen for storage changes (e.g., when user logs in from another tab)
-    window.addEventListener('storage', checkSession);
-    
+    const handleStorageChange = (e) => {
+      // Only react to user_id or user_email changes
+      if (e.key === 'user_id' || e.key === 'user_email') {
+        checkSession();
+      }
+    };
+    window.addEventListener('storage', handleStorageChange);
+
     return () => {
       subscription.unsubscribe();
-      window.removeEventListener('storage', checkSession);
+      window.removeEventListener('storage', handleStorageChange);
     };
   }, []);
 
@@ -207,7 +222,7 @@ function MyApp({ Component, pageProps }) {
     }
 
     // No additional redirect needed when authenticated or on public paths.
-  }, [session, loading, router]);
+  }, [session, loading, router.pathname]); // Use router.pathname instead of router object
 
   // Optional: could render a loader while checking auth
   if (loading) return null;

@@ -2068,6 +2068,14 @@ React.useEffect(() => {
 
   // Handle plan selection in pricing modal
   const handleSelectPlan = (plan) => {
+    // Check if user is logged in
+    if (!session) {
+      addToast('עליך להתחבר כדי לרכוש חבילה', 'error');
+      setShowPricingPlan(false);
+      onAuthClick('sign_in');
+      return;
+    }
+
     const price = getPlanPrice(plan);
 
     // All plans now require payment
@@ -2097,6 +2105,15 @@ React.useEffect(() => {
 
   // Purchase addon capacity (100 guests for 100 shekel)
   const handlePurchaseAddon = () => {
+    // Check if user is logged in
+    if (!session) {
+      addToast('עליך להתחבר כדי לרכוש חבילה', 'error');
+      setShowPlanLimitWarning(false);
+      resetCapacityWarningGuests();
+      onAuthClick('sign_in');
+      return;
+    }
+
     const totalGuests = guestSummary.adults + guestSummary.children;
     const baseLimit = getPlanBaseLimit(selectedPlan) || 50;
     const extraCapacity = additionalPackages.reduce(

@@ -54,6 +54,8 @@ export default function AuthModal({ initialMode = 'sign_in', open = false, onClo
 
   // Close modal automatically after successful sign-in / sign-up
   useEffect(() => {
+    if (!open) return; // Only listen when modal is open
+
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
@@ -70,7 +72,7 @@ export default function AuthModal({ initialMode = 'sign_in', open = false, onClo
       }
     });
     return () => subscription.unsubscribe();
-  }, []);
+  }, [open, onClose]);
 
   // sync view when parent changes initialMode
   useEffect(() => {
