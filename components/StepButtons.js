@@ -285,6 +285,11 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick }, re
   const [pendingAddonCount, setPendingAddonCount] = useState(1);
   const [paymentAmount, setPaymentAmount] = useState(0);
   const [paymentPlanName, setPaymentPlanName] = useState('');
+  // Payment result modal state
+  const [showPaymentResultModal, setShowPaymentResultModal] = useState(false);
+  const [paymentResultType, setPaymentResultType] = useState(null); // 'success' or 'error'
+  const [paymentResultMessage, setPaymentResultMessage] = useState('');
+  const [paymentWasPlanPurchase, setPaymentWasPlanPurchase] = useState(false); // true if plan purchase, false if addon
   const getPlanBaseLimit = React.useCallback((plan) => {
     switch(plan) {
       case 'free':
@@ -2156,11 +2161,12 @@ React.useEffect(() => {
       setAllowedGuestCapacity(newBaseLimit + existingExtraCapacity);
 
       const planDisplayName = getPlanDisplayName(pendingPlan);
-      addToast(`התשלום בוצע בהצלחה! ${planDisplayName} הופעל`, 'success');
-
-      // Close payment modal and show event types
+      // Show success modal instead of toast
+      setPaymentResultType('success');
+      setPaymentResultMessage(`התשלום בוצע בהצלחה! ${planDisplayName} הופעל`);
+      setPaymentWasPlanPurchase(true);
       setShowPaymentModal(false);
-      setShowEventTypes(true);
+      setShowPaymentResultModal(true);
     }
     // Handle addon packages (100 guests for 100 shekel each)
     else if (pendingPlan === 'addon') {
@@ -2169,7 +2175,10 @@ React.useEffect(() => {
       setPlanSelectionError('');
 
       const totalGuestsAdded = pendingAddonCount * 100;
-      addToast(`התשלום בוצע בהצלחה! ${totalGuestsAdded} מקומות נוספים נוספו לאירוע שלך.`, 'success');
+      // Show success modal instead of toast
+      setPaymentResultType('success');
+      setPaymentResultMessage(`התשלום בוצע בהצלחה! ${totalGuestsAdded} מקומות נוספים נוספו לאירוע שלך.`);
+      setPaymentWasPlanPurchase(false);
 
       // Update allowed_guests in database for current event
       if (currentEventId) {
@@ -2200,6 +2209,7 @@ React.useEffect(() => {
       }
 
       setShowPaymentModal(false);
+      setShowPaymentResultModal(true);
     }
 
     // Clear pending state
@@ -2211,12 +2221,27 @@ React.useEffect(() => {
   const handlePaymentFailure = (errorData) => {
     console.log('Payment failed:', errorData);
 
-    // Show error message
-    addToast('התשלום נכשל. אנא נסה שוב או בחר מסלול אחר.', 'error');
+    // Determine error message
+    let errorMessage = 'התשלום נכשל. אנא נסה שוב או בחר מסלול אחר.';
+    if (errorData?.Response) {
+      // Tranzila error codes
+      const errorCodes = {
+        '001': 'כרטיס אשראי נדחה',
+        '002': 'פג תוקף כרטיס האשראי',
+        '003': 'מספר כרטיס לא תקין',
+        '004': 'סכום לא תקין',
+        '005': 'בעיה בשרת התשלומים',
+      };
+      errorMessage = errorCodes[errorData.Response] || `שגיאה בתשלום (קוד: ${errorData.Response})`;
+    } else if (errorData?.error) {
+      errorMessage = typeof errorData.error === 'string' ? errorData.error : 'אירעה שגיאה בעת ביצוע התשלום';
+    }
 
-    // Close payment modal and show pricing modal again
+    // Show error modal instead of toast
+    setPaymentResultType('error');
+    setPaymentResultMessage(errorMessage);
     setShowPaymentModal(false);
-    setShowPricingPlan(true);
+    setShowPaymentResultModal(true);
 
     // Clear pending state
     setPendingPlan(null);
@@ -5897,7 +5922,7 @@ React.useEffect(() => {
               &times;
             </button>
             <h2 className="text-2xl md:text-3xl font-bold mb-3 text-center text-primary">תיאור תהליך יצירת אירוע ב-Meet-M</h2>
-            <p className="text-center text-gray-600 text-base mb-3">לחץ על כל שלב כדי לראות פרטים נוספים</p>
+            <p className="text-center text-gray-600 text-base mb-3">כך נראה התהליך ליצירת האירוע שלך</p>
             <div className="border-b-2 border-primary mb-3"></div>
             
             {/* Flow Steps - Horizontal Layout */}
@@ -5910,8 +5935,7 @@ React.useEffect(() => {
                 
                 {/* Step 0.5: New Event Confirmation */}
                 <div 
-                  onClick={() => setSelectedFlowStep(0.5)}
-                  className={`border-2 ${selectedFlowStep === 0.5 ? 'border-primary bg-[#FFF9E8]' : 'border-gray-300'} rounded-lg p-4 cursor-pointer hover:border-primary hover:shadow-lg transition-all flex items-center gap-3`}
+                  className="border-2 border-gray-300 rounded-lg p-4 flex items-center gap-3"
                 >
                   <div className="text-4xl flex-shrink-0">✅</div>
                   <div className="flex-1 text-right">
@@ -5922,8 +5946,7 @@ React.useEffect(() => {
                 
                 {/* Step 0: Pricing */}
                 <div 
-                  onClick={() => setSelectedFlowStep(0)}
-                  className={`border-2 ${selectedFlowStep === 0 ? 'border-primary bg-[#FFF9E8]' : 'border-gray-300'} rounded-lg p-4 cursor-pointer hover:border-primary hover:shadow-lg transition-all flex items-center gap-3`}
+                  className="border-2 border-gray-300 rounded-lg p-4 flex items-center gap-3"
                 >
                   <div className="text-4xl flex-shrink-0">💰</div>
                   <div className="flex-1 text-right">
@@ -5939,8 +5962,7 @@ React.useEffect(() => {
 
                 {/* Step 1: Event Type */}
                 <div 
-                  onClick={() => setSelectedFlowStep(1)}
-                  className={`border-2 ${selectedFlowStep === 1 ? 'border-primary bg-[#FFF9E8]' : 'border-gray-300'} rounded-lg p-4 cursor-pointer hover:border-primary hover:shadow-lg transition-all flex items-center gap-3`}
+                  className="border-2 border-gray-300 rounded-lg p-4 flex items-center gap-3"
                 >
                   <div className="text-4xl flex-shrink-0">🎉</div>
                   <div className="flex-1 text-right">
@@ -5951,8 +5973,7 @@ React.useEffect(() => {
 
                 {/* Step 2: Event Details */}
                 <div 
-                  onClick={() => setSelectedFlowStep(2)}
-                  className={`border-2 ${selectedFlowStep === 2 ? 'border-primary bg-[#FFF9E8]' : 'border-gray-300'} rounded-lg p-4 cursor-pointer hover:border-primary hover:shadow-lg transition-all flex items-center gap-3`}
+                  className="border-2 border-gray-300 rounded-lg p-4 flex items-center gap-3"
                 >
                   <div className="text-4xl flex-shrink-0">📝</div>
                   <div className="flex-1 text-right">
@@ -5963,8 +5984,7 @@ React.useEffect(() => {
 
                 {/* Step 3: Design */}
                 <div 
-                  onClick={() => setSelectedFlowStep(3)}
-                  className={`border-2 ${selectedFlowStep === 3 ? 'border-primary bg-[#FFF9E8]' : 'border-gray-300'} rounded-lg p-4 cursor-pointer hover:border-primary hover:shadow-lg transition-all flex items-center gap-3`}
+                  className="border-2 border-gray-300 rounded-lg p-4 flex items-center gap-3"
                 >
                   <div className="text-4xl flex-shrink-0">🎨</div>
                   <div className="flex-1 text-right">
@@ -5980,20 +6000,18 @@ React.useEffect(() => {
 
                 {/* Step 4: Send Invitations */}
                 <div 
-                  onClick={() => setSelectedFlowStep(4)}
-                  className={`border-2 ${selectedFlowStep === 4 ? 'border-primary bg-[#FFF9E8]' : 'border-gray-300'} rounded-lg p-4 cursor-pointer hover:border-primary hover:shadow-lg transition-all flex items-center gap-3`}
+                  className="border-2 border-gray-300 rounded-lg p-4 flex items-center gap-3"
                 >
                   <div className="text-4xl flex-shrink-0">📱</div>
                   <div className="flex-1 text-right">
                     <h3 className="text-lg font-bold text-primary">שלב 4: שליחת הזמנות</h3>
-                    <p className="text-base text-gray-600">שליחה אוטומטית מקובץ ל SMS</p>
+                    <p className="text-base text-gray-600">שליחה אוטומטית מקובץ ל SMS ו-WhatsApp</p>
                   </div>
                 </div>
 
                 {/* Step 5: Reports */}
                 <div 
-                  onClick={() => setSelectedFlowStep(5)}
-                  className={`border-2 ${selectedFlowStep === 5 ? 'border-primary bg-[#FFF9E8]' : 'border-gray-300'} rounded-lg p-4 cursor-pointer hover:border-primary hover:shadow-lg transition-all flex items-center gap-3`}
+                  className="border-2 border-gray-300 rounded-lg p-4 flex items-center gap-3"
                 >
                   <div className="text-4xl flex-shrink-0">📊</div>
                   <div className="flex-1 text-right">
@@ -6171,7 +6189,7 @@ React.useEffect(() => {
                   <p className="text-base md:text-xl font-semibold text-primary mb-3 whitespace-nowrap tracking-wide">✓ עד 5 מוזמנים</p>
                   <p className="text-gray-600 mb-2">✓ הזמנות מעוצבות מקצועית</p>
                   <p className="text-gray-600 mb-2">✓ שליחה אוטומטית לכל האורחים</p>
-                  <p className="text-gray-600 mb-2">✓ שליחת הודעות SMS ב-3 סבבים</p>
+                  <p className="text-gray-600 mb-2">✓ שליחת הודעות SMS ו-WhatsApp ב-2 סבבים</p>
                   <p className="text-gray-600 mb-2">✓ מעקב אישורי הגעה</p>
                   <p className="text-gray-600 mb-2">✓ הצגת דוחות סיכום מתעדכנים בזמן אמת בדף הבית</p>
                   <p className="text-gray-600 mb-2">✓ ניהול פרטי אורחים</p>
@@ -6203,7 +6221,7 @@ React.useEffect(() => {
                   <p className="text-base md:text-xl font-semibold text-primary mb-3 whitespace-nowrap tracking-wide">✓ מ 51 עד 200 מוזמנים</p>
                   <p className="text-gray-600 mb-2">✓ הזמנות מעוצבות מקצועית</p>
                   <p className="text-gray-600 mb-2">✓ שליחה אוטומטית לכל האורחים</p>
-                  <p className="text-gray-600 mb-2">✓ שליחת הודעות SMS ב-3 סבבים</p>
+                  <p className="text-gray-600 mb-2">✓ שליחת הודעות SMS ו-WhatsApp ב-2 סבבים</p>
                   <p className="text-gray-600 mb-2">✓ מעקב אישורי הגעה</p>
                   <p className="text-gray-600 mb-2">✓ הצגת דוחות סיכום מתעדכנים בזמן אמת בדף הבית</p>
                   <p className="text-gray-600 mb-2">✓ ניהול פרטי אורחים</p>
@@ -6231,7 +6249,7 @@ React.useEffect(() => {
                   <p className="text-base md:text-xl font-semibold text-primary mb-3 whitespace-nowrap tracking-wide">✓ מ 201 עד 350 מוזמנים</p>
                   <p className="text-gray-600 mb-2">✓ הזמנות מעוצבות מקצועית</p>
                   <p className="text-gray-600 mb-2">✓ שליחה אוטומטית לכל האורחים</p>
-                  <p className="text-gray-600 mb-2">✓ שליחת הודעות SMS ב-3 סבבים</p>
+                  <p className="text-gray-600 mb-2">✓ שליחת הודעות SMS ו-WhatsApp ב-2 סבבים</p>
                   <p className="text-gray-600 mb-2">✓ מעקב אישורי הגעה</p>
                   <p className="text-gray-600 mb-2">✓ הצגת דוחות סיכום מתעדכנים בזמן אמת בדף הבית</p>
                   <p className="text-gray-600 mb-2">✓ ניהול פרטי אורחים</p>
@@ -6259,7 +6277,7 @@ React.useEffect(() => {
                   <p className="text-base md:text-xl font-semibold text-primary mb-3 whitespace-nowrap tracking-wide">✓ מ 351 עד 500 מוזמנים</p>
                   <p className="text-gray-600 mb-2">✓ הזמנות מעוצבות מקצועית</p>
                   <p className="text-gray-600 mb-2">✓ שליחה אוטומטית לכל האורחים</p>
-                  <p className="text-gray-600 mb-2">✓ שליחת הודעות SMS ב-3 סבבים</p>
+                  <p className="text-gray-600 mb-2">✓ שליחת הודעות SMS ו-WhatsApp ב-2 סבבים</p>
                   <p className="text-gray-600 mb-2">✓ מעקב אישורי הגעה</p>
                   <p className="text-gray-600 mb-2">✓ הצגת דוחות סיכום מתעדכנים בזמן אמת בדף הבית</p>
                   <p className="text-gray-600 mb-2">✓ ניהול פרטי אורחים</p>
@@ -6278,10 +6296,10 @@ React.useEffect(() => {
             </div>
 
             <div className="mt-6 space-y-2">
-              <p className="text-center text-gray-500 text-sm">* המחירים הם חד פעמיים לאירוע</p>
+              <p className="text-center text-gray-500 text-base">* המחירים הם חד פעמיים לאירוע</p>
               <div className="bg-blue-50 border-2 border-blue-200 rounded-lg p-4 text-center">
-                <p className="text-blue-800 font-bold text-base mb-1">💡 צריך יותר מ-500 מוזמנים?</p>
-                <p className="text-blue-700 text-sm">ניתן לרכוש חבילות הרחבה של 100 מוזמנים נוספים ב-100 ₪ בלבד!</p>
+                <p className="text-blue-800 font-bold text-lg mb-1">💡 צריך יותר מ-500 מוזמנים?</p>
+                <p className="text-blue-700 text-base">ניתן לרכוש חבילות הרחבה של 100 מוזמנים נוספים ב-100 ₪ בלבד!</p>
               </div>
             </div>
             </div>
@@ -6298,6 +6316,56 @@ React.useEffect(() => {
         onSuccess={handlePaymentSuccess}
         onFailure={handlePaymentFailure}
       />
+
+      {/* Payment Result Modal - Success or Error */}
+      {showPaymentResultModal && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black/60 z-[60]">
+          <div className="relative bg-white rounded-2xl p-8 md:p-12 w-full max-w-lg mx-4 shadow-2xl text-center">
+            {paymentResultType === 'success' ? (
+              <>
+                <div className="text-6xl md:text-7xl mb-6">✅</div>
+                <h2 className="text-2xl md:text-3xl font-bold text-green-600 mb-4">
+                  התשלום בוצע בהצלחה!
+                </h2>
+                <p className="text-lg md:text-xl text-gray-700 mb-8">
+                  {paymentResultMessage}
+                </p>
+                <button
+                  onClick={() => {
+                    setShowPaymentResultModal(false);
+                    // If it was a plan purchase (not addon), show event types
+                    if (paymentWasPlanPurchase) {
+                      setShowEventTypes(true);
+                    }
+                  }}
+                  className="w-full bg-green-600 hover:bg-green-700 text-white font-bold text-lg md:text-xl py-4 px-8 rounded-full transition-all shadow-lg transform hover:scale-105"
+                >
+                  המשך
+                </button>
+              </>
+            ) : (
+              <>
+                <div className="text-6xl md:text-7xl mb-6">❌</div>
+                <h2 className="text-2xl md:text-3xl font-bold text-red-600 mb-4">
+                  התשלום נכשל
+                </h2>
+                <p className="text-lg md:text-xl text-gray-700 mb-8">
+                  {paymentResultMessage}
+                </p>
+                <button
+                  onClick={() => {
+                    setShowPaymentResultModal(false);
+                    setShowPricingPlan(true);
+                  }}
+                  className="w-full bg-red-600 hover:bg-red-700 text-white font-bold text-lg md:text-xl py-4 px-8 rounded-full transition-all shadow-lg transform hover:scale-105"
+                >
+                  חזור למסלולים
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Archive events list modal */}
       {showArchiveList && (

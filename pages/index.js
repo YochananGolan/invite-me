@@ -74,7 +74,7 @@ export default function Home({ session }) {
                 </div>
                 <div className="bg-white p-4 rounded-lg shadow-sm">
                   <div className="text-3xl mb-2">📱</div>
-                  <h4 className="font-bold text-lg mb-2">שליחה ל SMS</h4>
+                  <h4 className="font-bold text-lg mb-2">שליחה ל SMS ו-WhatsApp</h4>
                   <p className="text-sm text-gray-600">שליחה אוטומטית מקובץ אקסל לאורחים</p>
                 </div>
                 <div className="bg-white p-4 rounded-lg shadow-sm">
@@ -106,7 +106,7 @@ export default function Home({ session }) {
                   <ol className="space-y-2 list-decimal list-inside">
                     <li>הזמנות מעוצבות מקצועית</li>
                     <li>שליחה אוטומטית לכל האורחים</li>
-                    <li>שליחת הודעות SMS ב-2 סבבים</li>
+                    <li>שליחת הודעות SMS ו-WhatsApp ב-2 סבבים</li>
                     <li>מעקב אחר אישורי הגעה</li>
                     <li>הצגת דוחות סיכום מתעדכנים בזמן אמת בדף הבית</li>
                   </ol>

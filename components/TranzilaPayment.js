@@ -354,6 +354,7 @@ export default function TranzilaPayment({
             <input type="hidden" name="trButtonColor" value="D4AF37" />
             <input type="hidden" name="nologo" value="1" />
             <input type="hidden" name="bit_pay" value="1" />
+            {/* Google Pay - Note: Only works on HTTPS (not on HTTP/localhost) */}
             <input type="hidden" name="google_pay" value="1" />
             {handshakeDetails?.response?.index && (
               <input
@@ -416,6 +417,33 @@ export default function TranzilaPayment({
               allow="payment"
               allowpaymentrequest="true"
             />
+          </div>
+
+          {/* Payment methods info */}
+          <div className="mt-4 bg-gray-50 border border-gray-200 rounded-lg p-4">
+            <p className="text-center font-semibold text-gray-800 mb-3">אפשרויות תשלום זמינות:</p>
+            <div className="flex flex-wrap justify-center gap-4 items-center">
+              <div className="flex items-center gap-2">
+                <span className="text-2xl">💳</span>
+                <span className="text-sm text-gray-700">כרטיס אשראי</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-2xl">📱</span>
+                <span className="text-sm text-gray-700">Bit</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-2xl">🟢</span>
+                <span className="text-sm text-gray-700">Google Pay</span>
+                {typeof window !== 'undefined' && window.location.protocol === 'http:' && (
+                  <span className="text-xs text-amber-600 mr-1">(זמין רק ב-HTTPS)</span>
+                )}
+              </div>
+            </div>
+            {typeof window !== 'undefined' && window.location.protocol === 'http:' && (
+              <p className="text-center text-xs text-amber-600 mt-2">
+                ⚠️ Google Pay זמין רק באתרים מאובטחים (HTTPS). באתר ייצור Google Pay יופיע אוטומטית.
+              </p>
+            )}
           </div>
 
           {/* Additional info */}
