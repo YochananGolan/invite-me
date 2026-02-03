@@ -213,11 +213,12 @@ function MyApp({ Component, pageProps }) {
     if (loading) return; // Wait until we know the session state
 
     // Public paths that don't require authentication
-    // Home page and guest RSVP pages should be accessible without session
-    const publicPaths = ['/'];
+    // Home page, terms page, and guest RSVP pages should be accessible without session
+    const publicPaths = ['/', '/terms'];
     const isGuestPage = router.pathname.startsWith('/[eventId]/[guestId]');
+    const isPublicPath = publicPaths.includes(router.pathname);
 
-    if (!session && router.pathname !== '/' && !isGuestPage) {
+    if (!session && !isPublicPath && !isGuestPage) {
       router.replace('/');
     }
 

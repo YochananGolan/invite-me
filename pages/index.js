@@ -4,6 +4,7 @@ import HeroSection from '../components/HeroSection';
 import StepButtons from '../components/StepButtons';
 import { useState, useEffect, useRef } from 'react';
 import AuthModal from '../components/AuthModal';
+import Footer from '../components/Footer';
 
 
 export default function Home({ session }) {
@@ -32,19 +33,22 @@ export default function Home({ session }) {
         <title>Meet-M | הדרך המושלמת להזמין ולנהל אורחים</title>
         <meta name="description" content="Send stylish invitations and manage guests effortlessly" />
       </Head>
-      <main>
-        <NavBar onAuthClick={handleAuthClick} />
-        <HeroSection 
-          onStart={() => stepRef.current?.startFlow()} 
-          onShowFeatures={handleShowFeatures}
-          onSignUpClick={() => handleAuthClick('sign_up')}
-          onSignInClick={() => handleAuthClick('sign_in')}
-          isLoggedIn={!!session}
-        />
-        <div className="mb-8">
-          <StepButtons ref={stepRef} session={session} onAuthClick={handleAuthClick} />
-        </div>
-      </main>
+      <div className="min-h-screen flex flex-col">
+        <main className="flex-1">
+          <NavBar onAuthClick={handleAuthClick} />
+          <HeroSection
+            onStart={() => stepRef.current?.startFlow()}
+            onShowFeatures={handleShowFeatures}
+            onSignUpClick={() => handleAuthClick('sign_up')}
+            onSignInClick={() => handleAuthClick('sign_in')}
+            isLoggedIn={!!session}
+          />
+          <div className="mb-8">
+            <StepButtons ref={stepRef} session={session} onAuthClick={handleAuthClick} />
+          </div>
+        </main>
+        <Footer />
+      </div>
       <AuthModal initialMode={authMode} open={showAuth} onClose={() => setShowAuth(false)} />
       
       {/* Features Modal */}
