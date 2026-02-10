@@ -1100,11 +1100,21 @@ const handleOpenAddonModal = React.useCallback(() => {
     return currentEventId || newEventStarted;
   };
 
-  // Expose imperative method to start the flow from parent components (e.g., "התחל עכשיו")
+  // Expose imperative methods to parent components
   useImperativeHandle(ref, () => ({
     startFlow: () => {
       setShowFlowDiagram(true);
       setStepErrorMsg('');
+    },
+    createNewEvent: async () => {
+      setShowFlowDiagram(true);
+      setStepErrorMsg('');
+      const hasActive = await checkActiveEventExists();
+      if (hasActive) {
+        setShowExistingEventWarning(true);
+      } else {
+        handleNewEvent();
+      }
     },
   }));
 
@@ -3131,98 +3141,90 @@ React.useEffect(() => {
       )}
 
       <div className="w-full flex flex-row justify-center gap-4 py-2">
-        {steps.map((step, idx) => {
-          console.log(`Rendering step ${idx} (${step}): finished=${finishedSteps.includes(idx)}`);
+        {steps.slice(1).map((step, idx) => {
+          const realIdx = idx + 1;
+          console.log(`Rendering step ${realIdx} (${step}): finished=${finishedSteps.includes(realIdx)}`);
           return (
           <button
-            key={idx}
+            key={realIdx}
               onClick={
-                idx === 0
-                  ? async () => { 
-                      const hasActive = await checkActiveEventExists();
-                      if (hasActive) {
-                        setShowExistingEventWarning(true);
-                      } else {
-                        handleNewEvent();
-                      }
-                    }
-                  : idx === 1
+                realIdx === 1
                 ? () => {
                     if (!hasActiveEvent()) {
-                      const msg = `עליך ליצור אירוע חדש לפני מעבר לשלב "${steps[idx]}"`;
+                      const msg = `עליך ליצור אירוע חדש לפני מעבר לשלב "${steps[realIdx]}"`;
                       setStepErrorMsg(msg);
-                      setClickedStepName(steps[idx]);
+                      setClickedStepName(steps[realIdx]);
                       setShowStepError(true);
                       return;
                     }
                     if (!selectedPlan) {
-                      const msg = `עליך לבחור מסלול תמחור ולשלם לפני מעבר לשלב "${steps[idx]}"`;
+                      const msg = `עליך לבחור מסלול תמחור ולשלם לפני מעבר לשלב "${steps[realIdx]}"`;
                       setStepErrorMsg(msg);
-                      setClickedStepName(steps[idx]);
+                      setClickedStepName(steps[realIdx]);
                       setShowStepError(true);
                       return;
                     }
                     setShowEventTypes(true);
                     setStepErrorMsg('');
                   }
-                : idx === 2
+                : realIdx === 2
                 ? () => {
                     if (!hasActiveEvent()) {
-                      const msg = `עליך ליצור אירוע חדש לפני מעבר לשלב "${steps[idx]}"`;
+                      const msg = `עליך ליצור אירוע חדש לפני מעבר לשלב "${steps[realIdx]}"`;
                       setStepErrorMsg(msg);
-                      setClickedStepName(steps[idx]);
+                      setClickedStepName(steps[realIdx]);
                       setShowStepError(true);
                       return;
                     }
                     if (!selectedPlan) {
-                      const msg = `עליך לבחור מסלול תמחור ולשלם לפני מעבר לשלב "${steps[idx]}"`;
+                      const msg = `עליך לבחור מסלול תמחור ולשלם לפני מעבר לשלב "${steps[realIdx]}"`;
                       setStepErrorMsg(msg);
-                      setClickedStepName(steps[idx]);
+                      setClickedStepName(steps[realIdx]);
                       setShowStepError(true);
                       return;
                     }
                     setShowEventDetails(true);
                     setStepErrorMsg('');
                   }
-                : idx === 3
+                : realIdx === 3
                 ? () => {
                     if (!hasActiveEvent()) {
-                      const msg = `עליך ליצור אירוע חדש לפני מעבר לשלב "${steps[idx]}"`;
+                      const msg = `עליך ליצור אירוע חדש לפני מעבר לשלב "${steps[realIdx]}"`;
                       setStepErrorMsg(msg);
-                      setClickedStepName(steps[idx]);
+                      setClickedStepName(steps[realIdx]);
                       setShowStepError(true);
                       return;
                     }
                     if (!selectedPlan) {
-                      const msg = `עליך לבחור מסלול תמחור ולשלם לפני מעבר לשלב "${steps[idx]}"`;
+                      const msg = `עליך לבחור מסלול תמחור ולשלם לפני מעבר לשלב "${steps[realIdx]}"`;
                       setStepErrorMsg(msg);
-                      setClickedStepName(steps[idx]);
+                      setClickedStepName(steps[realIdx]);
                       setShowStepError(true);
                       return;
                     }
                     setShowDesignChooser(true);
                     setStepErrorMsg('');
                   }
-                : idx === 4
+                : realIdx === 4
                 ? () => {
                     if (!hasActiveEvent()) {
-                      const msg = `עליך ליצור אירוע חדש לפני מעבר לשלב "${steps[idx]}"`;
+                      const msg = `עליך ליצור אירוע חדש לפני מעבר לשלב "${steps[realIdx]}"`;
                       setStepErrorMsg(msg);
-                      setClickedStepName(steps[idx]);
+                      setClickedStepName(steps[realIdx]);
                       setShowStepError(true);
                       return;
                     }
                     if (!selectedPlan) {
-                      const msg = `עליך לבחור מסלול תמחור ולשלם לפני מעבר לשלב "${steps[idx]}"`;
+                      const msg = `עליך לבחור מסלול תמחור ולשלם לפני מעבר לשלב "${steps[realIdx]}"`;
                       setStepErrorMsg(msg);
-                      setClickedStepName(steps[idx]);
+                      setClickedStepName(steps[realIdx]);
                       setShowStepError(true);
                       return;
                     }
                     setShowGuestForm(true);
                     setStepErrorMsg('');
                   }
-                : idx === 5
+                : realIdx === 5
                 ? () => {
                     // שלב 5 (דוחות) זמין תמיד, גם כשאין אירוע פעיל
                     setShowReportsOptions(true);
@@ -3232,15 +3234,13 @@ React.useEffect(() => {
                 : undefined
             }
             className={`${
-              idx === 0
-                ? 'bg-gradient-to-r from-primary to-blue-600 text-white font-bold text-lg px-8 py-4 shadow-2xl hover:shadow-3xl transform hover:scale-110 transition-all border border-primary rounded-full ring-2 ring-primary ring-offset-2 ring-offset-[#FCE6AC] animate-pulse'
-                : finishedSteps.includes(idx) || (idx === 3 && finishedSteps.includes(2))
+              finishedSteps.includes(realIdx) || (realIdx === 3 && finishedSteps.includes(2))
                 ? 'bg-primary text-white border border-primary rounded-full px-8 py-4 font-bold ring-2 ring-primary ring-offset-2 ring-offset-[#FCE6AC] hover:bg-[#FCE6AC]/90 transition-all text-lg' 
-                : idx === 3
+                : realIdx === 3
                   ? 'bg-gradient-to-r from-pink-100 to-purple-100 text-purple-800 border-2 border-purple-400 ring-2 ring-purple-400 ring-offset-2 ring-offset-purple-100 shadow-lg rounded-full px-8 py-4 font-bold transition-all text-lg' 
                   : 'bg-[#FCE6AC] text-primary border border-primary rounded-full px-8 py-4 font-bold ring-2 ring-primary ring-offset-2 ring-offset-[#FCE6AC] hover:bg-[#FCE6AC]/90 transition-all text-lg'
             }`}
-            title={`Step ${idx}: ${finishedSteps.includes(idx) ? 'Completed' : 'Not completed'}. FinishedSteps: [${finishedSteps.join(',')}]`}
+            title={`Step ${realIdx}: ${finishedSteps.includes(realIdx) ? 'Completed' : 'Not completed'}. FinishedSteps: [${finishedSteps.join(',')}]`}
           >
             {step}
           </button>

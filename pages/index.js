@@ -35,15 +35,15 @@ export default function Home({ session }) {
       </Head>
       <div className="min-h-screen flex flex-col">
         <main className="flex-1">
-          <NavBar onAuthClick={handleAuthClick} />
+          <NavBar onAuthClick={handleAuthClick} onAboutClick={handleShowFeatures} />
           <HeroSection
-            onStart={() => stepRef.current?.startFlow()}
+            onStart={() => stepRef.current?.createNewEvent?.()}
             onShowFeatures={handleShowFeatures}
             onSignUpClick={() => handleAuthClick('sign_up')}
             onSignInClick={() => handleAuthClick('sign_in')}
             isLoggedIn={!!session}
           />
-          <div className="mb-8">
+          <div id="pricing" className="mb-8 scroll-mt-20">
             <StepButtons ref={stepRef} session={session} onAuthClick={handleAuthClick} />
           </div>
         </main>
@@ -135,7 +135,7 @@ export default function Home({ session }) {
                 <button
                   onClick={() => {
                     setShowFeatures(false);
-                    stepRef.current?.startFlow();
+                    stepRef.current?.createNewEvent?.();
                   }}
                   className="bg-gradient-to-r from-green-500 to-emerald-600 text-white px-8 py-4 rounded-full font-bold hover:from-green-600 hover:to-emerald-700 transition-all shadow-lg transform hover:scale-105 text-lg"
                 >
