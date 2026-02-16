@@ -11,15 +11,32 @@ export default function Home({ session }) {
   const [showAuth, setShowAuth] = useState(false);
   const [authMode, setAuthMode] = useState('sign_in');
   const [showFeatures, setShowFeatures] = useState(false);
+  const [pendingCreateEvent, setPendingCreateEvent] = useState(false);
   const stepRef = useRef();
 
   useEffect(() => {
     // אם יש סשן, אל תפתח מודאל; אחרת תישאר סגור עד שהמשתמש לוחץ
-  }, [session]);
+    // After successful login, create event if user was trying to create one
+    if (session) {
+      // Check localStorage for pending create event (survives page reload)
+      const shouldCreateEvent = pendingCreateEvent || (typeof window !== 'undefined' && localStorage.getItem('pendingCreateEvent') === 'true');
+      if (shouldCreateEvent) {
+        setPendingCreateEvent(false);
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('pendingCreateEvent');
+        }
+        // Small delay to ensure component is ready
+        setTimeout(() => {
+          stepRef.current?.createNewEvent?.();
+        }, 500);
+      }
+    }
+  }, [session, pendingCreateEvent]);
   // When no session, show Supabase AuthModal; otherwise render site normally.
 
   const handleAuthClick = (mode) => {
-    setAuthMode(mode);
+    // Always default to sign_in, user can switch to sign_up using the button in the modal
+    setAuthMode('sign_in');
     setShowAuth(true);
   };
 
@@ -37,19 +54,50 @@ export default function Home({ session }) {
         <main className="flex-1">
           <NavBar onAuthClick={handleAuthClick} onAboutClick={handleShowFeatures} />
           <HeroSection
-            onStart={() => stepRef.current?.createNewEvent?.()}
+            onStart={() => stepRef.current?.startFlow?.()}
+            onCreateEvent={() => {
+              if (!session) {
+                // Open auth modal if not logged in
+                setAuthMode('sign_in');
+                setPendingCreateEvent(true);
+                // Save to localStorage to survive page reload
+                if (typeof window !== 'undefined') {
+                  localStorage.setItem('pendingCreateEvent', 'true');
+                }
+                setShowAuth(true);
+              } else {
+                // Create event if logged in
+                stepRef.current?.createNewEvent?.();
+              }
+            }}
             onShowFeatures={handleShowFeatures}
-            onSignUpClick={() => handleAuthClick('sign_up')}
-            onSignInClick={() => handleAuthClick('sign_in')}
+            onSignUpClick={() => {
+              setAuthMode('sign_in'); // Always start with sign_in
+              setShowAuth(true);
+            }}
+            onSignInClick={() => {
+              setAuthMode('sign_in');
+              setShowAuth(true);
+            }}
             isLoggedIn={!!session}
           />
           <div id="pricing" className="mb-8 scroll-mt-20">
-            <StepButtons ref={stepRef} session={session} onAuthClick={handleAuthClick} />
+            <StepButtons 
+              ref={stepRef} 
+              session={session} 
+              onAuthClick={handleAuthClick}
+            />
           </div>
         </main>
         <Footer />
       </div>
-      <AuthModal initialMode={authMode} open={showAuth} onClose={() => setShowAuth(false)} />
+      <AuthModal 
+        initialMode={authMode} 
+        open={showAuth} 
+        onClose={() => {
+          setShowAuth(false);
+        }} 
+      />
       
       {/* Features Modal */}
       {showFeatures && (

@@ -74,16 +74,18 @@ export default function AuthModal({ initialMode = 'sign_in', open = false, onClo
     return () => subscription.unsubscribe();
   }, [open, onClose]);
 
-  // sync view when parent changes initialMode
+  // Always default to sign_in when modal opens, regardless of initialMode
   useEffect(() => {
-    setView(initialMode);
-  }, [initialMode]);
+    if (open) {
+      setView('sign_in');
+    }
+  }, [open]);
 
   // Parent component will hide/show modal based on session state.
 
   return (
     open && (
-      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+      <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[100] backdrop-blur-sm">
         {/* Confetti background layer */}
         <div
           aria-hidden
@@ -219,57 +221,68 @@ export default function AuthModal({ initialMode = 'sign_in', open = false, onClo
                 </button>
               </form>
             ) : (
-              <div className="rounded-2xl border-2 border-gray-400 p-5 bg-white shadow-sm signin-strong">
-                <Auth
-                  supabaseClient={supabase}
-                  appearance={{
-                theme: ThemeSupa,
-                variables: {
-                  default: {
-                    colors: {
-                      brand: '#7c3aed', // purple-600
-                      brandAccent: '#6d28d9',
-                      inputBorder: '#e5e7eb',
-                      inputText: '#111827',
-                      messageText: '#ef4444'
-                    },
-                    radii: {
-                      inputBorderRadius: '12px',
-                      buttonBorderRadius: '12px'
+              <>
+                <div className="rounded-2xl border-2 border-gray-400 p-5 bg-white shadow-sm signin-strong">
+                  <Auth
+                    supabaseClient={supabase}
+                    appearance={{
+                  theme: ThemeSupa,
+                  variables: {
+                    default: {
+                      colors: {
+                        brand: '#7c3aed', // purple-600
+                        brandAccent: '#6d28d9',
+                        inputBorder: '#e5e7eb',
+                        inputText: '#111827',
+                        messageText: '#ef4444'
+                      },
+                      radii: {
+                        inputBorderRadius: '12px',
+                        buttonBorderRadius: '12px'
+                      }
                     }
+                  },
+                  className: {
+                    container: 'space-y-3',
+                    label: 'text-lg font-bold text-gray-800',
+                    input: 'h-12 rounded-xl border-2 border-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-lg shadow-sm font-medium',
+                    button: 'h-12 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-semibold shadow-sm text-base',
+                    anchor: 'text-purple-700 hover:text-purple-800 font-medium text-base',
+                    message: 'text-base'
                   }
-                },
-                className: {
-                  container: 'space-y-3',
-                  label: 'text-lg font-bold text-gray-800',
-                  input: 'h-12 rounded-xl border-2 border-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-lg shadow-sm font-medium',
-                  button: 'h-12 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-semibold shadow-sm text-base',
-                  anchor: 'text-purple-700 hover:text-purple-800 font-medium text-base',
-                  message: 'text-base'
-                }
-              }}
-                view={view}
-                onViewChange={(v) => setView(v)}
-                localization={{
-                variables: {
-                  sign_in: {
-                    email_label: 'אימייל',
-                    password_label: 'סיסמה',
-                    link_text: '',
+                }}
+                  view={view}
+                  onViewChange={(v) => setView(v)}
+                  localization={{
+                  variables: {
+                    sign_in: {
+                      email_label: 'אימייל',
+                      password_label: 'סיסמה',
+                      link_text: '',
+                    },
+                    sign_up: {
+                      email_label: 'אימייל',
+                      password_label: 'סיסמה',
+                      password_confirm_label: 'אימות סיסמה',
+                      button_label: 'לחץ להודעת אימות לאימייל',
+                      link_text: '',
+                    },
                   },
-                  sign_up: {
-                    email_label: 'אימייל',
-                    password_label: 'סיסמה',
-                    password_confirm_label: 'אימות סיסמה',
-                    button_label: 'לחץ להודעת אימות לאימייל',
-                    link_text: '',
-                  },
-                },
-              }}
-                providers={[]}
-                magicLink={false}
-                />
-              </div>
+                }}
+                  providers={[]}
+                  magicLink={false}
+                  />
+                </div>
+                {/* Sign Up Button */}
+                <div className="mt-4 text-center">
+                  <button
+                    onClick={() => setView('sign_up')}
+                    className="w-full h-12 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-sm text-base transition-colors"
+                  >
+                    הרשמה
+                  </button>
+                </div>
+              </>
             )}
           </div>
         </div>

@@ -20,7 +20,7 @@ const ConfettiBackground = () => (
   </div>
 );
 
-export default forwardRef(function HeroSection({ onStart, onShowFeatures, onSignUpClick, onSignInClick, isLoggedIn }, ref) {
+export default forwardRef(function HeroSection({ onStart, onShowFeatures, onSignUpClick, onSignInClick, isLoggedIn, onCreateEvent }, ref) {
   return (
     <section className="relative min-h-[85vh] flex items-center bg-white">
       {/* Confetti background */}
@@ -52,7 +52,7 @@ export default forwardRef(function HeroSection({ onStart, onShowFeatures, onSign
                 תיאור תהליך יצירת אירוע
               </button>
               <button
-                onClick={() => typeof onStart === 'function' && onStart()}
+                onClick={() => typeof onCreateEvent === 'function' && onCreateEvent()}
                 className="px-8 py-4 rounded-lg bg-primary text-white font-bold hover:bg-primary/90 transition-colors shadow-lg text-lg"
               >
                 צור אירוע חדש

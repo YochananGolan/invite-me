@@ -61,6 +61,12 @@ const fieldLabels = {
 
 const StepButtons = forwardRef(function StepButtons({ session, onAuthClick }, ref) {
   const { addToast } = useToast();
+  const sessionRef = useRef(session);
+  
+  // Keep session ref updated
+  useEffect(() => {
+    sessionRef.current = session;
+  }, [session]);
   const steps = ['צור אירוע חדש', '📅 שלב 1 - סוג אירוע', '📝 שלב 2 - פרטי האירוע', '🎨 שלב 3 - עיצוב הזמנה', '📤 שלב 4 - שליחת הזמנה לאורח', '📊 שלב 5 - דוחו"ת אישורי הגעה'];
   const eventTypes = ['חתונה', 'חינה', 'מסיבת אירוסין', 'בר מצווה', 'בת מצווה', 'ברית', 'בריתה', 'יום הולדת', 'אירוע עסקי', 'הפרשת חלה'];
   const times = Array.from({ length: (24 - 8) * 2 }, (_, i) => {
@@ -1107,6 +1113,20 @@ const handleOpenAddonModal = React.useCallback(() => {
       setStepErrorMsg('');
     },
     createNewEvent: async () => {
+      // User should already be logged in at this point (checked in HeroSection)
+      if (!sessionRef.current) {
+        console.warn('createNewEvent called without session');
+        return;
+      }
+      
+      // Check if user has selected a plan (paid)
+      if (!selectedPlan) {
+        // Show pricing plan modal first - user must select and pay before creating event
+        setShowPricingPlan(true);
+        setPlanAddOnMode(false);
+        return;
+      }
+      
       setShowFlowDiagram(true);
       setStepErrorMsg('');
       const hasActive = await checkActiveEventExists();
@@ -2010,23 +2030,21 @@ React.useEffect(() => {
     setShowGuestListModal(false);
     setShowReportModal(false);
     setSelectedEventForReport(null);
-    setSelectedPlan(null);
+    // Don't clear selectedPlan here - user already paid for it
+    // Only clear if creating a completely new event (not from existing)
     setAdditionalPackages([]);
     
     try { localStorage.setItem('newEventStarted','1'); } catch(e){}
     try{ localStorage.removeItem('selectedDesign'); }catch{}
     try{ localStorage.removeItem('finishedSteps'); }catch{} // Clear finished steps from local storage
     try{ localStorage.removeItem('selectedEventType'); }catch{} // Clear selected event type from local storage
-    try{ localStorage.removeItem('selectedPlan'); }catch{}
     try{ localStorage.removeItem('additionalPackages'); }catch{}
 
-    // Clear selected plan - user must choose and pay
-    setSelectedPlan(null);
-    try { localStorage.removeItem('selectedPlan'); } catch(e){}
-
-    // Show pricing plan modal first, then event type selection
-    setShowPricingPlan(true);
-    setPlanAddOnMode(false); // Ensure we're in plan selection mode, not addon mode
+    // Check if user has a plan - if not, show pricing modal
+    if (!selectedPlan) {
+      setShowPricingPlan(true);
+      setPlanAddOnMode(false); // Ensure we're in plan selection mode, not addon mode
+    }
 
     if (showDeletionMessage) {
       setShowDeletionSuccess(true);
@@ -3087,38 +3105,9 @@ React.useEffect(() => {
     try{ localStorage.removeItem('draftEvent'); localStorage.removeItem('newEventStarted'); }catch{}
   },[currentEventId, newEventStarted]);
 
-  // Check if user is connected - if not, show error message and disable all functionality except auth
+  // If user is not connected, show empty state (auth modal will be shown from HeroSection button)
   if (!session) {
-    return (
-      <div className="w-full flex flex-col items-center justify-center py-12 px-4">
-        <div className="bg-red-50 border-4 border-red-500 rounded-2xl p-8 max-w-2xl w-full text-center shadow-2xl">
-          <div className="text-6xl mb-4">⚠️</div>
-          <h2 className="text-3xl font-bold text-red-800 mb-4">אין חיבור למערכת!</h2>
-          <p className="text-xl font-bold text-red-700 mb-6">
-            יש לבצע כניסה למערכת כדי להמשיך.
-          </p>
-          <p className="text-lg text-gray-700 mb-6">
-            כל המערכת מושבתת למעט הרשמה וכניסה. לאחר חיבור למערכת הכל משתחרר.
-          </p>
-          {onAuthClick && (
-            <div className="flex flex-col sm:flex-row gap-4 justify-center mt-6">
-              <button
-                onClick={() => onAuthClick('sign_in')}
-                className="bg-green-600 text-white border-2 border-green-700 rounded-full px-8 py-4 font-bold text-lg hover:bg-green-700 transition-all shadow-lg"
-              >
-                התחבר למערכת
-              </button>
-              <button
-                onClick={() => onAuthClick('sign_up')}
-                className="bg-blue-600 text-white border-2 border-blue-700 rounded-full px-8 py-4 font-bold text-lg hover:bg-blue-700 transition-all shadow-lg"
-              >
-                הרשמה למערכת
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
-    );
+    return null;
   }
 
   return (
@@ -3326,22 +3315,7 @@ React.useEffect(() => {
         })}
       </div>
 
-      {showStepError && stepErrorMsg && (
-        <div className="max-w-4xl mx-auto mb-6 relative">
-          <div className="bg-red-100 border-4 border-red-500 rounded-xl p-6 shadow-2xl">
-            <button 
-              onClick={() => setShowStepError(false)}
-              className="absolute top-3 left-3 text-red-700 hover:text-red-900 text-2xl font-bold leading-none"
-              aria-label="סגור הודעה"
-            >
-              ×
-            </button>
-            <div className="pr-12">
-              <p className="text-center text-red-700 text-2xl font-bold">{stepErrorMsg}</p>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Error message is now displayed in HeroSection instead */}
       {/* Status and Summary Tables */}
       <div className="w-full px-4 mb-0 mt-4" style={{ marginBottom: '200px' }}>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
@@ -6411,9 +6385,18 @@ React.useEffect(() => {
                 <button
                   onClick={() => {
                     setShowPaymentResultModal(false);
-                    // If it was a plan purchase (not addon), show event types
+                    // If it was a plan purchase (not addon), continue with event creation
                     if (paymentWasPlanPurchase) {
-                      setShowEventTypes(true);
+                      // Check if user was trying to create event (from localStorage)
+                      const wasCreatingEvent = typeof window !== 'undefined' && localStorage.getItem('pendingCreateEvent') === 'true';
+                      if (wasCreatingEvent) {
+                        localStorage.removeItem('pendingCreateEvent');
+                        // Continue with event creation flow
+                        setShowEventTypes(true);
+                      } else {
+                        // Just show event types selection
+                        setShowEventTypes(true);
+                      }
                     }
                   }}
                   className="w-full bg-green-600 hover:bg-green-700 text-white font-bold text-lg md:text-xl py-4 px-8 rounded-full transition-all shadow-lg transform hover:scale-105"
