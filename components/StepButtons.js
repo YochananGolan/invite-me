@@ -1127,7 +1127,6 @@ const handleOpenAddonModal = React.useCallback(() => {
         return;
       }
       
-      setShowFlowDiagram(true);
       setStepErrorMsg('');
       const hasActive = await checkActiveEventExists();
       if (hasActive) {
