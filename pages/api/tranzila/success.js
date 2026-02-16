@@ -80,17 +80,30 @@ export default async function handler(req, res) {
           </div>
           <script>
             // Send success message to parent window
-            if (window.parent) {
-              window.parent.postMessage({
-                success: true,
-                transactionData: ${JSON.stringify(transactionData)}
-              }, '*');
+            try {
+              if (window.parent && window.parent !== window) {
+                const message = {
+                  success: true,
+                  Response: '000',
+                  transactionData: ${JSON.stringify(transactionData)},
+                  ConfirmationCode: ${transactionData.ConfirmationCode ? JSON.stringify(transactionData.ConfirmationCode) : 'null'},
+                  sum: ${transactionData.sum ? JSON.stringify(transactionData.sum) : 'null'}
+                };
+                console.log('Sending success message to parent:', message);
+                window.parent.postMessage(message, '*');
+              }
+            } catch (error) {
+              console.error('Error sending success message:', error);
             }
 
             // Close window after delay
             setTimeout(() => {
-              if (window.parent) {
-                window.parent.postMessage({ closePayment: true }, '*');
+              try {
+                if (window.parent && window.parent !== window) {
+                  window.parent.postMessage({ closePayment: true }, '*');
+                }
+              } catch (error) {
+                console.error('Error closing payment window:', error);
               }
             }, 3000);
           </script>

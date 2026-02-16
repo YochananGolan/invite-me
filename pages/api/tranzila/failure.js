@@ -99,17 +99,29 @@ export default async function handler(req, res) {
           </div>
           <script>
             // Send failure message to parent window
-            if (window.parent) {
-              window.parent.postMessage({
-                success: false,
-                error: true,
-                transactionData: ${JSON.stringify(transactionData)}
-              }, '*');
+            try {
+              if (window.parent && window.parent !== window) {
+                const message = {
+                  success: false,
+                  error: true,
+                  Response: ${transactionData.Response ? JSON.stringify(transactionData.Response) : 'null'},
+                  transactionData: ${JSON.stringify(transactionData)},
+                  reason: ${transactionData.reason ? JSON.stringify(transactionData.reason) : JSON.stringify(transactionData.Response || 'שגיאה בעיבוד התשלום')}
+                };
+                console.log('Sending failure message to parent:', message);
+                window.parent.postMessage(message, '*');
+              }
+            } catch (error) {
+              console.error('Error sending failure message:', error);
             }
 
             function tryAgain() {
-              if (window.parent) {
-                window.parent.postMessage({ retryPayment: true }, '*');
+              try {
+                if (window.parent && window.parent !== window) {
+                  window.parent.postMessage({ retryPayment: true }, '*');
+                }
+              } catch (error) {
+                console.error('Error sending retry message:', error);
               }
             }
 

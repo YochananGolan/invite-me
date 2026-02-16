@@ -15,6 +15,7 @@ export default function TranzilaPayment({
   const [handshakeDetails, setHandshakeDetails] = useState(null);
   const [handshakeError, setHandshakeError] = useState(null);
   const [handshakeAttempt, setHandshakeAttempt] = useState(0);
+  const handshakeInProgressRef = useRef(false);
   const iframeRef = useRef(null);
   const formRef = useRef(null);
 
@@ -27,6 +28,7 @@ export default function TranzilaPayment({
       setHandshakeDetails(null);
       setHandshakeError(null);
       setHandshakeAttempt(0);
+      handshakeInProgressRef.current = false;
     }
   }, [isOpen]);
 
@@ -35,23 +37,57 @@ export default function TranzilaPayment({
 
     // Listen for messages from Tranzila iframe
     const handleMessage = (event) => {
-      // Security: Verify the origin if needed
-      // if (event.origin !== 'https://direct.tranzila.com') return;
+      try {
+        // Security: Verify the origin if needed
+        // Allow messages from Tranzila domains
+        const allowedOrigins = [
+          'https://direct.tranzila.com',
+          'https://secure5.tranzila.com',
+          window.location.origin // Allow same-origin for API callbacks
+        ];
+        
+        // Log all messages for debugging
+        console.log('Received message from iframe:', {
+          origin: event.origin,
+          data: event.data,
+          type: typeof event.data
+        });
 
-      console.log('Received message from iframe:', event.data);
+        const data = event.data;
 
-      const data = event.data;
+        // Handle string messages (from API callbacks)
+        if (typeof data === 'string') {
+          try {
+            const parsed = JSON.parse(data);
+            if (parsed.success || parsed.Response === '000') {
+              onSuccess && onSuccess(parsed);
+              onClose();
+              return;
+            }
+            if (parsed.error || parsed.Response) {
+              onFailure && onFailure(parsed);
+              return;
+            }
+          } catch (e) {
+            // Not JSON, ignore
+            return;
+          }
+        }
 
-      if (!data || typeof data !== 'object') {
-        return;
-      }
+        // Handle object messages
+        if (!data || typeof data !== 'object') {
+          return;
+        }
 
-      if (data.closePayment) {
-        onClose();
-        return;
-      }
+        // Handle close payment request
+        if (data.closePayment) {
+          onClose();
+          return;
+        }
 
+        // Handle retry payment request
       if (data.retryPayment) {
+        handshakeInProgressRef.current = false;
         setHandshakeToken(null);
         setHandshakeDetails(null);
         setHandshakeError(null);
@@ -61,14 +97,36 @@ export default function TranzilaPayment({
         return;
       }
 
-      if (data.success || data.Response === '000') {
-        onSuccess && onSuccess(data);
-        onClose();
-        return;
-      }
+        // Handle successful payment
+        // Response can be '000', 0, or success: true
+        const isSuccess = data.success === true || 
+                         data.Response === '000' || 
+                         data.Response === 0 ||
+                         data.Response === '0' ||
+                         (data.transactionData && (data.transactionData.Response === '000' || data.transactionData.Response === 0));
 
-      if (data.error || data.Response) {
-        onFailure && onFailure(data);
+        if (isSuccess) {
+          console.log('Payment successful, calling onSuccess with:', data);
+          const transactionData = data.transactionData || data;
+          onSuccess && onSuccess(transactionData);
+          onClose();
+          return;
+        }
+
+        // Handle failed payment
+        // Response codes other than '000' indicate failure
+        if (data.error || data.Response || (data.transactionData && data.transactionData.Response)) {
+          console.log('Payment failed, calling onFailure with:', data);
+          const errorData = data.transactionData || data;
+          onFailure && onFailure(errorData);
+          return;
+        }
+
+        // Log unhandled messages for debugging
+        console.warn('Unhandled message from iframe:', data);
+      } catch (error) {
+        console.error('Error handling message from iframe:', error);
+        // Don't crash - just log the error
       }
     };
 
@@ -80,9 +138,19 @@ export default function TranzilaPayment({
   }, [isOpen, onSuccess, onFailure, onClose]);
 
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen) {
+      handshakeInProgressRef.current = false;
+      return;
+    }
+    
+    // Prevent multiple handshakes if one is already in progress
+    if (handshakeInProgressRef.current) {
+      console.log('Handshake already in progress, skipping...');
+      return;
+    }
 
     let isCancelled = false;
+    handshakeInProgressRef.current = true;
 
     const amountValue = Number(amount);
 
@@ -152,16 +220,20 @@ export default function TranzilaPayment({
           return;
         }
 
-        if (!payload?.token && !payload?.mock) {
+        // Check for token in multiple possible fields
+        const token = payload?.token || payload?.thtk;
+        if (!token && !payload?.mock) {
           throw new Error('Handshake response missing token');
         }
 
         const isMockHandshake = Boolean(payload?.mock);
 
         console.log('Tranzila handshake ready', {
-          sum: payload?.sum,
-          hasToken: Boolean(payload?.token),
-          mock: isMockHandshake
+          sum: payload?.sum || payload?.amount || amountValue,
+          amount: payload?.amount || amountValue,
+          hasToken: Boolean(payload?.token || payload?.thtk),
+          mock: isMockHandshake,
+          payload
         });
 
         if (isCancelled) {
@@ -178,8 +250,14 @@ export default function TranzilaPayment({
           setHandshakeDetails(payload);
         } else {
           setHandshakeMode('handshake');
-          setHandshakeToken(payload.token);
-          setHandshakeDetails(payload);
+          const token = payload.token || payload.thtk;
+          setHandshakeToken(token);
+          // Ensure sum is set from amount if not present
+          setHandshakeDetails({
+            ...payload,
+            sum: payload.sum || payload.amount || amountValue,
+            token: token // Ensure token is in details too
+          });
         }
       } catch (error) {
         console.error('Failed to initialize Tranzila handshake', error);
@@ -203,6 +281,7 @@ export default function TranzilaPayment({
       } finally {
         if (!isCancelled) {
           setIsHandshakeLoading(false);
+          handshakeInProgressRef.current = false;
         }
       }
     };
@@ -211,6 +290,7 @@ export default function TranzilaPayment({
 
     return () => {
       isCancelled = true;
+      handshakeInProgressRef.current = false;
     };
   }, [isOpen, amount, planName, onFailure, handshakeAttempt]);
 
@@ -327,16 +407,16 @@ export default function TranzilaPayment({
             <input
               type="hidden"
               name="sum"
-              value={`${handshakeDetails?.sum ?? amount}`}
+              value={`${handshakeDetails?.sum ?? handshakeDetails?.amount ?? amount}`}
             />
             <input type="hidden" name="supplier" value={terminalName} />
             <input type="hidden" name="currency" value="1" />
             <input type="hidden" name="cred_type" value="1" />
             <input type="hidden" name="tranmode" value="A" />
-            {handshakeMode === 'handshake' && (
+            {handshakeMode === 'handshake' && handshakeToken && (
               <>
                 <input type="hidden" name="new_process" value="1" />
-                <input type="hidden" name="thtk" value={handshakeToken || ''} />
+                <input type="hidden" name="thtk" value={handshakeToken} />
               </>
             )}
             <input type="hidden" name="buttonLabel" value="שלם עכשיו" />

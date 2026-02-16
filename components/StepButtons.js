@@ -2157,105 +2157,183 @@ React.useEffect(() => {
 
   // Handle successful payment
   const handlePaymentSuccess = async (transactionData) => {
-    console.log('Payment successful:', transactionData);
+    try {
+      console.log('Payment successful:', transactionData);
 
-    // Handle plan purchase (ב, ג, ד)
-    if (pendingPlan && pendingPlan !== 'addon') {
-      setSelectedPlan(pendingPlan);
-      try { localStorage.setItem('selectedPlan', pendingPlan); } catch(e){}
-      const newBaseLimit = getPlanBaseLimit(pendingPlan) || 0;
-      const existingExtraCapacity = additionalPackages.reduce(
-        (sum, planId) => sum + getPlanBaseLimit(planId),
-        0
-      );
-      setAllowedGuestCapacity(newBaseLimit + existingExtraCapacity);
+      // Validate transaction data
+      if (!transactionData) {
+        console.error('No transaction data received');
+        setPaymentResultType('error');
+        setPaymentResultMessage('לא התקבלו נתוני תשלום');
+        setShowPaymentModal(false);
+        setShowPaymentResultModal(true);
+        return;
+      }
 
-      const planDisplayName = getPlanDisplayName(pendingPlan);
-      // Show success modal instead of toast
-      setPaymentResultType('success');
-      setPaymentResultMessage(`התשלום בוצע בהצלחה! ${planDisplayName} הופעל`);
-      setPaymentWasPlanPurchase(true);
-      setShowPaymentModal(false);
-      setShowPaymentResultModal(true);
-    }
-    // Handle addon packages (100 guests for 100 shekel each)
-    else if (pendingPlan === 'addon') {
-      const newAddons = Array(pendingAddonCount).fill('addon');
-      setAdditionalPackages((prev) => [...prev, ...newAddons]);
-      setPlanSelectionError('');
+      // Check if transaction was actually successful
+      const responseCode = transactionData.Response || transactionData.response_code;
+      if (responseCode && responseCode !== '000' && responseCode !== 0 && responseCode !== '0') {
+        console.error('Transaction failed with response code:', responseCode);
+        setPaymentResultType('error');
+        setPaymentResultMessage(`שגיאה בתשלום (קוד: ${responseCode})`);
+        setShowPaymentModal(false);
+        setShowPaymentResultModal(true);
+        return;
+      }
 
-      const totalGuestsAdded = pendingAddonCount * 100;
-      // Show success modal instead of toast
-      setPaymentResultType('success');
-      setPaymentResultMessage(`התשלום בוצע בהצלחה! ${totalGuestsAdded} מקומות נוספים נוספו לאירוע שלך.`);
-      setPaymentWasPlanPurchase(false);
-
-      // Update allowed_guests in database for current event
-      if (currentEventId) {
+      // Handle plan purchase (ב, ג, ד)
+      if (pendingPlan && pendingPlan !== 'addon') {
         try {
-          const baseLimit = getPlanBaseLimit(selectedPlan) || 50;
+          setSelectedPlan(pendingPlan);
+          try { localStorage.setItem('selectedPlan', pendingPlan); } catch(e){
+            console.warn('Failed to save plan to localStorage:', e);
+          }
+          const newBaseLimit = getPlanBaseLimit(pendingPlan) || 0;
           const existingExtraCapacity = additionalPackages.reduce(
             (sum, planId) => sum + getPlanBaseLimit(planId),
             0
           );
-          const addedCapacity = pendingAddonCount * getPlanBaseLimit('addon');
-          const newTotalAllowedGuests =
-            baseLimit + existingExtraCapacity + addedCapacity;
-          setAllowedGuestCapacity(newTotalAllowedGuests);
+          setAllowedGuestCapacity(newBaseLimit + existingExtraCapacity);
 
-          const { error: updateError } = await supabase
-            .from('events')
-            .update({ allowed_guests: newTotalAllowedGuests })
-            .eq('id', currentEventId);
-
-          if (updateError) {
-            console.error('Failed to update allowed_guests in database:', updateError);
-          } else {
-            console.log(`✅ Updated allowed_guests to ${newTotalAllowedGuests} in database`);
-          }
-        } catch (err) {
-          console.error('Error updating allowed_guests:', err);
+          const planDisplayName = getPlanDisplayName(pendingPlan);
+          // Show success modal instead of toast
+          setPaymentResultType('success');
+          setPaymentResultMessage(`התשלום בוצע בהצלחה! ${planDisplayName} הופעל`);
+          setPaymentWasPlanPurchase(true);
+          setShowPaymentModal(false);
+          setShowPaymentResultModal(true);
+        } catch (error) {
+          console.error('Error handling plan purchase:', error);
+          setPaymentResultType('error');
+          setPaymentResultMessage('שגיאה בעדכון המסלול. אנא פנה לתמיכה.');
+          setShowPaymentModal(false);
+          setShowPaymentResultModal(true);
         }
       }
+      // Handle addon packages (100 guests for 100 shekel each)
+      else if (pendingPlan === 'addon') {
+        try {
+          const newAddons = Array(pendingAddonCount).fill('addon');
+          setAdditionalPackages((prev) => [...prev, ...newAddons]);
+          setPlanSelectionError('');
 
+          const totalGuestsAdded = pendingAddonCount * 100;
+          // Show success modal instead of toast
+          setPaymentResultType('success');
+          setPaymentResultMessage(`התשלום בוצע בהצלחה! ${totalGuestsAdded} מקומות נוספים נוספו לאירוע שלך.`);
+          setPaymentWasPlanPurchase(false);
+
+          // Update allowed_guests in database for current event
+          if (currentEventId) {
+            try {
+              const baseLimit = getPlanBaseLimit(selectedPlan) || 50;
+              const existingExtraCapacity = additionalPackages.reduce(
+                (sum, planId) => sum + getPlanBaseLimit(planId),
+                0
+              );
+              const addedCapacity = pendingAddonCount * getPlanBaseLimit('addon');
+              const newTotalAllowedGuests =
+                baseLimit + existingExtraCapacity + addedCapacity;
+              setAllowedGuestCapacity(newTotalAllowedGuests);
+
+              const { error: updateError } = await supabase
+                .from('events')
+                .update({ allowed_guests: newTotalAllowedGuests })
+                .eq('id', currentEventId);
+
+              if (updateError) {
+                console.error('Failed to update allowed_guests in database:', updateError);
+                // Don't fail the entire flow - just log the error
+              } else {
+                console.log(`✅ Updated allowed_guests to ${newTotalAllowedGuests} in database`);
+              }
+            } catch (err) {
+              console.error('Error updating allowed_guests:', err);
+              // Don't fail the entire flow - just log the error
+            }
+          }
+
+          setShowPaymentModal(false);
+          setShowPaymentResultModal(true);
+        } catch (error) {
+          console.error('Error handling addon purchase:', error);
+          setPaymentResultType('error');
+          setPaymentResultMessage('שגיאה בעדכון החבילות. אנא פנה לתמיכה.');
+          setShowPaymentModal(false);
+          setShowPaymentResultModal(true);
+        }
+      } else {
+        // No pending plan - this shouldn't happen, but handle gracefully
+        console.warn('Payment succeeded but no pending plan found');
+        setPaymentResultType('success');
+        setPaymentResultMessage('התשלום בוצע בהצלחה!');
+        setShowPaymentModal(false);
+        setShowPaymentResultModal(true);
+      }
+
+      // Clear pending state
+      setPendingPlan(null);
+      setPendingAddonCount(1);
+    } catch (error) {
+      console.error('Error in handlePaymentSuccess:', error);
+      setPaymentResultType('error');
+      setPaymentResultMessage('אירעה שגיאה בעיבוד התשלום. אנא פנה לתמיכה עם מספר אישור: ' + (transactionData?.ConfirmationCode || 'לא זמין'));
       setShowPaymentModal(false);
       setShowPaymentResultModal(true);
     }
-
-    // Clear pending state
-    setPendingPlan(null);
-    setPendingAddonCount(1);
   };
 
   // Handle payment failure
   const handlePaymentFailure = (errorData) => {
-    console.log('Payment failed:', errorData);
+    try {
+      console.log('Payment failed:', errorData);
 
-    // Determine error message
-    let errorMessage = 'התשלום נכשל. אנא נסה שוב או בחר מסלול אחר.';
-    if (errorData?.Response) {
-      // Tranzila error codes
-      const errorCodes = {
-        '001': 'כרטיס אשראי נדחה',
-        '002': 'פג תוקף כרטיס האשראי',
-        '003': 'מספר כרטיס לא תקין',
-        '004': 'סכום לא תקין',
-        '005': 'בעיה בשרת התשלומים',
-      };
-      errorMessage = errorCodes[errorData.Response] || `שגיאה בתשלום (קוד: ${errorData.Response})`;
-    } else if (errorData?.error) {
-      errorMessage = typeof errorData.error === 'string' ? errorData.error : 'אירעה שגיאה בעת ביצוע התשלום';
+      // Determine error message
+      let errorMessage = 'התשלום נכשל. אנא נסה שוב או בחר מסלול אחר.';
+      
+      // Check for Response code in different locations
+      const responseCode = errorData?.Response || 
+                          errorData?.transactionData?.Response || 
+                          errorData?.response_code;
+      
+      if (responseCode) {
+        // Tranzila error codes
+        const errorCodes = {
+          '001': 'כרטיס אשראי נדחה על ידי הבנק',
+          '002': 'פג תוקף כרטיס האשראי',
+          '003': 'מספר כרטיס לא תקין',
+          '004': 'סכום לא תקין',
+          '005': 'בעיה בשרת התשלומים',
+          '006': 'כרטיס חסום',
+          '007': 'סכום חריג - נדרש אישור מהבנק',
+          '008': 'בעיה בהתחברות למערכת הסליקה',
+        };
+        errorMessage = errorCodes[responseCode] || `שגיאה בתשלום (קוד: ${responseCode})`;
+      } else if (errorData?.error) {
+        errorMessage = typeof errorData.error === 'string' ? errorData.error : 'אירעה שגיאה בעת ביצוע התשלום';
+      } else if (errorData?.reason) {
+        errorMessage = typeof errorData.reason === 'string' ? errorData.reason : errorMessage;
+      } else if (errorData?.message) {
+        errorMessage = typeof errorData.message === 'string' ? errorData.message : errorMessage;
+      }
+
+      // Show error modal instead of toast
+      setPaymentResultType('error');
+      setPaymentResultMessage(errorMessage);
+      setShowPaymentModal(false);
+      setShowPaymentResultModal(true);
+
+      // Clear pending state
+      setPendingPlan(null);
+      setPendingAddonCount(1);
+    } catch (error) {
+      console.error('Error in handlePaymentFailure:', error);
+      // Fallback error message
+      setPaymentResultType('error');
+      setPaymentResultMessage('אירעה שגיאה בעיבוד התשלום. אנא נסה שוב או פנה לתמיכה.');
+      setShowPaymentModal(false);
+      setShowPaymentResultModal(true);
     }
-
-    // Show error modal instead of toast
-    setPaymentResultType('error');
-    setPaymentResultMessage(errorMessage);
-    setShowPaymentModal(false);
-    setShowPaymentResultModal(true);
-
-    // Clear pending state
-    setPendingPlan(null);
-    setPendingAddonCount(1);
   };
 
   // Check if there's an existing event in progress
@@ -5048,6 +5126,31 @@ React.useEffect(() => {
                     ))}
                   </div>
                 </div>
+
+                {/* Preview */}
+                <div>
+                  <label className="block mb-2 font-bold text-right">תצוגה מקדימה</label>
+                  <div className="border border-gray-300 rounded-md p-4 bg-gray-50 min-h-[100px]" style={{ textAlign: lineStyles[showAdvancedEdit]?.textAlign || 'right' }}>
+                    <div
+                      style={{
+                        fontSize: `${lineStyles[showAdvancedEdit]?.fontSize || 16}px`,
+                        color: lineStyles[showAdvancedEdit]?.color || 'black',
+                        fontWeight: lineStyles[showAdvancedEdit]?.fontWeight || 'normal',
+                        lineHeight: lineStyles[showAdvancedEdit]?.lineHeight || 1.5,
+                        letterSpacing: `${lineStyles[showAdvancedEdit]?.letterSpacing || 0}px`,
+                        textAlign: lineStyles[showAdvancedEdit]?.textAlign || 'right',
+                        textDecoration: lineStyles[showAdvancedEdit]?.textDecoration || 'none',
+                        fontStyle: 'normal',
+                        textShadow: lineStyles[showAdvancedEdit]?.textShadow || 'none',
+                        transform: lineStyles[showAdvancedEdit]?.fontStyle === 'italic' ? 'skewX(20deg)' : lineStyles[showAdvancedEdit]?.fontStyle === 'back-slant' ? 'skewX(-20deg)' : 'none',
+                        whiteSpace: 'pre-wrap',
+                        wordBreak: 'break-word'
+                      }}
+                    >
+                      {customInvitationText.split('\n')[showAdvancedEdit] || 'דוגמת טקסט להזמנה'}
+                    </div>
+                  </div>
+                </div>
               </div>
 
               {/* Right Column */}
@@ -5163,31 +5266,6 @@ React.useEffect(() => {
                       <span className={`text-lg ${lineStyles[showAdvancedEdit]?.textShadow && lineStyles[showAdvancedEdit]?.textShadow !== 'none' ? 'drop-shadow-md' : ''}`}>A</span>
                       <div className="text-xs mt-1">צל</div>
                     </button>
-                  </div>
-                </div>
-
-                {/* Preview */}
-                <div>
-                  <label className="block mb-2 font-bold text-right">תצוגה מקדימה</label>
-                  <div className="border border-gray-300 rounded-md p-4 bg-gray-50 min-h-[100px]" style={{ textAlign: lineStyles[showAdvancedEdit]?.textAlign || 'right' }}>
-                    <div
-                      style={{
-                        fontSize: `${lineStyles[showAdvancedEdit]?.fontSize || 16}px`,
-                        color: lineStyles[showAdvancedEdit]?.color || 'black',
-                        fontWeight: lineStyles[showAdvancedEdit]?.fontWeight || 'normal',
-                        lineHeight: lineStyles[showAdvancedEdit]?.lineHeight || 1.5,
-                        letterSpacing: `${lineStyles[showAdvancedEdit]?.letterSpacing || 0}px`,
-                        textAlign: lineStyles[showAdvancedEdit]?.textAlign || 'right',
-                        textDecoration: lineStyles[showAdvancedEdit]?.textDecoration || 'none',
-                        fontStyle: 'normal',
-                        textShadow: lineStyles[showAdvancedEdit]?.textShadow || 'none',
-                        transform: lineStyles[showAdvancedEdit]?.fontStyle === 'italic' ? 'skewX(20deg)' : lineStyles[showAdvancedEdit]?.fontStyle === 'back-slant' ? 'skewX(-20deg)' : 'none',
-                        whiteSpace: 'pre-wrap',
-                        wordBreak: 'break-word'
-                      }}
-                    >
-                      {customInvitationText.split('\n')[showAdvancedEdit] || 'דוגמת טקסט להזמנה'}
-                    </div>
                   </div>
                 </div>
               </div>
