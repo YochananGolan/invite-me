@@ -991,6 +991,7 @@ const handleOpenAddonModal = React.useCallback(() => {
   const designImages = [
     '/images/background-flowers-light.png',
     '/images/background-flowers-bright.png',
+    '/images/wedding-couple-bright-luxury.jpg',
     '/images/עיצוב-הזמנה-1.jpg',
     '/images/עיצוב-הזמנה-2.jpg',
     '/images/עיצוב-הזמנה-3.jpg',
@@ -3414,7 +3415,7 @@ React.useEffect(() => {
         </div>
       )}
 
-      <div className="w-full flex flex-row justify-center gap-4 py-2">
+      <div className="fixed left-0 right-0 bottom-0 z-20 w-full bg-white/95 backdrop-blur-sm border-t border-gray-200 shadow-[0_-4px_12px_rgba(0,0,0,0.08)] pt-3 pb-2 px-2 flex flex-row justify-center gap-4 flex-wrap">
         {steps.slice(1).map((step, idx) => {
           const realIdx = idx + 1;
           console.log(`Rendering step ${realIdx} (${step}): finished=${finishedSteps.includes(realIdx)}`);
@@ -3524,7 +3525,7 @@ React.useEffect(() => {
 
       {/* Error message is now displayed in HeroSection instead */}
       {/* Status and Summary Tables */}
-      <div className="w-full px-4 mb-0 mt-4" style={{ marginBottom: '200px' }}>
+      <div className="w-full px-4 mb-0 mt-4 pb-24" style={{ marginBottom: '200px' }}>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           
           {/* First Column - Event Status */}

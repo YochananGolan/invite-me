@@ -86,7 +86,7 @@ export default function Home({ session }) {
             }}
             isLoggedIn={!!session}
           />
-          <div id="pricing" className="mb-8 scroll-mt-20">
+          <div id="pricing" className="mb-8 scroll-mt-20 scroll-mb-28 pb-24">
             <StepButtons 
               ref={stepRef} 
               session={session} 

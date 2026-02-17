@@ -34,7 +34,7 @@ export default forwardRef(function HeroSection({ onStart, onShowFeatures, onSign
               נעים מאוד, אנחנו Meet-M
             </h1>
             <p className="text-gray-600 text-lg md:text-xl mb-6 leading-relaxed max-w-xl lg:mr-0 lg:ml-auto mx-auto">
-              ממשק מתקדם לתכנון וניהול אירוע מושלם בקלות – עם דרך חדשה להזמין ולהרשים את האורחים.
+              יצירת הזמנות מעוצבות, שליחה אוטומטית ב-SMS ו-WhatsApp, מעקב אישורי הגעה בזמן אמת, דוחות וייצוא לאקסל – הכל במקום אחד.
             </p>
             
             {/* Stats */}
@@ -81,40 +81,41 @@ export default forwardRef(function HeroSection({ onStart, onShowFeatures, onSign
           <div className="lg:flex-1 flex justify-center order-1 lg:order-2">
             <div className="w-full max-w-md">
               <div className="bg-white rounded-2xl shadow-xl overflow-hidden border border-gray-100">
-                {/* Card Image with overlay */}
+                {/* Card Image with all text overlay */}
                 <div className="relative aspect-[3/4] md:aspect-[4/5]">
                   <Image
-                    src="/images/עיצוב-הזמנה-1.jpg"
+                    src="/images/wedding-couple-bright-luxury.jpg"
                     alt="הזמנה לדוגמא"
                     fill
                     sizes="(max-width: 768px) 100vw, 450px"
                     className="object-cover"
                     priority
                   />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
-                  <div className="absolute bottom-0 left-0 right-0 p-4 md:p-6 text-white">
-                    <h3 className="text-2xl md:text-3xl font-bold mb-1">מעיין & אמיר</h3>
-                    <p className="text-amber-100 text-lg font-semibold mb-3">מתחתנים</p>
-                    <button
-                      onClick={onShowFeatures}
-                      className="flex items-center gap-2 bg-white/20 backdrop-blur-sm text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-white/30 transition-colors"
-                    >
-                      אישור הגעה
-                      <span className="text-xs">▼</span>
-                    </button>
+                  {/* Very bright overlay so text is readable without white box */}
+                  <div className="absolute inset-0 bg-gradient-to-b from-white/25 via-white/55 to-white/35" />
+                  {/* All invitation text on image */}
+                  <div className="absolute inset-0 flex flex-col p-4 md:p-6 text-right">
+                    {/* Top section - Names */}
+                    <div className="mt-4 md:mt-6">
+                      <h3 className="text-2xl md:text-3xl font-bold mb-2 text-gray-800 drop-shadow-lg">דוד & שרה</h3>
+                      <p className="text-gray-700 text-lg font-semibold mb-1 drop-shadow-md">מתחתנים</p>
+                    </div>
+                    
+                    {/* Center section - All details, no white box */}
+                    <div className="flex-1 flex items-center justify-center">
+                      <div className="w-full max-w-[90%]">
+                        <p className="text-gray-800 text-base md:text-lg mb-4 font-medium leading-relaxed drop-shadow-lg">
+                          בשמחה רבה אנו מזמינים אתכם לחגוג עמנו את יום נישואינו
+                        </p>
+                        <p className="text-gray-900 font-bold text-xl md:text-2xl mb-3 drop-shadow-lg">יום שישי • 15.03.2025</p>
+                        <p className="text-gray-800 text-base md:text-lg flex items-center gap-1 justify-end mb-3 drop-shadow-lg">
+                          <span>📍</span>
+                          ירושלים, ישראל
+                        </p>
+                        <p className="text-gray-700 text-sm md:text-base drop-shadow-md">קבלת פנים 17:00 • חופה וקידושין 18:00 • ארוחת ערב 19:30</p>
+                      </div>
+                    </div>
                   </div>
-                </div>
-                {/* Card Details */}
-                <div className="p-4 md:p-5 bg-[#FFFBF5] text-right">
-                  <p className="text-gray-700 text-sm mb-3">
-                    אנו שמחים ונרגשים להזמין אתכם לחגוג עמנו את יום נישואינו
-                  </p>
-                  <p className="text-gray-800 font-bold text-lg mb-1">יום שני • 18.12.2024</p>
-                  <p className="text-gray-600 text-sm flex items-center gap-1 justify-end">
-                    <span>📍</span>
-                    תל אביב, ישראל
-                  </p>
-                  <p className="text-gray-500 text-xs mt-2">קבלת פנים 19:30 • חופה וקידושין 20:30</p>
                 </div>
               </div>
             </div>
