@@ -74,31 +74,18 @@ export default function AuthModal({ initialMode = 'sign_in', open = false, onClo
     return () => subscription.unsubscribe();
   }, [open, onClose]);
 
-  // Always default to sign_in when modal opens, regardless of initialMode
   useEffect(() => {
     if (open) {
-      setView('sign_in');
+      setView(initialMode);
     }
-  }, [open]);
+  }, [open, initialMode]);
 
   // Parent component will hide/show modal based on session state.
 
   return (
     open && (
-      <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[100] backdrop-blur-sm">
-        {/* Confetti background layer */}
-        <div
-          aria-hidden
-          className="absolute inset-0 pointer-events-none opacity-80"
-          style={{
-            backgroundImage:
-              'radial-gradient(#f87171 1.2px, transparent 1.2px), radial-gradient(#60a5fa 1.2px, transparent 1.2px), radial-gradient(#34d399 1.2px, transparent 1.2px), radial-gradient(#fbbf24 1.2px, transparent 1.2px)',
-            backgroundSize: '28px 28px, 32px 32px, 36px 36px, 30px 30px',
-            backgroundPosition: '0 0, 8px 12px, 16px 6px, 20px 18px'
-          }}
-        />
-
-        <div className="relative bg-white/95 backdrop-blur-sm rounded-2xl p-8 w-full max-w-md shadow-2xl">
+      <div className="fixed inset-0 flex items-center justify-center z-[100]">
+        <div className="relative bg-white rounded-2xl p-8 w-full max-w-md shadow-2xl">
           {/* Close Button */}
           <button
             onClick={onClose}

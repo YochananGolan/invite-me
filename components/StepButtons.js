@@ -248,6 +248,10 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick }, re
   const [guestErrorMsg, setGuestErrorMsg] = useState('');
   const [invitationSent, setInvitationSent] = useState(false);
   const [rsvpConfirmed, setRsvpConfirmed] = useState(false);
+  // Invitation send result modal
+  const [showInvitationResultModal, setShowInvitationResultModal] = useState(false);
+  const [invitationResult, setInvitationResult] = useState({ type: 'success', message: '' });
+  const [isSendingInvitation, setIsSendingInvitation] = useState(false);
   const [showGuestListModal, setShowGuestListModal] = useState(false);
   const [sentGuests, setSentGuests] = useState([]);
   // Guests fetched from Supabase (latest event)
@@ -758,7 +762,11 @@ const handleOpenAddonModal = React.useCallback(() => {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) {
           console.error('User session lost during invitation send');
-          setGuestErrorMsg('אירעה שגיאה בשליחת ההזמנה.');
+          setInvitationResult({ 
+            type: 'error', 
+            message: 'אירעה שגיאה בשליחת ההזמנה.' 
+          });
+          setShowInvitationResultModal(true);
           return;
         }
 
@@ -791,29 +799,58 @@ const handleOpenAddonModal = React.useCallback(() => {
           `לאישור הגעה:\n${inviteLink}`
         );
         const waWin = window.open(`https://wa.me/972${waNumber.slice(1)}?text=${waText}`, '_blank','noopener,noreferrer');
-        if (waWin) waWin.opener = null; // prevent redirect effect
-        else {
+        if (waWin) {
+          waWin.opener = null; // prevent redirect effect
+          // Show success modal
+          setInvitationResult({ 
+            type: 'success', 
+            message: 'ההזמנה נשלחה בהצלחה בוואטסאפ!' 
+          });
+          setShowInvitationResultModal(true);
+        } else {
           console.warn('WhatsApp popup possibly blocked');
+          // Show error modal
+          setInvitationResult({ 
+            type: 'error', 
+            message: 'אירעה שגיאה בשליחת ההזמנה. ייתכן שחלון הוואטסאפ נחסם.' 
+          });
+          setShowInvitationResultModal(true);
         }
       } catch (err) {
         console.error('Failed to send invitation:', err);
-        setGuestErrorMsg('אירעה שגיאה בשליחת ההזמנה.');
+        setInvitationResult({ 
+          type: 'error', 
+          message: 'אירעה שגיאה בשליחת ההזמנה.' 
+        });
+        setShowInvitationResultModal(true);
       }
     } catch (err) {
       console.error('Failed to send invitation:', err);
-      setGuestErrorMsg('אירעה שגיאה בשליחת ההזמנה.');
+      setInvitationResult({ 
+        type: 'error', 
+        message: 'אירעה שגיאה בשליחת ההזמנה.' 
+      });
+      setShowInvitationResultModal(true);
     }
   };
 
   // Quick SMS sender – opens default SMS app with pre-filled text (mobile browsers)
   const handleSendInvitationSms = async () => {
+    // Show loading modal IMMEDIATELY
+    setIsSendingInvitation(true);
+    
     // Persist event details before SMS flow (may trigger navigation)
     try{ localStorage.setItem('savedEventDetails', JSON.stringify(formData)); }catch{}
 
     const digitsOnly = guestData.guestPhone.replace(/\D/g, '');
     if (digitsOnly.length !== 10) {
+      setIsSendingInvitation(false);
       setGuestErrors({ guestPhone: true });
-      setGuestErrorMsg('מספר טלפון לא תקין – יש להזין 10 ספרות.');
+      setInvitationResult({ 
+        type: 'error', 
+        message: 'מספר טלפון לא תקין – יש להזין 10 ספרות.' 
+      });
+      setShowInvitationResultModal(true);
       return;
     }
 
@@ -821,7 +858,12 @@ const handleOpenAddonModal = React.useCallback(() => {
       // create guest in DB (similar to WA function but without opening WA)
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
-        setGuestErrorMsg('יש להתחבר כדי לשלוח הזמנות');
+        setIsSendingInvitation(false);
+        setInvitationResult({ 
+          type: 'error', 
+          message: 'יש להתחבר כדי לשלוח הזמנות' 
+        });
+        setShowInvitationResultModal(true);
         return;
       }
 
@@ -885,19 +927,70 @@ const handleOpenAddonModal = React.useCallback(() => {
       const baseUrl = process.env.NEXT_PUBLIC_APP_URL || (typeof window !== 'undefined' ? window.location.origin : 'https://invite-me-two.vercel.app');
       const inviteLink = `${baseUrl}/${evRow?.id}/${newGuest.id}`;
 
-      // Compose message
-      const smsBody = encodeURIComponent(`${invitationText}\n\nלאישור הגעה:\n${inviteLink}`);
-      const smsWin = window.open(`sms:972${digitsOnly.slice(1)}?body=${smsBody}`, '_blank', 'noopener,noreferrer');
-      if(smsWin) smsWin.opener = null;
-      setInvitationSent(true);
+      // Send SMS via API
+      try {
+        const smsMessage = `${invitationText}\n\nלאישור הגעה:\n{inviteLink}`;
+        const smsResponse = await fetch('/api/send-sms', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            guests: [{
+              phone: guestData.guestPhone,
+              firstName: guestData.guestFirstName,
+              lastName: guestData.guestLastName,
+              inviteLink: inviteLink,
+            }],
+            message: smsMessage,
+          }),
+        });
+
+        const smsResult = await smsResponse.json();
+
+        if (smsResult.success && smsResult.sent > 0) {
+          setInvitationSent(true);
+          setIsSendingInvitation(false);
+          // Show success modal
+          setInvitationResult({ 
+            type: 'success', 
+            message: 'ההזמנה נשלחה בהצלחה ב-SMS!' 
+          });
+          setShowInvitationResultModal(true);
+        } else {
+          setIsSendingInvitation(false);
+          // Show error modal
+          const errorMsg = smsResult.failed > 0 
+            ? `אירעה שגיאה בשליחת ההזמנה ב-SMS. ${smsResult.errors?.[0]?.error || ''}`
+            : 'אירעה שגיאה בשליחת ההזמנה ב-SMS.';
+          setInvitationResult({ 
+            type: 'error', 
+            message: errorMsg
+          });
+          setShowInvitationResultModal(true);
+        }
+      } catch (smsError) {
+        console.error('SMS sending error:', smsError);
+        setIsSendingInvitation(false);
+        setInvitationResult({ 
+          type: 'error', 
+          message: 'אירעה שגיאה בשליחת ההזמנה ב-SMS.' 
+        });
+        setShowInvitationResultModal(true);
+      }
     } catch (err) {
       console.error('Failed to send SMS invitation', err);
-      setGuestErrorMsg('אירעה שגיאה בשליחת ההזמנה בסמס.');
+      setIsSendingInvitation(false);
+      setInvitationResult({ 
+        type: 'error', 
+        message: err.message || 'אירעה שגיאה בשליחת ההזמנה בסמס.' 
+      });
+      setShowInvitationResultModal(true);
     }
   };
 
   // כל קבצי העיצוב הקיימים בתיקייה public/images
   const designImages = [
+    '/images/background-flowers-light.png',
+    '/images/background-flowers-bright.png',
     '/images/עיצוב-הזמנה-1.jpg',
     '/images/עיצוב-הזמנה-2.jpg',
     '/images/עיצוב-הזמנה-3.jpg',
@@ -929,6 +1022,16 @@ const handleOpenAddonModal = React.useCallback(() => {
     '/images/תמונה חדשה 8.jpg',
     '/images/תמונה חדשה 9.jpg',
     '/images/תמונה חדשה 10.jpg',
+    '/images/background-01.png',
+    '/images/background-02.png',
+    '/images/background-03.png',
+    '/images/background-04.png',
+    '/images/background-05.png',
+    '/images/background-06.png',
+    '/images/background-07.png',
+    '/images/background-08.png',
+    '/images/background-09.png',
+    '/images/background-10.png',
   ];
 
   const [selectedDesign, setSelectedDesign] = useState(null);
@@ -966,6 +1069,39 @@ const handleOpenAddonModal = React.useCallback(() => {
   const [lineStyles, setLineStyles] = useState({});
   const [openMenu, setOpenMenu] = useState(null); // Format: "lineIndex-menuType" or null
   const [showAdvancedEdit, setShowAdvancedEdit] = useState(null); // Format: lineIndex or null
+  const [showColorPalette, setShowColorPalette] = useState(false);
+
+  useEffect(() => {
+    if (showAdvancedEdit !== null) setShowColorPalette(false);
+  }, [showAdvancedEdit]);
+
+  const colorClasses = {
+    black: 'bg-black',
+    red: 'bg-red-500',
+    blue: 'bg-blue-500',
+    green: 'bg-green-500',
+    purple: 'bg-purple-500',
+    orange: 'bg-orange-500',
+    brown: 'bg-amber-700',
+    gold: 'bg-yellow-400',
+    pink: 'bg-pink-500',
+    cyan: 'bg-cyan-500',
+    indigo: 'bg-indigo-500',
+    teal: 'bg-teal-500',
+    navy: 'bg-blue-900',
+    maroon: 'bg-[#800020]',
+    lime: 'bg-lime-500',
+    olive: 'bg-yellow-700',
+    coral: 'bg-orange-400',
+    lavender: 'bg-violet-300',
+    slate: 'bg-slate-500',
+    rose: 'bg-rose-500',
+    violet: 'bg-violet-600',
+    darkgreen: 'bg-green-800',
+    crimson: 'bg-red-700',
+    turquoise: 'bg-teal-400'
+  };
+  const colorKeys = ['black', 'red', 'blue', 'green', 'purple', 'orange', 'brown', 'gold', 'pink', 'cyan', 'indigo', 'teal', 'navy', 'maroon', 'lime', 'olive', 'coral', 'lavender', 'slate', 'rose', 'violet', 'darkgreen', 'crimson', 'turquoise'];
 
   const invitationTextDefault = selectedEventType && invitationTemplates[normalizeType(selectedEventType)]
     ? `הזמנה ל${selectedEventType}\n\n` + invitationTemplates[normalizeType(selectedEventType)](formData)
@@ -1111,6 +1247,9 @@ const handleOpenAddonModal = React.useCallback(() => {
     startFlow: () => {
       setShowFlowDiagram(true);
       setStepErrorMsg('');
+    },
+    goToReportsStep: () => {
+      setSelectedFlowStep(5);
     },
     createNewEvent: async () => {
       // User should already be logged in at this point (checked in HeroSection)
@@ -1719,15 +1858,14 @@ React.useEffect(() => {
         setExcelPreviewData(imported);
         setExcelErrors(errors);
         setShowExcelPreview(true);
-
-        // Show summary toast
-        if (errors.length > 0) {
-          addToast(`נמצאו ${imported.length} שורות, ${errors.length} עם שגיאות`, 'warning');
-        } else {
-          addToast(`נמצאו ${imported.length} אורחים תקינים`, 'success');
-        }
+        // No message here - file is displayed, message will appear only after sending
       } else {
-        addToast('לא נמצאו אורחים בקובץ', 'error', 6000);
+        // Only show error if no guests found at all - this prevents continuation
+        setInvitationResult({ 
+          type: 'error', 
+          message: 'לא נמצאו אורחים בקובץ' 
+        });
+        setShowInvitationResultModal(true);
       }
       e.target.value = '';
     };
@@ -1739,7 +1877,11 @@ React.useEffect(() => {
     const validGuests = excelPreviewData.filter(g => !g.errors || g.errors.length === 0);
 
     if (validGuests.length === 0) {
-      addToast('אין אורחים תקינים לשמירה. נא לתקן את השגיאות תחילה.', 'error');
+      setInvitationResult({ 
+        type: 'error', 
+        message: 'אין אורחים תקינים לשמירה. נא לתקן את השגיאות תחילה.' 
+      });
+      setShowInvitationResultModal(true);
       return;
     }
 
@@ -1749,8 +1891,12 @@ React.useEffect(() => {
       // Get current user and event
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
-        addToast('יש להתחבר כדי לשמור אורחים', 'error');
         setIsSavingExcelGuests(false);
+        setInvitationResult({ 
+          type: 'error', 
+          message: 'יש להתחבר כדי לשמור אורחים' 
+        });
+        setShowInvitationResultModal(true);
         return;
       }
 
@@ -1763,8 +1909,12 @@ React.useEffect(() => {
         .single();
 
       if (!evRow) {
-        addToast('לא נמצא אירוע פעיל. יש ליצור אירוע תחילה.', 'error');
         setIsSavingExcelGuests(false);
+        setInvitationResult({ 
+          type: 'error', 
+          message: 'לא נמצא אירוע פעיל. יש ליצור אירוע תחילה.' 
+        });
+        setShowInvitationResultModal(true);
         return;
       }
 
@@ -1810,7 +1960,12 @@ React.useEffect(() => {
         // Show capacity warning modal
         setShowPlanLimitWarning(true);
 
-        addToast(`אין מספיק מקום! יש לך ${currentGuestCount} אורחים, מנסה להוסיף ${newGuestsToAdd}. המכסה: ${totalCapacity}`, 'error', 8000);
+        // Also show result modal with error
+        setInvitationResult({ 
+          type: 'error', 
+          message: `אין מספיק מקום! יש לך ${currentGuestCount} אורחים, מנסה להוסיף ${newGuestsToAdd}. המכסה: ${totalCapacity}` 
+        });
+        setShowInvitationResultModal(true);
         return;
       }
 
@@ -1868,32 +2023,77 @@ React.useEffect(() => {
 
           const smsResult = await smsResponse.json();
 
-          if (smsResult.success) {
-            addToast(`נשמרו ${validGuests.length} אורחים ונשלחו ${smsResult.sent} הודעות SMS בהצלחה!`, 'success');
+          // Close preview modal first
+          setShowExcelPreview(false);
+          setExcelPreviewData([]);
+          setExcelErrors([]);
+          setIsSavingExcelGuests(false);
+
+          // Add to local state
+          setSentGuests((prev) => [...prev, ...validGuests]);
+
+          if (smsResult.success && smsResult.sent === validGuests.length) {
+            // All SMS sent successfully
+            setInvitationResult({ 
+              type: 'success', 
+              message: `נשמרו ${validGuests.length} אורחים ונשלחו ${smsResult.sent} הודעות SMS בהצלחה!` 
+            });
+            setShowInvitationResultModal(true);
+          } else if (smsResult.sent > 0) {
+            // Partial success
+            setInvitationResult({ 
+              type: 'error', 
+              message: `נשמרו ${validGuests.length} אורחים. נשלחו ${smsResult.sent} הודעות, ${smsResult.failed} נכשלו.` 
+            });
+            setShowInvitationResultModal(true);
           } else {
-            addToast(`נשמרו ${validGuests.length} אורחים. נשלחו ${smsResult.sent} הודעות, ${smsResult.failed} נכשלו.`, 'warning');
+            // All failed
+            setInvitationResult({ 
+              type: 'error', 
+              message: `נשמרו ${validGuests.length} אורחים, אך אירעה שגיאה בשליחת ה-SMS.` 
+            });
+            setShowInvitationResultModal(true);
           }
         } catch (smsError) {
           console.error('SMS sending error:', smsError);
-          addToast(`נשמרו ${validGuests.length} אורחים, אך אירעה שגיאה בשליחת ה-SMS.`, 'warning');
+          // Close preview modal
+          setShowExcelPreview(false);
+          setExcelPreviewData([]);
+          setExcelErrors([]);
+          setIsSavingExcelGuests(false);
+          // Add to local state
+          setSentGuests((prev) => [...prev, ...validGuests]);
+          // Show error modal
+          setInvitationResult({ 
+            type: 'error', 
+            message: `נשמרו ${validGuests.length} אורחים, אך אירעה שגיאה בשליחת ה-SMS.` 
+          });
+          setShowInvitationResultModal(true);
         }
       } else {
-        addToast(`נשמרו בהצלחה ${validGuests.length} אורחים למסד הנתונים!`, 'success');
+        // Close preview modal
+        setShowExcelPreview(false);
+        setExcelPreviewData([]);
+        setExcelErrors([]);
+        setIsSavingExcelGuests(false);
+        // Add to local state
+        setSentGuests((prev) => [...prev, ...validGuests]);
+        // Show success modal
+        setInvitationResult({ 
+          type: 'success', 
+          message: `נשמרו בהצלחה ${validGuests.length} אורחים למסד הנתונים!` 
+        });
+        setShowInvitationResultModal(true);
       }
-
-      // Add to local state as well
-      setSentGuests((prev) => [...prev, ...validGuests]);
-
-      // Close preview modal
-      setShowExcelPreview(false);
-      setExcelPreviewData([]);
-      setExcelErrors([]);
-      setIsSavingExcelGuests(false);
 
     } catch (error) {
       console.error('Error saving guests:', error);
-      addToast('אירעה שגיאה בשמירת האורחים: ' + error.message, 'error');
       setIsSavingExcelGuests(false);
+      setInvitationResult({ 
+        type: 'error', 
+        message: 'אירעה שגיאה בשמירת האורחים: ' + (error.message || 'שגיאה לא ידועה') 
+      });
+      setShowInvitationResultModal(true);
     }
   };
 
@@ -2105,7 +2305,11 @@ React.useEffect(() => {
   const handleSelectPlan = (plan) => {
     // Check if user is logged in
     if (!session) {
-      addToast('עליך להתחבר כדי לרכוש חבילה', 'error');
+      setInvitationResult({ 
+        type: 'error', 
+        message: 'עליך להתחבר כדי לרכוש חבילה' 
+      });
+      setShowInvitationResultModal(true);
       setShowPricingPlan(false);
       onAuthClick('sign_in');
       return;
@@ -2142,7 +2346,11 @@ React.useEffect(() => {
   const handlePurchaseAddon = () => {
     // Check if user is logged in
     if (!session) {
-      addToast('עליך להתחבר כדי לרכוש חבילה', 'error');
+      setInvitationResult({ 
+        type: 'error', 
+        message: 'עליך להתחבר כדי לרכוש חבילה' 
+      });
+      setShowInvitationResultModal(true);
       setShowPlanLimitWarning(false);
       resetCapacityWarningGuests();
       onAuthClick('sign_in');
@@ -4989,48 +5197,63 @@ React.useEffect(() => {
 
       {/* Advanced Edit Modal */}
       {showAdvancedEdit !== null && (
+        <>
+          {/* Full-screen color picker */}
+          {showColorPalette ? (
+            <div className="fixed inset-0 z-[60] bg-white flex flex-col" dir="rtl">
+              <div className="p-4 border-b border-gray-200">
+                <h2 className="text-xl font-bold text-primary text-center">בחירת צבע פונט</h2>
+              </div>
+              <div className="flex-1 overflow-y-auto p-6">
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 max-w-4xl mx-auto">
+                  {colorKeys.map(color => (
+                    <button
+                      key={color}
+                      onClick={() => {
+                        updateLineStyle(showAdvancedEdit, 'color', color);
+                      }}
+                      className={`aspect-square rounded-xl border-4 transition-all hover:scale-105 ${
+                        lineStyles[showAdvancedEdit]?.color === color ? 'border-gray-800 ring-4 ring-primary/30' : 'border-gray-300'
+                      } ${colorClasses[color] || 'bg-gray-300'}`}
+                      title={color}
+                    ></button>
+                  ))}
+                </div>
+                <div className="flex justify-center mt-8">
+                  <button
+                    onClick={() => setShowColorPalette(false)}
+                    className="px-8 py-3 bg-primary text-white rounded-lg font-medium hover:bg-primary/90 transition-colors"
+                  >
+                    חזרה לעיצוב
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : (
         <div className="fixed inset-0 flex items-center justify-center bg-black/70 z-50 p-4" onClick={() => setShowAdvancedEdit(null)}>
-          <div className="relative bg-white rounded-lg p-6 w-full max-w-4xl max-h-[92vh] overflow-y-auto shadow-2xl" onClick={(e) => e.stopPropagation()}>
+          <div className="relative bg-white rounded-lg w-full max-w-4xl h-[92vh] max-h-[92vh] flex flex-col overflow-hidden shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <button 
               onClick={() => setShowAdvancedEdit(null)} 
-              className="absolute top-2 left-2 text-3xl text-gray-500 hover:text-gray-700"
+              className="absolute top-2 left-2 text-3xl text-gray-500 hover:text-gray-700 z-10"
             >
               &times;
             </button>
-            <h2 className="text-2xl font-bold mb-4 text-center">עיצוב מתקדם - שורה {showAdvancedEdit + 1}</h2>
+            <h2 className="text-xl font-bold py-3 text-center flex-shrink-0">עיצוב מתקדם - שורה {showAdvancedEdit + 1}</h2>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-4">
+            <div className="flex-1 min-h-0 overflow-y-auto px-6 pb-2">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
               {/* Left Column */}
-              <div className="space-y-4">
+              <div className="space-y-3">
                 {/* Font Color */}
                 <div>
                   <label className="block mb-2 font-bold text-right">צבע פונט</label>
-                  <div className="grid grid-cols-4 gap-2">
-                    {['black', 'red', 'blue', 'green', 'purple', 'orange', 'brown', 'gold', 'pink', 'cyan', 'indigo', 'teal'].map(color => {
-                      const colorClasses = {
-                        black: 'bg-black',
-                        red: 'bg-red-500',
-                        blue: 'bg-blue-500',
-                        green: 'bg-green-500',
-                        purple: 'bg-purple-500',
-                        orange: 'bg-orange-500',
-                        brown: 'bg-amber-700',
-                        gold: 'bg-yellow-400',
-                        pink: 'bg-pink-500',
-                        cyan: 'bg-cyan-500',
-                        indigo: 'bg-indigo-500',
-                        teal: 'bg-teal-500'
-                      };
-                      return (
-                        <button
-                          key={color}
-                          onClick={() => updateLineStyle(showAdvancedEdit, 'color', color)}
-                          className={`w-full h-10 rounded border-2 ${lineStyles[showAdvancedEdit]?.color === color ? 'border-gray-800' : 'border-gray-300'} ${colorClasses[color] || 'bg-gray-300'} hover:scale-110 transition-transform`}
-                          title={color}
-                        ></button>
-                      );
-                    })}
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowColorPalette(true)}
+                    className="w-full py-2 px-4 border-2 border-gray-300 rounded-lg hover:border-primary hover:bg-primary/5 transition-colors text-center font-medium"
+                  >
+                    לחץ לבחירת צבע
+                  </button>
                 </div>
 
                 {/* Font Size */}
@@ -5077,6 +5300,23 @@ React.useEffect(() => {
                   </select>
                 </div>
 
+                {/* Text Shadow - positioned to align with סגנון פונט */}
+                <div>
+                  <label className="block mb-2 font-bold text-right">צל טקסט</label>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => {
+                        const current = lineStyles[showAdvancedEdit]?.textShadow || 'none';
+                        updateLineStyle(showAdvancedEdit, 'textShadow', current === 'none' ? '2px 2px 4px rgba(0,0,0,0.3)' : 'none');
+                      }}
+                      className={`flex-1 p-3 border-2 rounded-lg ${lineStyles[showAdvancedEdit]?.textShadow && lineStyles[showAdvancedEdit]?.textShadow !== 'none' ? 'border-primary bg-primary/10' : 'border-gray-300'} hover:border-primary transition-colors`}
+                    >
+                      <span className={`text-lg ${lineStyles[showAdvancedEdit]?.textShadow && lineStyles[showAdvancedEdit]?.textShadow !== 'none' ? 'drop-shadow-md' : ''}`}>A</span>
+                      <div className="text-xs mt-1">צל</div>
+                    </button>
+                  </div>
+                </div>
+
                 {/* Text Alignment */}
                 <div>
                   <label className="block mb-2 font-bold text-right">יישור טקסט</label>
@@ -5084,8 +5324,7 @@ React.useEffect(() => {
                     {[
                       { value: 'right', icon: '←', label: 'ימין' },
                       { value: 'center', icon: '↔', label: 'מרכז' },
-                      { value: 'left', icon: '→', label: 'שמאל' },
-                      { value: 'justify', icon: '⇄', label: 'מיושר' }
+                      { value: 'left', icon: '→', label: 'שמאל' }
                     ].map(align => (
                       <button
                         key={align.value}
@@ -5099,35 +5338,10 @@ React.useEffect(() => {
                     ))}
                   </div>
                 </div>
-
-                {/* Preview */}
-                <div>
-                  <label className="block mb-2 font-bold text-right">תצוגה מקדימה</label>
-                  <div className="border border-gray-300 rounded-md p-4 bg-gray-50 min-h-[100px]" style={{ textAlign: lineStyles[showAdvancedEdit]?.textAlign || 'right' }}>
-                    <div
-                      style={{
-                        fontSize: `${lineStyles[showAdvancedEdit]?.fontSize || 16}px`,
-                        color: lineStyles[showAdvancedEdit]?.color || 'black',
-                        fontWeight: lineStyles[showAdvancedEdit]?.fontWeight || 'normal',
-                        lineHeight: lineStyles[showAdvancedEdit]?.lineHeight || 1.5,
-                        letterSpacing: `${lineStyles[showAdvancedEdit]?.letterSpacing || 0}px`,
-                        textAlign: lineStyles[showAdvancedEdit]?.textAlign || 'right',
-                        textDecoration: lineStyles[showAdvancedEdit]?.textDecoration || 'none',
-                        fontStyle: 'normal',
-                        textShadow: lineStyles[showAdvancedEdit]?.textShadow || 'none',
-                        transform: lineStyles[showAdvancedEdit]?.fontStyle === 'italic' ? 'skewX(20deg)' : lineStyles[showAdvancedEdit]?.fontStyle === 'back-slant' ? 'skewX(-20deg)' : 'none',
-                        whiteSpace: 'pre-wrap',
-                        wordBreak: 'break-word'
-                      }}
-                    >
-                      {customInvitationText.split('\n')[showAdvancedEdit] || 'דוגמת טקסט להזמנה'}
-                    </div>
-                  </div>
-                </div>
               </div>
 
               {/* Right Column */}
-              <div className="space-y-4">
+              <div className="space-y-3">
                 {/* Line Height */}
                 <div>
                   <label className="block mb-2 font-bold text-right">מרווח בין שורות</label>
@@ -5195,6 +5409,14 @@ React.useEffect(() => {
                   <label className="block mb-2 font-bold text-right">סגנון פונט - הטיה</label>
                   <div className="flex gap-2">
                     <button
+                      onClick={() => updateLineStyle(showAdvancedEdit, 'fontStyle', 'normal')}
+                      className={`flex-1 p-3 border-2 rounded-lg ${(lineStyles[showAdvancedEdit]?.fontStyle || 'normal') === 'normal' ? 'border-primary bg-primary/10' : 'border-gray-300'} hover:border-primary transition-colors`}
+                      title="ישר"
+                    >
+                      <span className="text-lg">I</span>
+                      <div className="text-xs mt-1">ישר</div>
+                    </button>
+                    <button
                       onClick={() => {
                         const current = lineStyles[showAdvancedEdit]?.fontStyle || 'normal';
                         updateLineStyle(showAdvancedEdit, 'fontStyle', current === 'italic' ? 'normal' : 'italic');
@@ -5224,27 +5446,36 @@ React.useEffect(() => {
                     </button>
                   </div>
                 </div>
+              </div>
+            </div>
+            </div>
 
-                {/* Text Shadow */}
-                <div>
-                  <label className="block mb-2 font-bold text-right">צל טקסט</label>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => {
-                        const current = lineStyles[showAdvancedEdit]?.textShadow || 'none';
-                        updateLineStyle(showAdvancedEdit, 'textShadow', current === 'none' ? '2px 2px 4px rgba(0,0,0,0.3)' : 'none');
-                      }}
-                      className={`flex-1 p-3 border-2 rounded-lg ${lineStyles[showAdvancedEdit]?.textShadow && lineStyles[showAdvancedEdit]?.textShadow !== 'none' ? 'border-primary bg-primary/10' : 'border-gray-300'} hover:border-primary transition-colors`}
-                    >
-                      <span className={`text-lg ${lineStyles[showAdvancedEdit]?.textShadow && lineStyles[showAdvancedEdit]?.textShadow !== 'none' ? 'drop-shadow-md' : ''}`}>A</span>
-                      <div className="text-xs mt-1">צל</div>
-                    </button>
-                  </div>
+            {/* Preview - centered at bottom, above buttons */}
+            <div className="flex flex-col items-center px-6 py-3 flex-shrink-0 border-t border-gray-200 bg-gray-50/50">
+              <label className="block mb-1 font-bold text-center text-sm">תצוגה מקדימה</label>
+              <div className="w-full max-w-xl border border-gray-300 rounded-md p-3 bg-white min-h-[70px]" style={{ textAlign: lineStyles[showAdvancedEdit]?.textAlign || 'right' }}>
+                <div
+                  style={{
+                    fontSize: `${lineStyles[showAdvancedEdit]?.fontSize || 16}px`,
+                    color: lineStyles[showAdvancedEdit]?.color || 'black',
+                    fontWeight: lineStyles[showAdvancedEdit]?.fontWeight || 'normal',
+                    lineHeight: lineStyles[showAdvancedEdit]?.lineHeight || 1.5,
+                    letterSpacing: `${lineStyles[showAdvancedEdit]?.letterSpacing || 0}px`,
+                    textAlign: lineStyles[showAdvancedEdit]?.textAlign || 'right',
+                    textDecoration: lineStyles[showAdvancedEdit]?.textDecoration || 'none',
+                    fontStyle: 'normal',
+                    textShadow: lineStyles[showAdvancedEdit]?.textShadow || 'none',
+                    transform: lineStyles[showAdvancedEdit]?.fontStyle === 'italic' ? 'skewX(20deg)' : lineStyles[showAdvancedEdit]?.fontStyle === 'back-slant' ? 'skewX(-20deg)' : 'none',
+                    whiteSpace: 'pre-wrap',
+                    wordBreak: 'break-word'
+                  }}
+                >
+                  {customInvitationText.split('\n')[showAdvancedEdit] || 'דוגמת טקסט להזמנה'}
                 </div>
               </div>
             </div>
 
-            <div className="mt-6 flex flex-col sm:flex-row gap-3">
+            <div className="flex flex-col sm:flex-row gap-3 px-6 py-4 flex-shrink-0 border-t border-gray-200">
               <button
                 onClick={() => {
                   const updatedStyles = { ...lineStyles };
@@ -5264,6 +5495,8 @@ React.useEffect(() => {
             </div>
           </div>
         </div>
+          )}
+        </>
       )}
 
       {/* Preview as guest button */}
@@ -6420,6 +6653,75 @@ React.useEffect(() => {
                   className="w-full bg-red-600 hover:bg-red-700 text-white font-bold text-lg md:text-xl py-4 px-8 rounded-full transition-all shadow-lg transform hover:scale-105"
                 >
                   חזור למסלולים
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Invitation Send Loading Modal */}
+      {isSendingInvitation && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black/60 z-[60]">
+          <div className="relative bg-white rounded-2xl p-8 md:p-12 w-full max-w-lg mx-4 shadow-2xl text-center">
+            <div className="text-6xl md:text-7xl mb-6 animate-spin">⏳</div>
+            <h2 className="text-2xl md:text-3xl font-bold text-primary mb-4">
+              שולח הזמנה...
+            </h2>
+            <p className="text-lg md:text-xl text-gray-700">
+              אנא המתן, ההזמנה נשלחת כעת
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Invitation Send Result Modal */}
+      {showInvitationResultModal && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black/60 z-[60]">
+          <div className="relative bg-white rounded-2xl p-8 md:p-12 w-full max-w-lg mx-4 shadow-2xl text-center">
+            {invitationResult.type === 'success' ? (
+              <>
+                <div className="text-6xl md:text-7xl mb-6">✅</div>
+                <h2 className="text-2xl md:text-3xl font-bold text-green-600 mb-4">
+                  השליחה הצליחה!
+                </h2>
+                <p className="text-lg md:text-xl text-gray-700 mb-8">
+                  {invitationResult.message}
+                </p>
+                <button
+                  onClick={() => {
+                    setShowInvitationResultModal(false);
+                    // Reset guest form
+                    setGuestData({
+                      guestFirstName: '',
+                      guestLastName: '',
+                      guestPhone: '',
+                      guestTable: '',
+                    });
+                    setGuestErrors({});
+                    setGuestErrorMsg('');
+                  }}
+                  className="w-full bg-green-600 hover:bg-green-700 text-white font-bold text-lg md:text-xl py-4 px-8 rounded-full transition-all shadow-lg transform hover:scale-105"
+                >
+                  המשך
+                </button>
+              </>
+            ) : (
+              <>
+                <div className="text-6xl md:text-7xl mb-6">❌</div>
+                <h2 className="text-2xl md:text-3xl font-bold text-red-600 mb-4">
+                  השליחה נכשלה
+                </h2>
+                <p className="text-lg md:text-xl text-gray-700 mb-8">
+                  {invitationResult.message}
+                </p>
+                <button
+                  onClick={() => {
+                    setShowInvitationResultModal(false);
+                  }}
+                  className="w-full bg-red-600 hover:bg-red-700 text-white font-bold text-lg md:text-xl py-4 px-8 rounded-full transition-all shadow-lg transform hover:scale-105"
+                >
+                  המשך
                 </button>
               </>
             )}

@@ -4,13 +4,13 @@ import { supabase } from '../lib/supabaseClient';
 
 const navLinks = [
   { name: 'ראשי', href: '/' },
-  { name: 'אישורי הגעה', href: '/rsvp' },
-  { name: 'חבילות ומחירים', href: '/#pricing' },
+  { name: 'חבילות ומחירים', onShowPricing: true },
+  { name: 'דוחו"ת בקרה', onShowReports: true },
   { name: 'אודות', isButton: true },
   { name: 'צור קשר', href: '/contact' },
 ];
 
-export default function NavBar({ onAuthClick, onAboutClick }) {
+export default function NavBar({ onAuthClick, onAboutClick, onShowPricing, onShowReports }) {
   const [session, setSession] = useState(null);
 
   useEffect(() => {
@@ -47,6 +47,22 @@ export default function NavBar({ onAuthClick, onAboutClick }) {
               <button
                 key={link.name}
                 onClick={onAboutClick}
+                className="text-gray-600 hover:text-primary transition-colors text-sm font-medium"
+              >
+                {link.name}
+              </button>
+            ) : link.onShowPricing ? (
+              <button
+                key={link.name}
+                onClick={() => typeof onShowPricing === 'function' && onShowPricing()}
+                className="text-gray-600 hover:text-primary transition-colors text-sm font-medium"
+              >
+                {link.name}
+              </button>
+            ) : link.onShowReports ? (
+              <button
+                key={link.name}
+                onClick={() => typeof onShowReports === 'function' && onShowReports()}
                 className="text-gray-600 hover:text-primary transition-colors text-sm font-medium"
               >
                 {link.name}

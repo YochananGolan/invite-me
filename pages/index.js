@@ -5,12 +5,14 @@ import StepButtons from '../components/StepButtons';
 import { useState, useEffect, useRef } from 'react';
 import AuthModal from '../components/AuthModal';
 import Footer from '../components/Footer';
+import PricingTableModal from '../components/PricingTableModal';
 
 
 export default function Home({ session }) {
   const [showAuth, setShowAuth] = useState(false);
   const [authMode, setAuthMode] = useState('sign_in');
   const [showFeatures, setShowFeatures] = useState(false);
+  const [showPricingTable, setShowPricingTable] = useState(false);
   const [pendingCreateEvent, setPendingCreateEvent] = useState(false);
   const stepRef = useRef();
 
@@ -35,13 +37,30 @@ export default function Home({ session }) {
   // When no session, show Supabase AuthModal; otherwise render site normally.
 
   const handleAuthClick = (mode) => {
-    // Always default to sign_in, user can switch to sign_up using the button in the modal
-    setAuthMode('sign_in');
+    setAuthMode(mode === 'sign_up' ? 'sign_up' : 'sign_in');
     setShowAuth(true);
   };
 
   const handleShowFeatures = () => {
     setShowFeatures(true);
+  };
+
+  const handleShowReports = () => {
+    stepRef.current?.goToReportsStep?.();
+    document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  const handleCreateEvent = () => {
+    if (!session) {
+      setAuthMode('sign_in');
+      setPendingCreateEvent(true);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('pendingCreateEvent', 'true');
+      }
+      setShowAuth(true);
+    } else {
+      stepRef.current?.createNewEvent?.();
+    }
   };
 
   return (
@@ -52,24 +71,10 @@ export default function Home({ session }) {
       </Head>
       <div className="min-h-screen flex flex-col">
         <main className="flex-1">
-          <NavBar onAuthClick={handleAuthClick} onAboutClick={handleShowFeatures} />
+          <NavBar onAuthClick={handleAuthClick} onAboutClick={handleShowFeatures} onShowPricing={() => setShowPricingTable(true)} onShowReports={handleShowReports} />
           <HeroSection
             onStart={() => stepRef.current?.startFlow?.()}
-            onCreateEvent={() => {
-              if (!session) {
-                // Open auth modal if not logged in
-                setAuthMode('sign_in');
-                setPendingCreateEvent(true);
-                // Save to localStorage to survive page reload
-                if (typeof window !== 'undefined') {
-                  localStorage.setItem('pendingCreateEvent', 'true');
-                }
-                setShowAuth(true);
-              } else {
-                // Create event if logged in
-                stepRef.current?.createNewEvent?.();
-              }
-            }}
+            onCreateEvent={handleCreateEvent}
             onShowFeatures={handleShowFeatures}
             onSignUpClick={() => {
               setAuthMode('sign_in'); // Always start with sign_in
@@ -98,6 +103,8 @@ export default function Home({ session }) {
           setShowAuth(false);
         }} 
       />
+
+      <PricingTableModal isOpen={showPricingTable} onClose={() => setShowPricingTable(false)} />
       
       {/* Features Modal */}
       {showFeatures && (
