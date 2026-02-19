@@ -427,10 +427,12 @@ const extraCapacityFromServer =
   normalizedAllowedCapacity != null
     ? Math.max(0, normalizedAllowedCapacity - basePlanCapacity)
     : null;
+// When user chose Plan A (free/basic) and did not purchase any addons, show only base plan – ignore stale DB allowed_guests
+const planAWithNoAddons = (selectedPlan === 'free' || selectedPlan === 'basic') && additionalPackages.length === 0;
 const displayTotalPlanCapacity =
-  normalizedAllowedCapacity != null ? normalizedAllowedCapacity : totalPlanCapacity;
+  planAWithNoAddons ? totalPlanCapacity : (normalizedAllowedCapacity != null ? normalizedAllowedCapacity : totalPlanCapacity);
 const displayAdditionalCapacity =
-  extraCapacityFromServer != null ? extraCapacityFromServer : additionalCapacity;
+  planAWithNoAddons ? 0 : (extraCapacityFromServer != null ? extraCapacityFromServer : additionalCapacity);
 const displayTotalPlanCapacityValue = Math.max(
   0,
   Math.round(displayTotalPlanCapacity)
@@ -463,6 +465,8 @@ if (effectiveAddonCount > 0) {
     extra: addonUnitSize * effectiveAddonCount,
   });
 }
+// For display: when Plan A with no purchased addons, don't show addon row from stale DB
+const displayPackageEntries = planAWithNoAddons ? packageEntries.filter(e => e.id !== 'addon') : packageEntries;
 
 // No longer needed - removed complex plan selection
 // Users just purchase addon packages as needed
@@ -3134,7 +3138,6 @@ React.useEffect(() => {
         };
         
         if(guests){
-          setMessagesSentCount(guests.length);
           guests.forEach(g => {
             
             // Count by status
@@ -3159,6 +3162,13 @@ React.useEffect(() => {
               statusSummary.pending += 1;
             }
           });
+          // Don't show "טרם הגיבו" when no invitations were effectively sent: if no one has responded yet (0 approved, 0 rejected), treat as "no RSVP data yet" and show 0 pending so we don't show misleading counts
+          if (statusSummary.approved === 0 && statusSummary.rejected === 0) {
+            statusSummary.pending = 0;
+          }
+          // "הודעות שנשלחו" – show only when there's evidence invitations were sent (at least one response). Otherwise 0 so "יתרת הודעות" matches "עדיין לא נשלחו הזמנות"
+          const hasAnyResponse = statusSummary.approved > 0 || statusSummary.rejected > 0;
+          setMessagesSentCount(hasAnyResponse ? guests.length : 0);
           
           // Calculate totals
           specialMeals.veg.total = specialMeals.veg.adults + specialMeals.veg.children;
@@ -3486,6 +3496,20 @@ React.useEffect(() => {
         </div>
       )}
 
+      {/* הודעה כשהמשתמש לוחץ על שלב 1–4 בלי ליצור אירוע ולבחור מסלול */}
+      {showStepError && (
+        <div className="fixed left-4 right-4 bottom-24 z-30 max-w-2xl mx-auto bg-amber-50 border-2 border-amber-500 rounded-xl shadow-lg p-4 flex flex-col gap-3">
+          <p className="text-amber-900 font-semibold text-center text-lg">{stepErrorMsg}</p>
+          <button
+            type="button"
+            onClick={() => { setShowStepError(false); setStepErrorMsg(''); }}
+            className="bg-amber-500 hover:bg-amber-600 text-white font-bold py-2 px-6 rounded-full mx-auto"
+          >
+            הבנתי
+          </button>
+        </div>
+      )}
+
       <div className="fixed left-0 right-0 bottom-0 z-20 w-full bg-white/95 backdrop-blur-sm border-t border-gray-200 shadow-[0_-4px_12px_rgba(0,0,0,0.08)] pt-3 pb-2 px-2 flex flex-row justify-center gap-4 flex-wrap">
         {steps.slice(1).map((step, idx) => {
           const realIdx = idx + 1;
@@ -3493,92 +3517,46 @@ React.useEffect(() => {
           return (
           <button
             key={realIdx}
-              onClick={
-                realIdx === 1
-                ? () => {
-                    if (!hasActiveEvent()) {
-                      const msg = `עליך ליצור אירוע חדש לפני מעבר לשלב "${steps[realIdx]}"`;
-                      setStepErrorMsg(msg);
-                      setClickedStepName(steps[realIdx]);
-                      setShowStepError(true);
-                      return;
-                    }
-                    if (!selectedPlan) {
-                      const msg = `עליך לבחור מסלול תמחור ולשלם לפני מעבר לשלב "${steps[realIdx]}"`;
-                      setStepErrorMsg(msg);
-                      setClickedStepName(steps[realIdx]);
-                      setShowStepError(true);
-                      return;
-                    }
+            type="button"
+            style={{ cursor: 'pointer', position: 'relative', zIndex: 21, pointerEvents: 'auto' }}
+            onMouseDown={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+            }}
+            onTouchStart={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+            }}
+              onClick={(e) => {
+                console.log(`Step ${realIdx} clicked!`, { currentEventId, newEventStarted, selectedPlan });
+                e.preventDefault();
+                e.stopPropagation();
+                const mustStartFirst = !hasActiveEvent() || !selectedPlan;
+                const stepRequiresFlow = realIdx >= 1 && realIdx <= 4;
+                if (stepRequiresFlow && mustStartFirst) {
+                  setStepErrorMsg('יש תחילה ליצור אירוע ולבחור מסלול תשלום. לאחר מכן כפתורי השלבים 1–4 יהיו פעילים.');
+                  setShowStepError(true);
+                  return;
+                }
+                if (realIdx === 1) {
                     setShowEventTypes(true);
                     setStepErrorMsg('');
-                  }
-                : realIdx === 2
-                ? () => {
-                    if (!hasActiveEvent()) {
-                      const msg = `עליך ליצור אירוע חדש לפני מעבר לשלב "${steps[realIdx]}"`;
-                      setStepErrorMsg(msg);
-                      setClickedStepName(steps[realIdx]);
-                      setShowStepError(true);
-                      return;
-                    }
-                    if (!selectedPlan) {
-                      const msg = `עליך לבחור מסלול תמחור ולשלם לפני מעבר לשלב "${steps[realIdx]}"`;
-                      setStepErrorMsg(msg);
-                      setClickedStepName(steps[realIdx]);
-                      setShowStepError(true);
-                      return;
-                    }
+                } else if (realIdx === 2) {
                     setShowEventDetails(true);
                     setStepErrorMsg('');
-                  }
-                : realIdx === 3
-                ? () => {
-                    if (!hasActiveEvent()) {
-                      const msg = `עליך ליצור אירוע חדש לפני מעבר לשלב "${steps[realIdx]}"`;
-                      setStepErrorMsg(msg);
-                      setClickedStepName(steps[realIdx]);
-                      setShowStepError(true);
-                      return;
-                    }
-                    if (!selectedPlan) {
-                      const msg = `עליך לבחור מסלול תמחור ולשלם לפני מעבר לשלב "${steps[realIdx]}"`;
-                      setStepErrorMsg(msg);
-                      setClickedStepName(steps[realIdx]);
-                      setShowStepError(true);
-                      return;
-                    }
+                } else if (realIdx === 3) {
                     setShowDesignChooser(true);
                     setStepErrorMsg('');
-                  }
-                : realIdx === 4
-                ? () => {
-                    if (!hasActiveEvent()) {
-                      const msg = `עליך ליצור אירוע חדש לפני מעבר לשלב "${steps[realIdx]}"`;
-                      setStepErrorMsg(msg);
-                      setClickedStepName(steps[realIdx]);
-                      setShowStepError(true);
-                      return;
-                    }
-                    if (!selectedPlan) {
-                      const msg = `עליך לבחור מסלול תמחור ולשלם לפני מעבר לשלב "${steps[realIdx]}"`;
-                      setStepErrorMsg(msg);
-                      setClickedStepName(steps[realIdx]);
-                      setShowStepError(true);
-                      return;
-                    }
+                } else if (realIdx === 4) {
                     setShowGuestForm(true);
                     setStepErrorMsg('');
-                  }
-                : realIdx === 5
-                ? () => {
+                } else if (realIdx === 5) {
                     // שלב 5 (דוחות) זמין תמיד, גם כשאין אירוע פעיל
                     setShowReportsOptions(true);
                     setShowGuestListModal(false);
                     setStepErrorMsg('');
-                  }
-                : undefined
-            }
+                }
+              }}
             className={`${
               finishedSteps.includes(realIdx) || (realIdx === 3 && finishedSteps.includes(2))
                 ? 'bg-primary text-white border border-primary rounded-full px-8 py-4 font-bold ring-2 ring-primary ring-offset-2 ring-offset-[#FCE6AC] hover:bg-[#FCE6AC]/90 transition-all text-lg' 
@@ -3601,6 +3579,18 @@ React.useEffect(() => {
           
           {/* First Column - Event Status */}
           <div className="w-full flex flex-col gap-6">
+            {/* Tranzila terminal name - always visible */}
+            {tranzilaTerminalInfo && (
+              <div className="bg-slate-50 p-2 text-center shadow w-full text-sm" style={{
+                border: '1px solid #94a3b8',
+                borderRadius: '6px',
+              }}>
+                מסוף טרנזילה: <strong>{tranzilaTerminalInfo.terminal}</strong>
+                {tranzilaTerminalInfo.isTestTerminal && (
+                  <span className="text-orange-600 mr-1">(מסוף בדיקות)</span>
+                )}
+              </div>
+            )}
             {currentEventId ? (
               <div className="bg-green-50 p-3 text-center shadow-lg w-full" style={{
                 border: '3px solid #D4AF37',
@@ -3727,9 +3717,9 @@ React.useEffect(() => {
                         <span className="text-lg">📦</span>
                         <span>חבילות נוספות שנרכשו:</span>
                       </div>
-                      {packageEntries.length > 0 ? (
+                      {displayPackageEntries.length > 0 ? (
                         <div className="flex flex-wrap justify-center gap-2 mb-3">
-                          {packageEntries.map(({ id, label, count, extra }) => (
+                          {displayPackageEntries.map(({ id, label, count, extra }) => (
                             <div key={id} className="flex items-center gap-2 bg-white border border-yellow-300 rounded-full px-3 py-1 shadow-sm">
                               <span className="text-sm font-semibold text-yellow-700">
                                 {label} × {count}
@@ -3752,7 +3742,10 @@ React.useEffect(() => {
                         <p className="text-sm text-yellow-700 text-center">לא נרכשו חבילות נוספות</p>
                       )}
                       <div className="text-base font-bold text-yellow-800">
-                        סה״כ כיסוי: {displayTotalPlanCapacityValue} אורחים (מתוכם {displayAdditionalCapacityValue} באמצעות חבילות הרחבה)
+                        סה״כ כיסוי: {displayTotalPlanCapacityValue} אורחים
+                        {displayAdditionalCapacityValue > 0 && (
+                          <> (מתוכם {displayAdditionalCapacityValue} באמצעות חבילות הרחבה)</>
+                        )}
                       </div>
                     </div>
                     {activePlanDescription && (
@@ -3947,6 +3940,9 @@ React.useEffect(() => {
                     <div className="text-2xl font-bold text-red-700">{guestStatusSummary.rejected}</div>
                   </div>
                 </div>
+                {!hasStatusData && (
+                  <p className="text-xs text-gray-500 mt-2 text-center">נתוני אישור הגעה יופיעו לאחר שליחת הזמנות ותגובות אורחים</p>
+                )}
               </div>
               {selectedPlan && (() => {
                 const messagesSent = messagesSentCount;
