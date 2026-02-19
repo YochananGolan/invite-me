@@ -991,6 +991,7 @@ const handleOpenAddonModal = React.useCallback(() => {
   const designImages = [
     '/images/background-flowers-light.png',
     '/images/background-flowers-bright.png',
+    '/images/background-stairs-flowers.png',
     '/images/wedding-couple-bright-luxury.jpg',
     '/images/עיצוב-הזמנה-1.jpg',
     '/images/עיצוב-הזמנה-2.jpg',

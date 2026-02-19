@@ -1,5 +1,5 @@
 import Image from 'next/image';
-import { forwardRef } from 'react';
+import { forwardRef, useState, useEffect } from 'react';
 
 // Confetti shapes for festive background
 const ConfettiBackground = () => (
@@ -20,7 +20,66 @@ const ConfettiBackground = () => (
   </div>
 );
 
+// Typewriter effect hook
+const useTypewriter = (text, speed = 100, pauseDuration = 5000) => {
+  const [displayedText, setDisplayedText] = useState('');
+
+  useEffect(() => {
+    let timeoutId;
+    let currentIndex = 0;
+    let isPaused = false;
+
+    const type = () => {
+      if (isPaused) return;
+      
+      if (currentIndex < text.length) {
+        setDisplayedText(text.slice(0, currentIndex + 1));
+        currentIndex++;
+        timeoutId = setTimeout(type, speed);
+      } else {
+        // Finished typing, wait for pause duration then restart
+        isPaused = true;
+        timeoutId = setTimeout(() => {
+          setDisplayedText('');
+          currentIndex = 0;
+          isPaused = false;
+          type();
+        }, pauseDuration);
+      }
+    };
+
+    type();
+
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+    };
+  }, [text, speed, pauseDuration]);
+
+  return displayedText;
+};
+
 export default forwardRef(function HeroSection({ onStart, onShowFeatures, onSignUpClick, onSignInClick, isLoggedIn, onCreateEvent }, ref) {
+  // Full invitation text with line breaks
+  const fullInvitationText = 'דוד & שרה\nמתחתנים\n\nבשמחה רבה אנו מזמינים אתכם לחגוג עמנו את יום נישואינו\n\nיום שלישי • 24.03.2026\n📍 ירושלים, ישראל\n\nקבלת פנים 19:00 • חופה וקידושין 21:00';
+  const displayedInvitationText = useTypewriter(fullInvitationText, 80, 5000);
+  
+  // Parse displayed text into parts
+  const allLines = fullInvitationText.split('\n');
+  const lines = displayedInvitationText.split('\n');
+  
+  const namesLine = lines[0] || '';
+  const weddingLine = lines[1] || '';
+  const invitationLine = lines[3] || '';
+  const dateLine = lines[5] || '';
+  const locationLine = lines[6] || '';
+  const timesLine = lines[8] || '';
+  
+  const isNamesComplete = namesLine === allLines[0];
+  const isWeddingComplete = weddingLine === allLines[1];
+  const isInvitationComplete = invitationLine === allLines[3];
+  const isDateComplete = dateLine === allLines[5];
+  const isLocationComplete = locationLine === allLines[6];
+  const isTimesComplete = timesLine === allLines[8];
   return (
     <section className="relative min-h-[85vh] flex items-center bg-white">
       {/* Confetti background */}
@@ -97,24 +156,50 @@ export default forwardRef(function HeroSection({ onStart, onShowFeatures, onSign
                   <div className="absolute inset-0 flex flex-col p-4 md:p-6 text-right">
                     {/* Top section - Names */}
                     <div className="mt-4 md:mt-6">
-                      <h3 className="text-2xl md:text-3xl font-bold mb-2 text-gray-800 drop-shadow-lg">דוד & שרה</h3>
-                      <p className="text-gray-700 text-lg font-semibold mb-1 drop-shadow-md">מתחתנים</p>
+                      <h3 className="text-2xl md:text-3xl font-bold mb-2 text-gray-800 drop-shadow-lg">
+                        {namesLine}
+                        {!isNamesComplete && <span className="animate-pulse">|</span>}
+                      </h3>
+                      {isNamesComplete && (
+                        <p className="text-gray-700 text-lg font-semibold mb-1 drop-shadow-md">
+                          {weddingLine}
+                          {!isWeddingComplete && <span className="animate-pulse">|</span>}
+                        </p>
+                      )}
                     </div>
                     
                     {/* Center section - All details, no white box */}
-                    <div className="flex-1 flex items-center justify-center">
-                      <div className="w-full max-w-[90%]">
-                        <p className="text-gray-800 text-base md:text-lg mb-4 font-medium leading-relaxed drop-shadow-lg">
-                          בשמחה רבה אנו מזמינים אתכם לחגוג עמנו את יום נישואינו
-                        </p>
-                        <p className="text-gray-900 font-bold text-xl md:text-2xl mb-3 drop-shadow-lg">יום שישי • 15.03.2025</p>
-                        <p className="text-gray-800 text-base md:text-lg flex items-center gap-1 justify-end mb-3 drop-shadow-lg">
-                          <span>📍</span>
-                          ירושלים, ישראל
-                        </p>
-                        <p className="text-gray-700 text-sm md:text-base drop-shadow-md">קבלת פנים 17:00 • חופה וקידושין 18:00 • ארוחת ערב 19:30</p>
+                    {isWeddingComplete && (
+                      <div className="flex-1 flex items-center justify-center">
+                        <div className="w-full max-w-[90%]">
+                          <p className="text-gray-800 text-base md:text-lg mb-4 font-medium leading-relaxed drop-shadow-lg">
+                            {invitationLine}
+                            {!isInvitationComplete && <span className="animate-pulse">|</span>}
+                          </p>
+                          {isInvitationComplete && (
+                            <>
+                              <p className="text-gray-900 font-bold text-xl md:text-2xl mb-3 drop-shadow-lg">
+                                {dateLine}
+                                {!isDateComplete && <span className="animate-pulse">|</span>}
+                              </p>
+                              {isDateComplete && (
+                                <p className="text-gray-800 text-base md:text-lg flex items-center gap-1 justify-end mb-3 drop-shadow-lg">
+                                  <span>📍</span>
+                                  {locationLine}
+                                  {!isLocationComplete && <span className="animate-pulse">|</span>}
+                                </p>
+                              )}
+                              {isLocationComplete && (
+                                <p className="text-gray-700 text-sm md:text-base drop-shadow-md">
+                                  {timesLine}
+                                  {!isTimesComplete && <span className="animate-pulse">|</span>}
+                                </p>
+                              )}
+                            </>
+                          )}
+                        </div>
                       </div>
-                    </div>
+                    )}
                   </div>
                 </div>
               </div>
