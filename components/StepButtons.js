@@ -325,7 +325,12 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick }, re
   const [selectedPlan, setSelectedPlan] = useState(() => {
     if (typeof window === 'undefined') return null;
     try {
-      return localStorage.getItem('selectedPlan') || null;
+      const stored = localStorage.getItem('selectedPlan');
+      // If user explicitly chose 'free' or 'basic', always respect that choice
+      if (stored === 'free' || stored === 'basic') {
+        return stored;
+      }
+      return stored || null;
     } catch(e) { return null; }
   });
 
@@ -2151,6 +2156,7 @@ React.useEffect(() => {
   };
   const handleNewEvent = async (showDeletionMessage = false) => {
     // IMPORTANT: Delete only ACTIVE events (not archived) and their guests BEFORE resetting state
+    let eventWasDeleted = false;
     if (currentEventId) {
       try {
         // First, check if the event is active (not archived)
@@ -2192,6 +2198,7 @@ React.useEffect(() => {
             alert('שגיאה במחיקת האירוע הקיים.');
           } else {
             console.log('✅ Current event deleted successfully, ID:', currentEventId);
+            eventWasDeleted = true; // Mark that event was actually deleted
           }
         }
       } catch (err) {
@@ -2212,8 +2219,20 @@ React.useEffect(() => {
     setStepErrorMsg('');
     setErrorMsg('');
     setFinishedSteps([]); // Reset finished steps for new event
-    setNewEventStarted(true);
     setCurrentEventId(null); // Clear current event ID
+    
+    // If event was actually deleted (not just archived), reset everything including plan
+    if (eventWasDeleted) {
+      setNewEventStarted(false); // Clear "event in progress" message
+      setSelectedPlan(null); // Clear selected plan when event is deleted
+      setAllowedGuestCapacity(null);
+      try { localStorage.removeItem('newEventStarted'); } catch(e){}
+      try { localStorage.removeItem('selectedPlan'); } catch(e){}
+    } else {
+      // Event was archived or doesn't exist - start new event process
+      setNewEventStarted(true);
+      try { localStorage.setItem('newEventStarted','1'); } catch(e){}
+    }
     
     // Reset guest data and reports (these are UI state only, data is preserved in DB)
     setGuestSummary({ approved: 0, adults: 0, children: 0 });
@@ -2231,11 +2250,8 @@ React.useEffect(() => {
     setShowGuestListModal(false);
     setShowReportModal(false);
     setSelectedEventForReport(null);
-    // Don't clear selectedPlan here - user already paid for it
-    // Only clear if creating a completely new event (not from existing)
     setAdditionalPackages([]);
     
-    try { localStorage.setItem('newEventStarted','1'); } catch(e){}
     try{ localStorage.removeItem('selectedDesign'); }catch{}
     try{ localStorage.removeItem('finishedSteps'); }catch{} // Clear finished steps from local storage
     try{ localStorage.removeItem('selectedEventType'); }catch{} // Clear selected event type from local storage
@@ -2580,6 +2596,9 @@ React.useEffect(() => {
     } catch(e) { return false; }
   });
 
+  // State for Tranzila terminal info
+  const [tranzilaTerminalInfo, setTranzilaTerminalInfo] = useState(null);
+
   // ---------------- helper to archive past event and check active -----------------
   React.useEffect(()=>{
     (async ()=>{
@@ -2595,14 +2614,26 @@ React.useEffect(() => {
           .single();
         if(!ev) return;
         setAllowedGuestCapacity(ev.allowed_guests ?? null);
-        // Restore selectedPlan from allowed_guests if not in localStorage
-        if (ev.allowed_guests && !selectedPlan) {
+        // NEVER override selectedPlan from allowed_guests - user's choice should always be respected
+        // Only set if there's absolutely no plan selected anywhere
+        const storedPlan = typeof window !== 'undefined' ? localStorage.getItem('selectedPlan') : null;
+        // If user explicitly chose 'free' or 'basic', NEVER override it
+        if (storedPlan === 'free' || storedPlan === 'basic' || selectedPlan === 'free' || selectedPlan === 'basic') {
+          // User chose plan A, respect that choice always
+          if (!selectedPlan && storedPlan) {
+            setSelectedPlan(storedPlan);
+          }
+        } else if (ev.allowed_guests && !selectedPlan && !storedPlan) {
+          // Only infer plan if user hasn't selected anything at all
           const inferredPlan = ev.allowed_guests <= 50 ? 'free' :
                                ev.allowed_guests <= 200 ? 'standard' :
                                ev.allowed_guests <= 350 ? 'premium' :
                                ev.allowed_guests <= 500 ? 'luxury' : 'supreme';
           setSelectedPlan(inferredPlan);
           try { localStorage.setItem('selectedPlan', inferredPlan); } catch(e){}
+        } else if (storedPlan && !selectedPlan) {
+          // Restore from localStorage if exists but state is not set
+          setSelectedPlan(storedPlan);
         }
         const details=typeof ev.event_details==='string'?JSON.parse(ev.event_details):ev.event_details||{};
         const dateStr=details.date||details.start_datetime;
@@ -2863,6 +2894,21 @@ React.useEffect(() => {
     }
   }, [formData.date, currentEventId]);
 
+  // Fetch Tranzila terminal info
+  React.useEffect(() => {
+    (async () => {
+      try {
+        const response = await fetch('/api/tranzila/terminal-info');
+        if (response.ok) {
+          const data = await response.json();
+          setTranzilaTerminalInfo(data);
+        }
+      } catch (e) {
+        console.error('Failed to fetch terminal info:', e);
+      }
+    })();
+  }, []);
+
   // ---- Check if there's an active event in database but currentEventId is null ----
   React.useEffect(() => {
     (async () => {
@@ -2896,14 +2942,26 @@ React.useEffect(() => {
                 console.log('Found future event in database, restoring...', ev);
                 setCurrentEventId(ev.id);
                 setAllowedGuestCapacity(ev.allowed_guests ?? null);
-                // Restore selectedPlan from allowed_guests if not in localStorage
-                if (ev.allowed_guests && !selectedPlan) {
+                // NEVER override selectedPlan from allowed_guests - user's choice should always be respected
+                // Only set if there's absolutely no plan selected anywhere
+                const storedPlan = typeof window !== 'undefined' ? localStorage.getItem('selectedPlan') : null;
+                // If user explicitly chose 'free' or 'basic', NEVER override it
+                if (storedPlan === 'free' || storedPlan === 'basic' || selectedPlan === 'free' || selectedPlan === 'basic') {
+                  // User chose plan A, respect that choice always
+                  if (!selectedPlan && storedPlan) {
+                    setSelectedPlan(storedPlan);
+                  }
+                } else if (ev.allowed_guests && !selectedPlan && !storedPlan) {
+                  // Only infer plan if user hasn't selected anything at all
                   const inferredPlan = ev.allowed_guests <= 50 ? 'free' :
                                        ev.allowed_guests <= 200 ? 'standard' :
                                        ev.allowed_guests <= 350 ? 'premium' :
                                        ev.allowed_guests <= 500 ? 'luxury' : 'supreme';
                   setSelectedPlan(inferredPlan);
                   try { localStorage.setItem('selectedPlan', inferredPlan); } catch(e){}
+                } else if (storedPlan && !selectedPlan) {
+                  // Restore from localStorage if exists but state is not set
+                  setSelectedPlan(storedPlan);
                 }
                 setFormData(prev => ({ ...prev, ...details }));
                 
@@ -2997,14 +3055,26 @@ React.useEffect(() => {
         if(ev){
           setCurrentEventId(ev.id);
           setAllowedGuestCapacity(ev.allowed_guests ?? null);
-          // Restore selectedPlan from allowed_guests if not in localStorage
-          if (ev.allowed_guests && !selectedPlan) {
+          // NEVER override selectedPlan from allowed_guests - user's choice should always be respected
+          // Only set if there's absolutely no plan selected anywhere
+          const storedPlan = typeof window !== 'undefined' ? localStorage.getItem('selectedPlan') : null;
+          // If user explicitly chose 'free' or 'basic', NEVER override it
+          if (storedPlan === 'free' || storedPlan === 'basic' || selectedPlan === 'free' || selectedPlan === 'basic') {
+            // User chose plan A, respect that choice always
+            if (!selectedPlan && storedPlan) {
+              setSelectedPlan(storedPlan);
+            }
+          } else if (ev.allowed_guests && !selectedPlan && !storedPlan) {
+            // Only infer plan if user hasn't selected anything at all
             const inferredPlan = ev.allowed_guests <= 50 ? 'free' :
                                  ev.allowed_guests <= 200 ? 'standard' :
                                  ev.allowed_guests <= 350 ? 'premium' :
                                  ev.allowed_guests <= 500 ? 'luxury' : 'supreme';
             setSelectedPlan(inferredPlan);
             try { localStorage.setItem('selectedPlan', inferredPlan); } catch(e){}
+          } else if (storedPlan && !selectedPlan) {
+            // Restore from localStorage if exists but state is not set
+            setSelectedPlan(storedPlan);
           }
           // Parse event_details if it's a string
           const details = typeof ev.event_details === 'string' 
@@ -3623,6 +3693,15 @@ React.useEffect(() => {
                   <span className="text-2xl">💰</span>
                   <h3 className="text-lg font-bold text-yellow-800">מסלול פעיל</h3>
                 </div>
+                {/* Display Tranzila Terminal Info */}
+                {tranzilaTerminalInfo && (
+                  <div className="text-xs text-gray-600 mb-2 px-2">
+                    מסוף טרנזילה: <strong>{tranzilaTerminalInfo.terminal}</strong>
+                    {tranzilaTerminalInfo.isTestTerminal && (
+                      <span className="text-orange-600 ml-1">(מסוף בדיקות)</span>
+                    )}
+                  </div>
+                )}
                 <div className="mt-3">
                   <div className="bg-white p-3 rounded-lg border border-yellow-200 mb-3 space-y-3">
                     <div>
