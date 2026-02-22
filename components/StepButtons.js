@@ -120,7 +120,6 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick }, re
   const resetCapacityWarningGuests = React.useCallback(() => {
     setCapacityWarningGuests({ adults: 0, children: 0, totalGuests: 0 });
   }, []);
-  const [messagesSentCount, setMessagesSentCount] = useState(0);
   const [guestStatusSummary, setGuestStatusSummary] = useState({ approved: 0, rejected: 0, pending: 0 });
   const [specialMealsSummary, setSpecialMealsSummary] = useState({ 
     veg: { adults: 0, children: 0, total: 0 },
@@ -300,6 +299,7 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick }, re
   const [paymentResultType, setPaymentResultType] = useState(null); // 'success' or 'error'
   const [paymentResultMessage, setPaymentResultMessage] = useState('');
   const [paymentWasPlanPurchase, setPaymentWasPlanPurchase] = useState(false); // true if plan purchase, false if addon
+  // Message quota limit per plan – used for all plans (א–ו); same logic for blocking, balance panel, and addon modal
   const getPlanBaseLimit = React.useCallback((plan) => {
     switch(plan) {
       case 'free':
@@ -378,26 +378,31 @@ const [eventMessagesSentCount, setEventMessagesSentCount] = useState(0);
     }
   }, [additionalPackages]);
 
+  const totalGuestsCount = guestSummary.adults + guestSummary.children;
+  // התאמה לסטטוס אישורי הגעה: הודעות שנשלחו = מקסימום בין מונה DB לבין אורחים שקיבלו הזמנה (אישרו/דחו/טרם הגיבו)
+  const invitedCount = (guestStatusSummary?.approved ?? 0) + (guestStatusSummary?.rejected ?? 0) + (guestStatusSummary?.pending ?? 0);
+  const effectiveMessagesSentCount = Math.max(eventMessagesSentCount || 0, invitedCount || 0);
+
   React.useEffect(() => {
     if (!showPricingPlan) {
       if (planWarningSuppressed) {
         const baseLimit = getPlanBaseLimit(selectedPlan);
         const extraCapacity = additionalPackages.reduce((sum, planId) => sum + getPlanBaseLimit(planId), 0);
         const totalLimit = (baseLimit || 0) + extraCapacity;
-        if (eventMessagesSentCount > totalLimit) {
+        if (effectiveMessagesSentCount > totalLimit) {
+          setPendingAddonCount(1);
           setShowPlanLimitWarning(true);
         }
         setPlanWarningSuppressed(false);
       }
       setPlanSelectionError('');
     }
-  }, [showPricingPlan, planWarningSuppressed, eventMessagesSentCount, selectedPlan, additionalPackages, getPlanBaseLimit]);
+  }, [showPricingPlan, planWarningSuppressed, effectiveMessagesSentCount, selectedPlan, additionalPackages, getPlanBaseLimit]);
 
 const basePlanLimit = getPlanBaseLimit(selectedPlan);
 const additionalCapacity = additionalPackages.reduce((sum, planId) => sum + getPlanBaseLimit(planId), 0);
 const totalPlanCapacity = (basePlanLimit || 0) + additionalCapacity;
-const totalGuestsCount = guestSummary.adults + guestSummary.children;
-const basePlanOverCapacity = basePlanLimit ? totalGuestsCount > basePlanLimit : false;
+const basePlanOverCapacity = basePlanLimit ? effectiveMessagesSentCount > basePlanLimit : false;
 const activePlanDescription =
   selectedPlan === 'basic' || selectedPlan === 'free'
     ? 'מסלול א - 5₪ לאירועים קטנים עם כל הפיצ\'רים הבסיסיים'
@@ -694,10 +699,18 @@ const handleOpenAddonModal = React.useCallback(() => {
 
     // Attempt to save guest to Supabase (optional – will work only if table exists)
     try {
-      // fetch latest event id for this user
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         setGuestErrorMsg('יש להתחבר כדי לשלוח הזמנות');
+        return;
+      }
+
+      // Block sending when over message quota (same limit for all plans; effective = sync with status panel)
+      const totalLimitForSend = (getPlanBaseLimit(selectedPlan) || 0) + additionalPackages.reduce((s, id) => s + (getPlanBaseLimit(id) || 0), 0);
+      if (totalLimitForSend > 0 && effectiveMessagesSentCount >= totalLimitForSend) {
+        setPendingAddonCount(1);
+        setShowPlanLimitWarning(true);
+        setPlanAddOnMode(true);
         return;
       }
 
@@ -781,7 +794,14 @@ const handleOpenAddonModal = React.useCallback(() => {
         const waWin = window.open(`https://wa.me/972${waNumber.slice(1)}?text=${waText}`, '_blank','noopener,noreferrer');
         if (waWin) {
           waWin.opener = null; // prevent redirect effect
-          // Show success modal
+          // Count this message toward quota (SMS and WhatsApp both count as one message)
+          const newCount = (eventMessagesSentCount || 0) + 1;
+          setEventMessagesSentCount(newCount);
+          if (evRow?.id) {
+            try {
+              await supabase.from('events').update({ messages_sent_count: newCount }).eq('id', evRow.id);
+            } catch (e) { /* column may not exist yet */ }
+          }
           setInvitationResult({ 
             type: 'success', 
             message: 'ההזמנה נשלחה בהצלחה בוואטסאפ!' 
@@ -878,9 +898,9 @@ const handleOpenAddonModal = React.useCallback(() => {
       const baseUrl = process.env.NEXT_PUBLIC_APP_URL || (typeof window !== 'undefined' ? window.location.origin : 'https://invite-me-two.vercel.app');
       const inviteLink = `${baseUrl}/${evRow?.id}/${newGuest.id}`;
 
-      // Send SMS via API - check message quota first
+      // Send SMS via API - check message quota first (effective = sync with status panel)
       const totalLimitSms = (getPlanBaseLimit(selectedPlan) || 0) + additionalPackages.reduce((s, id) => s + (getPlanBaseLimit(id) || 0), 0);
-      if (totalLimitSms > 0 && eventMessagesSentCount >= totalLimitSms) {
+      if (totalLimitSms > 0 && effectiveMessagesSentCount >= totalLimitSms) {
         setInvitationResult({ type: 'error', message: 'אין מספיק הודעות במכסה. נא לרכוש חבילת הרחבה.' });
         setShowInvitationResultModal(true);
         setIsSendingInvitation(false);
@@ -1936,7 +1956,7 @@ React.useEffect(() => {
         const smsMessage = `${invitationText}\n\nשלום {firstName},\nלאישור הגעה:\n{inviteLink}`;
 
         const totalLimitBulk = (getPlanBaseLimit(selectedPlan) || 0) + additionalPackages.reduce((s, id) => s + (getPlanBaseLimit(id) || 0), 0);
-        if (totalLimitBulk > 0 && eventMessagesSentCount + smsGuests.length > totalLimitBulk) {
+        if (totalLimitBulk > 0 && effectiveMessagesSentCount + smsGuests.length > totalLimitBulk) {
           setShowExcelPreview(false);
           setExcelPreviewData([]);
           setExcelErrors([]);
@@ -1944,7 +1964,7 @@ React.useEffect(() => {
           setSentGuests((prev) => [...prev, ...validGuests]);
           setInvitationResult({ 
             type: 'error', 
-            message: `נשמרו ${validGuests.length} אורחים. אין מספיק הודעות במכסה לשליחת SMS (נשלחו ${eventMessagesSentCount}, מכסה ${totalLimitBulk}). נא לרכוש חבילת הרחבה.` 
+            message: `נשמרו ${validGuests.length} אורחים. אין מספיק הודעות במכסה לשליחת SMS (נשלחו ${effectiveMessagesSentCount}, מכסה ${totalLimitBulk}). נא לרכוש חבילת הרחבה.` 
           });
           setShowInvitationResultModal(true);
           return;
@@ -2322,14 +2342,10 @@ React.useEffect(() => {
     return 'חבילת הרחבה - 100 הודעות נוספות';
   };
 
-  // Purchase addon capacity (100 guests for 100 shekel)
+  // Purchase addon: הלקוח בחר כמה חבילות (100 הודעות כל אחת), 100₪ לחבילה
   const handlePurchaseAddon = () => {
-    // Check if user is logged in
     if (!session) {
-      setInvitationResult({ 
-        type: 'error', 
-        message: 'עליך להתחבר כדי לרכוש חבילה' 
-      });
+      setInvitationResult({ type: 'error', message: 'עליך להתחבר כדי לרכוש חבילה' });
       setShowInvitationResultModal(true);
       setShowPlanLimitWarning(false);
       resetCapacityWarningGuests();
@@ -2337,23 +2353,12 @@ React.useEffect(() => {
       return;
     }
 
-    const baseLimit = getPlanBaseLimit(selectedPlan) || 50;
-    const extraCapacity = additionalPackages.reduce(
-      (sum, planId) => sum + getPlanBaseLimit(planId),
-      0
-    );
-    const totalLimit = baseLimit + extraCapacity;
-    const messagesOverQuota = Math.max(0, eventMessagesSentCount - totalLimit);
-    const packagesNeeded = Math.max(
-      1,
-      Math.ceil(messagesOverQuota / getPlanBaseLimit('addon'))
-    );
-    const totalCost = packagesNeeded * 100;
+    const numPackages = Math.max(1, pendingAddonCount);
+    const totalCost = numPackages * 100;
 
     setPendingPlan('addon');
-    setPendingAddonCount(packagesNeeded); // Store how many packages to add
     setPaymentAmount(totalCost);
-    setPaymentPlanName(packagesNeeded === 1 ? getAddonDisplayName() : `${packagesNeeded} חבילות הרחבה - ${packagesNeeded * 100} הודעות נוספות`);
+    setPaymentPlanName(numPackages === 1 ? getAddonDisplayName() : `${numPackages} חבילות הרחבה - ${numPackages * 100} הודעות (₪${totalCost})`);
     setShowPaymentModal(true);
     setShowPlanLimitWarning(false);
     resetCapacityWarningGuests();
@@ -2427,10 +2432,10 @@ React.useEffect(() => {
           setPaymentResultMessage(`התשלום בוצע בהצלחה! ${totalGuestsAdded} מקומות נוספים נוספו לאירוע שלך.`);
           setPaymentWasPlanPurchase(false);
 
-          // Update allowed_guests in database for current event
+          // Update allowed_guests in database for current event (same formula for all plans)
           if (currentEventId) {
             try {
-              const baseLimit = getPlanBaseLimit(selectedPlan) || 50;
+              const baseLimit = getPlanBaseLimit(selectedPlan) || 0;
               const existingExtraCapacity = additionalPackages.reduce(
                 (sum, planId) => sum + getPlanBaseLimit(planId),
                 0
@@ -3172,17 +3177,12 @@ React.useEffect(() => {
           if (statusSummary.approved === 0 && statusSummary.rejected === 0) {
             statusSummary.pending = 0;
           }
-          // "הודעות שנשלחו" – show only when there's evidence invitations were sent (at least one response). Otherwise 0 so "יתרת הודעות" matches "עדיין לא נשלחו הזמנות"
-          const hasAnyResponse = statusSummary.approved > 0 || statusSummary.rejected > 0;
-          setMessagesSentCount(hasAnyResponse ? guests.length : 0);
-          
+          // "הודעות שנשלחו" comes from eventMessagesSentCount (DB), not from guest count
           // Calculate totals
           specialMeals.veg.total = specialMeals.veg.adults + specialMeals.veg.children;
           specialMeals.vegan.total = specialMeals.vegan.adults + specialMeals.vegan.children;
           specialMeals.glatt.total = specialMeals.glatt.adults + specialMeals.glatt.children;
           specialMeals.allergy.total = specialMeals.allergy.adults + specialMeals.allergy.children;
-        } else {
-          setMessagesSentCount(0);
         }
         
         setGuestSummary(summary);
@@ -3336,8 +3336,9 @@ React.useEffect(() => {
       return;
     }
     const totalLimit = (baseLimit || 0) + extraCapacity;
-    // Show warning only when messages SENT exceed plan limit (not guest count)
-    if (eventMessagesSentCount > totalLimit) {
+    // Show warning only when messages SENT exceed plan limit (effective = sync with status panel)
+    if (effectiveMessagesSentCount > totalLimit) {
+      setPendingAddonCount(1);
       setShowPlanLimitWarning(true);
       setPlanAddOnMode(true);
     } else {
@@ -3345,7 +3346,7 @@ React.useEffect(() => {
       setPlanAddOnMode(false);
       resetCapacityWarningGuests();
     }
-  }, [selectedPlan, eventMessagesSentCount, currentEventId, additionalPackages, getPlanBaseLimit, resetCapacityWarningGuests]);
+  }, [selectedPlan, eventMessagesSentCount, invitedCount, currentEventId, additionalPackages, getPlanBaseLimit, resetCapacityWarningGuests]);
 
   // helper to open guest report with fresh data
   const openGuestReport = async () => {
@@ -3409,25 +3410,25 @@ React.useEffect(() => {
         <div className="fixed inset-0 flex items-center justify-center bg-black/70 z-[100]">
           <div className="bg-white rounded-lg p-8 w-full max-w-2xl mx-4 text-center shadow-2xl">
             {(() => {
-              const baseLimit = getPlanBaseLimit(selectedPlan) || 50;
+              // חישוב מכסה אחיד בכל המסלולים (א–ו) + תוספות; אותה הצעת חבילות 100 הודעות
+              const baseLimit = getPlanBaseLimit(selectedPlan) || 0;
               const extraCapacity = additionalPackages.reduce(
                 (sum, planId) => sum + getPlanBaseLimit(planId),
                 0
               );
               const totalLimit = baseLimit + extraCapacity;
-              const messagesOverQuota = Math.max(0, eventMessagesSentCount - totalLimit);
-              const packagesNeeded =
-                messagesOverQuota === 0
-                  ? 1
-                  : Math.ceil(messagesOverQuota / getPlanBaseLimit('addon'));
-              const totalCost = packagesNeeded * 100;
+              const messagesOverQuota = Math.max(0, effectiveMessagesSentCount - totalLimit);
+              const addonUnit = getPlanBaseLimit('addon') || 100;
+              const numPackages = Math.max(1, pendingAddonCount);
+              const totalMessages = numPackages * addonUnit;
+              const totalCost = numPackages * 100;
 
               return (
                 <div className="mb-6">
                   <div className="text-6xl mb-4">🎉</div>
                   <h2 className="text-3xl font-bold text-primary mb-4">חרגת ממכסת ההודעות!</h2>
                   <p className="text-xl text-gray-700 mb-6">
-                    נשלחו <strong className="text-primary">{eventMessagesSentCount}</strong> הודעות
+                    נשלחו <strong className="text-primary">{effectiveMessagesSentCount}</strong> הודעות
                   </p>
 
                   <div className="bg-blue-50 border-2 border-blue-300 rounded-lg p-6 mb-6">
@@ -3438,7 +3439,7 @@ React.useEffect(() => {
                       </div>
                       <div className="text-3xl text-gray-400">→</div>
                       <div className="text-center">
-                        <div className="text-4xl font-bold text-green-600">{eventMessagesSentCount}</div>
+                        <div className="text-4xl font-bold text-green-600">{effectiveMessagesSentCount}</div>
                         <div className="text-sm text-gray-600">הודעות שנשלחו</div>
                       </div>
                     </div>
@@ -3450,14 +3451,31 @@ React.useEffect(() => {
                   </div>
 
                   <div className="bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-300 rounded-lg p-6 mb-6">
-                    <h3 className="text-xl font-bold text-green-800 mb-3">💰 הצעה מיוחדת</h3>
+                    <h3 className="text-xl font-bold text-green-800 mb-3">💰 חבילות הרחבה – 100 הודעות בכל חבילה</h3>
                     <div className="text-center mb-4">
                       <div className="text-5xl font-bold text-green-600 mb-2">₪100</div>
-                      <div className="text-lg text-gray-700">עבור 100 הודעות נוספות</div>
+                      <div className="text-lg text-gray-700">לכל חבילה (100 הודעות)</div>
                     </div>
                     <div className="bg-white rounded-lg p-4 mb-4">
+                      <p className="text-gray-700 font-semibold mb-3">בחר כמה חבילות לרכוש:</p>
+                      <div className="flex flex-wrap justify-center gap-2 mb-4">
+                        {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => (
+                          <button
+                            key={n}
+                            type="button"
+                            onClick={() => setPendingAddonCount(n)}
+                            className={`min-w-[3rem] py-2 px-3 rounded-full font-bold border-2 transition-all ${
+                              numPackages === n
+                                ? 'bg-green-600 text-white border-green-700'
+                                : 'bg-white text-gray-700 border-gray-300 hover:border-green-500'
+                            }`}
+                          >
+                            {n}
+                          </button>
+                        ))}
+                      </div>
                       <p className="text-gray-700">
-                        <strong>מספר חבילות נדרשות:</strong> {packagesNeeded}<br/>
+                        <strong>{numPackages}</strong> {numPackages === 1 ? 'חבילה' : 'חבילות'} = <strong>{totalMessages}</strong> הודעות נוספות<br/>
                         <strong>סה"כ לתשלום:</strong> <span className="text-2xl font-bold text-green-600">₪{totalCost}</span>
                       </p>
                     </div>
@@ -3468,7 +3486,7 @@ React.useEffect(() => {
                       onClick={handlePurchaseAddon}
                       className="bg-gradient-to-r from-green-600 to-emerald-600 text-white border-2 border-green-700 rounded-full px-10 py-5 font-bold text-xl hover:from-green-700 hover:to-emerald-700 transition-all shadow-lg transform hover:scale-105"
                     >
-                      🛒 רכוש {packagesNeeded} {packagesNeeded === 1 ? 'חבילה' : 'חבילות'} (₪{totalCost})
+                      🛒 רכוש {numPackages} {numPackages === 1 ? 'חבילה' : 'חבילות'} (₪{totalCost})
                     </button>
                     <button
                       onClick={() => {
@@ -3735,9 +3753,9 @@ React.useEffect(() => {
                         <p className="text-sm text-yellow-700 text-center">לא נרכשו חבילות נוספות</p>
                       )}
                       <div className="text-base font-bold text-yellow-800">
-                        סה״כ כיסוי: {displayTotalPlanCapacityValue} הודעות
-                        {displayAdditionalCapacityValue > 0 && (
-                          <> (מתוכם {displayAdditionalCapacityValue} באמצעות חבילות הרחבה)</>
+                        סה״כ כיסוי: {totalPlanCapacity} הודעות
+                        {additionalCapacity > 0 && (
+                          <> (מתוכם {additionalCapacity} באמצעות חבילות הרחבה)</>
                         )}
                       </div>
                     </div>
@@ -3938,8 +3956,9 @@ React.useEffect(() => {
                 )}
               </div>
               {selectedPlan && (() => {
-                const messagesSent = messagesSentCount;
-                const messageLimit = Math.max(displayTotalPlanCapacityValue, basePlanLimit || 0);
+                // התאמה לסטטוס אישורי הגעה: אותו מספר הודעות שנשלחו בכל הדוחות
+                const messagesSent = effectiveMessagesSentCount;
+                const messageLimit = totalPlanCapacity;
                 const remainingMessagesRaw = messageLimit - messagesSent;
                 const remainingMessages = Math.max(0, remainingMessagesRaw);
                 const overMessages = remainingMessagesRaw < 0 ? Math.abs(remainingMessagesRaw) : 0;
