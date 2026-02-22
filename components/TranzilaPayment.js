@@ -344,10 +344,15 @@ export default function TranzilaPayment({
     handshakeMode
   });
 
-  // Success and failure URLs - these should point to your API routes
-  const successUrl = `${typeof window !== 'undefined' ? window.location.origin : ''}/api/tranzila/success`;
-  const failUrl = `${typeof window !== 'undefined' ? window.location.origin : ''}/api/tranzila/failure`;
-  const notifyUrl = `${typeof window !== 'undefined' ? window.location.origin : ''}/api/tranzila/notify`;
+  // Success and failure URLs - use NEXT_PUBLIC_APP_URL for production consistency (Vercel)
+  // Tranzila requires absolute URLs; NEXT_PUBLIC_APP_URL ensures correct domain in production
+  const baseUrl =
+    typeof window !== 'undefined'
+      ? (process.env.NEXT_PUBLIC_APP_URL || window.location.origin)
+      : process.env.NEXT_PUBLIC_APP_URL || '';
+  const successUrl = `${baseUrl || 'https://invite-me-two.vercel.app'}/api/tranzila/success`;
+  const failUrl = `${baseUrl || 'https://invite-me-two.vercel.app'}/api/tranzila/failure`;
+  const notifyUrl = `${baseUrl || 'https://invite-me-two.vercel.app'}/api/tranzila/notify`;
 
   return (
     <div className="fixed inset-0 flex items-center justify-center bg-black/70 z-[200] p-4">

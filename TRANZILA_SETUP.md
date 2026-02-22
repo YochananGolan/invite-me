@@ -65,6 +65,16 @@ Notify URL: https://your-domain.com/api/tranzila/notify
 
 Replace `your-domain.com` with your actual deployed domain.
 
+### Vercel Production
+
+**Important:** Set these environment variables in Vercel Dashboard → Settings → Environment Variables:
+
+- `NEXT_PUBLIC_TRANZILA_TERMINAL` = your terminal name (e.g. testgya)
+- `TRANZILA_TERMINAL_PASSWORD` = Terminal Token Password (TranzilaPW) from my.tranzila.com
+- `NEXT_PUBLIC_APP_URL` = https://your-domain.vercel.app (for callback URLs)
+
+Without these, payments will fail with 400 in production.
+
 ### Payment Options (Optional)
 
 Enable additional payment methods:
