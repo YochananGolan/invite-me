@@ -1883,7 +1883,7 @@ React.useEffect(() => {
     reader.readAsArrayBuffer(file);
   };
 
-  const handleSaveExcelGuests = async (sendSms = false) => {
+  const handleSaveExcelGuests = async (sendSms = false, sendWhatsApp = false) => {
     // Filter out guests with errors
     const validGuests = excelPreviewData.filter(g => !g.errors || g.errors.length === 0);
 
@@ -2081,15 +2081,35 @@ React.useEffect(() => {
           });
           setShowInvitationResultModal(true);
         }
-      } else {
-        // Close preview modal
+      } else if (sendWhatsApp && insertedGuests && insertedGuests.length > 0) {
+        // Save + open WhatsApp for first guest
+        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || (typeof window !== 'undefined' ? window.location.origin : 'https://invite-me-two.vercel.app');
+        const first = insertedGuests[0];
+        const inviteLink = `${baseUrl}/${evRow.id}/${first.id}`;
+        const digitsOnly = (first.phone || '').replace(/\D/g, '');
+        const waText = encodeURIComponent(
+          `${invitationText}\n\nלאישור הגעה:\n${inviteLink}`
+        );
         setShowExcelPreview(false);
         setExcelPreviewData([]);
         setExcelErrors([]);
         setIsSavingExcelGuests(false);
-        // Add to local state
         setSentGuests((prev) => [...prev, ...validGuests]);
-        // Show success modal
+        if (digitsOnly.length >= 9) {
+          window.open(`https://wa.me/972${digitsOnly.startsWith('0') ? digitsOnly.slice(1) : digitsOnly}?text=${waText}`, '_blank', 'noopener,noreferrer');
+        }
+        setInvitationResult({ 
+          type: 'success', 
+          message: `נשמרו ${validGuests.length} אורחים. נפתח חלון וואטסאפ לאורח הראשון – שלח וחפש "שלח הזמנה" ברשימה לשאר.` 
+        });
+        setShowInvitationResultModal(true);
+      } else {
+        // Close preview modal - save only
+        setShowExcelPreview(false);
+        setExcelPreviewData([]);
+        setExcelErrors([]);
+        setIsSavingExcelGuests(false);
+        setSentGuests((prev) => [...prev, ...validGuests]);
         setInvitationResult({ 
           type: 'success', 
           message: `נשמרו בהצלחה ${validGuests.length} אורחים למסד הנתונים!` 
@@ -3510,7 +3530,7 @@ React.useEffect(() => {
         </div>
       )}
 
-      <div className="fixed left-0 right-0 bottom-0 z-20 w-full bg-white/95 backdrop-blur-sm border-t border-gray-200 shadow-[0_-4px_12px_rgba(0,0,0,0.08)] pt-3 pb-2 px-2 flex flex-row justify-center gap-4 flex-wrap">
+      <div className="fixed left-0 right-0 bottom-0 z-20 w-full bg-white/95 backdrop-blur-sm border-t border-gray-200 shadow-[0_-4px_12px_rgba(0,0,0,0.08)] pt-3 px-2 overflow-x-auto overflow-y-hidden flex flex-row justify-center sm:justify-center gap-2 sm:gap-4 flex-nowrap sm:flex-wrap" style={{ paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom, 0.5rem))' }}>
         {steps.slice(1).map((step, idx) => {
           const realIdx = idx + 1;
           console.log(`Rendering step ${realIdx} (${step}): finished=${finishedSteps.includes(realIdx)}`);
@@ -3559,10 +3579,10 @@ React.useEffect(() => {
               }}
             className={`${
               finishedSteps.includes(realIdx) || (realIdx === 3 && finishedSteps.includes(2))
-                ? 'bg-primary text-white border border-primary rounded-full px-8 py-4 font-bold ring-2 ring-primary ring-offset-2 ring-offset-[#FCE6AC] hover:bg-[#FCE6AC]/90 transition-all text-lg' 
+                ? 'bg-primary text-white border border-primary rounded-full px-4 py-3 sm:px-8 sm:py-4 font-bold ring-2 ring-primary ring-offset-2 ring-offset-[#FCE6AC] hover:bg-[#FCE6AC]/90 transition-all text-sm sm:text-lg shrink-0' 
                 : realIdx === 3
-                  ? 'bg-gradient-to-r from-pink-100 to-purple-100 text-purple-800 border-2 border-purple-400 ring-2 ring-purple-400 ring-offset-2 ring-offset-purple-100 shadow-lg rounded-full px-8 py-4 font-bold transition-all text-lg' 
-                  : 'bg-[#FCE6AC] text-primary border border-primary rounded-full px-8 py-4 font-bold ring-2 ring-primary ring-offset-2 ring-offset-[#FCE6AC] hover:bg-[#FCE6AC]/90 transition-all text-lg'
+                  ? 'bg-gradient-to-r from-pink-100 to-purple-100 text-purple-800 border-2 border-purple-400 ring-2 ring-purple-400 ring-offset-2 ring-offset-purple-100 shadow-lg rounded-full px-4 py-3 sm:px-8 sm:py-4 font-bold transition-all text-sm sm:text-lg shrink-0' 
+                  : 'bg-[#FCE6AC] text-primary border border-primary rounded-full px-4 py-3 sm:px-8 sm:py-4 font-bold ring-2 ring-primary ring-offset-2 ring-offset-[#FCE6AC] hover:bg-[#FCE6AC]/90 transition-all text-sm sm:text-lg shrink-0'
             }`}
             title={`Step ${realIdx}: ${finishedSteps.includes(realIdx) ? 'Completed' : 'Not completed'}. FinishedSteps: [${finishedSteps.join(',')}]`}
           >
@@ -4258,18 +4278,29 @@ React.useEffect(() => {
       />
 
       {showGuestForm && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50">
-          <div className="relative bg-white rounded-lg p-6 w-full max-w-md max-h-[90vh] overflow-y-auto event-form">
+        <div className="fixed inset-0 flex items-end sm:items-center justify-center bg-black/50 z-50">
+          <div className="relative bg-white rounded-t-2xl sm:rounded-lg p-6 w-full max-w-md min-h-[85vh] sm:min-h-0 sm:max-h-[90vh] overflow-y-auto event-form">
             <button onClick={() => setShowGuestForm(false)} className="absolute top-2 left-2 text-4xl leading-none w-8 h-8 flex items-center justify-center text-gray-500 hover:text-gray-700">&times;</button>
-            <div className="flex flex-row-reverse items-center mb-4 gap-6 ml-10">
+            <h2 className="text-xl font-bold text-primary text-center mb-5">שליחת הזמנות</h2>
+
+            <div className="flex flex-col gap-3 mb-6">
               <button
+                type="button"
                 onClick={() => setShowExcelInstructions(true)}
-                className="mr-auto text-primary font-medium border border-primary rounded-full px-4 py-1 ring-2 ring-primary ring-offset-2 ring-offset-white hover:bg-primary hover:text-white transition-colors whitespace-nowrap text-base"
+                className="w-full text-primary font-medium border-2 border-primary rounded-lg px-4 py-3 hover:bg-primary hover:text-white transition-colors"
               >
-                ייבוא קובץ אקסל
+                ייבוא קובץ אורחים - אקסל
               </button>
-              <h2 className="text-xl font-medium text-center flex-1">פרטי אורח מוזמן</h2>
+              <button
+                type="button"
+                onClick={() => { addToast?.('שליחה לקבוצת וואטסאפ – בתהליך פיתוח'); }}
+                className="w-full text-primary font-medium border-2 border-primary rounded-lg px-4 py-3 hover:bg-primary hover:text-white transition-colors"
+              >
+                שלח לקבוצת וואטסאפ
+              </button>
             </div>
+
+            <h3 className="text-lg font-semibold text-gray-800 mb-3">שלח הזמנה לאורח בודד - פרטי אורח:</h3>
             {guestErrorMsg && <p className="text-red-600 text-lg text-center mb-2">{guestErrorMsg}</p>}
             <form className="space-y-4">
               <div>
@@ -4289,11 +4320,11 @@ React.useEffect(() => {
                 <input type="tel" placeholder="טלפון" value={guestData.guestPhone} onChange={(e) => setGuestData({ ...guestData, guestPhone: e.target.value })} className={`w-full border rounded-md p-2 ${guestErrors.guestPhone ? 'border-red-500' : ''}`} />
               </div>
               <div className="flex flex-col sm:flex-row justify-center gap-3 pt-4">
+                <button type="button" onClick={handleSendInvitationSms} className="bg-green-600 text-white border border-green-700 rounded-full px-8 py-3 font-medium hover:bg-green-700 transition-all">
+                  שלח הזמנה ב-SMS
+                </button>
                 <button type="button" onClick={handleSendInvitation} className="bg-primary text-white border border-primary rounded-full px-8 py-3 font-medium hover:bg-primary/90 transition-all">
                   שלח הזמנה בוואטסאפ
-                </button>
-                <button type="button" onClick={handleSendInvitationSms} className="bg-blue-600 text-white border border-blue-700 rounded-full px-8 py-3 font-medium hover:bg-blue-700 transition-all">
-                  שלח הזמנה ב-SMS
                 </button>
               </div>
             </form>
@@ -4548,9 +4579,16 @@ React.useEffect(() => {
               <button
                 onClick={() => handleSaveExcelGuests(true)}
                 disabled={isSavingExcelGuests || excelPreviewData.filter(g => !g.errors || g.errors.length === 0).length === 0}
-                className="bg-primary text-white px-8 py-3 rounded-full font-medium hover:bg-primary/90 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                className="bg-green-600 text-white px-8 py-3 rounded-full font-medium hover:bg-green-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isSavingExcelGuests ? 'שומר ושולח...' : `שמור ושלח SMS ל-${excelPreviewData.filter(g => !g.errors || g.errors.length === 0).length} אורחים`}
+              </button>
+              <button
+                onClick={() => handleSaveExcelGuests(false, true)}
+                disabled={isSavingExcelGuests || excelPreviewData.filter(g => !g.errors || g.errors.length === 0).length === 0}
+                className="bg-primary text-white px-8 py-3 rounded-full font-medium hover:bg-primary/90 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isSavingExcelGuests ? 'שומר...' : `שמור ושלח בוואטסאפ ל-${excelPreviewData.filter(g => !g.errors || g.errors.length === 0).length} אורחים`}
               </button>
               <button
                 onClick={() => {

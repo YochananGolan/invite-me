@@ -68,6 +68,10 @@ export default function Home({ session }) {
       <Head>
         <title>Meet-M | הדרך המושלמת להזמין ולנהל אורחים</title>
         <meta name="description" content="Send stylish invitations and manage guests effortlessly" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
+        <meta name="theme-color" content="#D1B45B" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
       </Head>
       <div className="min-h-screen flex flex-col">
         <main className="flex-1">
@@ -75,6 +79,7 @@ export default function Home({ session }) {
           <HeroSection
             onStart={() => stepRef.current?.startFlow?.()}
             onCreateEvent={handleCreateEvent}
+            onShowReports={handleShowReports}
             onShowFeatures={handleShowFeatures}
             onSignUpClick={() => {
               setAuthMode('sign_in'); // Always start with sign_in
@@ -86,7 +91,7 @@ export default function Home({ session }) {
             }}
             isLoggedIn={!!session}
           />
-          <div id="pricing" className="mb-8 scroll-mt-20 scroll-mb-28 pb-24">
+          <div id="pricing" className="mb-8 scroll-mt-20 scroll-mb-28 pb-36 sm:pb-24">
             <StepButtons 
               ref={stepRef} 
               session={session} 

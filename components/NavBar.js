@@ -12,6 +12,7 @@ const navLinks = [
 
 export default function NavBar({ onAuthClick, onAboutClick, onShowPricing, onShowReports }) {
   const [session, setSession] = useState(null);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -40,7 +41,16 @@ export default function NavBar({ onAuthClick, onAboutClick, onShowPricing, onSho
           </span>
         </Link>
 
-        {/* Nav Links - Center */}
+        {/* Mobile menu button */}
+        <button
+          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+          className="lg:hidden p-2 -m-2 rounded-lg min-w-[44px] min-h-[44px] flex items-center justify-center text-gray-600 hover:bg-gray-100"
+          aria-label="תפריט"
+        >
+          <span className="text-2xl">{mobileMenuOpen ? '✕' : '☰'}</span>
+        </button>
+
+        {/* Nav Links - Center (desktop) */}
         <div className="hidden lg:flex items-center gap-6">
           {navLinks.map((link) =>
             link.isButton ? (
@@ -111,6 +121,50 @@ export default function NavBar({ onAuthClick, onAboutClick, onShowPricing, onSho
           )}
         </div>
       </div>
+
+      {/* Mobile menu dropdown */}
+      {mobileMenuOpen && (
+        <div className="lg:hidden border-t border-gray-100 bg-white">
+          <div className="container mx-auto py-3 px-4 flex flex-col gap-1">
+            {navLinks.map((link) =>
+              link.isButton ? (
+                <button
+                  key={link.name}
+                  onClick={() => { onAboutClick?.(); setMobileMenuOpen(false); }}
+                  className="text-right py-3 px-4 text-gray-700 hover:bg-primary/10 rounded-lg min-h-[44px] flex items-center justify-end"
+                >
+                  {link.name}
+                </button>
+              ) : link.onShowPricing ? (
+                <button
+                  key={link.name}
+                  onClick={() => { onShowPricing?.(); setMobileMenuOpen(false); }}
+                  className="text-right py-3 px-4 text-gray-700 hover:bg-primary/10 rounded-lg min-h-[44px] flex items-center justify-end"
+                >
+                  {link.name}
+                </button>
+              ) : link.onShowReports ? (
+                <button
+                  key={link.name}
+                  onClick={() => { onShowReports?.(); setMobileMenuOpen(false); }}
+                  className="text-right py-3 px-4 text-gray-700 hover:bg-primary/10 rounded-lg min-h-[44px] flex items-center justify-end"
+                >
+                  {link.name}
+                </button>
+              ) : (
+                <Link
+                  key={link.name}
+                  href={link.href}
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="text-right py-3 px-4 text-gray-700 hover:bg-primary/10 rounded-lg min-h-[44px] flex items-center justify-end"
+                >
+                  {link.name}
+                </Link>
+              )
+            )}
+          </div>
+        </div>
+      )}
     </nav>
   );
 }

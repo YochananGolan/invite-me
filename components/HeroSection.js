@@ -58,7 +58,7 @@ const useTypewriter = (text, speed = 100, pauseDuration = 5000) => {
   return displayedText;
 };
 
-export default forwardRef(function HeroSection({ onStart, onShowFeatures, onSignUpClick, onSignInClick, isLoggedIn, onCreateEvent }, ref) {
+export default forwardRef(function HeroSection({ onStart, onShowFeatures, onSignUpClick, onSignInClick, isLoggedIn, onCreateEvent, onShowReports }, ref) {
   // Full invitation text with line breaks
   const fullInvitationText = 'דוד & שרה\nמתחתנים\n\nבשמחה רבה אנו מזמינים אתכם לחגוג עמנו את יום נישואינו\n\nיום שלישי • 24.03.2026\n📍 ירושלים, ישראל\n\nקבלת פנים 19:00 • חופה וקידושין 21:00';
   const displayedInvitationText = useTypewriter(fullInvitationText, 80, 5000);
@@ -118,11 +118,11 @@ export default forwardRef(function HeroSection({ onStart, onShowFeatures, onSign
               </button>
             </div>
 
-            {/* Feature Icons */}
-            <div className="flex flex-wrap justify-center lg:justify-start gap-6 mt-10">
+            {/* Feature Icons + דוחות בקרה - אותה שורה מתחת לכפתור העליון */}
+            <div className="flex flex-wrap justify-center lg:justify-start items-end gap-6 mt-10">
               {[
-                { icon: '🎨', label: 'עיצוב מקצועי', sub: '20 תבניות' },
-                { icon: '📱', label: 'אישורים ב-SMS', sub: 'שליחה אוטומטית' },
+                { icon: '🎨', label: 'עיצוב מקצועי', sub: '45 תבניות' },
+                { icon: '📱', label: 'אישורים בוואטסאפ וב-SMS', sub: 'שליחה אוטומטית' },
                 { icon: '💬', label: 'אישורי הגעה', sub: 'מעקב בזמן אמת' },
               ].map((f) => (
                 <div key={f.label} className="flex flex-col items-center lg:items-start">
@@ -133,15 +133,23 @@ export default forwardRef(function HeroSection({ onStart, onShowFeatures, onSign
                   <span className="text-gray-500 text-xs">{f.sub}</span>
                 </div>
               ))}
+              {typeof onShowReports === 'function' && (
+                <button
+                  onClick={() => onShowReports()}
+                  className="px-8 py-4 rounded-full bg-primary/15 text-primary font-bold border-2 border-primary hover:bg-primary hover:text-white transition-colors text-lg shadow-md shrink-0 self-center lg:-translate-x-24"
+                >
+                  דוחו״ת בקרה
+                </button>
+              )}
             </div>
           </div>
 
-          {/* Invitation Card - Left side in RTL */}
-          <div className="lg:flex-1 flex justify-center order-1 lg:order-2">
+          {/* Invitation Card */}
+          <div className="lg:flex-1 flex justify-center order-1 lg:order-2 -translate-y-8 md:-translate-y-12">
             <div className="w-full max-w-md">
               <div className="bg-white rounded-2xl shadow-xl overflow-hidden border border-gray-100">
                 {/* Card Image with all text overlay */}
-                <div className="relative aspect-[3/4] md:aspect-[4/5]">
+                <div className="relative aspect-[3/5] md:aspect-[2/3]">
                   <Image
                     src="/images/wedding-couple-bright-luxury.jpg"
                     alt="הזמנה לדוגמא"
