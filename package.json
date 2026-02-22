@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev -p 3000",
+    "db:migrate": "supabase db push",
     "dev:clean": "powershell -ExecutionPolicy Bypass -File ./free-port-3000.ps1",
     "dev:clean-bat": "start-dev.bat",
     "free-port": "powershell -ExecutionPolicy Bypass -File ./free-port-3000.ps1",

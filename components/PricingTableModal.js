@@ -1,9 +1,9 @@
 const PLANS = [
-  { id: 'א', range: 'עד 5 מוזמנים', price: 5, desc: 'מתאים לאירועים קטנים' },
-  { id: 'ב', range: 'מ־51 עד 200 מוזמנים', price: 149, desc: 'מתאים לרוב האירועים' },
-  { id: 'ג', range: 'מ־201 עד 350 מוזמנים', price: 199, desc: 'לאירועים גדולים' },
-  { id: 'ד', range: 'מ־351 עד 500 מוזמנים', price: 259, desc: 'לאירועים גדולים מאוד' },
-  { id: 'הרחבה', range: '100 מוזמנים נוספים', price: 100, desc: 'חבילת הרחבה' },
+  { id: 'א', range: 'עד 5 הודעות', price: 5, desc: 'מתאים לאירועים קטנים' },
+  { id: 'ב', range: 'מ־51 עד 200 הודעות', price: 149, desc: 'מתאים לרוב האירועים' },
+  { id: 'ג', range: 'מ־201 עד 350 הודעות', price: 199, desc: 'לאירועים גדולים' },
+  { id: 'ד', range: 'מ־351 עד 500 הודעות', price: 259, desc: 'לאירועים גדולים מאוד' },
+  { id: 'הרחבה', range: '100 הודעות נוספות', price: 100, desc: 'חבילת הרחבה' },
 ];
 
 export default function PricingTableModal({ isOpen, onClose }) {
@@ -30,7 +30,7 @@ export default function PricingTableModal({ isOpen, onClose }) {
               <thead>
                 <tr className="border-b-2 border-primary bg-primary/5">
                   <th className="text-right py-3 px-4 font-bold text-primary">מסלול</th>
-                  <th className="text-right py-3 px-4 font-bold text-primary">מספר מוזמנים</th>
+                  <th className="text-right py-3 px-4 font-bold text-primary">מספר הודעות</th>
                   <th className="text-right py-3 px-4 font-bold text-primary">מחיר</th>
                 </tr>
               </thead>
@@ -60,7 +60,7 @@ export default function PricingTableModal({ isOpen, onClose }) {
             * המחירים הם חד פעמיים לכל אירוע
           </p>
           <p className="text-center text-blue-700 text-sm mt-2">
-            💡 ניתן לרכוש חבילות הרחבה של 100 מוזמנים נוספים ב־100 ₪
+            💡 ניתן לרכוש חבילות הרחבה של 100 הודעות נוספות ב־100 ₪
           </p>
 
           <div className="mt-6 flex justify-center">

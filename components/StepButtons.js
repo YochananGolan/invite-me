@@ -368,6 +368,7 @@ const [planAddOnMode, setPlanAddOnMode] = useState(false);
 const [planSelectionError, setPlanSelectionError] = useState('');
 const [planWarningSuppressed, setPlanWarningSuppressed] = useState(false);
 const [allowedGuestCapacity, setAllowedGuestCapacity] = useState(null);
+const [eventMessagesSentCount, setEventMessagesSentCount] = useState(0);
 
   React.useEffect(() => {
     try {
@@ -380,18 +381,17 @@ const [allowedGuestCapacity, setAllowedGuestCapacity] = useState(null);
   React.useEffect(() => {
     if (!showPricingPlan) {
       if (planWarningSuppressed) {
-        const totalGuests = guestSummary.adults + guestSummary.children;
         const baseLimit = getPlanBaseLimit(selectedPlan);
         const extraCapacity = additionalPackages.reduce((sum, planId) => sum + getPlanBaseLimit(planId), 0);
         const totalLimit = (baseLimit || 0) + extraCapacity;
-        if (totalGuests > totalLimit) {
+        if (eventMessagesSentCount > totalLimit) {
           setShowPlanLimitWarning(true);
         }
         setPlanWarningSuppressed(false);
       }
       setPlanSelectionError('');
     }
-  }, [showPricingPlan, planWarningSuppressed, guestSummary.adults, guestSummary.children, selectedPlan, additionalPackages, getPlanBaseLimit]);
+  }, [showPricingPlan, planWarningSuppressed, eventMessagesSentCount, selectedPlan, additionalPackages, getPlanBaseLimit]);
 
 const basePlanLimit = getPlanBaseLimit(selectedPlan);
 const additionalCapacity = additionalPackages.reduce((sum, planId) => sum + getPlanBaseLimit(planId), 0);
@@ -709,36 +709,7 @@ const handleOpenAddonModal = React.useCallback(() => {
         .limit(1)
         .single();
 
-      // Check capacity before adding guest
-      const { data: existingGuests } = await supabase
-        .from('invited_guests')
-        .select('adults, children')
-        .eq('event_id', evRow.id);
-
-      const currentAdultsCount = (existingGuests || []).reduce((sum, g) => sum + (g.adults || 0), 0);
-      const currentChildrenCount = (existingGuests || []).reduce((sum, g) => sum + (g.children || 0), 0);
-      const currentGuestCount = currentAdultsCount + currentChildrenCount;
-      const totalAfterAdd = currentGuestCount + 1; // Adding 1 guest
-
-      const baseLimit = getPlanBaseLimit(selectedPlan) || 50;
-      const extraCapacity = additionalPackages.reduce(
-        (sum, planId) => sum + getPlanBaseLimit(planId),
-        0
-      );
-      const totalCapacity = baseLimit + extraCapacity;
-
-      if (totalAfterAdd > totalCapacity) {
-        // Capacity exceeded - show payment popup
-        setCapacityWarningGuests({
-          adults: currentAdultsCount + 1,
-          children: currentChildrenCount,
-          totalGuests: totalAfterAdd,
-        });
-        setShowPlanLimitWarning(true);
-        setGuestErrorMsg(`אין מספיק מקום! יש לך ${currentGuestCount} אורחים, המכסה: ${totalCapacity}`);
-        return;
-      }
-
+      // Quota is by messages sent only - adding guests is not limited by count
       const { data: newGuest, error } = await supabase
         .from('invited_guests')
         .insert([
@@ -884,36 +855,7 @@ const handleOpenAddonModal = React.useCallback(() => {
         .limit(1)
         .single();
 
-      // Check capacity before adding guest
-      const { data: existingGuests } = await supabase
-        .from('invited_guests')
-        .select('adults, children')
-        .eq('event_id', evRow.id);
-
-      const currentAdultsCount = (existingGuests || []).reduce((sum, g) => sum + (g.adults || 0), 0);
-      const currentChildrenCount = (existingGuests || []).reduce((sum, g) => sum + (g.children || 0), 0);
-      const currentGuestCount = currentAdultsCount + currentChildrenCount;
-      const totalAfterAdd = currentGuestCount + 1; // Adding 1 guest
-
-      const baseLimit = getPlanBaseLimit(selectedPlan) || 50;
-      const extraCapacity = additionalPackages.reduce(
-        (sum, planId) => sum + getPlanBaseLimit(planId),
-        0
-      );
-      const totalCapacity = baseLimit + extraCapacity;
-
-      if (totalAfterAdd > totalCapacity) {
-        // Capacity exceeded - show payment popup
-        setCapacityWarningGuests({
-          adults: currentAdultsCount + 1,
-          children: currentChildrenCount,
-          totalGuests: totalAfterAdd,
-        });
-        setShowPlanLimitWarning(true);
-        setGuestErrorMsg(`אין מספיק מקום! יש לך ${currentGuestCount} אורחים, המכסה: ${totalCapacity}`);
-        return;
-      }
-
+      // Quota is by messages sent only - adding guests is not limited by count
       const { data: newGuest, error } = await supabase
         .from('invited_guests')
         .insert([
@@ -936,7 +878,14 @@ const handleOpenAddonModal = React.useCallback(() => {
       const baseUrl = process.env.NEXT_PUBLIC_APP_URL || (typeof window !== 'undefined' ? window.location.origin : 'https://invite-me-two.vercel.app');
       const inviteLink = `${baseUrl}/${evRow?.id}/${newGuest.id}`;
 
-      // Send SMS via API
+      // Send SMS via API - check message quota first
+      const totalLimitSms = (getPlanBaseLimit(selectedPlan) || 0) + additionalPackages.reduce((s, id) => s + (getPlanBaseLimit(id) || 0), 0);
+      if (totalLimitSms > 0 && eventMessagesSentCount >= totalLimitSms) {
+        setInvitationResult({ type: 'error', message: 'אין מספיק הודעות במכסה. נא לרכוש חבילת הרחבה.' });
+        setShowInvitationResultModal(true);
+        setIsSendingInvitation(false);
+        return;
+      }
       try {
         const smsMessage = `${invitationText}\n\nלאישור הגעה:\n{inviteLink}`;
         const smsResponse = await fetch('/api/send-sms', {
@@ -956,9 +905,15 @@ const handleOpenAddonModal = React.useCallback(() => {
         const smsResult = await smsResponse.json();
 
         if (smsResult.success && smsResult.sent > 0) {
+          const newCount = (eventMessagesSentCount || 0) + smsResult.sent;
+          setEventMessagesSentCount(newCount);
+          if (evRow?.id) {
+            try {
+              await supabase.from('events').update({ messages_sent_count: newCount }).eq('id', evRow.id);
+            } catch (e) { /* column may not exist yet */ }
+          }
           setInvitationSent(true);
           setIsSendingInvitation(false);
-          // Show success modal
           setInvitationResult({ 
             type: 'success', 
             message: 'ההזמנה נשלחה בהצלחה ב-SMS!' 
@@ -1443,6 +1398,7 @@ const handleOpenAddonModal = React.useCallback(() => {
           console.debug('[StepButtons] Insert success', inserted);
           setCurrentEventId(inserted.id);
           setAllowedGuestCapacity(totalAllowedGuests);
+          setEventMessagesSentCount(0);
         }
         if(insertErr){
           console.error('[StepButtons] Insert error', insertErr);
@@ -1939,47 +1895,7 @@ React.useEffect(() => {
       const currentChildrenCount = (existingGuests || []).reduce((sum, g) => sum + (g.children || 0), 0);
       const currentGuestCount = currentAdultsCount + currentChildrenCount;
       const newGuestsToAdd = validGuests.length; // Each guest in Excel = 1 person
-      const totalAfterSave = currentGuestCount + newGuestsToAdd;
-
-      // Calculate current capacity
-      const baseLimit = getPlanBaseLimit(selectedPlan) || 50;
-      const extraCapacity = additionalPackages.reduce(
-        (sum, planId) => sum + getPlanBaseLimit(planId),
-        0
-      );
-      const totalCapacity = baseLimit + extraCapacity;
-
-      console.log('Capacity check:', {
-        current: currentGuestCount,
-        adding: newGuestsToAdd,
-        total: totalAfterSave,
-        capacity: totalCapacity
-      });
-
-      // Check if we'll exceed capacity
-      if (totalAfterSave > totalCapacity) {
-        setIsSavingExcelGuests(false);
-        setShowExcelPreview(false);
-
-        // Update warning state to show accurate totals in modal
-        setCapacityWarningGuests({
-          adults: currentAdultsCount + newGuestsToAdd,
-          children: currentChildrenCount,
-          totalGuests: totalAfterSave,
-        });
-
-        // Show capacity warning modal
-        setShowPlanLimitWarning(true);
-
-        // Also show result modal with error
-        setInvitationResult({ 
-          type: 'error', 
-          message: `אין מספיק מקום! יש לך ${currentGuestCount} אורחים, מנסה להוסיף ${newGuestsToAdd}. המכסה: ${totalCapacity}` 
-        });
-        setShowInvitationResultModal(true);
-        return;
-      }
-
+      // Quota is by messages sent only - saving guests is allowed; we check message limit when sending SMS below
       // Prepare guests for bulk insert
       const guestsToInsert = validGuests.map(g => ({
         user_id: user.id,
@@ -2019,6 +1935,21 @@ React.useEffect(() => {
         // Build SMS message with invitation text and RSVP link
         const smsMessage = `${invitationText}\n\nשלום {firstName},\nלאישור הגעה:\n{inviteLink}`;
 
+        const totalLimitBulk = (getPlanBaseLimit(selectedPlan) || 0) + additionalPackages.reduce((s, id) => s + (getPlanBaseLimit(id) || 0), 0);
+        if (totalLimitBulk > 0 && eventMessagesSentCount + smsGuests.length > totalLimitBulk) {
+          setShowExcelPreview(false);
+          setExcelPreviewData([]);
+          setExcelErrors([]);
+          setIsSavingExcelGuests(false);
+          setSentGuests((prev) => [...prev, ...validGuests]);
+          setInvitationResult({ 
+            type: 'error', 
+            message: `נשמרו ${validGuests.length} אורחים. אין מספיק הודעות במכסה לשליחת SMS (נשלחו ${eventMessagesSentCount}, מכסה ${totalLimitBulk}). נא לרכוש חבילת הרחבה.` 
+          });
+          setShowInvitationResultModal(true);
+          return;
+        }
+
         try {
           const smsResponse = await fetch('/api/send-sms', {
             method: 'POST',
@@ -2043,8 +1974,14 @@ React.useEffect(() => {
           // Add to local state
           setSentGuests((prev) => [...prev, ...validGuests]);
 
+          if (smsResult.sent > 0 && evRow?.id) {
+            const newCountBulk = (eventMessagesSentCount || 0) + smsResult.sent;
+            setEventMessagesSentCount(newCountBulk);
+            try {
+              await supabase.from('events').update({ messages_sent_count: newCountBulk }).eq('id', evRow.id);
+            } catch (e) { /* column may not exist yet */ }
+          }
           if (smsResult.success && smsResult.sent === validGuests.length) {
-            // All SMS sent successfully
             setInvitationResult({ 
               type: 'success', 
               message: `נשמרו ${validGuests.length} אורחים ונשלחו ${smsResult.sent} הודעות SMS בהצלחה!` 
@@ -2250,6 +2187,7 @@ React.useEffect(() => {
       setNewEventStarted(false); // Clear "event in progress" message
       setSelectedPlan(null); // Clear selected plan when event is deleted
       setAllowedGuestCapacity(null);
+      setEventMessagesSentCount(0);
       try { localStorage.removeItem('newEventStarted'); } catch(e){}
       try { localStorage.removeItem('selectedPlan'); } catch(e){}
     } else {
@@ -2381,7 +2319,7 @@ React.useEffect(() => {
 
   // Helper function to get addon display name
   const getAddonDisplayName = () => {
-    return 'חבילת הרחבה - 100 מוזמנים נוספים';
+    return 'חבילת הרחבה - 100 הודעות נוספות';
   };
 
   // Purchase addon capacity (100 guests for 100 shekel)
@@ -2399,24 +2337,23 @@ React.useEffect(() => {
       return;
     }
 
-    const totalGuests = guestSummary.adults + guestSummary.children;
     const baseLimit = getPlanBaseLimit(selectedPlan) || 50;
     const extraCapacity = additionalPackages.reduce(
       (sum, planId) => sum + getPlanBaseLimit(planId),
       0
     );
     const totalLimit = baseLimit + extraCapacity;
-    const guestsNeeded = Math.max(0, totalGuests - totalLimit);
+    const messagesOverQuota = Math.max(0, eventMessagesSentCount - totalLimit);
     const packagesNeeded = Math.max(
       1,
-      Math.ceil(guestsNeeded / getPlanBaseLimit('addon'))
+      Math.ceil(messagesOverQuota / getPlanBaseLimit('addon'))
     );
     const totalCost = packagesNeeded * 100;
 
     setPendingPlan('addon');
     setPendingAddonCount(packagesNeeded); // Store how many packages to add
     setPaymentAmount(totalCost);
-    setPaymentPlanName(packagesNeeded === 1 ? getAddonDisplayName() : `${packagesNeeded} חבילות הרחבה - ${packagesNeeded * 100} מוזמנים נוספים`);
+    setPaymentPlanName(packagesNeeded === 1 ? getAddonDisplayName() : `${packagesNeeded} חבילות הרחבה - ${packagesNeeded * 100} הודעות נוספות`);
     setShowPaymentModal(true);
     setShowPlanLimitWarning(false);
     resetCapacityWarningGuests();
@@ -2629,15 +2566,31 @@ React.useEffect(() => {
       try{
         const { data:{user} } = await supabase.auth.getUser();
         if(!user) return;
-        const { data: ev } = await supabase
+        let ev = null;
+        let messagesSent = 0;
+        const { data: evData, error: evError } = await supabase
           .from('events')
-          .select('id,event_details,allowed_guests')
+          .select('id,event_details,allowed_guests,messages_sent_count')
           .eq('user_id',user.id)
           .order('created_at',{ascending:false})
           .limit(1)
           .single();
+        if (evError && (evError.message || '').toLowerCase().includes('column')) {
+          const { data: evF } = await supabase
+            .from('events')
+            .select('id,event_details,allowed_guests')
+            .eq('user_id',user.id)
+            .order('created_at',{ascending:false})
+            .limit(1)
+            .single();
+          ev = evF;
+        } else {
+          ev = evData;
+          messagesSent = ev?.messages_sent_count ?? 0;
+        }
         if(!ev) return;
         setAllowedGuestCapacity(ev.allowed_guests ?? null);
+        setEventMessagesSentCount(messagesSent);
         // NEVER override selectedPlan from allowed_guests - user's choice should always be respected
         // Only set if there's absolutely no plan selected anywhere
         const storedPlan = typeof window !== 'undefined' ? localStorage.getItem('selectedPlan') : null;
@@ -2679,14 +2632,28 @@ React.useEffect(() => {
     try{
       const { data:{user} } = await supabase.auth.getUser();
       if(!user) return false;
-      const { data: ev } = await supabase
+      let ev = null;
+      const { data: evData, error: evError } = await supabase
         .from('events')
-        .select('id,event_details,status,allowed_guests')
+        .select('id,event_details,status,allowed_guests,messages_sent_count')
         .eq('user_id',user.id)
         .neq('status','archived')
         .order('created_at',{ascending:false})
         .limit(1)
         .maybeSingle();
+      if (evError && (evError.message || '').toLowerCase().includes('column')) {
+        const { data: evF } = await supabase
+          .from('events')
+          .select('id,event_details,status,allowed_guests')
+          .eq('user_id',user.id)
+          .neq('status','archived')
+          .order('created_at',{ascending:false})
+          .limit(1)
+          .maybeSingle();
+        ev = evF;
+      } else {
+        ev = evData;
+      }
       if(!ev) return false;
       const details=typeof ev.event_details==='string'?JSON.parse(ev.event_details):ev.event_details||{};
       const dateStr=details.date||details.start_datetime;
@@ -2895,6 +2862,7 @@ React.useEffect(() => {
         setCurrentEventId(null);
         setSelectedPlan(null);
         setAllowedGuestCapacity(null);
+        setEventMessagesSentCount(0);
         
         // Reset guest data and reports
         setGuestSummary({ approved: 0, adults: 0, children: 0 });
@@ -2943,7 +2911,7 @@ React.useEffect(() => {
           
           const { data: ev } = await supabase
             .from('events')
-            .select('id, event_details, allowed_guests')
+            .select('id, event_details, allowed_guests, messages_sent_count')
             .eq('user_id', user.id)
             .order('created_at', { ascending: false })
             .limit(1)
@@ -2966,6 +2934,7 @@ React.useEffect(() => {
                 console.log('Found future event in database, restoring...', ev);
                 setCurrentEventId(ev.id);
                 setAllowedGuestCapacity(ev.allowed_guests ?? null);
+                setEventMessagesSentCount(messagesSent);
                 // NEVER override selectedPlan from allowed_guests - user's choice should always be respected
                 // Only set if there's absolutely no plan selected anywhere
                 const storedPlan = typeof window !== 'undefined' ? localStorage.getItem('selectedPlan') : null;
@@ -3069,16 +3038,33 @@ React.useEffect(() => {
       try{
         const { data:{user} } = await supabase.auth.getUser();
         if(!user) return;
-        const { data: ev } = await supabase
+        let ev = null;
+        let messagesSent = 0;
+        const { data: evData, error: evError } = await supabase
           .from('events')
-          .select('id,event_details,allowed_guests')
+          .select('id,event_details,allowed_guests,messages_sent_count')
           .eq('user_id', user.id)
           .order('created_at',{ascending:false})
           .limit(1)
           .maybeSingle();
+        if (evError && (evError.message || '').toLowerCase().includes('column')) {
+          const { data: evFallback } = await supabase
+            .from('events')
+            .select('id,event_details,allowed_guests')
+            .eq('user_id', user.id)
+            .order('created_at',{ascending:false})
+            .limit(1)
+            .maybeSingle();
+          ev = evFallback;
+          messagesSent = 0;
+        } else {
+          ev = evData;
+          messagesSent = ev?.messages_sent_count ?? 0;
+        }
         if(ev){
           setCurrentEventId(ev.id);
           setAllowedGuestCapacity(ev.allowed_guests ?? null);
+          setEventMessagesSentCount(messagesSent);
           // NEVER override selectedPlan from allowed_guests - user's choice should always be respected
           // Only set if there's absolutely no plan selected anywhere
           const storedPlan = typeof window !== 'undefined' ? localStorage.getItem('selectedPlan') : null;
@@ -3341,20 +3327,17 @@ React.useEffect(() => {
       return;
     }
     
-    const totalGuests = guestSummary.adults + guestSummary.children;
     const baseLimit = getPlanBaseLimit(selectedPlan);
     const extraCapacity = additionalPackages.reduce((sum, planId) => sum + getPlanBaseLimit(planId), 0);
     if (!baseLimit && extraCapacity === 0) {
-      // No plan selected, no limit check
       setShowPlanLimitWarning(false);
       setPlanAddOnMode(false);
       resetCapacityWarningGuests();
       return;
     }
     const totalLimit = (baseLimit || 0) + extraCapacity;
-    
-    // Show warning if total guests exceed plan limit
-    if (totalGuests > totalLimit) {
+    // Show warning only when messages SENT exceed plan limit (not guest count)
+    if (eventMessagesSentCount > totalLimit) {
       setShowPlanLimitWarning(true);
       setPlanAddOnMode(true);
     } else {
@@ -3362,7 +3345,7 @@ React.useEffect(() => {
       setPlanAddOnMode(false);
       resetCapacityWarningGuests();
     }
-  }, [selectedPlan, guestSummary.adults, guestSummary.children, currentEventId, additionalPackages, getPlanBaseLimit, resetCapacityWarningGuests]);
+  }, [selectedPlan, eventMessagesSentCount, currentEventId, additionalPackages, getPlanBaseLimit, resetCapacityWarningGuests]);
 
   // helper to open guest report with fresh data
   const openGuestReport = async () => {
@@ -3426,50 +3409,42 @@ React.useEffect(() => {
         <div className="fixed inset-0 flex items-center justify-center bg-black/70 z-[100]">
           <div className="bg-white rounded-lg p-8 w-full max-w-2xl mx-4 text-center shadow-2xl">
             {(() => {
-              const warningTotals = capacityWarningGuests.totalGuests > 0
-                ? capacityWarningGuests
-                : {
-                    adults: guestSummary.adults,
-                    children: guestSummary.children,
-                    totalGuests: guestSummary.adults + guestSummary.children,
-                  };
-              const totalGuests = warningTotals.totalGuests ?? (warningTotals.adults + warningTotals.children);
               const baseLimit = getPlanBaseLimit(selectedPlan) || 50;
               const extraCapacity = additionalPackages.reduce(
                 (sum, planId) => sum + getPlanBaseLimit(planId),
                 0
               );
               const totalLimit = baseLimit + extraCapacity;
-              const guestsNeeded = Math.max(0, totalGuests - totalLimit);
+              const messagesOverQuota = Math.max(0, eventMessagesSentCount - totalLimit);
               const packagesNeeded =
-                guestsNeeded === 0
+                messagesOverQuota === 0
                   ? 1
-                  : Math.ceil(guestsNeeded / getPlanBaseLimit('addon'));
+                  : Math.ceil(messagesOverQuota / getPlanBaseLimit('addon'));
               const totalCost = packagesNeeded * 100;
 
               return (
                 <div className="mb-6">
                   <div className="text-6xl mb-4">🎉</div>
-                  <h2 className="text-3xl font-bold text-primary mb-4">מספר האורחים עולה על המכסה!</h2>
+                  <h2 className="text-3xl font-bold text-primary mb-4">חרגת ממכסת ההודעות!</h2>
                   <p className="text-xl text-gray-700 mb-6">
-                    יש לך <strong className="text-primary">{totalGuests} אורחים</strong> מוזמנים
+                    נשלחו <strong className="text-primary">{eventMessagesSentCount}</strong> הודעות
                   </p>
 
                   <div className="bg-blue-50 border-2 border-blue-300 rounded-lg p-6 mb-6">
                     <div className="flex items-center justify-center gap-4 mb-4">
                       <div className="text-center">
                         <div className="text-4xl font-bold text-primary">{totalLimit}</div>
-                        <div className="text-sm text-gray-600">מכסה נוכחית</div>
+                        <div className="text-sm text-gray-600">מכסת הודעות נוכחית</div>
                       </div>
                       <div className="text-3xl text-gray-400">→</div>
                       <div className="text-center">
-                        <div className="text-4xl font-bold text-green-600">{totalGuests}</div>
-                        <div className="text-sm text-gray-600">אורחים מוזמנים</div>
+                        <div className="text-4xl font-bold text-green-600">{eventMessagesSentCount}</div>
+                        <div className="text-sm text-gray-600">הודעות שנשלחו</div>
                       </div>
                     </div>
                     <div className="text-center text-gray-700 mb-4">
                       <p className="text-lg font-semibold">
-                        נדרשים עוד <strong className="text-red-600">{guestsNeeded}</strong> מקומות
+                        נדרשים עוד <strong className="text-red-600">{messagesOverQuota}</strong> הודעות במכסה
                       </p>
                     </div>
                   </div>
@@ -3478,7 +3453,7 @@ React.useEffect(() => {
                     <h3 className="text-xl font-bold text-green-800 mb-3">💰 הצעה מיוחדת</h3>
                     <div className="text-center mb-4">
                       <div className="text-5xl font-bold text-green-600 mb-2">₪100</div>
-                      <div className="text-lg text-gray-700">עבור 100 מוזמנים נוספים</div>
+                      <div className="text-lg text-gray-700">עבור 100 הודעות נוספות</div>
                     </div>
                     <div className="bg-white rounded-lg p-4 mb-4">
                       <p className="text-gray-700">
@@ -3724,12 +3699,12 @@ React.useEffect(() => {
                          selectedPlan === 'supreme' ? 'מסלול ו' : 'לא נבחר מסלול'}
                       </div>
                       <div className="text-base text-gray-700 font-semibold">
-                        {selectedPlan === 'basic' || selectedPlan === 'free' ? '5₪ - עד 5 מוזמנים' :
-                         selectedPlan === 'standard' ? '149₪ - מ 51 עד 200 מוזמנים' :
-                         selectedPlan === 'premium' ? '199₪ - מ 201 עד 350 מוזמנים' :
-                         selectedPlan === 'luxury' ? '259₪ - מ 351 עד 500 מוזמנים' :
-                         selectedPlan === 'elite' ? '349₪ - מ 501 עד 650 מוזמנים' :
-                         selectedPlan === 'supreme' ? '499₪ - מ 651 עד 1000 מוזמנים' : ''}
+                        {selectedPlan === 'basic' || selectedPlan === 'free' ? '5₪ - עד 5 הודעות' :
+                         selectedPlan === 'standard' ? '149₪ - מ 51 עד 200 הודעות' :
+                         selectedPlan === 'premium' ? '199₪ - מ 201 עד 350 הודעות' :
+                         selectedPlan === 'luxury' ? '259₪ - מ 351 עד 500 הודעות' :
+                         selectedPlan === 'elite' ? '349₪ - מ 501 עד 650 הודעות' :
+                         selectedPlan === 'supreme' ? '499₪ - מ 651 עד 1000 הודעות' : ''}
                       </div>
                     </div>
                     <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
@@ -3746,9 +3721,7 @@ React.useEffect(() => {
                               </span>
                               {extra > 0 && (
                                 <span className="text-xs text-yellow-500">
-                                  {id === 'addon'
-                                    ? `+${extra} הודעות נוספות`
-                                    : `+${extra} אורחים נוספים`}
+                                  +{extra} הודעות נוספות
                                 </span>
                               )}
                             </div>
@@ -3762,7 +3735,7 @@ React.useEffect(() => {
                         <p className="text-sm text-yellow-700 text-center">לא נרכשו חבילות נוספות</p>
                       )}
                       <div className="text-base font-bold text-yellow-800">
-                        סה״כ כיסוי: {displayTotalPlanCapacityValue} אורחים
+                        סה״כ כיסוי: {displayTotalPlanCapacityValue} הודעות
                         {displayAdditionalCapacityValue > 0 && (
                           <> (מתוכם {displayAdditionalCapacityValue} באמצעות חבילות הרחבה)</>
                         )}
@@ -6446,10 +6419,10 @@ React.useEffect(() => {
                   <div className="space-y-2">
                     <p className="text-gray-700 text-base leading-relaxed">בשלב זה תבחר את המסלול המתאים לאירוע שלך:</p>
                     <ul className="list-disc list-inside space-y-1.5 mr-3 text-base">
-                      <li><strong>מסלול א (5₪)</strong> - עד 5 מוזמנים</li>
-                      <li><strong>מסלול ב (149₪)</strong> - מ 51 עד 200 מוזמנים</li>
-                      <li><strong>מסלול ג (199₪)</strong> - מ 201 עד 350 מוזמנים</li>
-                      <li><strong>מסלול ד (259₪)</strong> - מ 351 עד 500 מוזמנים</li>
+                      <li><strong>מסלול א (5₪)</strong> - עד 5 הודעות</li>
+                      <li><strong>מסלול ב (149₪)</strong> - מ 51 עד 200 הודעות</li>
+                      <li><strong>מסלול ג (199₪)</strong> - מ 201 עד 350 הודעות</li>
+                      <li><strong>מסלול ד (259₪)</strong> - מ 351 עד 500 הודעות</li>
                     </ul>
                     <p className="text-gray-600 text-sm mt-2">המחירים הם חד פעמיים לכל אירוע</p>
                   </div>
@@ -6567,7 +6540,7 @@ React.useEffect(() => {
             <h2 className="text-2xl md:text-3xl font-bold mb-4 text-center text-primary">בחר את המסלול המתאים לאירוע שלך</h2>
             {planAddOnMode && (
               <div className="text-center text-sm font-semibold text-primary mb-4">
-                בחר חבילת הרחבה בתשלום כדי להוסיף עוד אורחים למכסה.
+                בחר חבילת הרחבה בתשלום כדי להוסיף עוד הודעות למכסה.
               </div>
             )}
             {planSelectionError && (
@@ -6585,7 +6558,7 @@ React.useEffect(() => {
                   <span className="text-base md:text-xl font-bold text-primary">5 ₪</span>
                 </div>
                 <div className="mb-6 text-right">
-                  <p className="text-base md:text-xl font-semibold text-primary mb-3 whitespace-nowrap tracking-wide">✓ עד 5 מוזמנים</p>
+                  <p className="text-base md:text-xl font-semibold text-primary mb-3 whitespace-nowrap tracking-wide">✓ עד 5 הודעות</p>
                   <p className="text-gray-600 mb-2">✓ הזמנות מעוצבות מקצועית</p>
                   <p className="text-gray-600 mb-2">✓ שליחה אוטומטית לכל האורחים</p>
                   <p className="text-gray-600 mb-2">✓ שליחת הודעות SMS ו-WhatsApp ב-2 סבבים</p>
@@ -6617,7 +6590,7 @@ React.useEffect(() => {
                   <span className="text-base md:text-xl font-bold text-primary">149 ₪</span>
                 </div>
                 <div className="mb-6 text-right">
-                  <p className="text-base md:text-xl font-semibold text-primary mb-3 whitespace-nowrap tracking-wide">✓ מ 51 עד 200 מוזמנים</p>
+                  <p className="text-base md:text-xl font-semibold text-primary mb-3 whitespace-nowrap tracking-wide">✓ מ 51 עד 200 הודעות</p>
                   <p className="text-gray-600 mb-2">✓ הזמנות מעוצבות מקצועית</p>
                   <p className="text-gray-600 mb-2">✓ שליחה אוטומטית לכל האורחים</p>
                   <p className="text-gray-600 mb-2">✓ שליחת הודעות SMS ו-WhatsApp ב-2 סבבים</p>
@@ -6645,7 +6618,7 @@ React.useEffect(() => {
                   <span className="text-base md:text-xl font-bold text-primary">199 ₪</span>
                 </div>
                 <div className="mb-6 text-right">
-                  <p className="text-base md:text-xl font-semibold text-primary mb-3 whitespace-nowrap tracking-wide">✓ מ 201 עד 350 מוזמנים</p>
+                  <p className="text-base md:text-xl font-semibold text-primary mb-3 whitespace-nowrap tracking-wide">✓ מ 201 עד 350 הודעות</p>
                   <p className="text-gray-600 mb-2">✓ הזמנות מעוצבות מקצועית</p>
                   <p className="text-gray-600 mb-2">✓ שליחה אוטומטית לכל האורחים</p>
                   <p className="text-gray-600 mb-2">✓ שליחת הודעות SMS ו-WhatsApp ב-2 סבבים</p>
@@ -6673,7 +6646,7 @@ React.useEffect(() => {
                   <span className="text-base md:text-xl font-bold text-primary">259 ₪</span>
                 </div>
                 <div className="mb-6 text-right">
-                  <p className="text-base md:text-xl font-semibold text-primary mb-3 whitespace-nowrap tracking-wide">✓ מ 351 עד 500 מוזמנים</p>
+                  <p className="text-base md:text-xl font-semibold text-primary mb-3 whitespace-nowrap tracking-wide">✓ מ 351 עד 500 הודעות</p>
                   <p className="text-gray-600 mb-2">✓ הזמנות מעוצבות מקצועית</p>
                   <p className="text-gray-600 mb-2">✓ שליחה אוטומטית לכל האורחים</p>
                   <p className="text-gray-600 mb-2">✓ שליחת הודעות SMS ו-WhatsApp ב-2 סבבים</p>
@@ -6697,8 +6670,8 @@ React.useEffect(() => {
             <div className="mt-6 space-y-2">
               <p className="text-center text-gray-500 text-base">* המחירים הם חד פעמיים לאירוע</p>
               <div className="bg-blue-50 border-2 border-blue-200 rounded-lg p-4 text-center">
-                <p className="text-blue-800 font-bold text-lg mb-1">💡 צריך יותר מ-500 מוזמנים?</p>
-                <p className="text-blue-700 text-base">ניתן לרכוש חבילות הרחבה של 100 מוזמנים נוספים ב-100 ₪ בלבד!</p>
+                <p className="text-blue-800 font-bold text-lg mb-1">💡 צריך יותר מ-500 הודעות?</p>
+                <p className="text-blue-700 text-base">ניתן לרכוש חבילות הרחבה של 100 הודעות נוספות ב-100 ₪ בלבד!</p>
               </div>
             </div>
             </div>
