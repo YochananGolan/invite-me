@@ -646,6 +646,13 @@ const handleOpenAddonModal = React.useCallback(() => {
       const [year, month, day] = isoDate.split('-');
       return `${day}/${month}/${year}`;
     };
+    // יום בשבוע בעברית (להזמנות)
+    const getDayOfWeekHebrew = (isoDate) => {
+      if (!isoDate) return '';
+      const d = new Date(isoDate + 'T12:00:00');
+      const days = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת'];
+      return days[d.getDay()] || '';
+    };
 
     /**
      * Try to share an invitation image using the Web Share API (level 2 – files).
@@ -1037,7 +1044,7 @@ const handleOpenAddonModal = React.useCallback(() => {
 
   // ---------- Invitation text templates ----------
   const invitationTemplates = {
-    'חתונה': (d) => `${d.brideParents} ובתם ${d.brideName} יחד עם ${d.groomParents} ובנם ${d.groomName}\nשמחים להזמינכם לחגוג עמנו את חתונת ילדינו\nבתאריך ${formatDateToHebrew(d.date)} בשעה ${d.time}\nבאולם ${d.hallName}, ${d.hallAddress}\nחופה תתקיים בשעה ${d.chuppahTime}`,
+    'חתונה': (d) => `${d.brideName} ו${d.groomName} מתחתנים\n\nשמחים להזמינכם לחגוג עמנו את יום הנישואין\nביום ${getDayOfWeekHebrew(d.date)} ${formatDateToHebrew(d.date)} בשעה ${d.time}\nבאולם ${d.hallName}, ${d.hallAddress}\nהחופה תתקיים בשעה ${d.chuppahTime}\n\nהורי הכלה: ${d.brideParents}\nהורי החתן: ${d.groomParents}`,
     'חינה': (d) => `${d.brideParents} ובתם ${d.brideName} יחד עם ${d.groomParents} ובנם ${d.groomName}\nמזמינים אתכם לחגוג עמנו בחינה\nבתאריך ${formatDateToHebrew(d.date)} בשעה ${d.time}\nבאולם ${d.hallName}, ${d.hallAddress}`,
     'מסיבת אירוסין': (d) => `של ${d.brideName} ו${d.groomName}\nשמחים להזמינכם למסיבת האירוסין שלנו\nבתאריך ${formatDateToHebrew(d.date)} בשעה ${d.time}\nבאולם ${d.hallName}, ${d.hallAddress}`,
     'הפרשת חלה': (d) => `${d.hostName}\nמזמינה אתכן לטקס הפרשת חלה מרגש\nבתאריך ${formatDateToHebrew(d.date)} בשעה ${d.time}\nב${d.hallName}, ${d.hallAddress}`,
@@ -1045,11 +1052,24 @@ const handleOpenAddonModal = React.useCallback(() => {
     'בת מצווה': (d)=> `אנו, ${d.girlParents},\nמזמינים אתכם לחגוג עמנו את בת המצווה של בתנו ${d.girlName}\nבתאריך ${formatDateToHebrew(d.date)} בשעה ${d.time}\nבאולם ${d.hallName}, ${d.hallAddress}`,
     'ברית': (d)=> `אנו, ${d.babyParents},\nשמחים להזמינכם לברית בננו\nבתאריך ${formatDateToHebrew(d.date)} בשעה ${d.time}\nבאולם ${d.hallName}, ${d.hallAddress}`,
     'בריתה': (d)=> `אנו, ${d.babyParents},\nשמחים להזמינכם לבריתה בתנו\nבתאריך ${formatDateToHebrew(d.date)} בשעה ${d.time}\nבאולם ${d.hallName}, ${d.hallAddress}`,
-    'יום הולדת': (d)=> `את/ה מוזמנ/ת לחגוג עם ${d.birthdayName} יום הולדת ${d.birthdayAge}!\nבתאריך ${formatDateToHebrew(d.date)} בשעה ${d.time}\nב-${d.hallName}, ${d.hallAddress}`,
+    'יום הולדת': (d)=> `את/ה מוזמנ/ת לחגוג עם ${d.birthdayName}\nיום הולדתו ה- ${d.birthdayAge}\nבתאריך ${formatDateToHebrew(d.date)} בשעה ${d.time}\nב-${d.hallName}, ${d.hallAddress}`,
     'אירוע עסקי': (d)=> `חברת ${d.businessName} (${d.businessContact})\nמתכבדת להזמינך לאירוע העסקי שלנו\nבתאריך ${formatDateToHebrew(d.date)} בשעה ${d.time}\nב-${d.hallName}, ${d.hallAddress}`,
   };
 
   const normalizeType = (t) => (t === 'ברית/ה' || t === 'בריתה' ? 'ברית' : t);
+
+  // עיצוב ברירת מחדל להזמנת חתונה (נוסח + עיצוב כיתוב)
+  const defaultLineStylesForWedding = {
+    0: { fontSize: 26, fontWeight: 'bold', textAlign: 'center', color: 'black' },
+    1: { fontSize: 18, textAlign: 'center', color: 'black' },
+    2: { fontSize: 18, textAlign: 'center', color: 'black' },
+    3: { fontSize: 17, textAlign: 'center', color: 'black' },
+    4: { fontSize: 17, textAlign: 'center', color: 'black' },
+    5: { fontSize: 17, textAlign: 'center', color: 'black' },
+    6: { fontSize: 15, textAlign: 'center', color: 'black' }, // רווח שורה בין החופה להורי הכלה
+    7: { fontSize: 15, textAlign: 'center', color: 'black' },
+    8: { fontSize: 15, textAlign: 'center', color: 'black' },
+  };
 
   const [customInvitationText, setCustomInvitationText] = useState('');
   const [lineStyles, setLineStyles] = useState({});
@@ -1090,7 +1110,9 @@ const handleOpenAddonModal = React.useCallback(() => {
   const colorKeys = ['black', 'red', 'blue', 'green', 'purple', 'orange', 'brown', 'gold', 'pink', 'cyan', 'indigo', 'teal', 'navy', 'maroon', 'lime', 'olive', 'coral', 'lavender', 'slate', 'rose', 'violet', 'darkgreen', 'crimson', 'turquoise'];
 
   const invitationTextDefault = selectedEventType && invitationTemplates[normalizeType(selectedEventType)]
-    ? `הזמנה ל${selectedEventType}\n\n` + invitationTemplates[normalizeType(selectedEventType)](formData)
+    ? (normalizeType(selectedEventType) === 'חתונה'
+        ? invitationTemplates['חתונה'](formData)
+        : `הזמנה ל${selectedEventType}\n\n` + invitationTemplates[normalizeType(selectedEventType)](formData))
     : '';
   const invitationText = customInvitationText.trim() || invitationTextDefault;
 
@@ -1179,12 +1201,15 @@ const handleOpenAddonModal = React.useCallback(() => {
     setCustomInvitationText('');
   }, [selectedEventType]);
 
-  // When design chooser opens the first time, prefill the textarea with default text so user edits retain event details
+  // When design chooser opens the first time, prefill the textarea with default text and (for wedding) default line styles
   React.useEffect(() => {
     if (showDesignChooser && !customInvitationText) {
       setCustomInvitationText(invitationTextDefault);
+      if (normalizeType(selectedEventType) === 'חתונה') {
+        setLineStyles(defaultLineStylesForWedding);
+      }
     }
-  }, [showDesignChooser, invitationTextDefault, customInvitationText]);
+  }, [showDesignChooser, invitationTextDefault, customInvitationText, selectedEventType]);
 
   React.useEffect(()=>{
     (async () => {
@@ -5035,8 +5060,10 @@ React.useEffect(() => {
                   <button
                     type="button"
                     onClick={() => {
-                      console.log('Reset text clicked');
                       setCustomInvitationText('');
+                      if (normalizeType(selectedEventType) === 'חתונה') {
+                        setLineStyles(defaultLineStylesForWedding);
+                      }
                     }}
                     className="text-base underline font-bold text-primary hover:text-primary/80"
                   >חזרה לנוסח ברירת מחדל</button>
@@ -5058,7 +5085,7 @@ React.useEffect(() => {
                           textAlign: lineStyles[index]?.textAlign || 'right',
                           textDecoration: lineStyles[index]?.textDecoration || 'none',
                           fontStyle: 'normal',
-                          textShadow: lineStyles[index]?.textShadow || 'none',
+                          textShadow: 'none',
                           transform: lineStyles[index]?.fontStyle === 'italic' ? 'skewX(20deg)' : lineStyles[index]?.fontStyle === 'back-slant' ? 'skewX(-20deg)' : 'none',
                           whiteSpace: 'pre-wrap',
                           wordBreak: 'break-word',
@@ -5207,9 +5234,7 @@ React.useEffect(() => {
                                         textAlign: style.textAlign || 'center',
                                         textDecoration: style.textDecoration || 'none',
                                         fontStyle: style.fontStyle || 'normal',
-                                        textShadow: style.textShadow && style.textShadow !== 'none' 
-                                          ? '2px 2px 4px rgba(0, 0, 0, 0.3)' 
-                                          : '0 1px 3px rgba(0, 0, 0, 0.4)',
+                                        textShadow: 'none',
                                         transform: style.fontStyle === 'italic' ? 'skewX(20deg)' : style.fontStyle === 'back-slant' ? 'skewX(-20deg)' : 'none',
                                         whiteSpace: 'pre-wrap',
                                         wordBreak: 'break-word',
@@ -5274,9 +5299,7 @@ React.useEffect(() => {
                         textAlign: style.textAlign || 'center',
                         textDecoration: style.textDecoration || 'none',
                         fontStyle: style.fontStyle || 'normal',
-                        textShadow: style.textShadow && style.textShadow !== 'none' 
-                          ? '2px 2px 4px rgba(0, 0, 0, 0.3)' 
-                          : '0 2px 4px rgba(0, 0, 0, 0.35)',
+                        textShadow: 'none',
                         transform: style.fontStyle === 'italic' ? 'skewX(20deg)' : style.fontStyle === 'back-slant' ? 'skewX(-20deg)' : 'none',
                         whiteSpace: 'pre-wrap',
                         wordBreak: 'break-word',
@@ -5571,7 +5594,7 @@ React.useEffect(() => {
                     textAlign: lineStyles[showAdvancedEdit]?.textAlign || 'right',
                     textDecoration: lineStyles[showAdvancedEdit]?.textDecoration || 'none',
                     fontStyle: 'normal',
-                    textShadow: lineStyles[showAdvancedEdit]?.textShadow || 'none',
+                    textShadow: 'none',
                     transform: lineStyles[showAdvancedEdit]?.fontStyle === 'italic' ? 'skewX(20deg)' : lineStyles[showAdvancedEdit]?.fontStyle === 'back-slant' ? 'skewX(-20deg)' : 'none',
                     whiteSpace: 'pre-wrap',
                     wordBreak: 'break-word'
