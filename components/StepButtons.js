@@ -2582,28 +2582,32 @@ React.useEffect(() => {
       else if (pendingPlan === 'addon') {
         try {
           const newAddons = Array(pendingAddonCount).fill('addon');
-          setAdditionalPackages((prev) => [...prev, ...newAddons]);
+          // עדכון סינכרוני: מערך מעודכן לכל המקומות (state, localStorage, DB) כדי שהמכסה תתעדכן מיד
+          const updatedPackages = [...additionalPackages, ...newAddons];
+          setAdditionalPackages(updatedPackages);
+          try {
+            localStorage.setItem('additionalPackages', JSON.stringify(updatedPackages));
+          } catch (e) {
+            console.warn('Failed to persist additionalPackages after addon purchase', e);
+          }
           setPlanSelectionError('');
 
           const totalGuestsAdded = pendingAddonCount * 100;
-          // Show success modal instead of toast
           setPaymentResultType('success');
           setPaymentResultMessage(`התשלום בוצע בהצלחה! ${totalGuestsAdded} מקומות נוספים נוספו לאירוע שלך.`);
           setPaymentWasPlanPurchase(false);
 
-          // Update allowed_guests in database for current event (same formula for all plans)
+          // עדכון מכסה ב-DB וב-state לפי המערך המעודכן
+          const baseLimit = getPlanBaseLimit(selectedPlan) || 0;
+          const existingExtraCapacity = updatedPackages.reduce(
+            (sum, planId) => sum + getPlanBaseLimit(planId),
+            0
+          );
+          const newTotalAllowedGuests = baseLimit + existingExtraCapacity;
+          setAllowedGuestCapacity(newTotalAllowedGuests);
+
           if (currentEventId) {
             try {
-              const baseLimit = getPlanBaseLimit(selectedPlan) || 0;
-              const existingExtraCapacity = additionalPackages.reduce(
-                (sum, planId) => sum + getPlanBaseLimit(planId),
-                0
-              );
-              const addedCapacity = pendingAddonCount * getPlanBaseLimit('addon');
-              const newTotalAllowedGuests =
-                baseLimit + existingExtraCapacity + addedCapacity;
-              setAllowedGuestCapacity(newTotalAllowedGuests);
-
               const { error: updateError } = await supabase
                 .from('events')
                 .update({ allowed_guests: newTotalAllowedGuests })
@@ -2611,13 +2615,11 @@ React.useEffect(() => {
 
               if (updateError) {
                 console.error('Failed to update allowed_guests in database:', updateError);
-                // Don't fail the entire flow - just log the error
               } else {
                 console.log(`✅ Updated allowed_guests to ${newTotalAllowedGuests} in database`);
               }
             } catch (err) {
               console.error('Error updating allowed_guests:', err);
-              // Don't fail the entire flow - just log the error
             }
           }
 
@@ -6994,6 +6996,16 @@ React.useEffect(() => {
                 <button
                   onClick={() => {
                     setShowInvitationResultModal(false);
+                    // כשהשגיאה קשורה למכסה – פתיחת מסך רכישת חבילות הרחבה (ברירת מחדל: 1 חבילה)
+                    const isQuotaError = invitationResult.message && (
+                      invitationResult.message.includes('מכסה') ||
+                      invitationResult.message.includes('חבילת הרחבה')
+                    );
+                    if (isQuotaError) {
+                      setPendingAddonCount(1);
+                      setShowPlanLimitWarning(true);
+                      setPlanAddOnMode(true);
+                    }
                   }}
                   className="w-full bg-red-600 hover:bg-red-700 text-white font-bold text-lg md:text-xl py-4 px-8 rounded-full transition-all shadow-lg transform hover:scale-105"
                 >
