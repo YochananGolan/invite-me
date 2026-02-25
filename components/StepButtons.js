@@ -73,6 +73,13 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick, trig
     sessionRef.current = session;
   }, [session]);
 
+  // כשאין כניסה – לא להציג מסלול שנשמר ב-localStorage (תיקון: בווב מוצג מסלול גם בלי סשן)
+  useEffect(() => {
+    if (!session) {
+      setSelectedPlan(null);
+    }
+  }, [session]);
+
   // כשהדף מעלה triggerCreateEvent – מריצים זרימת יצירת אירוע (בלי תלות ב-ref)
   useEffect(() => {
     if (!triggerCreateEvent) return;
@@ -3838,7 +3845,7 @@ React.useEffect(() => {
                 </p>
               </div>
             )}
-            {selectedPlan && (
+            {session && selectedPlan && (
               <div className="bg-yellow-50 p-3 text-center shadow-lg w-full" style={{
                 border: '3px solid #D4AF37',
                 outline: '2px solid #B8860B',
@@ -4109,7 +4116,7 @@ React.useEffect(() => {
                   <p className="text-xs text-gray-500 mt-2 text-center">נתוני אישור הגעה יופיעו לאחר שליחת הזמנות ותגובות אורחים</p>
                 )}
               </div>
-              {selectedPlan && (() => {
+              {session && selectedPlan && (() => {
                 // התאמה לסטטוס אישורי הגעה: אותו מספר הודעות שנשלחו בכל הדוחות
                 const messagesSent = effectiveMessagesSentCount;
                 const messageLimit = totalPlanCapacity;
