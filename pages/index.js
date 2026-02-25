@@ -14,23 +14,18 @@ export default function Home({ session }) {
   const [showFeatures, setShowFeatures] = useState(false);
   const [showPricingTable, setShowPricingTable] = useState(false);
   const [pendingCreateEvent, setPendingCreateEvent] = useState(false);
+  const [triggerCreateEvent, setTriggerCreateEvent] = useState(false);
   const stepRef = useRef();
 
   useEffect(() => {
-    // אם יש סשן, אל תפתח מודאל; אחרת תישאר סגור עד שהמשתמש לוחץ
-    // After successful login, create event if user was trying to create one
     if (session) {
-      // Check localStorage for pending create event (survives page reload)
       const shouldCreateEvent = pendingCreateEvent || (typeof window !== 'undefined' && localStorage.getItem('pendingCreateEvent') === 'true');
       if (shouldCreateEvent) {
         setPendingCreateEvent(false);
         if (typeof window !== 'undefined') {
           localStorage.removeItem('pendingCreateEvent');
         }
-        // Small delay to ensure component is ready
-        setTimeout(() => {
-          stepRef.current?.createNewEvent?.();
-        }, 500);
+        setTimeout(() => setTriggerCreateEvent(true), 500);
       }
     }
   }, [session, pendingCreateEvent]);
@@ -59,7 +54,7 @@ export default function Home({ session }) {
       }
       setShowAuth(true);
     } else {
-      stepRef.current?.createNewEvent?.();
+      setTriggerCreateEvent(true);
     }
   };
 
@@ -78,8 +73,8 @@ export default function Home({ session }) {
           <NavBar onAuthClick={handleAuthClick} onAboutClick={handleShowFeatures} onShowPricing={() => setShowPricingTable(true)} onShowReports={handleShowReports} />
           <HeroSection
             onStart={() => stepRef.current?.startFlow?.()}
-            onCreateEvent={handleCreateEvent}
-            onShowReports={handleShowReports}
+            onPressCreateEvent={handleCreateEvent}
+            onPressReports={handleShowReports}
             onShowFeatures={handleShowFeatures}
             onSignUpClick={() => {
               setAuthMode('sign_in'); // Always start with sign_in
@@ -96,6 +91,8 @@ export default function Home({ session }) {
               ref={stepRef} 
               session={session} 
               onAuthClick={handleAuthClick}
+              triggerCreateEvent={triggerCreateEvent}
+              onConsumedCreateTrigger={() => setTriggerCreateEvent(false)}
             />
           </div>
         </main>

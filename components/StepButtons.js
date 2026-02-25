@@ -59,14 +59,62 @@ const fieldLabels = {
   hostName: 'שם המארחת',
 };
 
-const StepButtons = forwardRef(function StepButtons({ session, onAuthClick }, ref) {
+const StepButtons = forwardRef(function StepButtons({ session, onAuthClick, triggerCreateEvent, onConsumedCreateTrigger }, ref) {
   const { addToast } = useToast();
   const sessionRef = useRef(session);
+  // After the user מחק אירוע קיים once successfully in this session, we don't need
+  // to לבקש מחיקה שוב בכל לחיצה על "צור אירוע חדש".
+  const [hasClearedExistingEvent, setHasClearedExistingEvent] = useState(false);
+  // הודעה לאחר שהמערכת זיהתה שהאירוע עבר – מאפשרת למשתמש להבין ש"האירוע הסתיים, אפשר לפתוח אירוע חדש"
+  const [showEventEndedNotice, setShowEventEndedNotice] = useState(false);
   
   // Keep session ref updated
   useEffect(() => {
     sessionRef.current = session;
   }, [session]);
+
+  // כשהדף מעלה triggerCreateEvent – מריצים זרימת יצירת אירוע (בלי תלות ב-ref)
+  useEffect(() => {
+    if (!triggerCreateEvent) return;
+    onConsumedCreateTrigger?.();
+    let hasSession = !!sessionRef.current;
+    const run = async () => {
+      if (!hasSession) {
+        const { data: { user } } = await supabase.auth.getUser();
+        hasSession = !!user;
+      }
+      if (!hasSession) {
+        setShowPricingPlan(true);
+        setPlanAddOnMode(false);
+        return;
+      }
+      if (!selectedPlan) {
+        setShowPricingPlan(true);
+        setPlanAddOnMode(false);
+        return;
+      }
+      setSelectedFlowStep(null);
+      setStepErrorMsg('');
+      // אם כבר בוצעה מחיקה מוצלחת של האירוע הקיים בסשן הזה – אין צורך לבקש מחיקה שוב.
+      if (hasClearedExistingEvent) {
+        await handleNewEvent();
+        // אחרי שמתחילים אירוע חדש אחרי מחיקה – לפתוח מיד את שלב 1 (בחירת סוג אירוע)
+        setShowEventTypes(true);
+      } else {
+        const hasActive = await checkActiveEventExists();
+        if (hasActive) {
+          setShowExistingEventWarning(true);
+        } else {
+          handleNewEvent();
+        }
+      }
+    };
+    run().catch((err) => {
+      console.error('createNewEvent error', err);
+      setShowPricingPlan(true);
+      setPlanAddOnMode(false);
+    });
+  }, [triggerCreateEvent, hasClearedExistingEvent]);
   const steps = ['צור אירוע חדש', '📅 שלב 1 - סוג אירוע', '📝 שלב 2 - פרטי האירוע', '🎨 שלב 3 - עיצוב הזמנה', '📤 שלב 4 - שליחת הזמנה לאורח', '📊 שלב 5 - דוחו"ת אישורי הגעה'];
   const eventTypes = ['חתונה', 'חינה', 'מסיבת אירוסין', 'בר מצווה', 'בת מצווה', 'ברית', 'בריתה', 'יום הולדת', 'אירוע עסקי', 'הפרשת חלה'];
   const times = Array.from({ length: (24 - 8) * 2 }, (_, i) => {
@@ -632,12 +680,26 @@ const handleOpenAddonModal = React.useCallback(() => {
   };
 
   const handleSelectEvent = (type) => {
-    setSelectedEventType(normalizeType(type));
-    try { localStorage.setItem('selectedEventType', normalizeType(type)); } catch(e){}
+    const normalizedType = normalizeType(type);
+    setSelectedEventType(normalizedType);
+    try { localStorage.setItem('selectedEventType', normalizedType); } catch(e){}
     setEventDetailsCompleted(false);
     // ensure button dark if user arrived here by page reload without clicking new event button
     if(!newEventStarted){ setNewEventStarted(true); try{localStorage.setItem('newEventStarted','1');}catch(e){} }
     markStepDone(0);
+    // If there's already an active event, persist the new type immediately
+    if (currentEventId) {
+      (async () => {
+        try {
+          await supabase
+            .from('events')
+            .update({ event_type: normalizedType })
+            .eq('id', currentEventId);
+        } catch (e) {
+          console.error('Failed to update event_type for current event', e);
+        }
+      })();
+    }
   };
 
       // Helper to format ISO date (YYYY-MM-DD) to Hebrew format (DD/MM/YYYY)
@@ -1263,26 +1325,34 @@ const handleOpenAddonModal = React.useCallback(() => {
       setSelectedFlowStep(5);
     },
     createNewEvent: async () => {
-      // User should already be logged in at this point (checked in HeroSection)
-      if (!sessionRef.current) {
-        console.warn('createNewEvent called without session');
-        return;
-      }
-      
-      // Check if user has selected a plan (paid)
-      if (!selectedPlan) {
-        // Show pricing plan modal first - user must select and pay before creating event
+      try {
+        setSelectedFlowStep(null);
+        let hasSession = !!sessionRef.current;
+        if (!hasSession) {
+          const { data: { user } } = await supabase.auth.getUser();
+          hasSession = !!user;
+        }
+        if (!hasSession) {
+          setShowPricingPlan(true);
+          setPlanAddOnMode(false);
+          return;
+        }
+        if (!selectedPlan) {
+          setShowPricingPlan(true);
+          setPlanAddOnMode(false);
+          return;
+        }
+        setStepErrorMsg('');
+        const hasActive = await checkActiveEventExists();
+        if (hasActive) {
+          setShowExistingEventWarning(true);
+        } else {
+          handleNewEvent();
+        }
+      } catch (err) {
+        console.error('createNewEvent error', err);
         setShowPricingPlan(true);
         setPlanAddOnMode(false);
-        return;
-      }
-      
-      setStepErrorMsg('');
-      const hasActive = await checkActiveEventExists();
-      if (hasActive) {
-        setShowExistingEventWarning(true);
-      } else {
-        handleNewEvent();
       }
     },
   }));
@@ -1343,6 +1413,7 @@ const handleOpenAddonModal = React.useCallback(() => {
           event_details: eventDetails,
           invitation_path: designFile,
           allowed_guests: totalAllowedGuests,
+          event_type: selectedEventType || null,
         };
 
         // Try to update progress_step, but don't fail if column doesn't exist
@@ -1369,6 +1440,7 @@ const handleOpenAddonModal = React.useCallback(() => {
                 event_details: eventDetails,
                 invitation_path: designFile,
                 allowed_guests: totalAllowedGuests,
+                event_type: selectedEventType || null,
               })
               .eq('id', currentEventId)
               .select('id, invitation_path, event_details')
@@ -2161,58 +2233,101 @@ React.useEffect(() => {
     customEventDescription: 'תיאור האירוע',
   };
   const handleNewEvent = async (showDeletionMessage = false) => {
-    // IMPORTANT: Delete only ACTIVE events (not archived) and their guests BEFORE resetting state
+    setShowExistingEventWarning(false);
+    setShowArchiveConfirm(false);
     let eventWasDeleted = false;
-    if (currentEventId) {
+    // "Deletion completed" means: we deleted the event successfully OR there was no DB event to delete.
+    // This better matches the user expectation when they confirm deletion and the UI resets cleanly.
+    let deletionCompleted = false;
+    let deletionErrorAlertShown = false;
+    let eventIdToDelete = currentEventId;
+
+    if (!eventIdToDelete) {
       try {
-        // First, check if the event is active (not archived)
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const { data: ev, error: evErr } = await supabase
+            .from('events')
+            .select('id, status')
+            .eq('user_id', user.id)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          if (evErr && (evErr.message || '').toLowerCase().includes('column')) {
+            const { data: evFallback } = await supabase
+              .from('events')
+              .select('id')
+              .eq('user_id', user.id)
+              .order('created_at', { ascending: false })
+              .limit(1)
+              .maybeSingle();
+            if (evFallback) eventIdToDelete = evFallback.id;
+          } else if (ev && ev.status !== 'archived') {
+            eventIdToDelete = ev.id;
+          }
+        }
+      } catch (e) {
+        console.warn('Could not fetch event to delete', e);
+      }
+    }
+
+    if (!eventIdToDelete) {
+      // Nothing to delete in DB (e.g. event only existed in UI/localStorage).
+      deletionCompleted = true;
+    } else {
+      try {
+        let skipDelete = false;
         const { data: eventData, error: fetchError } = await supabase
           .from('events')
           .select('id, status')
-          .eq('id', currentEventId)
-          .single();
-        
-        if (fetchError) {
-          console.error('Error fetching event status:', fetchError);
-          // Continue anyway - try to delete only if exists
-        } else if (eventData && eventData.status === 'archived') {
-          // Don't delete archived events - just reset the UI state
-          console.log('⚠️ Event is archived, skipping deletion. ID:', currentEventId);
-        } else {
-          // Event is active/draft - safe to delete
-          // First, delete all guests related to this ACTIVE event only
+          .eq('id', eventIdToDelete)
+          .maybeSingle();
+        if (!fetchError && eventData && eventData.status === 'archived') {
+          skipDelete = true;
+        }
+        if (!skipDelete) {
           const { error: guestsError } = await supabase
             .from('invited_guests')
             .delete()
-            .eq('event_id', currentEventId);
-          
+            .eq('event_id', eventIdToDelete);
           if (guestsError) {
             console.error('Error deleting guests:', guestsError);
             alert('שגיאה במחיקת האורחים של האירוע הקיים.');
-          } else {
-            console.log('✅ Guests deleted successfully for event:', currentEventId);
+            deletionErrorAlertShown = true;
+            // If guests couldn't be deleted, don't show "success" at the end.
+            deletionCompleted = false;
+            throw guestsError;
           }
-          
-          // Then, delete the event itself
+          const { error: rsvpsErr } = await supabase.from('event_rsvps').delete().eq('event_id', eventIdToDelete);
+          if (rsvpsErr) {
+            // event_rsvps או event_id אולי לא קיימים – לא חוסם
+          }
           const { error: deleteError } = await supabase
             .from('events')
             .delete()
-            .eq('id', currentEventId);
-          
+            .eq('id', eventIdToDelete);
           if (deleteError) {
             console.error('Error deleting current event:', deleteError);
             alert('שגיאה במחיקת האירוע הקיים.');
+            deletionErrorAlertShown = true;
+            deletionCompleted = false;
           } else {
-            console.log('✅ Current event deleted successfully, ID:', currentEventId);
-            eventWasDeleted = true; // Mark that event was actually deleted
+            eventWasDeleted = true;
+            deletionCompleted = true;
           }
+        } else {
+          // Event is archived (or treated as such) -> no hard delete is needed for "new event" flow.
+          deletionCompleted = true;
         }
       } catch (err) {
         console.error('Failed to delete current event:', err);
-        alert('שגיאה במחיקת האירוע הקיים.');
+        if (!deletionErrorAlertShown) {
+          alert('שגיאה במחיקת האירוע הקיים.');
+        }
+        deletionCompleted = false;
       }
     }
-    
+
     // Now reset the state for new event
     setSelectedEventType('');
     setFormData(initialFormState);
@@ -2227,14 +2342,13 @@ React.useEffect(() => {
     setFinishedSteps([]); // Reset finished steps for new event
     setCurrentEventId(null); // Clear current event ID
     
-    // If event was actually deleted (not just archived), reset everything including plan
+    // If event was actually deleted (not just archived), reset everything פרט לחבילה:
+    // המשתמש כבר רכש/בחר מסלול, אין סיבה לבקש ממנו לבחור שוב.
     if (eventWasDeleted) {
       setNewEventStarted(false); // Clear "event in progress" message
-      setSelectedPlan(null); // Clear selected plan when event is deleted
       setAllowedGuestCapacity(null);
       setEventMessagesSentCount(0);
       try { localStorage.removeItem('newEventStarted'); } catch(e){}
-      try { localStorage.removeItem('selectedPlan'); } catch(e){}
     } else {
       // Event was archived or doesn't exist - start new event process
       setNewEventStarted(true);
@@ -2270,8 +2384,11 @@ React.useEffect(() => {
       setPlanAddOnMode(false); // Ensure we're in plan selection mode, not addon mode
     }
 
-    if (showDeletionMessage) {
+    if (showDeletionMessage && (eventWasDeleted || deletionCompleted)) {
+      // סימון ש"ניקינו" את האירוע הקודם – כדי לא לבקש מחיקה שוב בכל לחיצה על "צור אירוע חדש"
+      setHasClearedExistingEvent(true);
       setShowDeletionSuccess(true);
+      setShowEventTypes(true);
     }
   };
 
@@ -2676,7 +2793,6 @@ React.useEffect(() => {
           .from('events')
           .select('id,event_details,status,allowed_guests')
           .eq('user_id',user.id)
-          .neq('status','archived')
           .order('created_at',{ascending:false})
           .limit(1)
           .maybeSingle();
@@ -2686,8 +2802,8 @@ React.useEffect(() => {
       }
       if(!ev) return false;
       const details=typeof ev.event_details==='string'?JSON.parse(ev.event_details):ev.event_details||{};
-      const dateStr=details.date||details.start_datetime;
-      if(!dateStr) return false;
+      const dateStr=details.date||details.start_datetime||details.end_datetime;
+      if(!dateStr) return true;
       const today = new Date();
       today.setHours(0,0,0,0);
       const eventDate = new Date(dateStr);
@@ -2862,57 +2978,50 @@ React.useEffect(() => {
     })();
   }, [showGuestListModal, currentEventId]);
 
-  // ---- Auto-reset when event ends ----
+  // ---- Auto-archive when event ends (after date has passed) ----
   React.useEffect(() => {
-    if (formData.date && currentEventId) {
-      const eventDate = new Date(formData.date);
-      const today = new Date();
-      const diffTime = eventDate.getTime() - today.getTime();
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-      
-      console.log('Event date:', formData.date, 'Today:', today.toISOString().split('T')[0], 'Diff days:', diffDays);
-      
-      // If event has ended (0 days ago or more), reset the system
-      if (diffDays < 0) {
-        console.log('Event has ended more than 1 day ago, resetting system...');
+    if (!formData.date || !currentEventId) return;
+    
+    const eventDate = new Date(formData.date);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    eventDate.setHours(0, 0, 0, 0);
+    const diffTime = eventDate.getTime() - today.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    // אם התאריך עבר – מסמנים את האירוע כ"archived" (אם יש עמודת status) ומציגים הודעה למשתמש
+    if (diffDays < 0) {
+      (async () => {
+        try {
+          // ננסה לסמן את האירוע כ"archived" – אם אין עמודת status פשוט נתעלם מהשגיאה
+          const { error } = await supabase
+            .from('events')
+            .update({ status: 'archived' })
+            .eq('id', currentEventId);
+          if (error && !(error.message || '').toLowerCase().includes('column')) {
+            console.error('Failed to archive past event:', error);
+          }
+        } catch (e) {
+          console.error('Failed to archive past event:', e);
+        }
         
-        // Reset all state
-        setSelectedEventType('');
-        setFormData(initialFormState);
-        setEventDetailsCompleted(false);
-        setSelectedDesign(null);
-        setInvitationSent(false);
-        setRsvpConfirmed(false);
-        setShowGuestForm(false);
-        setShowReportsOptions(false);
-        setStepErrorMsg('');
-        setErrorMsg('');
-        setFinishedSteps([]);
+        // מנקים את סימון "אירוע בתהליך"
         setNewEventStarted(false);
+        try { localStorage.removeItem('newEventStarted'); } catch(e){}
+
+        // מנקים את האירוע הפעיל כך שהמערכת תראה שאין אירוע פעיל כרגע
         setCurrentEventId(null);
+        
+        // מאחר שהאירוע הסתיים באופן טבעי (עבר התאריך) – המסלול הנוכחי "נצרך"
+        // וליצירת אירוע חדש יש לבחור ולשלם על מסלול מחדש.
         setSelectedPlan(null);
         setAllowedGuestCapacity(null);
         setEventMessagesSentCount(0);
-        
-        // Reset guest data and reports
-        setGuestSummary({ approved: 0, adults: 0, children: 0 });
-        setGuestStatusSummary({ approved: 0, rejected: 0, pending: 0 });
-        setDbGuests([]);
-        setSentGuests([]);
-        setReportGuests([]);
-        setShowGuestListModal(false);
-        setShowReportModal(false);
-        setShowReportsOptions(false);
-        setSelectedEventForReport(null);
-        
-        // Clear localStorage
-        try { localStorage.removeItem('newEventStarted'); } catch(e){}
-        try { localStorage.removeItem('selectedDesign'); } catch(e){}
-        try { localStorage.removeItem('finishedSteps'); } catch(e){}
-        try { localStorage.removeItem('selectedEventType'); } catch(e){}
-        try { localStorage.removeItem('draftEvent'); } catch(e){}
         try { localStorage.removeItem('selectedPlan'); } catch(e){}
-      }
+        
+        // מציגים למשתמש הודעה ברורה שאפשר לפתוח אירוע חדש
+        setShowEventEndedNotice(true);
+      })();
     }
   }, [formData.date, currentEventId]);
 
@@ -3530,6 +3639,26 @@ React.useEffect(() => {
                 </div>
               );
             })()}
+          </div>
+        </div>
+      )}
+
+      {/* הודעה כשהאירוע הסתיים (עבר התאריך) – מאפשר למשתמש להבין שאפשר לפתוח אירוע חדש */}
+      {showEventEndedNotice && (
+        <div className="fixed left-4 right-4 bottom-32 z-40 max-w-2xl mx-auto bg-green-50 border-2 border-green-500 rounded-xl shadow-lg p-4 flex flex-col gap-3">
+          <p className="text-green-900 font-semibold text-center text-lg">
+            האירוע הסתיים. כעת ניתן לפתוח אירוע חדש באותו מסלול.
+          </p>
+          <div className="flex justify-center gap-3">
+            <button
+              type="button"
+              onClick={() => {
+                setShowEventEndedNotice(false);
+              }}
+              className="bg-white border border-green-400 text-green-800 font-medium py-2 px-6 rounded-full hover:bg-green-50"
+            >
+              הבנתי
+            </button>
           </div>
         </div>
       )}
@@ -5207,11 +5336,13 @@ React.useEffect(() => {
                                 alt="Invitation design"
                                 className="absolute inset-0 w-full h-full object-cover"
                               />
+                              <div className="absolute inset-0 rounded-md pointer-events-none" style={{ background: 'rgba(255,255,255,0.22)' }} aria-hidden />
                               <div className="absolute inset-0 flex flex-col items-center justify-center px-4" dir="rtl">
                                 {(customInvitationText || invitationText || 'דוגמת טקסט להזמנה').split('\n').map((line, lineIndex) => {
                                   if (!line || !line.trim()) return <div key={lineIndex} style={{ height: '0.5em' }} />;
                                   const style = lineStyles[lineIndex] || {};
-                                  const fontSize = style.fontSize ? parseInt(style.fontSize) : 20;
+                                  const baseFontSize = style.fontSize ? parseInt(style.fontSize) : 20;
+                                  const fontSize = lineIndex === 0 ? baseFontSize + 6 : baseFontSize;
                                   let textColor = style.color || '#000000';
                                   if (!textColor.startsWith('#')) {
                                     const colorMap = {
@@ -5227,7 +5358,8 @@ React.useEffect(() => {
                                       style={{
                                         fontSize: `${fontSize}px`,
                                         fontFamily: selectedFontCss || 'Assistant, sans-serif',
-                                        fontWeight: style.fontWeight || 'normal',
+                                        // Requirement: first line is always bold (all event types)
+                                        fontWeight: lineIndex === 0 ? 'bold' : (style.fontWeight || 'normal'),
                                         color: textColor,
                                     lineHeight: style.lineHeight ? `${style.lineHeight}` : '1.4',
                                         letterSpacing: style.letterSpacing ? `${style.letterSpacing}px` : '0',
@@ -5272,11 +5404,13 @@ React.useEffect(() => {
             <button onClick={()=> setShowLightbox(false)} className="absolute top-2 left-2 text-2xl text-gray-200 hover:text-white">&times;</button>
             <div className="relative">
               <img src={lightboxSrc} alt="preview" className="w-full h-auto rounded-md" />
+              <div className="absolute inset-0 rounded-md pointer-events-none" style={{ background: 'rgba(255,255,255,0.22)' }} aria-hidden />
               <div className="absolute inset-0 flex flex-col items-center justify-center px-4" dir="rtl">
                 {(customInvitationText || invitationText || 'דוגמת טקסט להזמנה').split('\n').map((line, lineIndex) => {
                   if (!line || !line.trim()) return <div key={lineIndex} style={{ height: '0.5em' }} />;
                   const style = lineStyles[lineIndex] || {};
-                  const fontSize = style.fontSize ? parseInt(style.fontSize) : 24;
+                  const baseFontSize = style.fontSize ? parseInt(style.fontSize) : 24;
+                  const fontSize = lineIndex === 0 ? baseFontSize + 6 : baseFontSize;
                   let textColor = style.color || '#000000';
                   if (!textColor.startsWith('#')) {
                     const colorMap = {
@@ -5292,7 +5426,8 @@ React.useEffect(() => {
                       style={{
                         fontSize: `${fontSize}px`,
                         fontFamily: selectedFontCss || 'Assistant, sans-serif',
-                        fontWeight: style.fontWeight || 'normal',
+                        // Requirement: first line is always bold (all event types)
+                        fontWeight: lineIndex === 0 ? 'bold' : (style.fontWeight || 'normal'),
                         color: textColor,
                         lineHeight: style.lineHeight ? `${style.lineHeight}` : '1.5',
                         letterSpacing: style.letterSpacing ? `${style.letterSpacing}px` : '0',
@@ -6200,7 +6335,7 @@ React.useEffect(() => {
                     • במערכת זו לא ניתן לנהל שני אירועים במקביל. בכל פעם ניתן לנהל אירוע אחד בלבד.
                   </p>
                   <p className="text-base font-bold text-red-800">
-                    • יצירת אירוע חדש תמחק את האירוע הקיים ואת כל הדוחות שלו לגמרי מהמערכת. מה שכבר נמצא בארכיון יישאר ללא שינוי.
+                    • יצירת אירוע חדש תתאפשר רק אחרי מחיקה מלאה של האירוע הקיים: כולל דוחות בקרה, רשימת אורחים וכל הנתונים. מה שבארכיון יישאר ללא שינוי.
                   </p>
                 </div>
               </div>
@@ -6254,7 +6389,7 @@ React.useEffect(() => {
                   <div className="flex items-start gap-2">
                     <span className="text-red-600 font-bold text-lg">⚠️</span>
                     <p className="text-right flex-1 text-base font-semibold">
-                      כל הדוחות של האירוע הקיים יימחקו לגמרי מהמערכת. מה שכבר נמצא בארכיון יישאר ללא שינוי.
+                      דוחות הבקרה וכל נתוני האירוע יימחקו לגמרי. יצירת אירוע חדש תתאפשר רק לאחר סיום המחיקה.
                     </p>
                   </div>
                 </div>
@@ -6281,12 +6416,12 @@ React.useEffect(() => {
         </div>
       )}
 
-      {/* Deletion Success Modal */}
+      {/* Deletion Success Modal – מוצג מעל כל המודלים אחרי מחיקה מוצלחת */}
       {showDeletionSuccess && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50">
+        <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-[60]">
           <div className="relative bg-white rounded-lg p-6 w-full max-w-md text-center shadow-2xl border-4 border-green-500">
             <button
-              onClick={() => setShowDeletionSuccess(false)}
+              onClick={() => { setShowDeletionSuccess(false); setShowEventTypes(true); }}
               className="absolute top-2 left-2 text-2xl text-gray-500 hover:text-gray-700"
               aria-label="סגור"
             >
@@ -6294,16 +6429,16 @@ React.useEffect(() => {
             </button>
             <div className="mb-6">
               <div className="text-5xl mb-4 text-green-600">✅</div>
-              <h2 className="text-2xl font-bold text-green-700 mb-3">האירוע נמחק בהצלחה</h2>
+              <h2 className="text-2xl font-bold text-green-700 mb-3">המחיקה בוצעה בהצלחה</h2>
               <p className="text-base text-gray-700 leading-relaxed">
-                האירוע הקודם והנתונים שלו הוסרו מהמערכת. באפשרותך לחזור לדף הבית ולהתחיל אירוע חדש מתי שתרצה.
+                האירוע הקודם, דוחות הבקרה וכל הנתונים הוסרו מהמערכת. כעת ניתן ליצור אירוע חדש.
               </p>
             </div>
             <button
-              onClick={() => setShowDeletionSuccess(false)}
+              onClick={() => { setShowDeletionSuccess(false); setShowEventTypes(true); }}
               className="bg-green-600 text-white border border-green-700 rounded-full px-8 py-3 font-bold text-lg hover:bg-green-700 transition-all"
             >
-              סגור
+              בחר סוג אירוע חדש
             </button>
           </div>
         </div>
@@ -6749,16 +6884,10 @@ React.useEffect(() => {
                     setShowPaymentResultModal(false);
                     // If it was a plan purchase (not addon), continue with event creation
                     if (paymentWasPlanPurchase) {
-                      // Check if user was trying to create event (from localStorage)
-                      const wasCreatingEvent = typeof window !== 'undefined' && localStorage.getItem('pendingCreateEvent') === 'true';
-                      if (wasCreatingEvent) {
-                        localStorage.removeItem('pendingCreateEvent');
-                        // Continue with event creation flow
-                        setShowEventTypes(true);
-                      } else {
-                        // Just show event types selection
-                        setShowEventTypes(true);
+                      if (typeof window !== 'undefined') {
+                        try { localStorage.removeItem('pendingCreateEvent'); } catch(e){}
                       }
+                      setShowEventTypes(true);
                     }
                   }}
                   className="w-full bg-green-600 hover:bg-green-700 text-white font-bold text-lg md:text-xl py-4 px-8 rounded-full transition-all shadow-lg transform hover:scale-105"

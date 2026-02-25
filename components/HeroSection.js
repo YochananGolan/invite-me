@@ -58,7 +58,9 @@ const useTypewriter = (text, speed = 100, pauseDuration = 5000) => {
   return displayedText;
 };
 
-export default forwardRef(function HeroSection({ onStart, onShowFeatures, onSignUpClick, onSignInClick, isLoggedIn, onCreateEvent, onShowReports }, ref) {
+export default forwardRef(function HeroSection({ onStart, onShowFeatures, onSignUpClick, onSignInClick, isLoggedIn, onPressCreateEvent, onPressReports }, ref) {
+  const handleCreateNewEvent = () => typeof onPressCreateEvent === 'function' && onPressCreateEvent();
+  const handleOpenReports = () => typeof onPressReports === 'function' && onPressReports();
   // Full invitation text with line breaks
   const fullInvitationText = 'דוד & שרה\nמתחתנים\n\nבשמחה רבה אנו מזמינים אתכם לחגוג עמנו את יום נישואינו\n\nיום שלישי • 24.03.2026\n📍 ירושלים, ישראל\n\nקבלת פנים 19:00 • חופה וקידושין 21:00';
   const displayedInvitationText = useTypewriter(fullInvitationText, 80, 5000);
@@ -102,23 +104,29 @@ export default forwardRef(function HeroSection({ onStart, onShowFeatures, onSign
               <span className="text-gray-700 font-medium text-lg md:text-xl">הצטרפו!</span>
             </div>
 
-            {/* Create Event + Process Description Buttons */}
+            {/* כפתורי פעולה ראשיים */}
             <div className="flex flex-col sm:flex-row gap-3 justify-center lg:justify-start mb-8">
               <button
+                type="button"
                 onClick={() => typeof onStart === 'function' && onStart()}
-                className="px-8 py-4 rounded-lg border-2 border-primary text-primary font-medium hover:bg-primary/5 transition-colors text-lg"
+                className="px-8 py-4 rounded-lg border border-gray-300 text-gray-700 font-medium hover:bg-gray-50 transition-colors text-lg"
+                aria-label="תיאור תהליך יצירת אירוע"
               >
                 תיאור תהליך יצירת אירוע
               </button>
               <button
-                onClick={() => typeof onCreateEvent === 'function' && onCreateEvent()}
-                className="px-8 py-4 rounded-lg bg-primary text-white font-bold hover:bg-primary/90 transition-colors shadow-lg text-lg"
+                type="button"
+                onClick={handleCreateNewEvent}
+                className="px-8 py-4 rounded-lg bg-purple-600 text-white font-extrabold text-lg cursor-pointer
+                           shadow-xl ring-2 ring-purple-400 hover:bg-purple-700 hover:shadow-[0_0_35px_rgba(147,51,234,0.65)]
+                           transition-all duration-200 hover:scale-105 active:scale-95 animate-[pulse_4s_ease-in-out_infinite]"
+                aria-label="צור אירוע חדש"
               >
                 צור אירוע חדש
               </button>
             </div>
 
-            {/* Feature Icons + דוחות בקרה - אותה שורה מתחת לכפתור העליון */}
+            {/* Feature Icons + דוחות בקרה – כפתור נפרד, קורא רק ל-onShowReports */}
             <div className="flex flex-wrap justify-center lg:justify-start items-end gap-6 mt-10">
               {[
                 { icon: '🎨', label: 'עיצוב מקצועי', sub: '45 תבניות' },
@@ -133,10 +141,12 @@ export default forwardRef(function HeroSection({ onStart, onShowFeatures, onSign
                   <span className="text-gray-500 text-xs">{f.sub}</span>
                 </div>
               ))}
-              {typeof onShowReports === 'function' && (
+              {typeof onPressReports === 'function' && (
                 <button
-                  onClick={() => onShowReports()}
+                  type="button"
+                  onClick={handleOpenReports}
                   className="px-8 py-4 rounded-full bg-primary/15 text-primary font-bold border-2 border-primary hover:bg-primary hover:text-white transition-colors text-lg shadow-md shrink-0 self-center lg:-translate-x-24"
+                  aria-label="דוחות בקרה"
                 >
                   דוחו״ת בקרה
                 </button>
