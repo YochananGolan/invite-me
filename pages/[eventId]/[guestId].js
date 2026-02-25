@@ -551,39 +551,6 @@ export default function GuestPage() {
         </div>
       )}
 
-      {guest?.table_number && (
-        <div className="mt-2 mb-2 text-center">
-          <div className="inline-block text-2xl font-extrabold text-primary bg-[#FCE6AC] border border-primary rounded-full px-6 py-3">
-            שים לב מקומך באולם : שולחן מספר {guest.table_number}
-          </div>
-        </div>
-      )}
-
-      {(wazeUrl || guest?.hall_address) && (
-        <div className="flex justify-center mb-3 gap-3 flex-wrap">
-          {wazeUrl && (
-            <a
-              href={wazeUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 rounded-full bg-blue-600 text-white px-5 py-2 text-lg font-medium shadow hover:bg-blue-700 transition-colors"
-            >
-              <span role="img" aria-label="Waze">🧭</span>
-              ניווט לאולם ב-Waze
-            </a>
-          )}
-
-          <button
-            type="button"
-            onClick={() => setShowMap(true)}
-            className="inline-flex items-center gap-2 rounded-full bg-emerald-600 text-white px-5 py-2 text-lg font-medium shadow hover:bg-emerald-700 transition-colors"
-          >
-            <span role="img" aria-label="מפת האזור">🗺️</span>
-            מפת איזור האירוע
-          </button>
-        </div>
-      )}
-
       <div className="w-full max-w-xl rounded-lg bg-white px-3 pb-1 pt-0 shadow-sm text-right text-sm mt-1 flex-shrink-0">
         <h1 className="mb-4 text-2xl font-bold text-primary">אישור הגעה</h1>
 
@@ -629,6 +596,39 @@ export default function GuestPage() {
           <p className="text-center text-gray-600">תודה על העדכון!</p>
         ) : null}
       </div>
+
+      {(wazeUrl || guest?.hall_address) && (
+        <div className="flex justify-center mb-3 gap-3 flex-wrap">
+          {wazeUrl && (
+            <a
+              href={wazeUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 rounded-full bg-blue-600 text-white px-5 py-2 text-lg font-medium shadow hover:bg-blue-700 transition-colors"
+            >
+              <span role="img" aria-label="Waze">🧭</span>
+              ניווט לאולם ב-Waze
+            </a>
+          )}
+
+          <button
+            type="button"
+            onClick={() => setShowMap(true)}
+            className="inline-flex items-center gap-2 rounded-full bg-emerald-600 text-white px-5 py-2 text-lg font-medium shadow hover:bg-emerald-700 transition-colors"
+          >
+            <span role="img" aria-label="מפת האזור">🗺️</span>
+            מפת איזור האירוע
+          </button>
+        </div>
+      )}
+
+      {guest?.table_number && (
+        <div className="mt-2 mb-2 text-center">
+          <div className="inline-block text-2xl font-extrabold text-primary bg-[#FCE6AC] border border-primary rounded-full px-6 py-3">
+            שים לב מקומך באולם : שולחן מספר {guest.table_number}
+          </div>
+        </div>
+      )}
 
       <div className="flex justify-center w-full mt-0 mb-0 flex-shrink-0">
         {/* Closed button removed */}
