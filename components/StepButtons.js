@@ -1127,18 +1127,21 @@ const handleOpenAddonModal = React.useCallback(() => {
 
   const normalizeType = (t) => (t === 'ברית/ה' || t === 'בריתה' ? 'ברית' : t);
 
-  // עיצוב ברירת מחדל להזמנת חתונה (נוסח + עיצוב כיתוב)
+  // עיצוב ברירת מחדל להזמנת חתונה – שורה ראשונה (שמות) ותאריך מודגשים מאוד
   const defaultLineStylesForWedding = {
-    0: { fontSize: 26, fontWeight: 'bold', textAlign: 'center', color: 'black' },
+    0: { fontSize: 30, fontWeight: 'bold', textAlign: 'center', color: 'black' }, // שמות – מודגש מאוד
     1: { fontSize: 18, textAlign: 'center', color: 'black' },
     2: { fontSize: 18, textAlign: 'center', color: 'black' },
-    3: { fontSize: 17, textAlign: 'center', color: 'black' },
+    3: { fontSize: 19, fontWeight: 'bold', textAlign: 'center', color: 'black' }, // תאריך ושעה – מודגש
     4: { fontSize: 17, textAlign: 'center', color: 'black' },
     5: { fontSize: 17, textAlign: 'center', color: 'black' },
-    6: { fontSize: 15, textAlign: 'center', color: 'black' }, // רווח שורה בין החופה להורי הכלה
+    6: { fontSize: 15, textAlign: 'center', color: 'black' },
     7: { fontSize: 15, textAlign: 'center', color: 'black' },
     8: { fontSize: 15, textAlign: 'center', color: 'black' },
   };
+
+  // ברירת מחדל לכל סוגי האירועים: שורה ראשונה (שמות/כותרת) מודגשת מאוד
+  const defaultFirstLineStyle = { fontSize: 28, fontWeight: 'bold', textAlign: 'center', color: 'black' };
 
   const [customInvitationText, setCustomInvitationText] = useState('');
   const [lineStyles, setLineStyles] = useState({});
@@ -1270,12 +1273,19 @@ const handleOpenAddonModal = React.useCallback(() => {
     setCustomInvitationText('');
   }, [selectedEventType]);
 
-  // When design chooser opens the first time, prefill the textarea with default text and (for wedding) default line styles
+  // When design chooser opens the first time, prefill the textarea with default text and default line styles
   React.useEffect(() => {
     if (showDesignChooser && !customInvitationText) {
       setCustomInvitationText(invitationTextDefault);
       if (normalizeType(selectedEventType) === 'חתונה') {
         setLineStyles(defaultLineStylesForWedding);
+      } else if (selectedEventType) {
+        // לכל שאר סוגי האירועים: שורה ראשונה מודגשת מאוד, ושורות תאריך (בדרך כלל 2–3) מודגשות
+        const lines = (invitationTextDefault || '').split('\n');
+        const defaultStyles = { 0: { ...defaultFirstLineStyle } };
+        if (lines.length > 2) defaultStyles[2] = { fontSize: 18, fontWeight: 'bold', textAlign: 'center', color: 'black' };
+        if (lines.length > 3) defaultStyles[3] = { fontSize: 17, fontWeight: 'bold', textAlign: 'center', color: 'black' };
+        setLineStyles(defaultStyles);
       }
     }
   }, [showDesignChooser, invitationTextDefault, customInvitationText, selectedEventType]);

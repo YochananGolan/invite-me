@@ -477,7 +477,10 @@ export default function GuestPage() {
                 if (!line || !line.trim()) return null;
                 const style = lineStyles[idx] || {};
                 const defaultFontSize = 24;
-                const fontSize = style.fontSize ? parseInt(style.fontSize) : defaultFontSize;
+                const baseFontSize = style.fontSize ? parseInt(style.fontSize) : defaultFontSize;
+                // שורה ראשונה (שמות) מודגשת מאוד כברירת מחדל; תאריך (שורה 3) מודגש
+                const fontSize = idx === 0 && !style.fontSize ? 28 : baseFontSize;
+                const fontWeight = idx === 0 ? 'bold' : (idx === 3 ? (style.fontWeight || 'bold') : (style.fontWeight || 'normal'));
                 const lineHeight = style.lineHeight ? parseFloat(style.lineHeight) : 1.4;
                 
                 // Clean font CSS
@@ -509,7 +512,7 @@ export default function GuestPage() {
                     style={{
                       fontSize: `${fontSize}px`,
                       fontFamily: cleanFontCSS,
-                      fontWeight: style.fontWeight || 'normal',
+                      fontWeight: fontWeight,
                       color: textColor,
                       lineHeight: `${lineHeight}`,
                       letterSpacing: style.letterSpacing ? `${style.letterSpacing}px` : '0',
