@@ -12,6 +12,17 @@ module.exports = {
         sans: ['"Heebo"', 'sans-serif'],
         mplus: ['"M PLUS 1p"', 'sans-serif'],
       },
+      keyframes: {
+        'cta-dark-cover': {
+          '0%': { opacity: '0' },
+          '25%': { opacity: '0' },
+          '25.01%': { opacity: '1' },
+          '100%': { opacity: '1' },
+        },
+      },
+      animation: {
+        'cta-dark-cover': 'cta-dark-cover 4s ease-in-out infinite',
+      },
     },
   },
   plugins: [],

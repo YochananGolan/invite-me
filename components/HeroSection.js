@@ -123,14 +123,17 @@ export default forwardRef(function HeroSection({ onStart, onShowFeatures, onSign
                            transition-all duration-200
                            hover:from-purple-900 hover:via-purple-900 hover:to-purple-900 hover:-translate-y-0.5 hover:shadow-[0_0_55px_rgba(88,28,135,0.8)] hover:ring-purple-900/80
                            active:from-purple-900 active:via-purple-900 active:to-purple-900 active:translate-y-0 active:scale-[0.98] active:shadow-inner
-                           focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-purple-500
-                           animate-[pulse_3s_ease-in-out_infinite]"
+                           focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-purple-500"
                 aria-label="צור אירוע חדש"
               >
+                <span
+                  aria-hidden="true"
+                  className="absolute inset-0 rounded-xl bg-purple-900 animate-cta-dark-cover pointer-events-none"
+                />
                 <span className="relative z-10">צור אירוע חדש</span>
                 <span
                   aria-hidden="true"
-                  className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-200 bg-[radial-gradient(circle_at_30%_20%,rgba(255,255,255,0.2),transparent_50%)]"
+                  className="absolute inset-0 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-200 bg-[radial-gradient(circle_at_30%_20%,rgba(255,255,255,0.2),transparent_50%)] pointer-events-none"
                 />
               </button>
             </div>
