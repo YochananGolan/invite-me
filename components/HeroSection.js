@@ -117,12 +117,21 @@ export default forwardRef(function HeroSection({ onStart, onShowFeatures, onSign
               <button
                 type="button"
                 onClick={handleCreateNewEvent}
-                className="px-8 py-4 rounded-lg bg-purple-600 text-white font-extrabold text-lg cursor-pointer
-                           shadow-xl ring-2 ring-purple-400 hover:bg-purple-700 hover:shadow-[0_0_35px_rgba(147,51,234,0.65)]
-                           transition-all duration-200 hover:scale-105 active:scale-95 animate-[pulse_4s_ease-in-out_infinite]"
+                className="group relative px-9 py-4 rounded-xl text-white font-extrabold text-lg cursor-pointer overflow-hidden
+                           bg-gradient-to-r from-purple-600 via-fuchsia-600 to-indigo-600
+                           shadow-[0_14px_35px_rgba(124,58,237,0.35)] ring-4 ring-purple-300/60 ring-offset-2 ring-offset-white
+                           transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_0_55px_rgba(168,85,247,0.65)]
+                           active:translate-y-0 active:scale-[0.98]
+                           focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-purple-500
+                           animate-[pulse_3s_ease-in-out_infinite]"
                 aria-label="צור אירוע חדש"
               >
-                צור אירוע חדש
+                <span className="relative z-10">צור אירוע חדש</span>
+                <span
+                  aria-hidden="true"
+                  className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-200
+                             bg-[radial-gradient(circle_at_30%_20%,rgba(255,255,255,0.45),transparent_55%)]"
+                />
               </button>
             </div>
 

@@ -409,33 +409,21 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick, trig
     }
   },[]);
 
-const [additionalPackages, setAdditionalPackages] = useState(() => {
-  if (typeof window === 'undefined') return [];
-  try {
-    const stored = localStorage.getItem('additionalPackages');
-    if (!stored) return [];
-    const parsed = JSON.parse(stored);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch(e) { return []; }
-});
+const [additionalPackages, setAdditionalPackages] = useState([]);
 const [planLimitWarningError, setPlanLimitWarningError] = useState('');
 const [planAddOnMode, setPlanAddOnMode] = useState(false);
 const [planSelectionError, setPlanSelectionError] = useState('');
 const [planWarningSuppressed, setPlanWarningSuppressed] = useState(false);
-const [allowedGuestCapacity, setAllowedGuestCapacity] = useState(null);
 const [eventMessagesSentCount, setEventMessagesSentCount] = useState(0);
+const [invitedGuestsCount, setInvitedGuestsCount] = useState(0);
 
-  React.useEffect(() => {
-    try {
-      localStorage.setItem('additionalPackages', JSON.stringify(additionalPackages));
-    } catch (e) {
-      console.warn('Failed to persist additionalPackages', e);
-    }
-  }, [additionalPackages]);
+  // Persist additionalPackages after currentEventId is known (see effect below).
 
   const totalGuestsCount = guestSummary.adults + guestSummary.children;
-  // התאמה לסטטוס אישורי הגעה: הודעות שנשלחו = מקסימום בין מונה DB לבין אורחים שקיבלו הזמנה (אישרו/דחו/טרם הגיבו)
-  const invitedCount = (guestStatusSummary?.approved ?? 0) + (guestStatusSummary?.rejected ?? 0) + (guestStatusSummary?.pending ?? 0);
+  // הודעות שנשלחו: מקור אמת = messages_sent_count (אם קיים) עם fallback למספר אורחים שנוצרו באירוע.
+  const invitedCountFromStatus =
+    (guestStatusSummary?.approved ?? 0) + (guestStatusSummary?.rejected ?? 0) + (guestStatusSummary?.pending ?? 0);
+  const invitedCount = Math.max(invitedGuestsCount || 0, invitedCountFromStatus || 0);
   const effectiveMessagesSentCount = Math.max(eventMessagesSentCount || 0, invitedCount || 0);
 
   React.useEffect(() => {
@@ -480,34 +468,9 @@ const additionalPackageCounts = React.useMemo(() => {
 }, [additionalPackages]);
 
 const addonUnitSize = getPlanBaseLimit('addon') || 0;
-const basePlanCapacity = basePlanLimit || 0;
-const normalizedAllowedCapacity =
-  allowedGuestCapacity != null ? Math.max(allowedGuestCapacity, basePlanCapacity) : null;
-const extraCapacityFromServer =
-  normalizedAllowedCapacity != null
-    ? Math.max(0, normalizedAllowedCapacity - basePlanCapacity)
-    : null;
-// When user chose Plan A (free/basic) and did not purchase any addons, show only base plan – ignore stale DB allowed_guests
-const planAWithNoAddons = (selectedPlan === 'free' || selectedPlan === 'basic') && additionalPackages.length === 0;
-const displayTotalPlanCapacity =
-  planAWithNoAddons ? totalPlanCapacity : (normalizedAllowedCapacity != null ? normalizedAllowedCapacity : totalPlanCapacity);
-const displayAdditionalCapacity =
-  planAWithNoAddons ? 0 : (extraCapacityFromServer != null ? extraCapacityFromServer : additionalCapacity);
-const displayTotalPlanCapacityValue = Math.max(
-  0,
-  Math.round(displayTotalPlanCapacity)
-);
-const displayAdditionalCapacityValue = Math.max(
-  0,
-  Math.round(displayAdditionalCapacity)
-);
-const computedAddonCountFromServer =
-  extraCapacityFromServer != null && addonUnitSize > 0
-    ? Math.floor(extraCapacityFromServer / addonUnitSize)
-    : 0;
-const fallbackAddonCount = additionalPackageCounts['addon'] || 0;
-const effectiveAddonCount =
-  extraCapacityFromServer != null ? computedAddonCountFromServer : fallbackAddonCount;
+const displayTotalPlanCapacityValue = Math.max(0, Math.round(totalPlanCapacity));
+const displayAdditionalCapacityValue = Math.max(0, Math.round(additionalCapacity));
+const effectiveAddonCount = additionalPackageCounts['addon'] || 0;
 const packageEntriesFromState = Object.entries(additionalPackageCounts)
   .filter(([planId, count]) => planId !== 'addon' && count > 0)
   .map(([planId, count]) => ({
@@ -525,8 +488,7 @@ if (effectiveAddonCount > 0) {
     extra: addonUnitSize * effectiveAddonCount,
   });
 }
-// For display: when Plan A with no purchased addons, don't show addon row from stale DB
-const displayPackageEntries = planAWithNoAddons ? packageEntries.filter(e => e.id !== 'addon') : packageEntries;
+const displayPackageEntries = packageEntries;
 
 // No longer needed - removed complex plan selection
 // Users just purchase addon packages as needed
@@ -798,13 +760,15 @@ const handleOpenAddonModal = React.useCallback(() => {
         .limit(1)
         .single();
 
+      const eventIdForInvite = currentEventId || evRow?.id || null;
+
       // Quota is by messages sent only - adding guests is not limited by count
       const { data: newGuest, error } = await supabase
         .from('invited_guests')
         .insert([
           {
             user_id: user.id,
-            event_id: evRow?.id || null,
+            event_id: eventIdForInvite,
             first_name: guestData.guestFirstName,
             last_name: guestData.guestLastName,
             phone: guestData.guestPhone,
@@ -817,9 +781,12 @@ const handleOpenAddonModal = React.useCallback(() => {
         .select()
         .single();
       if (error) throw error;
+      if (eventIdForInvite) {
+        setInvitedGuestsCount((prev) => prev + 1);
+      }
 
       const baseUrl = process.env.NEXT_PUBLIC_APP_URL || (typeof window !== 'undefined' ? window.location.origin : 'https://invite-me-two.vercel.app');
-      const inviteLink = `${baseUrl}/${evRow?.id}/${newGuest.id}`;
+      const inviteLink = `${baseUrl}/${eventIdForInvite}/${newGuest.id}`;
 
       // Dev helper: log the RSVP link so it can be copied from the browser console
       if (process.env.NODE_ENV !== 'production') {
@@ -873,9 +840,9 @@ const handleOpenAddonModal = React.useCallback(() => {
           // Count this message toward quota (SMS and WhatsApp both count as one message)
           const newCount = (eventMessagesSentCount || 0) + 1;
           setEventMessagesSentCount(newCount);
-          if (evRow?.id) {
+          if (eventIdForInvite) {
             try {
-              await supabase.from('events').update({ messages_sent_count: newCount }).eq('id', evRow.id);
+              await supabase.from('events').update({ messages_sent_count: newCount }).eq('id', eventIdForInvite);
             } catch (e) { /* column may not exist yet */ }
           }
           setInvitationResult({ 
@@ -951,13 +918,15 @@ const handleOpenAddonModal = React.useCallback(() => {
         .limit(1)
         .single();
 
+      const eventIdForInvite = currentEventId || evRow?.id || null;
+
       // Quota is by messages sent only - adding guests is not limited by count
       const { data: newGuest, error } = await supabase
         .from('invited_guests')
         .insert([
           {
             user_id: user.id,
-            event_id: evRow?.id || null,
+            event_id: eventIdForInvite,
             first_name: guestData.guestFirstName,
             last_name: guestData.guestLastName,
             phone: guestData.guestPhone,
@@ -970,9 +939,12 @@ const handleOpenAddonModal = React.useCallback(() => {
         .select()
         .single();
       if (error) throw error;
+      if (eventIdForInvite) {
+        setInvitedGuestsCount((prev) => prev + 1);
+      }
 
       const baseUrl = process.env.NEXT_PUBLIC_APP_URL || (typeof window !== 'undefined' ? window.location.origin : 'https://invite-me-two.vercel.app');
-      const inviteLink = `${baseUrl}/${evRow?.id}/${newGuest.id}`;
+      const inviteLink = `${baseUrl}/${eventIdForInvite}/${newGuest.id}`;
 
       // Send SMS via API - check message quota first (effective = sync with status panel)
       const totalLimitSms = (getPlanBaseLimit(selectedPlan) || 0) + additionalPackages.reduce((s, id) => s + (getPlanBaseLimit(id) || 0), 0);
@@ -1003,9 +975,9 @@ const handleOpenAddonModal = React.useCallback(() => {
         if (smsResult.success && smsResult.sent > 0) {
           const newCount = (eventMessagesSentCount || 0) + smsResult.sent;
           setEventMessagesSentCount(newCount);
-          if (evRow?.id) {
+          if (eventIdForInvite) {
             try {
-              await supabase.from('events').update({ messages_sent_count: newCount }).eq('id', evRow.id);
+              await supabase.from('events').update({ messages_sent_count: newCount }).eq('id', eventIdForInvite);
             } catch (e) { /* column may not exist yet */ }
           }
           setInvitationSent(true);
@@ -1507,7 +1479,7 @@ const handleOpenAddonModal = React.useCallback(() => {
           }
         }
 
-        setAllowedGuestCapacity(totalAllowedGuests);
+        // allowed_guests is persisted in DB; UI quota uses selectedPlan/addons from state.
       } else {
         // Calculate allowed guests based on plan and addons
         const basePlanLimit = getPlanBaseLimit(selectedPlan) || 50;
@@ -1531,7 +1503,6 @@ const handleOpenAddonModal = React.useCallback(() => {
         if(inserted){
           console.debug('[StepButtons] Insert success', inserted);
           setCurrentEventId(inserted.id);
-          setAllowedGuestCapacity(totalAllowedGuests);
           setEventMessagesSentCount(0);
         }
         if(insertErr){
@@ -2363,7 +2334,6 @@ React.useEffect(() => {
     // המשתמש כבר רכש/בחר מסלול, אין סיבה לבקש ממנו לבחור שוב.
     if (eventWasDeleted) {
       setNewEventStarted(false); // Clear "event in progress" message
-      setAllowedGuestCapacity(null);
       setEventMessagesSentCount(0);
       try { localStorage.removeItem('newEventStarted'); } catch(e){}
     } else {
@@ -2394,6 +2364,8 @@ React.useEffect(() => {
     try{ localStorage.removeItem('finishedSteps'); }catch{} // Clear finished steps from local storage
     try{ localStorage.removeItem('selectedEventType'); }catch{} // Clear selected event type from local storage
     try{ localStorage.removeItem('additionalPackages'); }catch{}
+    try{ localStorage.removeItem('additionalPackagesEventId'); }catch{}
+    try{ if (currentEventId) localStorage.removeItem(`additionalPackages:${currentEventId}`); }catch{}
 
     // Check if user has a plan - if not, show pricing modal
     if (!selectedPlan) {
@@ -2556,12 +2528,6 @@ React.useEffect(() => {
           try { localStorage.setItem('selectedPlan', pendingPlan); } catch(e){
             console.warn('Failed to save plan to localStorage:', e);
           }
-          const newBaseLimit = getPlanBaseLimit(pendingPlan) || 0;
-          const existingExtraCapacity = additionalPackages.reduce(
-            (sum, planId) => sum + getPlanBaseLimit(planId),
-            0
-          );
-          setAllowedGuestCapacity(newBaseLimit + existingExtraCapacity);
 
           const planDisplayName = getPlanDisplayName(pendingPlan);
           // Show success modal instead of toast
@@ -2586,7 +2552,12 @@ React.useEffect(() => {
           const updatedPackages = [...additionalPackages, ...newAddons];
           setAdditionalPackages(updatedPackages);
           try {
-            localStorage.setItem('additionalPackages', JSON.stringify(updatedPackages));
+            const payload = JSON.stringify(updatedPackages);
+            if (currentEventId) {
+              localStorage.setItem(`additionalPackages:${currentEventId}`, payload);
+              localStorage.setItem('additionalPackagesEventId', String(currentEventId));
+            }
+            localStorage.setItem('additionalPackages', payload);
           } catch (e) {
             console.warn('Failed to persist additionalPackages after addon purchase', e);
           }
@@ -2597,31 +2568,7 @@ React.useEffect(() => {
           setPaymentResultMessage(`התשלום בוצע בהצלחה! ${totalGuestsAdded} מקומות נוספים נוספו לאירוע שלך.`);
           setPaymentWasPlanPurchase(false);
 
-          // עדכון מכסה ב-DB וב-state לפי המערך המעודכן
-          const baseLimit = getPlanBaseLimit(selectedPlan) || 0;
-          const existingExtraCapacity = updatedPackages.reduce(
-            (sum, planId) => sum + getPlanBaseLimit(planId),
-            0
-          );
-          const newTotalAllowedGuests = baseLimit + existingExtraCapacity;
-          setAllowedGuestCapacity(newTotalAllowedGuests);
-
-          if (currentEventId) {
-            try {
-              const { error: updateError } = await supabase
-                .from('events')
-                .update({ allowed_guests: newTotalAllowedGuests })
-                .eq('id', currentEventId);
-
-              if (updateError) {
-                console.error('Failed to update allowed_guests in database:', updateError);
-              } else {
-                console.log(`✅ Updated allowed_guests to ${newTotalAllowedGuests} in database`);
-              }
-            } catch (err) {
-              console.error('Error updating allowed_guests:', err);
-            }
-          }
+          // מכסת הודעות נגזרת מ-selectedPlan + additionalPackages (state/localStorage).
 
           setShowPaymentModal(false);
           setShowPaymentResultModal(true);
@@ -2755,7 +2702,6 @@ React.useEffect(() => {
           messagesSent = ev?.messages_sent_count ?? 0;
         }
         if(!ev) return;
-        setAllowedGuestCapacity(ev.allowed_guests ?? null);
         setEventMessagesSentCount(messagesSent);
         // NEVER override selectedPlan from allowed_guests - user's choice should always be respected
         // Only set if there's absolutely no plan selected anywhere
@@ -2852,6 +2798,78 @@ React.useEffect(() => {
 
   const [currentEventId,setCurrentEventId]=useState(null);
   const [showActiveError,setShowActiveError]=useState(false);
+
+  // Load additionalPackages per-event (prevents leaking addons between events/users).
+  React.useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (!currentEventId) return;
+    try {
+      const scopedKey = `additionalPackages:${currentEventId}`;
+      let stored = localStorage.getItem(scopedKey);
+
+      // Legacy fallback (only if it belongs to this event)
+      if (!stored) {
+        const legacyEventId = localStorage.getItem('additionalPackagesEventId');
+        const legacy = localStorage.getItem('additionalPackages');
+        if (legacy && legacyEventId === String(currentEventId)) {
+          stored = legacy;
+        }
+      }
+
+      if (!stored) {
+        setAdditionalPackages([]);
+        return;
+      }
+
+      const parsed = JSON.parse(stored);
+      setAdditionalPackages(Array.isArray(parsed) ? parsed : []);
+    } catch (e) {
+      console.warn('Failed to load additionalPackages for event', e);
+      setAdditionalPackages([]);
+    }
+  }, [currentEventId]);
+
+  // Persist additionalPackages for the current event.
+  React.useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (!currentEventId) return;
+    try {
+      const payload = JSON.stringify(additionalPackages);
+      localStorage.setItem(`additionalPackages:${currentEventId}`, payload);
+      // Legacy keys (kept to avoid breaking older sessions), guarded by event id.
+      localStorage.setItem('additionalPackages', payload);
+      localStorage.setItem('additionalPackagesEventId', String(currentEventId));
+    } catch (e) {
+      console.warn('Failed to persist additionalPackages', e);
+    }
+  }, [additionalPackages, currentEventId]);
+
+  // Keep a robust count of invited guests for this event (fallback for message counter/report).
+  React.useEffect(() => {
+    if (!currentEventId) {
+      setInvitedGuestsCount(0);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const { count, error } = await supabase
+          .from('invited_guests')
+          .select('id', { count: 'exact', head: true })
+          .eq('event_id', currentEventId);
+        if (!cancelled && !error) {
+          setInvitedGuestsCount(count || 0);
+        }
+      } catch (e) {
+        if (!cancelled) {
+          console.error('Failed to count invited guests', e);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [currentEventId]);
 
   // Auto-save invitation text and styles to database when they change (with debounce)
   useEffect(() => {
@@ -3034,7 +3052,6 @@ React.useEffect(() => {
         // מאחר שהאירוע הסתיים באופן טבעי (עבר התאריך) – המסלול הנוכחי "נצרך"
         // וליצירת אירוע חדש יש לבחור ולשלם על מסלול מחדש.
         setSelectedPlan(null);
-        setAllowedGuestCapacity(null);
         setEventMessagesSentCount(0);
         try { localStorage.removeItem('selectedPlan'); } catch(e){}
         
@@ -3091,7 +3108,6 @@ React.useEffect(() => {
               if (eventDate >= today) {
                 console.log('Found future event in database, restoring...', ev);
                 setCurrentEventId(ev.id);
-                setAllowedGuestCapacity(ev.allowed_guests ?? null);
                 setEventMessagesSentCount(messagesSent);
                 // NEVER override selectedPlan from allowed_guests - user's choice should always be respected
                 // Only set if there's absolutely no plan selected anywhere
@@ -3221,7 +3237,6 @@ React.useEffect(() => {
         }
         if(ev){
           setCurrentEventId(ev.id);
-          setAllowedGuestCapacity(ev.allowed_guests ?? null);
           setEventMessagesSentCount(messagesSent);
           // NEVER override selectedPlan from allowed_guests - user's choice should always be respected
           // Only set if there's absolutely no plan selected anywhere

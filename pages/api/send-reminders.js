@@ -1,5 +1,5 @@
 /**
- * תזכורת אוטומטית – שבוע לפני האירוע.
+ * תזכורת אוטומטית – יומיים לפני האירוע.
  * נשלחת ב-SMS בלבד לכל מי שהזמנה נשלחה אליו (כל המופיעים ברשימת המוזמנים).
  * מופעלת אוטומטית על ידי Vercel Cron מדי יום; אפשר גם להפעיל ידנית עם CRON_SECRET.
  */
@@ -34,9 +34,9 @@ export default async function handler(req, res) {
   const supabase = createClient(supabaseUrl, supabaseKey);
 
   const now = new Date();
-  const inSevenDays = new Date(now);
-  inSevenDays.setDate(inSevenDays.getDate() + 7);
-  const targetDateStr = getDateStringInIsrael(inSevenDays);
+  const inTwoDays = new Date(now);
+  inTwoDays.setDate(inTwoDays.getDate() + 2);
+  const targetDateStr = getDateStringInIsrael(inTwoDays);
 
   const { data: events, error: evError } = await supabase
     .from('events')
@@ -49,7 +49,7 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: evError.message });
   }
 
-  const eventsInSevenDays = (events || []).filter((ev) => {
+  const eventsInTwoDays = (events || []).filter((ev) => {
     const d = ev?.event_details || {};
     const dateStr = d.end_datetime || d.date || d.start_datetime;
     if (!dateStr) return false;
@@ -60,7 +60,7 @@ export default async function handler(req, res) {
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://invite-me-two.vercel.app';
   const report = { targetDate: targetDateStr, eventsProcessed: 0, totalSent: 0, errors: [] };
 
-  for (const event of eventsInSevenDays) {
+  for (const event of eventsInTwoDays) {
     const details = typeof event.event_details === 'string' ? JSON.parse(event.event_details || '{}') : event.event_details || {};
     const eventName = details.title || details.event_name || 'האירוע';
     const eventDateStr = details.date || details.start_datetime || details.end_datetime || '';
@@ -89,7 +89,7 @@ export default async function handler(req, res) {
       };
     });
 
-    const message = `תזכורת מ-MeetM: ${eventName} – ${eventDateDisplay}. לאישור הגעה: {inviteLink}`;
+    const message = `תזכורת מ-MeetM: ${eventName} – ${eventDateDisplay}. לאישור הגעה: {inviteLink}. אין צורך לאשר שוב אלא אם כן חל שינוי ביחס לאישור הקודם.`;
 
     try {
       const { sent, failed, errors: sendErrors } = await sendSmsToGuests(smsGuests, message, 'Reminder');
@@ -112,7 +112,7 @@ export default async function handler(req, res) {
   return res.status(200).json({
     ok: true,
     targetDate: targetDateStr,
-    eventsFound: eventsInSevenDays.length,
+    eventsFound: eventsInTwoDays.length,
     eventsProcessed: report.eventsProcessed,
     totalRemindersSent: report.totalSent,
     errors: report.errors.length ? report.errors : undefined,
