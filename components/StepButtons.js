@@ -176,6 +176,7 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick, trig
     setCapacityWarningGuests({ adults: 0, children: 0, totalGuests: 0 });
   }, []);
   const [guestStatusSummary, setGuestStatusSummary] = useState({ approved: 0, rejected: 0, pending: 0 });
+  const [guestSummaryRefreshKey, setGuestSummaryRefreshKey] = useState(0);
   const [specialMealsSummary, setSpecialMealsSummary] = useState({ 
     veg: { adults: 0, children: 0, total: 0 },
     vegan: { adults: 0, children: 0, total: 0 },
@@ -3401,7 +3402,24 @@ React.useEffect(() => {
         console.error('❌ Failed to load guest summary', e);
       }
     })();
-  },[currentEventId]);
+  },[currentEventId, guestSummaryRefreshKey]);
+
+  // Refresh guest summary when user opens reports or returns to tab (so RSVP updates appear without full page reload)
+  const prevShowReportsRef = React.useRef(false);
+  React.useEffect(() => {
+    const didOpen = showReportsOptions && !prevShowReportsRef.current;
+    prevShowReportsRef.current = !!showReportsOptions;
+    if (didOpen) setGuestSummaryRefreshKey((k) => k + 1);
+  }, [showReportsOptions]);
+  React.useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible' && currentEventId) setGuestSummaryRefreshKey((k) => k + 1);
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => document.removeEventListener('visibilitychange', onVisibility);
+  }, [currentEventId]);
+
   // persist selectedDesign changes
   React.useEffect(()=>{
     if(typeof window==='undefined') return;
