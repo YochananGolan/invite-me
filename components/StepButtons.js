@@ -837,13 +837,27 @@ const handleOpenAddonModal = React.useCallback(() => {
         const waWin = window.open(`https://wa.me/972${waNumber.slice(1)}?text=${waText}`, '_blank','noopener,noreferrer');
         if (waWin) {
           waWin.opener = null; // prevent redirect effect
-          // Count this message toward quota (SMS and WhatsApp both count as one message)
-          const newCount = (eventMessagesSentCount || 0) + 1;
-          setEventMessagesSentCount(newCount);
+          // Count this message toward quota – atomic DB increment so WhatsApp + SMS in quick succession both count
           if (eventIdForInvite) {
             try {
-              await supabase.from('events').update({ messages_sent_count: newCount }).eq('id', eventIdForInvite);
-            } catch (e) { /* column may not exist yet */ }
+              const { data: newCount, error: rpcErr } = await supabase.rpc('increment_event_messages_sent', {
+                p_event_id: eventIdForInvite,
+                p_delta: 1
+              });
+              if (!rpcErr && typeof newCount === 'number') {
+                setEventMessagesSentCount(newCount);
+              } else {
+                const fallback = (eventMessagesSentCount || 0) + 1;
+                setEventMessagesSentCount(fallback);
+                await supabase.from('events').update({ messages_sent_count: fallback }).eq('id', eventIdForInvite);
+              }
+            } catch (e) {
+              const fallback = (eventMessagesSentCount || 0) + 1;
+              setEventMessagesSentCount(fallback);
+              try { await supabase.from('events').update({ messages_sent_count: fallback }).eq('id', eventIdForInvite); } catch (_) {}
+            }
+          } else {
+            setEventMessagesSentCount((prev) => (prev || 0) + 1);
           }
           setInvitationResult({ 
             type: 'success', 
@@ -973,12 +987,26 @@ const handleOpenAddonModal = React.useCallback(() => {
         const smsResult = await smsResponse.json();
 
         if (smsResult.success && smsResult.sent > 0) {
-          const newCount = (eventMessagesSentCount || 0) + smsResult.sent;
-          setEventMessagesSentCount(newCount);
           if (eventIdForInvite) {
             try {
-              await supabase.from('events').update({ messages_sent_count: newCount }).eq('id', eventIdForInvite);
-            } catch (e) { /* column may not exist yet */ }
+              const { data: newCount, error: rpcErr } = await supabase.rpc('increment_event_messages_sent', {
+                p_event_id: eventIdForInvite,
+                p_delta: smsResult.sent
+              });
+              if (!rpcErr && typeof newCount === 'number') {
+                setEventMessagesSentCount(newCount);
+              } else {
+                const fallback = (eventMessagesSentCount || 0) + smsResult.sent;
+                setEventMessagesSentCount(fallback);
+                await supabase.from('events').update({ messages_sent_count: fallback }).eq('id', eventIdForInvite);
+              }
+            } catch (e) {
+              const fallback = (eventMessagesSentCount || 0) + smsResult.sent;
+              setEventMessagesSentCount(fallback);
+              try { await supabase.from('events').update({ messages_sent_count: fallback }).eq('id', eventIdForInvite); } catch (_) {}
+            }
+          } else {
+            setEventMessagesSentCount((prev) => (prev || 0) + smsResult.sent);
           }
           setInvitationSent(true);
           setIsSendingInvitation(false);
@@ -2079,12 +2107,25 @@ React.useEffect(() => {
           // Add to local state
           setSentGuests((prev) => [...prev, ...validGuests]);
 
-          if (smsResult.sent > 0 && evRow?.id) {
-            const newCountBulk = (eventMessagesSentCount || 0) + smsResult.sent;
-            setEventMessagesSentCount(newCountBulk);
+          if (smsResult.sent > 0 && (currentEventId || evRow?.id)) {
+            const eventIdForBulk = currentEventId || evRow?.id;
             try {
-              await supabase.from('events').update({ messages_sent_count: newCountBulk }).eq('id', evRow.id);
-            } catch (e) { /* column may not exist yet */ }
+              const { data: newCount, error: rpcErr } = await supabase.rpc('increment_event_messages_sent', {
+                p_event_id: eventIdForBulk,
+                p_delta: smsResult.sent
+              });
+              if (!rpcErr && typeof newCount === 'number') {
+                setEventMessagesSentCount(newCount);
+              } else {
+                const newCountBulk = (eventMessagesSentCount || 0) + smsResult.sent;
+                setEventMessagesSentCount(newCountBulk);
+                await supabase.from('events').update({ messages_sent_count: newCountBulk }).eq('id', eventIdForBulk);
+              }
+            } catch (e) {
+              const newCountBulk = (eventMessagesSentCount || 0) + smsResult.sent;
+              setEventMessagesSentCount(newCountBulk);
+              try { await supabase.from('events').update({ messages_sent_count: newCountBulk }).eq('id', eventIdForBulk); } catch (_) {}
+            }
           }
           if (smsResult.success && smsResult.sent === validGuests.length) {
             setInvitationResult({ 
