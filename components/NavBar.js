@@ -90,18 +90,21 @@ export default function NavBar({ onAuthClick, onAboutClick, onShowPricing, onSho
         </div>
 
         {/* Auth Buttons - Left side in RTL */}
-        <div className="flex items-center gap-3">
+        <div className="flex flex-col items-end gap-1 sm:flex-row sm:items-center sm:gap-3">
           {session ? (
             <>
-              <span className="hidden sm:inline text-sm text-gray-600 truncate max-w-[120px] md:max-w-[180px]">
-                {session.user?.email}
-              </span>
               <button
                 onClick={() => supabase.auth.signOut()}
                 className="text-primary font-medium border-2 border-primary rounded-lg px-4 py-2 hover:bg-primary hover:text-white transition-colors text-sm"
               >
                 התנתק
               </button>
+              <span className="hidden sm:inline text-sm text-gray-600 truncate max-w-[120px] md:max-w-[180px]">
+                {session.user?.email}
+              </span>
+              <span className="block sm:hidden text-[11px] text-gray-600 truncate max-w-[180px] text-left">
+                {session.user?.email}
+              </span>
             </>
           ) : (
             <>
