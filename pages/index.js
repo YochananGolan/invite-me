@@ -57,9 +57,7 @@ export default function Home({ session }) {
   const handleShowProcess = () => {
     if (stepRef.current?.startFlow) {
       stepRef.current.startFlow();
-      scrollToWizard();
     } else {
-      // אם הוויזארד לא קיים (למשל בלי סשן) – הצג את מסך האודות/הסבר
       handleShowFeatures();
     }
   };

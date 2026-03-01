@@ -61,9 +61,8 @@ const useTypewriter = (text, speed = 100, pauseDuration = 5000) => {
 export default forwardRef(function HeroSection({ onStart, onShowFeatures, onSignUpClick, onSignInClick, isLoggedIn, onPressCreateEvent, onPressReports }, ref) {
   const handleCreateNewEvent = () => typeof onPressCreateEvent === 'function' && onPressCreateEvent();
   const handleOpenReports = () => typeof onPressReports === 'function' && onPressReports();
-  const [showProcessModal, setShowProcessModal] = useState(false);
   // Full invitation text with line breaks
-  const fullInvitationText = 'דוד & שרה\nמתחתנים\n\nבשמחה רבה אנו מזמינים אתכם לחגוג עמנו את יום נישואינו\n\nיום שלישי • 24.03.2026\n📍 ירושלים, ישראל\n\nקבלת פנים 19:00 • חופה וקידושין 21:00';
+  const fullInvitationText = '\u05D3\u05D5\u05D3 & \u05E9\u05E8\u05D4\n\u05DE\u05EA\u05D7\u05EA\u05E0\u05D9\u05DD\n\n\u05D1\u05E9\u05DE\u05D7\u05D4 \u05E8\u05D1\u05D4 \u05D0\u05E0\u05D5 \u05DE\u05D6\u05DE\u05D9\u05E0\u05D9\u05DD \u05D0\u05EA\u05DB\u05DD \u05DC\u05D7\u05D2\u05D5\u05D2 \u05E2\u05DE\u05E0\u05D5 \u05D0\u05EA \u05D9\u05D5\u05DD \u05E0\u05D9\u05E9\u05D5\u05D0\u05D9\u05E0\u05D5\n\n\u05D9\u05D5\u05DD \u05E9\u05DC\u05D9\u05E9\u05D9 \u2022 24.03.2026\n\uD83D\uDCCD \u05D9\u05E8\u05D5\u05E9\u05DC\u05D9\u05DD, \u05D9\u05E9\u05E8\u05D0\u05DC\n\n\u05E7\u05D1\u05DC\u05EA \u05E4\u05E0\u05D9\u05DD 19:00 \u2022 \u05D7\u05D5\u05E4\u05D4 \u05D5\u05E7\u05D9\u05D3\u05D5\u05E9\u05D9\u05DF 21:00';
   const displayedInvitationText = useTypewriter(fullInvitationText, 80, 5000);
   
   // Parse displayed text into parts
@@ -93,30 +92,26 @@ export default forwardRef(function HeroSection({ onStart, onShowFeatures, onSign
           {/* Hero Text - Right side in RTL */}
           <div className="lg:flex-1 flex flex-col justify-center text-center lg:text-right order-2 lg:order-1">
             <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold text-gray-800 mb-4 leading-tight">
-              נעים מאוד, אנחנו Meet-M
+              {'\u05E0\u05E2\u05D9\u05DD \u05DE\u05D0\u05D5\u05D3, \u05D0\u05E0\u05D7\u05E0\u05D5 Meet-M'}
             </h1>
             <p className="text-gray-600 text-lg md:text-xl mb-6 leading-relaxed max-w-xl lg:mr-0 lg:ml-auto mx-auto">
-              יצירת הזמנות מעוצבות, שליחה אוטומטית ב-SMS ו-WhatsApp, מעקב אישורי הגעה בזמן אמת, דוחות וייצוא לאקסל – הכל במקום אחד.
+              {'\u05D9\u05E6\u05D9\u05E8\u05EA \u05D4\u05D6\u05DE\u05E0\u05D5\u05EA \u05DE\u05E2\u05D5\u05E6\u05D1\u05D5\u05EA, \u05E9\u05DC\u05D9\u05D7\u05D4 \u05D0\u05D5\u05D8\u05D5\u05DE\u05D8\u05D9\u05EA \u05D1-SMS \u05D5-WhatsApp, \u05DE\u05E2\u05E7\u05D1 \u05D0\u05D9\u05E9\u05D5\u05E8\u05D9 \u05D4\u05D2\u05E2\u05D4 \u05D1\u05D6\u05DE\u05DF \u05D0\u05DE\u05EA, \u05D3\u05D5\u05D7\u05D5\u05EA \u05D5\u05D9\u05D9\u05E6\u05D5\u05D0 \u05DC\u05D0\u05E7\u05E1\u05DC \u2013 \u05D4\u05DB\u05DC \u05D1\u05DE\u05E7\u05D5\u05DD \u05D0\u05D7\u05D3.'}
             </p>
             
             {/* Stats */}
             <div className="mb-4">
-              <span className="text-primary font-bold text-2xl md:text-3xl">אלפי אירועים </span>
-              <span className="text-gray-700 font-medium text-lg md:text-xl">הצטרפו!</span>
+              <span className="text-primary font-bold text-2xl md:text-3xl">{'\u05D0\u05DC\u05E4\u05D9 \u05D0\u05D9\u05E8\u05D5\u05E2\u05D9\u05DD '}</span>
+              <span className="text-gray-700 font-medium text-lg md:text-xl">{'\u05D4\u05E6\u05D8\u05E8\u05E4\u05D5!'}</span>
             </div>
 
-            {/* כפתורי פעולה ראשיים */}
             <div className="flex flex-col sm:flex-row gap-3 justify-center lg:justify-start mb-8">
               <button
                 type="button"
-                onClick={() => {
-                  setShowProcessModal(true);
-                  if (typeof onStart === 'function') onStart();
-                }}
+                onClick={() => { if (typeof onStart === 'function') onStart(); }}
                 className="px-8 py-4 rounded-lg border border-gray-300 text-gray-700 font-medium hover:bg-gray-50 transition-colors text-lg"
-                aria-label="תיאור תהליך יצירת אירוע"
+                aria-label={'\u05EA\u05D9\u05D0\u05D5\u05E8 \u05EA\u05D4\u05DC\u05D9\u05DA \u05D9\u05E6\u05D9\u05E8\u05EA \u05D0\u05D9\u05E8\u05D5\u05E2'}
               >
-                תיאור תהליך יצירת אירוע
+                {'\u05EA\u05D9\u05D0\u05D5\u05E8 \u05EA\u05D4\u05DC\u05D9\u05DA \u05D9\u05E6\u05D9\u05E8\u05EA \u05D0\u05D9\u05E8\u05D5\u05E2'}
               </button>
               <button
                 type="button"
@@ -128,13 +123,13 @@ export default forwardRef(function HeroSection({ onStart, onShowFeatures, onSign
                            hover:from-purple-900 hover:via-purple-900 hover:to-purple-900 hover:-translate-y-0.5 hover:shadow-[0_0_55px_rgba(88,28,135,0.8)] hover:ring-purple-900/80
                            active:from-purple-900 active:via-purple-900 active:to-purple-900 active:translate-y-0 active:scale-[0.98] active:shadow-inner
                            focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-purple-500"
-                aria-label="צור אירוע חדש"
+                aria-label={'\u05E6\u05D5\u05E8 \u05D0\u05D9\u05E8\u05D5\u05E2 \u05D7\u05D3\u05E9'}
               >
                 <span
                   aria-hidden="true"
                   className="absolute inset-0 rounded-xl bg-purple-900 animate-cta-dark-cover pointer-events-none"
                 />
-                <span className="relative z-10">צור אירוע חדש</span>
+                <span className="relative z-10">{'\u05E6\u05D5\u05E8 \u05D0\u05D9\u05E8\u05D5\u05E2 \u05D7\u05D3\u05E9'}</span>
                 <span
                   aria-hidden="true"
                   className="absolute inset-0 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-200 bg-[radial-gradient(circle_at_30%_20%,rgba(255,255,255,0.2),transparent_50%)] pointer-events-none"
@@ -142,12 +137,11 @@ export default forwardRef(function HeroSection({ onStart, onShowFeatures, onSign
               </button>
             </div>
 
-            {/* Feature Icons + דוחות בקרה – כפתור נפרד, קורא רק ל-onShowReports */}
             <div className="flex flex-wrap justify-center lg:justify-start items-end gap-6 mt-10">
               {[
-                { icon: '🎨', label: 'עיצוב מקצועי', sub: '45 תבניות' },
-                { icon: '📱', label: 'אישורים בוואטסאפ וב-SMS', sub: 'שליחה אוטומטית' },
-                { icon: '💬', label: 'אישורי הגעה', sub: 'מעקב בזמן אמת' },
+                { icon: '\uD83C\uDFA8', label: '\u05E2\u05D9\u05E6\u05D5\u05D1 \u05DE\u05E7\u05E6\u05D5\u05E2\u05D9', sub: '45 \u05EA\u05D1\u05E0\u05D9\u05D5\u05EA' },
+                { icon: '\uD83D\uDCF1', label: '\u05D0\u05D9\u05E9\u05D5\u05E8\u05D9\u05DD \u05D1\u05D5\u05D5\u05D0\u05D8\u05E1\u05D0\u05E4 \u05D5\u05D1-SMS', sub: '\u05E9\u05DC\u05D9\u05D7\u05D4 \u05D0\u05D5\u05D8\u05D5\u05DE\u05D8\u05D9\u05EA' },
+                { icon: '\uD83D\uDCAC', label: '\u05D0\u05D9\u05E9\u05D5\u05E8\u05D9 \u05D4\u05D2\u05E2\u05D4', sub: '\u05DE\u05E2\u05E7\u05D1 \u05D1\u05D6\u05DE\u05DF \u05D0\u05DE\u05EA' },
               ].map((f) => (
                 <div key={f.label} className="flex flex-col items-center lg:items-start">
                   <div className="w-14 h-14 rounded-full bg-gray-100 flex items-center justify-center text-2xl mb-2">
@@ -162,9 +156,9 @@ export default forwardRef(function HeroSection({ onStart, onShowFeatures, onSign
                   type="button"
                   onClick={handleOpenReports}
                   className="px-8 py-4 rounded-full bg-primary/15 text-primary font-bold border-2 border-primary hover:bg-primary hover:text-white transition-colors text-lg shadow-md shrink-0 self-center lg:-translate-x-24"
-                  aria-label="דוחות בקרה"
+                  aria-label={'\u05D3\u05D5\u05D7\u05D5\u05EA \u05D1\u05E7\u05E8\u05D4'}
                 >
-                  דוחו״ת בקרה
+                  {'\u05D3\u05D5\u05D7\u05D5\u05F4\u05EA \u05D1\u05E7\u05E8\u05D4'}
                 </button>
               )}
             </div>
@@ -178,7 +172,7 @@ export default forwardRef(function HeroSection({ onStart, onShowFeatures, onSign
                 <div className="relative aspect-[3/5] md:aspect-[2/3]">
                   <Image
                     src="/images/wedding-couple-bright-luxury.jpg"
-                    alt="הזמנה לדוגמא"
+                    alt={'\u05D4\u05D6\u05DE\u05E0\u05D4 \u05DC\u05D3\u05D5\u05D2\u05DE\u05D0'}
                     fill
                     sizes="(max-width: 768px) 100vw, 450px"
                     className="object-cover"
@@ -218,7 +212,7 @@ export default forwardRef(function HeroSection({ onStart, onShowFeatures, onSign
                               </p>
                               {isDateComplete && (
                                 <p className="text-gray-800 text-base md:text-lg flex items-center gap-1 justify-end mb-3 drop-shadow-lg">
-                                  <span>📍</span>
+                                  <span>{'\uD83D\uDCCD'}</span>
                                   {locationLine}
                                   {!isLocationComplete && <span className="animate-pulse">|</span>}
                                 </p>
@@ -241,41 +235,6 @@ export default forwardRef(function HeroSection({ onStart, onShowFeatures, onSign
           </div>
         </div>
       </div>
-
-      {/* Modal: תיאור תהליך יצירת אירוע – always available (desktop + mobile, with/without login) */}
-      {showProcessModal && (
-        <div className="fixed inset-0 z-[130] bg-black/50 flex items-center justify-center px-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-6 text-right rtl relative">
-            <button
-              onClick={() => setShowProcessModal(false)}
-              className="absolute top-3 left-3 text-2xl text-gray-500 hover:text-gray-700"
-              aria-label="סגור"
-            >
-              &times;
-            </button>
-            <h2 className="text-2xl font-bold text-gray-900 mb-4">תהליך יצירת אירוע ב‑Meet‑M</h2>
-            <ol className="space-y-3 text-gray-700 text-sm md:text-base list-decimal list-inside">
-              <li><strong>בחירת סוג אירוע</strong> – חתונה, בר/בת מצווה, ברית, אירוע עסקי ועוד.</li>
-              <li><strong>מילוי פרטי האירוע</strong> – תאריך, שעה, אולם, שמות, טקסט להזמנה.</li>
-              <li><strong>בחירת עיצוב להזמנה</strong> – בוחרים תבנית מעוצבת ומתאימים טקסט.</li>
-              <li><strong>הוספת אורחים</strong> – מזינים אורחים ידנית או מייבאים מאקסל.</li>
-              <li><strong>שליחת הזמנות</strong> – ב‑WhatsApp ו‑SMS, עם קישור לאישור הגעה.</li>
-              <li><strong>מעקב ודוחות</strong> – רואים כמה אישרו, כמה לא מגיעים וכמה טרם הגיבו.</li>
-            </ol>
-            <p className="mt-4 text-sm text-gray-600">
-              בכל רגע אפשר לחזור לדף הבית וללחוץ על <strong>“צור אירוע חדש”</strong> כדי להתחיל בפועל את התהליך.
-            </p>
-            <div className="mt-6 flex justify-center">
-              <button
-                onClick={() => setShowProcessModal(false)}
-                className="px-6 py-2 rounded-full bg-primary text-white font-semibold hover:bg-primary/90 transition-colors text-sm md:text-base"
-              >
-                הבנתי, תודה
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </section>
   );
 });

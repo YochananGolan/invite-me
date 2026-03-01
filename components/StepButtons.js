@@ -6806,11 +6806,36 @@ React.useEffect(() => {
                 סגור
               </button>
               <button
-                onClick={() => { setShowFlowDiagram(false); }}
-                className="bg-primary text-white border border-primary rounded-full px-8 py-3 font-medium hover:bg-primary/90 transition-all flex flex-col items-center gap-1 text-lg"
+                onClick={async () => {
+                  setShowFlowDiagram(false);
+                  try {
+                    setSelectedFlowStep(null);
+                    let hasSession = !!sessionRef.current;
+                    if (!hasSession) {
+                      const { data: { user } } = await supabase.auth.getUser();
+                      hasSession = !!user;
+                    }
+                    if (!hasSession || !selectedPlan) {
+                      setShowPricingPlan(true);
+                      setPlanAddOnMode(false);
+                      return;
+                    }
+                    setStepErrorMsg('');
+                    const hasActive = await checkActiveEventExists();
+                    if (hasActive) {
+                      setShowExistingEventWarning(true);
+                    } else {
+                      handleNewEvent();
+                    }
+                  } catch (err) {
+                    console.error('createNewEvent error', err);
+                    setShowPricingPlan(true);
+                    setPlanAddOnMode(false);
+                  }
+                }}
+                className="bg-primary text-white border border-primary rounded-full px-8 py-3 font-medium hover:bg-primary/90 transition-all text-lg"
               >
-                <span className="text-lg">בואו נתחיל! 🚀</span>
-                <span className="font-medium text-lg">במעבר לדף הבית לחץ על "צור אירוע חדש" שנמצא בדף הבית מימין.</span>
+                בואו נתחיל - צור אירוע חדש! 🚀
               </button>
             </div>
           </div>
