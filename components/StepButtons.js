@@ -3793,45 +3793,80 @@ React.useEffect(() => {
       )}
 
       <div className="fixed left-0 right-0 bottom-0 z-20 w-full bg-white/95 backdrop-blur-sm border-t border-gray-200 shadow-[0_-4px_12px_rgba(0,0,0,0.08)] py-2 px-2 sm:pt-3 sm:px-2" style={{ paddingBottom: 'max(0.4rem, env(safe-area-inset-bottom, 0.4rem))' }}>
-        <div className="grid grid-cols-5 gap-1.5 sm:hidden max-w-md mx-auto">
-          {steps.slice(1).map((step, idx) => {
-            const realIdx = idx + 1;
-            const isFinished = finishedSteps.includes(realIdx) || (realIdx === 3 && finishedSteps.includes(2));
-            const isDesign = realIdx === 3;
-            return (
-              <button
-                key={realIdx}
-                type="button"
-                style={{ cursor: 'pointer', position: 'relative', zIndex: 21, pointerEvents: 'auto' }}
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  const mustStartFirst = !hasActiveEvent() || !selectedPlan;
-                  const stepRequiresFlow = realIdx >= 1 && realIdx <= 4;
-                  if (stepRequiresFlow && mustStartFirst) {
-                    setStepErrorMsg('\u05D9\u05E9 \u05EA\u05D7\u05D9\u05DC\u05D4 \u05DC\u05D9\u05E6\u05D5\u05E8 \u05D0\u05D9\u05E8\u05D5\u05E2 \u05D5\u05DC\u05D1\u05D7\u05D5\u05E8 \u05DE\u05E1\u05DC\u05D5\u05DC \u05EA\u05E9\u05DC\u05D5\u05DD.');
-                    setShowStepError(true);
-                    return;
-                  }
-                  if (realIdx === 1) { setShowEventTypes(true); setStepErrorMsg(''); }
-                  else if (realIdx === 2) { setShowEventDetails(true); setStepErrorMsg(''); }
-                  else if (realIdx === 3) { setShowDesignChooser(true); setStepErrorMsg(''); }
-                  else if (realIdx === 4) { setShowGuestForm(true); setStepErrorMsg(''); }
-                  else if (realIdx === 5) { setShowReportsOptions(true); setShowGuestListModal(false); setStepErrorMsg(''); }
-                }}
-                className={`flex flex-col items-center justify-center rounded-xl py-2 px-1 text-center transition-all ${
-                  isFinished
-                    ? 'bg-primary text-white shadow-md'
-                    : isDesign
-                      ? 'bg-gradient-to-b from-pink-50 to-purple-50 text-purple-800 border border-purple-300 shadow'
+        <div className="flex flex-col gap-1.5 sm:hidden px-1">
+          <div className="grid grid-cols-3 gap-1.5">
+            {steps.slice(1, 4).map((step, idx) => {
+              const realIdx = idx + 1;
+              const isFinished = finishedSteps.includes(realIdx) || (realIdx === 3 && finishedSteps.includes(2));
+              const isDesign = realIdx === 3;
+              return (
+                <button
+                  key={realIdx}
+                  type="button"
+                  style={{ cursor: 'pointer', position: 'relative', zIndex: 21, pointerEvents: 'auto' }}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const mustStartFirst = !hasActiveEvent() || !selectedPlan;
+                    if (mustStartFirst) {
+                      setStepErrorMsg('\u05D9\u05E9 \u05EA\u05D7\u05D9\u05DC\u05D4 \u05DC\u05D9\u05E6\u05D5\u05E8 \u05D0\u05D9\u05E8\u05D5\u05E2 \u05D5\u05DC\u05D1\u05D7\u05D5\u05E8 \u05DE\u05E1\u05DC\u05D5\u05DC \u05EA\u05E9\u05DC\u05D5\u05DD.');
+                      setShowStepError(true);
+                      return;
+                    }
+                    if (realIdx === 1) { setShowEventTypes(true); setStepErrorMsg(''); }
+                    else if (realIdx === 2) { setShowEventDetails(true); setStepErrorMsg(''); }
+                    else if (realIdx === 3) { setShowDesignChooser(true); setStepErrorMsg(''); }
+                  }}
+                  className={`flex items-center justify-center gap-1.5 rounded-xl py-2.5 px-2 text-center transition-all ${
+                    isFinished
+                      ? 'bg-primary text-white shadow-md'
+                      : isDesign
+                        ? 'bg-gradient-to-r from-pink-50 to-purple-50 text-purple-800 border border-purple-300 shadow'
+                        : 'bg-[#FCE6AC] text-primary border border-primary/40'
+                  }`}
+                >
+                  <span className="text-base leading-none">{stepsMobile[realIdx].split(' ')[0]}</span>
+                  <span className="text-xs font-bold leading-tight">{stepsMobile[realIdx].split(' ').slice(1).join(' ')}</span>
+                </button>
+              );
+            })}
+          </div>
+          <div className="grid grid-cols-2 gap-1.5">
+            {steps.slice(4).map((step, idx) => {
+              const realIdx = idx + 4;
+              const isFinished = finishedSteps.includes(realIdx);
+              return (
+                <button
+                  key={realIdx}
+                  type="button"
+                  style={{ cursor: 'pointer', position: 'relative', zIndex: 21, pointerEvents: 'auto' }}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (realIdx === 4) {
+                      const mustStartFirst = !hasActiveEvent() || !selectedPlan;
+                      if (mustStartFirst) {
+                        setStepErrorMsg('\u05D9\u05E9 \u05EA\u05D7\u05D9\u05DC\u05D4 \u05DC\u05D9\u05E6\u05D5\u05E8 \u05D0\u05D9\u05E8\u05D5\u05E2 \u05D5\u05DC\u05D1\u05D7\u05D5\u05E8 \u05DE\u05E1\u05DC\u05D5\u05DC \u05EA\u05E9\u05DC\u05D5\u05DD.');
+                        setShowStepError(true);
+                        return;
+                      }
+                      setShowGuestForm(true); setStepErrorMsg('');
+                    } else if (realIdx === 5) {
+                      setShowReportsOptions(true); setShowGuestListModal(false); setStepErrorMsg('');
+                    }
+                  }}
+                  className={`flex items-center justify-center gap-1.5 rounded-xl py-2.5 px-2 text-center transition-all ${
+                    isFinished
+                      ? 'bg-primary text-white shadow-md'
                       : 'bg-[#FCE6AC] text-primary border border-primary/40'
-                }`}
-              >
-                <span className="text-lg leading-none">{stepsMobile[realIdx].split(' ')[0]}</span>
-                <span className="text-[10px] font-bold leading-tight mt-0.5">{stepsMobile[realIdx].split(' ').slice(1).join(' ')}</span>
-              </button>
-            );
-          })}
+                  }`}
+                >
+                  <span className="text-base leading-none">{stepsMobile[realIdx].split(' ')[0]}</span>
+                  <span className="text-xs font-bold leading-tight">{stepsMobile[realIdx].split(' ').slice(1).join(' ')}</span>
+                </button>
+              );
+            })}
+          </div>
         </div>
         <div className="hidden sm:flex flex-row justify-center gap-4 flex-wrap">
           {steps.slice(1).map((step, idx) => {
