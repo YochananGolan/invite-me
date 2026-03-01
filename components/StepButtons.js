@@ -413,6 +413,7 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick, trig
 
 const [additionalPackages, setAdditionalPackages] = useState([]);
 const [dbAddonCount, setDbAddonCount] = useState(null);
+const [eventDataLoaded, setEventDataLoaded] = useState(false);
 const [planLimitWarningError, setPlanLimitWarningError] = useState('');
 const [planAddOnMode, setPlanAddOnMode] = useState(false);
 const [planSelectionError, setPlanSelectionError] = useState('');
@@ -2352,7 +2353,8 @@ React.useEffect(() => {
     setStepErrorMsg('');
     setErrorMsg('');
     setFinishedSteps([]); // Reset finished steps for new event
-    setCurrentEventId(null); // Clear current event ID
+    setCurrentEventId(null);
+    setEventDataLoaded(false);
     
     // If event was actually deleted (not just archived), reset everything פרט לחבילה:
     // המשתמש כבר רכש/בחר מסלול, אין סיבה לבקש ממנו לבחור שוב.
@@ -2755,6 +2757,7 @@ React.useEffect(() => {
           if (addonCount > prevCount) return Array(addonCount).fill('addon');
           return prev;
         });
+        setEventDataLoaded(true);
         const storedPlan = typeof window !== 'undefined' ? localStorage.getItem('selectedPlan') : null;
         if (storedPlan === 'free' || storedPlan === 'basic' || selectedPlan === 'free' || selectedPlan === 'basic') {
           // User chose plan A, respect that choice always
@@ -3175,6 +3178,7 @@ React.useEffect(() => {
                   if (restoreAddonCount > prevCount) return Array(restoreAddonCount).fill('addon');
                   return prev;
                 });
+                setEventDataLoaded(true);
                 const storedPlan = typeof window !== 'undefined' ? localStorage.getItem('selectedPlan') : null;
                 // If user explicitly chose 'free' or 'basic', NEVER override it
                 if (storedPlan === 'free' || storedPlan === 'basic' || selectedPlan === 'free' || selectedPlan === 'basic') {
@@ -3567,8 +3571,9 @@ React.useEffect(() => {
     })();
   }, [currentEventId, guestStatusSummary.approved]);
 
-  // Check for plan limit violation and show warning
+  // Check for plan limit violation and show warning (only after DB data loaded)
   React.useEffect(() => {
+    if (!eventDataLoaded) return;
     if (!selectedPlan || !currentEventId) {
       setShowPlanLimitWarning(false);
       setPlanAddOnMode(false);
@@ -3585,7 +3590,6 @@ React.useEffect(() => {
       return;
     }
     const totalLimit = (baseLimit || 0) + extraCapacity;
-    // Show warning only when messages SENT exceed plan limit (effective = sync with status panel)
     if (effectiveMessagesSentCount > totalLimit) {
       setPendingAddonCount(1);
       setShowPlanLimitWarning(true);
@@ -3595,7 +3599,7 @@ React.useEffect(() => {
       setPlanAddOnMode(false);
       resetCapacityWarningGuests();
     }
-  }, [selectedPlan, eventMessagesSentCount, invitedCount, currentEventId, additionalPackages, getPlanBaseLimit, resetCapacityWarningGuests]);
+  }, [selectedPlan, eventMessagesSentCount, invitedCount, currentEventId, additionalPackages, getPlanBaseLimit, resetCapacityWarningGuests, eventDataLoaded]);
 
   // helper to open guest report with fresh data
   const openGuestReport = async () => {
