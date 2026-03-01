@@ -158,7 +158,7 @@ export default function Home({ session }) {
                 <div className="bg-white p-4 rounded-lg shadow-sm">
                   <div className="text-3xl mb-2">👥</div>
                   <h4 className="font-bold text-lg mb-2">ניהול חכם</h4>
-                  <p className="text-sm text-gray-600">מעקב אורחים + דוחות מפורטים</p>
+                  <p className="text-sm text-gray-600">מעקב אורחים + דוחות בקרה</p>
                 </div>
               </div>
             </div>
@@ -186,12 +186,12 @@ export default function Home({ session }) {
                     <li>שליחה אוטומטית לכל האורחים</li>
                     <li>שליחת הודעות SMS ו-WhatsApp ב-2 סבבים</li>
                     <li>מעקב אחר אישורי הגעה</li>
-                    <li>הצגת דוחות סיכום מתעדכנים בזמן אמת בדף הבית</li>
+                    <li>הצגת דוחות בקרה מתעדכנים בזמן אמת בדף הבית</li>
                   </ol>
                   <ol start={7} className="space-y-2 list-decimal list-inside">
                     <li>ניהול פרטי אורחים</li>
                     <li>ניהול העדפות מזון ואלרגיות</li>
-                    <li>דוחות מפורטים + ייצוא ל-Excel</li>
+                    <li>דוחות בקרה מפורטים + ייצוא ל-Excel</li>
                     <li>שמירת אירועי עבר בארכיון</li>
                     <li>הצגת מפת אזור האירוע</li>
                     <li>ניווט ישיר לאולם האירועים</li>

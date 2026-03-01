@@ -122,8 +122,8 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick, trig
       setPlanAddOnMode(false);
     });
   }, [triggerCreateEvent, hasClearedExistingEvent]);
-  const steps = ['צור אירוע חדש', '📅 שלב 1 - סוג אירוע', '📝 שלב 2 - פרטי האירוע', '🎨 שלב 3 - עיצוב הזמנה', '📤 שלב 4 - שליחת הזמנה לאורח', '📊 שלב 5 - דוחו"ת אישורי הגעה'];
-  const stepsMobile = ['', 'סוג אירוע', 'פרטי האירוע', 'עיצוב', 'שליחה', 'דוחות'];
+  const steps = ['צור אירוע חדש', '📅 שלב 1 - סוג אירוע', '📝 שלב 2 - פרטי האירוע', '🎨 שלב 3 - עיצוב הזמנה', '📤 שלב 4 - שליחת הזמנה לאורח', '📊 שלב 5 - דוחו"ת בקרה'];
+  const stepsMobile = ['', 'סוג אירוע', 'פרטי האירוע', 'עיצוב', 'שליחה', 'דוחות בקרה'];
   const eventTypes = ['חתונה', 'חינה', 'מסיבת אירוסין', 'בר מצווה', 'בת מצווה', 'ברית', 'בריתה', 'יום הולדת', 'אירוע עסקי', 'הפרשת חלה'];
   const times = Array.from({ length: (24 - 8) * 2 }, (_, i) => {
     const totalHalfHours = 16 + i; // מתחילים מ-08:00
@@ -3735,7 +3735,7 @@ React.useEffect(() => {
                     <div className="border-2 border-gray-300 rounded-lg p-4 flex items-center gap-3">
                       <div className="text-4xl flex-shrink-0">{'\uD83D\uDCCA'}</div>
                       <div className="flex-1 text-right">
-                        <h3 className="text-lg font-bold text-primary">{'\u05E9\u05DC\u05D1 5: \u05D3\u05D5\u05D7\u05D5\u05EA'}</h3>
+                        <h3 className="text-lg font-bold text-primary">{'\u05E9\u05DC\u05D1 5: \u05D3\u05D5\u05D7\u05D5\u05EA \u05D1\u05E7\u05E8\u05D4'}</h3>
                         <p className="text-base text-gray-600">{'\u05DE\u05E2\u05E7\u05D1 \u05D0\u05D9\u05E9\u05D5\u05E8\u05D9 \u05D4\u05D2\u05E2\u05D4 \u05D5\u05D9\u05D9\u05E6\u05D5\u05D0 \u05DC\u05D0\u05E7\u05E1\u05DC'}</p>
                       </div>
                     </div>
@@ -6827,7 +6827,7 @@ React.useEffect(() => {
                 >
                   <div className="text-4xl flex-shrink-0">📊</div>
                   <div className="flex-1 text-right">
-                    <h3 className="text-lg font-bold text-primary">שלב 5: דוחות</h3>
+                    <h3 className="text-lg font-bold text-primary">שלב 5: דוחות בקרה</h3>
                     <p className="text-base text-gray-600">מעקב אישורי הגעה ויצוא לאקסל</p>
                   </div>
                 </div>
@@ -6852,7 +6852,7 @@ React.useEffect(() => {
                   {selectedFlowStep === 2 && '📝 שלב 2: פרטי האירוע'}
                   {selectedFlowStep === 3 && '🎨 שלב 3: בחירת עיצוב הזמנה'}
                   {selectedFlowStep === 4 && '📱 שלב 4: שליחת הזמנות'}
-                  {selectedFlowStep === 5 && '📊 שלב 5: דוחות אישורי הגעה'}
+                  {selectedFlowStep === 5 && '📊 שלב 5: דוחות בקרה'}
                 </h3>
                 
                 {selectedFlowStep === 0 && (
@@ -6943,9 +6943,9 @@ React.useEffect(() => {
                       <li><strong>דוח דחיות</strong> - אורחים שהודיעו שלא מגיעים</li>
                       <li><strong>דוח ממתינים</strong> - אורחים שעדיין לא הגיבו</li>
                       <li><strong>יצוא לאקסל</strong> - הורדת כל הנתונים לקובץ Excel מסודר</li>
-                      <li><strong>ארכיון אירועים</strong> - גישה לדוחות של אירועים קודמים</li>
+                      <li><strong>ארכיון אירועים</strong> - גישה לדוחות בקרה של אירועים קודמים</li>
                     </ul>
-                    <p className="text-gray-600 text-base mt-3">עדכון בזמן אמת - הדוחות מתעדכנים אוטומטית</p>
+                    <p className="text-gray-600 text-base mt-3">עדכון בזמן אמת - דוחות הבקרה מתעדכנים אוטומטית</p>
                   </div>
                 )}
               </div>
@@ -7028,10 +7028,10 @@ React.useEffect(() => {
                   <p className="text-gray-600 mb-2">✓ שליחה אוטומטית לכל האורחים</p>
                   <p className="text-gray-600 mb-2">✓ שליחת הודעות SMS ו-WhatsApp ב-2 סבבים</p>
                   <p className="text-gray-600 mb-2">✓ מעקב אישורי הגעה</p>
-                  <p className="text-gray-600 mb-2">✓ הצגת דוחות סיכום מתעדכנים בזמן אמת בדף הבית</p>
+                  <p className="text-gray-600 mb-2">✓ הצגת דוחות בקרה מתעדכנים בזמן אמת בדף הבית</p>
                   <p className="text-gray-600 mb-2">✓ ניהול פרטי אורחים</p>
                   <p className="text-gray-600 mb-2">✓ ניהול העדפות מזון ואלרגיות</p>
-                  <p className="text-gray-600 mb-2">✓ דוחות מפורטים + ייצוא ל-Excel</p>
+                  <p className="text-gray-600 mb-2">✓ דוחות בקרה מפורטים + ייצוא ל-Excel</p>
                   <p className="text-gray-600 mb-2">✓ שמירת אירועי עבר בארכיון</p>
                   <p className="text-gray-600 mb-2">✓ הצגת מפת אזור האירוע + ניווט לאולם</p>
                 </div>
@@ -7060,10 +7060,10 @@ React.useEffect(() => {
                   <p className="text-gray-600 mb-2">✓ שליחה אוטומטית לכל האורחים</p>
                   <p className="text-gray-600 mb-2">✓ שליחת הודעות SMS ו-WhatsApp ב-2 סבבים</p>
                   <p className="text-gray-600 mb-2">✓ מעקב אישורי הגעה</p>
-                  <p className="text-gray-600 mb-2">✓ הצגת דוחות סיכום מתעדכנים בזמן אמת בדף הבית</p>
+                  <p className="text-gray-600 mb-2">✓ הצגת דוחות בקרה מתעדכנים בזמן אמת בדף הבית</p>
                   <p className="text-gray-600 mb-2">✓ ניהול פרטי אורחים</p>
                   <p className="text-gray-600 mb-2">✓ ניהול העדפות מזון ואלרגיות</p>
-                  <p className="text-gray-600 mb-2">✓ דוחות מפורטים + ייצוא ל-Excel</p>
+                  <p className="text-gray-600 mb-2">✓ דוחות בקרה מפורטים + ייצוא ל-Excel</p>
                   <p className="text-gray-600 mb-2">✓ שמירת אירועי עבר בארכיון</p>
                   <p className="text-gray-600 mb-2">✓ הצגת מפת אזור האירוע + ניווט לאולם</p>
                 </div>
@@ -7088,10 +7088,10 @@ React.useEffect(() => {
                   <p className="text-gray-600 mb-2">✓ שליחה אוטומטית לכל האורחים</p>
                   <p className="text-gray-600 mb-2">✓ שליחת הודעות SMS ו-WhatsApp ב-2 סבבים</p>
                   <p className="text-gray-600 mb-2">✓ מעקב אישורי הגעה</p>
-                  <p className="text-gray-600 mb-2">✓ הצגת דוחות סיכום מתעדכנים בזמן אמת בדף הבית</p>
+                  <p className="text-gray-600 mb-2">✓ הצגת דוחות בקרה מתעדכנים בזמן אמת בדף הבית</p>
                   <p className="text-gray-600 mb-2">✓ ניהול פרטי אורחים</p>
                   <p className="text-gray-600 mb-2">✓ ניהול העדפות מזון ואלרגיות</p>
-                  <p className="text-gray-600 mb-2">✓ דוחות מפורטים + ייצוא ל-Excel</p>
+                  <p className="text-gray-600 mb-2">✓ דוחות בקרה מפורטים + ייצוא ל-Excel</p>
                   <p className="text-gray-600 mb-2">✓ שמירת אירועי עבר בארכיון</p>
                   <p className="text-gray-600 mb-2">✓ הצגת מפת אזור האירוע + ניווט לאולם</p>
                 </div>
@@ -7116,10 +7116,10 @@ React.useEffect(() => {
                   <p className="text-gray-600 mb-2">✓ שליחה אוטומטית לכל האורחים</p>
                   <p className="text-gray-600 mb-2">✓ שליחת הודעות SMS ו-WhatsApp ב-2 סבבים</p>
                   <p className="text-gray-600 mb-2">✓ מעקב אישורי הגעה</p>
-                  <p className="text-gray-600 mb-2">✓ הצגת דוחות סיכום מתעדכנים בזמן אמת בדף הבית</p>
+                  <p className="text-gray-600 mb-2">✓ הצגת דוחות בקרה מתעדכנים בזמן אמת בדף הבית</p>
                   <p className="text-gray-600 mb-2">✓ ניהול פרטי אורחים</p>
                   <p className="text-gray-600 mb-2">✓ ניהול העדפות מזון ואלרגיות</p>
-                  <p className="text-gray-600 mb-2">✓ דוחות מפורטים + ייצוא ל-Excel</p>
+                  <p className="text-gray-600 mb-2">✓ דוחות בקרה מפורטים + ייצוא ל-Excel</p>
                   <p className="text-gray-600 mb-2">✓ שמירת אירועי עבר בארכיון</p>
                   <p className="text-gray-600 mb-2">✓ הצגת מפת אזור האירוע + ניווט לאולם</p>
                 </div>
