@@ -985,30 +985,15 @@ const handleOpenAddonModal = React.useCallback(() => {
               inviteLink: inviteLink,
             }],
             message: smsMessage,
+            eventId: eventIdForInvite || null,
           }),
         });
 
         const smsResult = await smsResponse.json();
 
         if (smsResult.success && smsResult.sent > 0) {
-          if (eventIdForInvite) {
-            try {
-              const { data: newCount, error: rpcErr } = await supabase.rpc('increment_event_messages_sent', {
-                p_event_id: eventIdForInvite,
-                p_delta: smsResult.sent
-              });
-              if (!rpcErr && typeof newCount === 'number') {
-                setEventMessagesSentCount(newCount);
-              } else {
-                const fallback = (eventMessagesSentCount || 0) + smsResult.sent;
-                setEventMessagesSentCount(fallback);
-                await supabase.from('events').update({ messages_sent_count: fallback }).eq('id', eventIdForInvite);
-              }
-            } catch (e) {
-              const fallback = (eventMessagesSentCount || 0) + smsResult.sent;
-              setEventMessagesSentCount(fallback);
-              try { await supabase.from('events').update({ messages_sent_count: fallback }).eq('id', eventIdForInvite); } catch (_) {}
-            }
+          if (typeof smsResult.updatedMessagesSentCount === 'number') {
+            setEventMessagesSentCount(smsResult.updatedMessagesSentCount);
           } else {
             setEventMessagesSentCount((prev) => (prev || 0) + smsResult.sent);
           }
@@ -2092,6 +2077,7 @@ React.useEffect(() => {
         }
 
         try {
+          const bulkEventId = currentEventId || evRow?.id || null;
           const smsResponse = await fetch('/api/send-sms', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -2101,6 +2087,7 @@ React.useEffect(() => {
                 message: smsMessage.replace('{inviteLink}', g.inviteLink),
               })),
               message: smsMessage,
+              eventId: bulkEventId,
             }),
           });
 
@@ -2115,24 +2102,11 @@ React.useEffect(() => {
           // Add to local state
           setSentGuests((prev) => [...prev, ...validGuests]);
 
-          if (smsResult.sent > 0 && (currentEventId || evRow?.id)) {
-            const eventIdForBulk = currentEventId || evRow?.id;
-            try {
-              const { data: newCount, error: rpcErr } = await supabase.rpc('increment_event_messages_sent', {
-                p_event_id: eventIdForBulk,
-                p_delta: smsResult.sent
-              });
-              if (!rpcErr && typeof newCount === 'number') {
-                setEventMessagesSentCount(newCount);
-              } else {
-                const newCountBulk = (eventMessagesSentCount || 0) + smsResult.sent;
-                setEventMessagesSentCount(newCountBulk);
-                await supabase.from('events').update({ messages_sent_count: newCountBulk }).eq('id', eventIdForBulk);
-              }
-            } catch (e) {
-              const newCountBulk = (eventMessagesSentCount || 0) + smsResult.sent;
-              setEventMessagesSentCount(newCountBulk);
-              try { await supabase.from('events').update({ messages_sent_count: newCountBulk }).eq('id', eventIdForBulk); } catch (_) {}
+          if (smsResult.sent > 0) {
+            if (typeof smsResult.updatedMessagesSentCount === 'number') {
+              setEventMessagesSentCount(smsResult.updatedMessagesSentCount);
+            } else {
+              setEventMessagesSentCount((prev) => (prev || 0) + smsResult.sent);
             }
           }
           if (smsResult.success && smsResult.sent === validGuests.length) {
@@ -2603,15 +2577,24 @@ React.useEffect(() => {
           const newAddonTotal = updatedPackages.filter((p) => p === 'addon').length;
           setDbAddonCount(newAddonTotal);
           if (currentEventId) {
-            try {
-              await supabase
-                .from('events')
-                .update({ additional_packages: newAddonTotal })
-                .eq('id', currentEventId);
-            } catch (e) {
-              console.error('Failed to persist additional_packages in DB', e);
+            const { error: updErr } = await supabase
+              .from('events')
+              .update({ additional_packages: newAddonTotal })
+              .eq('id', currentEventId);
+            if (updErr) {
+              console.error('Failed to persist additional_packages in DB', updErr);
+            }
+            const { data: verify } = await supabase
+              .from('events')
+              .select('additional_packages')
+              .eq('id', currentEventId)
+              .single();
+            if (verify && typeof verify.additional_packages === 'number' && verify.additional_packages !== newAddonTotal) {
+              console.warn('additional_packages mismatch after update, retrying');
+              await supabase.from('events').update({ additional_packages: newAddonTotal }).eq('id', currentEventId);
             }
           }
+          try { localStorage.setItem('additionalPackages_' + (currentEventId || 'global'), JSON.stringify(newAddonTotal)); } catch (_) {}
           setPlanSelectionError('');
 
           const totalGuestsAdded = pendingAddonCount * 100;
@@ -2754,14 +2737,24 @@ React.useEffect(() => {
         }
         if(!ev) return;
         setEventMessagesSentCount(messagesSent);
+        let addonCount = 0;
         if (typeof ev.additional_packages === 'number') {
-          setDbAddonCount(ev.additional_packages);
-          setAdditionalPackages(Array(ev.additional_packages).fill('addon'));
+          addonCount = ev.additional_packages;
         }
-        // NEVER override selectedPlan from allowed_guests - user's choice should always be respected
-        // Only set if there's absolutely no plan selected anywhere
+        try {
+          const lsKey = 'additionalPackages_' + ev.id;
+          const lsVal = parseInt(localStorage.getItem(lsKey), 10);
+          if (!isNaN(lsVal) && lsVal > addonCount) {
+            addonCount = lsVal;
+          }
+        } catch (_) {}
+        setDbAddonCount((prev) => Math.max(prev ?? 0, addonCount));
+        setAdditionalPackages((prev) => {
+          const prevCount = prev ? prev.length : 0;
+          if (addonCount > prevCount) return Array(addonCount).fill('addon');
+          return prev;
+        });
         const storedPlan = typeof window !== 'undefined' ? localStorage.getItem('selectedPlan') : null;
-        // If user explicitly chose 'free' or 'basic', NEVER override it
         if (storedPlan === 'free' || storedPlan === 'basic' || selectedPlan === 'free' || selectedPlan === 'basic') {
           // User chose plan A, respect that choice always
           if (!selectedPlan && storedPlan) {
@@ -2809,8 +2802,12 @@ React.useEffect(() => {
             setEventMessagesSentCount(ev.messages_sent_count);
           }
           if (typeof ev.additional_packages === 'number') {
-            setDbAddonCount(ev.additional_packages);
-            setAdditionalPackages(Array(ev.additional_packages).fill('addon'));
+            setDbAddonCount((prev) => Math.max(prev ?? 0, ev.additional_packages));
+            setAdditionalPackages((prev) => {
+              const prevCount = prev ? prev.length : 0;
+              if (ev.additional_packages > prevCount) return Array(ev.additional_packages).fill('addon');
+              return prev;
+            });
           }
           setEventRefreshKey((k) => k + 1);
         }
@@ -3163,12 +3160,20 @@ React.useEffect(() => {
                 console.log('Found future event in database, restoring...', ev);
                 setCurrentEventId(ev.id);
                 setEventMessagesSentCount(messagesSent);
+                let restoreAddonCount = 0;
                 if (typeof ev.additional_packages === 'number') {
-                  setDbAddonCount(ev.additional_packages);
-                  setAdditionalPackages(Array(ev.additional_packages).fill('addon'));
+                  restoreAddonCount = ev.additional_packages;
                 }
-                // NEVER override selectedPlan from allowed_guests - user's choice should always be respected
-                // Only set if there's absolutely no plan selected anywhere
+                try {
+                  const lsVal = parseInt(localStorage.getItem('additionalPackages_' + ev.id), 10);
+                  if (!isNaN(lsVal) && lsVal > restoreAddonCount) restoreAddonCount = lsVal;
+                } catch (_) {}
+                setDbAddonCount((prev) => Math.max(prev ?? 0, restoreAddonCount));
+                setAdditionalPackages((prev) => {
+                  const prevCount = prev ? prev.length : 0;
+                  if (restoreAddonCount > prevCount) return Array(restoreAddonCount).fill('addon');
+                  return prev;
+                });
                 const storedPlan = typeof window !== 'undefined' ? localStorage.getItem('selectedPlan') : null;
                 // If user explicitly chose 'free' or 'basic', NEVER override it
                 if (storedPlan === 'free' || storedPlan === 'basic' || selectedPlan === 'free' || selectedPlan === 'basic') {
