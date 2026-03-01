@@ -5390,67 +5390,50 @@ React.useEffect(() => {
               {/* Invitation text editor with advanced formatting */}
               <div>
                 <label className="block mb-1 font-bold text-right">אפשרות לשינוי נוסח ועיצוב ההזמנה</label>
-                <div className="border border-primary rounded-md p-3 bg-white">
-                  <div className="flex justify-center items-center mb-3">
+                <div className="border border-primary rounded-md p-2 sm:p-3 bg-white">
+                  <div className="flex justify-center items-center mb-2">
                     <button
                       onClick={addNewLineAtTop}
-                      className="bg-green-500 text-white px-4 py-2 rounded text-sm hover:bg-green-600 font-medium"
+                      className="bg-green-500 text-white px-3 py-1.5 rounded text-xs sm:text-sm hover:bg-green-600 font-medium"
                     >
                       + הוסף שורה למעלה
                     </button>
-                    <span className="text-sm text-gray-600 mr-4">
+                    <span className="text-xs sm:text-sm text-gray-600 mr-3">
                       {customInvitationText.split('\n').length} שורות
                     </span>
                   </div>
                   
                   {customInvitationText.split('\n').map((line, index) => (
-                    <div key={index} className="mb-1 p-1 border border-gray-200 rounded bg-gray-50">
-                      <div className="flex items-center gap-2">
-                        {/* Text area */}
-                        <div className="flex-1">
-                          <textarea
-                            value={line}
-                            onChange={(e) => updateLineText(index, e.target.value)}
-                            className="w-full border border-gray-300 rounded p-1 text-right"
-                            style={{
-                              fontSize: `${lineStyles[index]?.fontSize || 16}px`,
-                              color: lineStyles[index]?.color || 'black',
-                              fontWeight: lineStyles[index]?.fontWeight || 'normal'
-                            }}
-                            rows={1}
-                          />
-                        </div>
-
-                        {/* Right side - Icon controls in horizontal row */}
-                        <div className="flex flex-col items-center gap-1">
-                          {index === 0 && (
-                            <div className="flex gap-2 text-sm font-bold text-gray-700">
-                              <span className="w-24 text-center">עיצוב מתקדם</span>
-                              <span className="w-8 text-center">מחק</span>
-                            </div>
-                          )}
-                          <div className="flex gap-2">
-                            {/* Advanced Edit Button */}
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setShowAdvancedEdit(index);
-                              }}
-                              className="px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white rounded-lg transition-colors font-medium text-sm"
-                              title="עיצוב מתקדם"
-                            >
-                              ✨ עיצוב מתקדם
-                            </button>
-                            {/* Delete Icon */}
-                            <button
-                              onClick={() => deleteLine(index)}
-                              className="p-2 bg-red-400 hover:bg-red-500 rounded-lg transition-colors"
-                              title="מחק שורה"
-                            >
-                              <span className="text-lg">🗑️</span>
-                            </button>
-                          </div>
-                        </div>
+                    <div key={index} className="mb-1.5 p-1.5 border border-gray-200 rounded bg-gray-50">
+                      <textarea
+                        value={line}
+                        onChange={(e) => updateLineText(index, e.target.value)}
+                        className="w-full border border-gray-300 rounded p-2 text-right text-sm sm:text-base"
+                        style={{
+                          fontSize: `${Math.min(lineStyles[index]?.fontSize || 16, 16)}px`,
+                          color: lineStyles[index]?.color || 'black',
+                          fontWeight: lineStyles[index]?.fontWeight || 'normal'
+                        }}
+                        rows={1}
+                      />
+                      <div className="flex items-center justify-end gap-1.5 mt-1">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setShowAdvancedEdit(index);
+                          }}
+                          className="px-2 py-1 bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white rounded text-xs font-medium"
+                          title="עיצוב מתקדם"
+                        >
+                          ✨ עיצוב
+                        </button>
+                        <button
+                          onClick={() => deleteLine(index)}
+                          className="px-2 py-1 bg-red-400 hover:bg-red-500 rounded text-xs text-white font-medium"
+                          title="מחק שורה"
+                        >
+                          🗑️
+                        </button>
                       </div>
                     </div>
                   ))}
@@ -5479,9 +5462,9 @@ React.useEffect(() => {
                 </div>
                 
                 {/* Preview of formatted text */}
-                <div className="mt-4 p-4 border border-gray-300 rounded bg-white">
-                  <h3 className="text-lg font-bold mb-2 text-center">תצוגה מקדימה:</h3>
-                  <div className="bg-gray-50 p-4 rounded border text-right">
+                <div className="mt-3 p-2 sm:p-4 border border-gray-300 rounded bg-white">
+                  <h3 className="text-sm sm:text-lg font-bold mb-2 text-center">תצוגה מקדימה:</h3>
+                  <div className="bg-gray-50 p-2 sm:p-4 rounded border text-right">
                     {customInvitationText.split('\n').map((line, index) => (
                       <div
                         key={index}
