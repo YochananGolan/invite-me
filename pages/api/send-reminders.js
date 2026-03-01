@@ -60,7 +60,7 @@ export default async function handler(req, res) {
     return targetDates.has(eventDateStr);
   });
 
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://invite-me-two.vercel.app';
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://meet-m.co.il';
   const report = { targetDates: [...targetDates], eventsProcessed: 0, totalSent: 0, errors: [] };
 
   for (const event of eventsInRange) {
@@ -92,7 +92,7 @@ export default async function handler(req, res) {
       };
     });
 
-    const message = `תזכורת מ-MeetM: ${eventName} – ${eventDateDisplay}. לאישור הגעה: {inviteLink}. אין צורך לאשר שוב אלא אם כן חל שינוי ביחס לאישור הקודם.`;
+    const message = `שלום {firstName}, תזכורת: ${eventName} בתאריך ${eventDateDisplay}.\nלאישור הגעה לחצו כאן:\n{inviteLink}\nאין צורך לאשר שוב אם כבר אישרתם. Meet-M`;
 
     try {
       const { sent, failed, errors: sendErrors } = await sendSmsToGuests(smsGuests, message, 'Reminder');

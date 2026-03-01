@@ -789,7 +789,7 @@ const handleOpenAddonModal = React.useCallback(() => {
         setInvitedGuestsCount((prev) => prev + 1);
       }
 
-      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || (typeof window !== 'undefined' ? window.location.origin : 'https://invite-me-two.vercel.app');
+      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || (typeof window !== 'undefined' ? window.location.origin : 'https://meet-m.co.il');
       const inviteLink = `${baseUrl}/${eventIdForInvite}/${newGuest.id}`;
 
       // Dev helper: log the RSVP link so it can be copied from the browser console
@@ -961,7 +961,7 @@ const handleOpenAddonModal = React.useCallback(() => {
         setInvitedGuestsCount((prev) => prev + 1);
       }
 
-      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || (typeof window !== 'undefined' ? window.location.origin : 'https://invite-me-two.vercel.app');
+      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || (typeof window !== 'undefined' ? window.location.origin : 'https://meet-m.co.il');
       const inviteLink = `${baseUrl}/${eventIdForInvite}/${newGuest.id}`;
 
       // Send SMS via API - check message quota first (effective = sync with status panel)
@@ -2047,7 +2047,7 @@ React.useEffect(() => {
 
       // Send SMS to all guests if requested
       if (sendSms && insertedGuests && insertedGuests.length > 0) {
-        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || (typeof window !== 'undefined' ? window.location.origin : 'https://invite-me-two.vercel.app');
+        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || (typeof window !== 'undefined' ? window.location.origin : 'https://meet-m.co.il');
         const smsGuests = insertedGuests.map(g => {
           const inviteLink = `${baseUrl}/${evRow.id}/${g.id}`;
           return {
@@ -2148,7 +2148,7 @@ React.useEffect(() => {
         }
       } else if (sendWhatsApp && insertedGuests && insertedGuests.length > 0) {
         // Save + open WhatsApp for first guest
-        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || (typeof window !== 'undefined' ? window.location.origin : 'https://invite-me-two.vercel.app');
+        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || (typeof window !== 'undefined' ? window.location.origin : 'https://meet-m.co.il');
         const first = insertedGuests[0];
         const inviteLink = `${baseUrl}/${evRow.id}/${first.id}`;
         const digitsOnly = (first.phone || '').replace(/\D/g, '');
