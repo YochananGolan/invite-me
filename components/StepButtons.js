@@ -123,7 +123,7 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick, trig
     });
   }, [triggerCreateEvent, hasClearedExistingEvent]);
   const steps = ['צור אירוע חדש', '📅 שלב 1 - סוג אירוע', '📝 שלב 2 - פרטי האירוע', '🎨 שלב 3 - עיצוב הזמנה', '📤 שלב 4 - שליחת הזמנה לאורח', '📊 שלב 5 - דוחו"ת אישורי הגעה'];
-  const stepsMobile = ['', '📅 סוג אירוע', '📝 פרטי האירוע', '🎨 עיצוב', '📤 שליחה', '📊 דוחות'];
+  const stepsMobile = ['', 'סוג אירוע', 'פרטי האירוע', 'עיצוב', 'שליחה', 'דוחות'];
   const eventTypes = ['חתונה', 'חינה', 'מסיבת אירוסין', 'בר מצווה', 'בת מצווה', 'ברית', 'בריתה', 'יום הולדת', 'אירוע עסקי', 'הפרשת חלה'];
   const times = Array.from({ length: (24 - 8) * 2 }, (_, i) => {
     const totalHalfHours = 16 + i; // מתחילים מ-08:00
@@ -3845,8 +3845,7 @@ React.useEffect(() => {
                   }`}
                 >
                   <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-white/80 text-xs font-bold text-primary shrink-0">{realIdx}</span>
-                  <span className="text-base leading-none">{stepsMobile[realIdx].split(' ')[0]}</span>
-                  <span className="text-xs font-bold leading-tight">{stepsMobile[realIdx].split(' ').slice(1).join(' ')}</span>
+                  <span className="text-sm font-bold leading-tight">{stepsMobile[realIdx]}</span>
                 </button>
               );
             })}
@@ -3882,8 +3881,7 @@ React.useEffect(() => {
                   }`}
                 >
                   <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-white/80 text-xs font-bold text-primary shrink-0">{realIdx}</span>
-                  <span className="text-base leading-none">{stepsMobile[realIdx].split(' ')[0]}</span>
-                  <span className="text-xs font-bold leading-tight">{stepsMobile[realIdx].split(' ').slice(1).join(' ')}</span>
+                  <span className="text-sm font-bold leading-tight">{stepsMobile[realIdx]}</span>
                 </button>
               );
             })}
