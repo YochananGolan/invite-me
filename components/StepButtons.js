@@ -2554,6 +2554,11 @@ React.useEffect(() => {
           try { localStorage.setItem('selectedPlan', pendingPlan); } catch(e){
             console.warn('Failed to save plan to localStorage:', e);
           }
+          if (currentEventId) {
+            supabase.from('events').update({ selected_plan: pendingPlan }).eq('id', currentEventId).then(({ error }) => {
+              if (error) console.error('Failed to persist selected_plan to DB', error);
+            });
+          }
 
           const planDisplayName = getPlanDisplayName(pendingPlan);
           // Show success modal instead of toast
@@ -2574,30 +2579,44 @@ React.useEffect(() => {
       else if (pendingPlan === 'addon') {
         try {
           const newAddons = Array(pendingAddonCount).fill('addon');
-          // עדכון סינכרוני: מערך מעודכן לכל המקומות (state, localStorage, DB) כדי שהמכסה תתעדכן מיד
           const updatedPackages = [...additionalPackages, ...newAddons];
           setAdditionalPackages(updatedPackages);
           const newAddonTotal = updatedPackages.filter((p) => p === 'addon').length;
           setDbAddonCount(newAddonTotal);
-          if (currentEventId) {
+          let eventIdForSave = currentEventId;
+          if (!eventIdForSave) {
+            try {
+              const { data: { user } } = await supabase.auth.getUser();
+              if (user) {
+                const { data: latestEv } = await supabase.from('events')
+                  .select('id').eq('user_id', user.id)
+                  .order('created_at', { ascending: false }).limit(1).single();
+                if (latestEv) {
+                  eventIdForSave = latestEv.id;
+                  setCurrentEventId(latestEv.id);
+                }
+              }
+            } catch (_) {}
+          }
+          if (eventIdForSave) {
             const { error: updErr } = await supabase
               .from('events')
               .update({ additional_packages: newAddonTotal })
-              .eq('id', currentEventId);
+              .eq('id', eventIdForSave);
             if (updErr) {
               console.error('Failed to persist additional_packages in DB', updErr);
             }
             const { data: verify } = await supabase
               .from('events')
               .select('additional_packages')
-              .eq('id', currentEventId)
+              .eq('id', eventIdForSave)
               .single();
             if (verify && typeof verify.additional_packages === 'number' && verify.additional_packages !== newAddonTotal) {
               console.warn('additional_packages mismatch after update, retrying');
-              await supabase.from('events').update({ additional_packages: newAddonTotal }).eq('id', currentEventId);
+              await supabase.from('events').update({ additional_packages: newAddonTotal }).eq('id', eventIdForSave);
             }
           }
-          try { localStorage.setItem('additionalPackages_' + (currentEventId || 'global'), JSON.stringify(newAddonTotal)); } catch (_) {}
+          try { localStorage.setItem('additionalPackages_' + (eventIdForSave || 'global'), JSON.stringify(newAddonTotal)); } catch (_) {}
           setPlanSelectionError('');
 
           const totalGuestsAdded = pendingAddonCount * 100;
@@ -2720,7 +2739,7 @@ React.useEffect(() => {
         let messagesSent = 0;
         const { data: evData, error: evError } = await supabase
           .from('events')
-          .select('id,event_details,allowed_guests,messages_sent_count,additional_packages')
+          .select('id,event_details,allowed_guests,messages_sent_count,additional_packages,selected_plan')
           .eq('user_id',user.id)
           .order('created_at',{ascending:false})
           .limit(1)
@@ -2747,9 +2766,7 @@ React.useEffect(() => {
         try {
           const lsKey = 'additionalPackages_' + ev.id;
           const lsVal = parseInt(localStorage.getItem(lsKey), 10);
-          if (!isNaN(lsVal) && lsVal > addonCount) {
-            addonCount = lsVal;
-          }
+          if (!isNaN(lsVal) && lsVal > addonCount) addonCount = lsVal;
         } catch (_) {}
         setDbAddonCount((prev) => Math.max(prev ?? 0, addonCount));
         setAdditionalPackages((prev) => {
@@ -2758,23 +2775,19 @@ React.useEffect(() => {
           return prev;
         });
         setEventDataLoaded(true);
+        const dbPlan = ev.selected_plan || null;
         const storedPlan = typeof window !== 'undefined' ? localStorage.getItem('selectedPlan') : null;
-        if (storedPlan === 'free' || storedPlan === 'basic' || selectedPlan === 'free' || selectedPlan === 'basic') {
-          // User chose plan A, respect that choice always
-          if (!selectedPlan && storedPlan) {
-            setSelectedPlan(storedPlan);
-          }
-        } else if (ev.allowed_guests && !selectedPlan && !storedPlan) {
-          // Only infer plan if user hasn't selected anything at all
+        const planToUse = dbPlan || storedPlan || null;
+        if (planToUse && !selectedPlan) {
+          setSelectedPlan(planToUse);
+          try { localStorage.setItem('selectedPlan', planToUse); } catch(e){}
+        } else if (!planToUse && ev.allowed_guests && !selectedPlan) {
           const inferredPlan = ev.allowed_guests <= 50 ? 'free' :
                                ev.allowed_guests <= 200 ? 'standard' :
                                ev.allowed_guests <= 350 ? 'premium' :
                                ev.allowed_guests <= 500 ? 'luxury' : 'supreme';
           setSelectedPlan(inferredPlan);
           try { localStorage.setItem('selectedPlan', inferredPlan); } catch(e){}
-        } else if (storedPlan && !selectedPlan) {
-          // Restore from localStorage if exists but state is not set
-          setSelectedPlan(storedPlan);
         }
         const details=typeof ev.event_details==='string'?JSON.parse(ev.event_details):ev.event_details||{};
         const dateStr=details.date||details.start_datetime;
@@ -2812,6 +2825,10 @@ React.useEffect(() => {
               if (ev.additional_packages > prevCount) return Array(ev.additional_packages).fill('addon');
               return prev;
             });
+          }
+          if (ev.selected_plan) {
+            setSelectedPlan(ev.selected_plan);
+            try { localStorage.setItem('selectedPlan', ev.selected_plan); } catch (_) {}
           }
           setEventRefreshKey((k) => k + 1);
         }
@@ -3141,14 +3158,13 @@ React.useEffect(() => {
           
           const { data: ev } = await supabase
             .from('events')
-            .select('id, event_details, allowed_guests, messages_sent_count, additional_packages')
+            .select('id, event_details, allowed_guests, messages_sent_count, additional_packages, selected_plan')
             .eq('user_id', user.id)
             .order('created_at', { ascending: false })
             .limit(1)
             .maybeSingle();
             
           if (ev) {
-            // Check if event date is in the future
             const details = typeof ev.event_details === 'string' 
               ? JSON.parse(ev.event_details) 
               : ev.event_details;
@@ -3159,7 +3175,6 @@ React.useEffect(() => {
               const today = new Date();
               today.setHours(0, 0, 0, 0);
               
-              // Only restore if event is today or in the future (not past)
               if (eventDate >= today) {
                 console.log('Found future event in database, restoring...', ev);
                 setCurrentEventId(ev.id);
@@ -3179,24 +3194,19 @@ React.useEffect(() => {
                   return prev;
                 });
                 setEventDataLoaded(true);
+                const dbPlan = ev.selected_plan || null;
                 const storedPlan = typeof window !== 'undefined' ? localStorage.getItem('selectedPlan') : null;
-                // If user explicitly chose 'free' or 'basic', NEVER override it
-                if (storedPlan === 'free' || storedPlan === 'basic' || selectedPlan === 'free' || selectedPlan === 'basic') {
-                  // User chose plan A, respect that choice always
-                  if (!selectedPlan && storedPlan) {
-                    setSelectedPlan(storedPlan);
-                  }
-                } else if (ev.allowed_guests && !selectedPlan && !storedPlan) {
-                  // Only infer plan if user hasn't selected anything at all
+                const planToUse = dbPlan || storedPlan || null;
+                if (planToUse && !selectedPlan) {
+                  setSelectedPlan(planToUse);
+                  try { localStorage.setItem('selectedPlan', planToUse); } catch(e){}
+                } else if (!planToUse && ev.allowed_guests && !selectedPlan) {
                   const inferredPlan = ev.allowed_guests <= 50 ? 'free' :
                                        ev.allowed_guests <= 200 ? 'standard' :
                                        ev.allowed_guests <= 350 ? 'premium' :
                                        ev.allowed_guests <= 500 ? 'luxury' : 'supreme';
                   setSelectedPlan(inferredPlan);
                   try { localStorage.setItem('selectedPlan', inferredPlan); } catch(e){}
-                } else if (storedPlan && !selectedPlan) {
-                  // Restore from localStorage if exists but state is not set
-                  setSelectedPlan(storedPlan);
                 }
                 setFormData(prev => ({ ...prev, ...details }));
                 
@@ -3284,7 +3294,7 @@ React.useEffect(() => {
         let messagesSent = 0;
         const { data: evData, error: evError } = await supabase
           .from('events')
-          .select('id,event_details,allowed_guests,messages_sent_count,additional_packages')
+          .select('id,event_details,allowed_guests,messages_sent_count,additional_packages,selected_plan')
           .eq('user_id', user.id)
           .order('created_at',{ascending:false})
           .limit(1)
@@ -3321,20 +3331,19 @@ React.useEffect(() => {
             return prev;
           });
           setEventDataLoaded(true);
+          const dbPlan = ev.selected_plan || null;
           const storedPlan = typeof window !== 'undefined' ? localStorage.getItem('selectedPlan') : null;
-          if (storedPlan === 'free' || storedPlan === 'basic' || selectedPlan === 'free' || selectedPlan === 'basic') {
-            if (!selectedPlan && storedPlan) {
-              setSelectedPlan(storedPlan);
-            }
-          } else if (ev.allowed_guests && !selectedPlan && !storedPlan) {
+          const planToUse = dbPlan || storedPlan || null;
+          if (planToUse && !selectedPlan) {
+            setSelectedPlan(planToUse);
+            try { localStorage.setItem('selectedPlan', planToUse); } catch(e){}
+          } else if (!planToUse && ev.allowed_guests && !selectedPlan) {
             const inferredPlan = ev.allowed_guests <= 50 ? 'free' :
                                  ev.allowed_guests <= 200 ? 'standard' :
                                  ev.allowed_guests <= 350 ? 'premium' :
                                  ev.allowed_guests <= 500 ? 'luxury' : 'supreme';
             setSelectedPlan(inferredPlan);
             try { localStorage.setItem('selectedPlan', inferredPlan); } catch(e){}
-          } else if (storedPlan && !selectedPlan) {
-            setSelectedPlan(storedPlan);
           }
           const details = typeof ev.event_details === 'string' 
             ? JSON.parse(ev.event_details) 
