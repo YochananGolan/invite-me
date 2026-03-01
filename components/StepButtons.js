@@ -3666,9 +3666,93 @@ React.useEffect(() => {
     try{ localStorage.removeItem('draftEvent'); localStorage.removeItem('newEventStarted'); }catch{}
   },[currentEventId, newEventStarted]);
 
-  // If user is not connected, show empty state (auth modal will be shown from HeroSection button)
   if (!session) {
-    return null;
+    return (
+      <>
+        {showFlowDiagram && (
+          <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50 p-2">
+            <div className="relative bg-white rounded-lg p-4 w-full max-w-6xl h-[98vh] overflow-hidden flex flex-col">
+              <button
+                onClick={() => setShowFlowDiagram(false)}
+                className="absolute top-4 left-4 text-3xl text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-full w-10 h-10 flex items-center justify-center font-bold transition-all z-10"
+                aria-label="\u05E1\u05D2\u05D5\u05E8"
+              >&times;</button>
+              <h2 className="text-2xl md:text-3xl font-bold mb-3 text-center text-primary">{'\u05EA\u05D9\u05D0\u05D5\u05E8 \u05EA\u05D4\u05DC\u05D9\u05DA \u05D9\u05E6\u05D9\u05E8\u05EA \u05D0\u05D9\u05E8\u05D5\u05E2 \u05D1-Meet-M'}</h2>
+              <p className="text-center text-gray-600 text-base mb-3">{'\u05DB\u05DA \u05E0\u05E8\u05D0\u05D4 \u05D4\u05EA\u05D4\u05DC\u05D9\u05DA \u05DC\u05D9\u05E6\u05D9\u05E8\u05EA \u05D4\u05D0\u05D9\u05E8\u05D5\u05E2 \u05E9\u05DC\u05DA'}</p>
+              <div className="border-b-2 border-primary mb-3"></div>
+              <div className="w-full mx-auto flex-1 overflow-y-auto px-2">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <h3 className="text-xl font-bold text-primary text-right mb-3 pr-2">{'\u05D4\u05EA\u05D7\u05DC\u05D4:'}</h3>
+                    <div className="border-2 border-gray-300 rounded-lg p-4 flex items-center gap-3">
+                      <div className="text-4xl flex-shrink-0">{'\u2705'}</div>
+                      <div className="flex-1 text-right">
+                        <h3 className="text-lg font-bold text-primary">{'\u05E4\u05EA\u05D9\u05D7\u05EA \u05D0\u05D9\u05E8\u05D5\u05E2 \u05D7\u05D3\u05E9'}</h3>
+                        <p className="text-base text-gray-600">{'\u05D0\u05D9\u05E9\u05D5\u05E8 \u05D5\u05D0\u05D9\u05E4\u05D5\u05E1 \u05D4\u05DE\u05E2\u05E8\u05DB\u05EA \u05DC\u05D0\u05D9\u05E8\u05D5\u05E2 \u05D7\u05D3\u05E9'}</p>
+                      </div>
+                    </div>
+                    <div className="border-2 border-gray-300 rounded-lg p-4 flex items-center gap-3">
+                      <div className="text-4xl flex-shrink-0">{'\uD83D\uDCB0'}</div>
+                      <div className="flex-1 text-right">
+                        <h3 className="text-lg font-bold text-primary">{'\u05D1\u05D7\u05D9\u05E8\u05EA \u05DE\u05E1\u05DC\u05D5\u05DC'}</h3>
+                        <p className="text-base text-gray-600">{'\u05D1\u05D7\u05E8 \u05D0\u05EA \u05D4\u05D7\u05D1\u05D9\u05DC\u05D4 \u05D4\u05DE\u05EA\u05D0\u05D9\u05DE\u05D4 \u05DC\u05D0\u05D9\u05E8\u05D5\u05E2 \u05E9\u05DC\u05DA'}</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <h3 className="text-xl font-bold text-primary text-right mb-3 pr-2">{'\u05D4\u05D2\u05D3\u05E8\u05EA \u05D4\u05D0\u05D9\u05E8\u05D5\u05E2:'}</h3>
+                    <div className="border-2 border-gray-300 rounded-lg p-4 flex items-center gap-3">
+                      <div className="text-4xl flex-shrink-0">{'\uD83C\uDF89'}</div>
+                      <div className="flex-1 text-right">
+                        <h3 className="text-lg font-bold text-primary">{'\u05E9\u05DC\u05D1 1: \u05E1\u05D5\u05D2 \u05D0\u05D9\u05E8\u05D5\u05E2'}</h3>
+                        <p className="text-base text-gray-600">{'\u05D7\u05EA\u05D5\u05E0\u05D4, \u05D1\u05E8 \u05DE\u05E6\u05D5\u05D5\u05D4, \u05D9\u05D5\u05DD \u05D4\u05D5\u05DC\u05D3\u05EA \u05D5\u05E2\u05D5\u05D3'}</p>
+                      </div>
+                    </div>
+                    <div className="border-2 border-gray-300 rounded-lg p-4 flex items-center gap-3">
+                      <div className="text-4xl flex-shrink-0">{'\uD83D\uDCDD'}</div>
+                      <div className="flex-1 text-right">
+                        <h3 className="text-lg font-bold text-primary">{'\u05E9\u05DC\u05D1 2: \u05E4\u05E8\u05D8\u05D9 \u05D4\u05D0\u05D9\u05E8\u05D5\u05E2'}</h3>
+                        <p className="text-base text-gray-600">{'\u05EA\u05D0\u05E8\u05D9\u05DA, \u05E9\u05E2\u05D4, \u05DE\u05E7\u05D5\u05DD \u05D5\u05E4\u05E8\u05D8\u05D9\u05DD \u05E0\u05D5\u05E1\u05E4\u05D9\u05DD'}</p>
+                      </div>
+                    </div>
+                    <div className="border-2 border-gray-300 rounded-lg p-4 flex items-center gap-3">
+                      <div className="text-4xl flex-shrink-0">{'\uD83C\uDFA8'}</div>
+                      <div className="flex-1 text-right">
+                        <h3 className="text-lg font-bold text-primary">{'\u05E9\u05DC\u05D1 3: \u05E2\u05D9\u05E6\u05D5\u05D1 \u05D4\u05D6\u05DE\u05E0\u05D4'}</h3>
+                        <p className="text-base text-gray-600">{'\u05D1\u05D7\u05E8 \u05DE\u05EA\u05D5\u05DA 21 \u05EA\u05D1\u05E0\u05D9\u05D5\u05EA \u05DE\u05E2\u05D5\u05E6\u05D1\u05D5\u05EA'}</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <h3 className="text-xl font-bold text-primary text-right mb-3 pr-2">{'\u05E0\u05D9\u05D4\u05D5\u05DC \u05D5\u05DE\u05E2\u05E7\u05D1:'}</h3>
+                    <div className="border-2 border-gray-300 rounded-lg p-4 flex items-center gap-3">
+                      <div className="text-4xl flex-shrink-0">{'\uD83D\uDCF1'}</div>
+                      <div className="flex-1 text-right">
+                        <h3 className="text-lg font-bold text-primary">{'\u05E9\u05DC\u05D1 4: \u05E9\u05DC\u05D9\u05D7\u05EA \u05D4\u05D6\u05DE\u05E0\u05D5\u05EA'}</h3>
+                        <p className="text-base text-gray-600">{'\u05E9\u05DC\u05D9\u05D7\u05D4 \u05D0\u05D5\u05D8\u05D5\u05DE\u05D8\u05D9\u05EA \u05DC SMS \u05D5-WhatsApp'}</p>
+                      </div>
+                    </div>
+                    <div className="border-2 border-gray-300 rounded-lg p-4 flex items-center gap-3">
+                      <div className="text-4xl flex-shrink-0">{'\uD83D\uDCCA'}</div>
+                      <div className="flex-1 text-right">
+                        <h3 className="text-lg font-bold text-primary">{'\u05E9\u05DC\u05D1 5: \u05D3\u05D5\u05D7\u05D5\u05EA'}</h3>
+                        <p className="text-base text-gray-600">{'\u05DE\u05E2\u05E7\u05D1 \u05D0\u05D9\u05E9\u05D5\u05E8\u05D9 \u05D4\u05D2\u05E2\u05D4 \u05D5\u05D9\u05D9\u05E6\u05D5\u05D0 \u05DC\u05D0\u05E7\u05E1\u05DC'}</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="flex justify-center gap-4 mt-4 pt-3 border-t border-gray-200">
+                <button
+                  onClick={() => setShowFlowDiagram(false)}
+                  className="bg-gray-200 text-gray-700 border border-gray-300 rounded-full px-8 py-3 font-medium hover:bg-gray-300 transition-all"
+                >{'\u05E1\u05D2\u05D5\u05E8'}</button>
+              </div>
+            </div>
+          </div>
+        )}
+      </>
+    );
   }
 
   return (
