@@ -34,9 +34,12 @@ export default async function handler(req, res) {
   const supabase = createClient(supabaseUrl, supabaseKey);
 
   const now = new Date();
-  const inTwoDays = new Date(now);
-  inTwoDays.setDate(inTwoDays.getDate() + 2);
-  const targetDateStr = getDateStringInIsrael(inTwoDays);
+  const todayStr = getDateStringInIsrael(now);
+  const tomorrow = new Date(now); tomorrow.setDate(tomorrow.getDate() + 1);
+  const tomorrowStr = getDateStringInIsrael(tomorrow);
+  const inTwoDays = new Date(now); inTwoDays.setDate(inTwoDays.getDate() + 2);
+  const inTwoDaysStr = getDateStringInIsrael(inTwoDays);
+  const targetDates = new Set([todayStr, tomorrowStr, inTwoDaysStr]);
 
   const { data: events, error: evError } = await supabase
     .from('events')
@@ -49,18 +52,18 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: evError.message });
   }
 
-  const eventsInTwoDays = (events || []).filter((ev) => {
+  const eventsInRange = (events || []).filter((ev) => {
     const d = ev?.event_details || {};
     const dateStr = d.end_datetime || d.date || d.start_datetime;
     if (!dateStr) return false;
     const eventDateStr = getDateStringInIsrael(new Date(dateStr));
-    return eventDateStr === targetDateStr;
+    return targetDates.has(eventDateStr);
   });
 
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://invite-me-two.vercel.app';
-  const report = { targetDate: targetDateStr, eventsProcessed: 0, totalSent: 0, errors: [] };
+  const report = { targetDates: [...targetDates], eventsProcessed: 0, totalSent: 0, errors: [] };
 
-  for (const event of eventsInTwoDays) {
+  for (const event of eventsInRange) {
     const details = typeof event.event_details === 'string' ? JSON.parse(event.event_details || '{}') : event.event_details || {};
     const eventName = details.title || details.event_name || 'האירוע';
     const eventDateStr = details.date || details.start_datetime || details.end_datetime || '';
@@ -111,8 +114,8 @@ export default async function handler(req, res) {
 
   return res.status(200).json({
     ok: true,
-    targetDate: targetDateStr,
-    eventsFound: eventsInTwoDays.length,
+    targetDates: [...targetDates],
+    eventsFound: eventsInRange.length,
     eventsProcessed: report.eventsProcessed,
     totalRemindersSent: report.totalSent,
     errors: report.errors.length ? report.errors : undefined,
