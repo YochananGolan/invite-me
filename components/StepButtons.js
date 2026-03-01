@@ -3759,10 +3759,9 @@ React.useEffect(() => {
     <>
       {/* Capacity Limit Warning Modal */}
       {showPlanLimitWarning && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black/70 z-[100] overflow-y-auto py-4">
-          <div className="bg-white rounded-lg p-6 sm:p-8 w-full max-w-2xl mx-4 my-auto text-center shadow-2xl max-h-[95vh] overflow-y-auto">
+        <div className="fixed inset-0 flex items-center justify-center bg-black/70 z-[100]">
+          <div className="bg-white rounded-lg p-4 sm:p-6 w-full max-w-lg mx-3 text-center shadow-2xl">
             {(() => {
-              // חישוב מכסה אחיד בכל המסלולים (א–ו) + תוספות; אותה הצעת חבילות 100 הודעות
               const baseLimit = getPlanBaseLimit(selectedPlan) || 0;
               const extraCapacity = additionalPackages.reduce(
                 (sum, planId) => sum + getPlanBaseLimit(planId),
@@ -3776,67 +3775,59 @@ React.useEffect(() => {
               const totalCost = numPackages * 100;
 
               return (
-                <div className="mb-6">
-                  <div className="text-6xl mb-4">🎉</div>
-                  <h2 className="text-3xl font-bold text-primary mb-4">חרגת ממכסת ההודעות!</h2>
-                  <p className="text-xl text-gray-700 mb-6">
+                <div>
+                  <h2 className="text-xl font-bold text-primary mb-2">חרגת ממכסת ההודעות!</h2>
+                  <p className="text-sm text-gray-700 mb-3">
                     נשלחו <strong className="text-primary">{effectiveMessagesSentCount}</strong> הודעות
                   </p>
 
-                  <div className="bg-blue-50 border-2 border-blue-300 rounded-lg p-6 mb-6">
-                    <div className="flex items-center justify-center gap-4 mb-4">
+                  <div className="bg-blue-50 border border-blue-300 rounded-lg p-3 mb-3">
+                    <div className="flex items-center justify-center gap-3 mb-1">
                       <div className="text-center">
-                        <div className="text-4xl font-bold text-primary">{totalLimit}</div>
-                        <div className="text-sm text-gray-600">מכסת הודעות נוכחית</div>
+                        <div className="text-2xl font-bold text-primary">{totalLimit}</div>
+                        <div className="text-xs text-gray-600">מכסת הודעות נוכחית</div>
                       </div>
-                      <div className="text-3xl text-gray-400">→</div>
+                      <div className="text-xl text-gray-400">→</div>
                       <div className="text-center">
-                        <div className="text-4xl font-bold text-green-600">{effectiveMessagesSentCount}</div>
-                        <div className="text-sm text-gray-600">הודעות שנשלחו</div>
+                        <div className="text-2xl font-bold text-green-600">{effectiveMessagesSentCount}</div>
+                        <div className="text-xs text-gray-600">הודעות שנשלחו</div>
                       </div>
                     </div>
-                    <div className="text-center text-gray-700 mb-4">
-                      <p className="text-lg font-semibold">
-                        נדרשים עוד <strong className="text-red-600">{messagesOverQuota}</strong> הודעות במכסה
-                      </p>
-                    </div>
+                    <p className="text-sm font-semibold text-gray-700">
+                      נדרשים עוד <strong className="text-red-600">{messagesOverQuota}</strong> הודעות במכסה
+                    </p>
                   </div>
 
-                  <div className="bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-300 rounded-lg p-6 mb-6">
-                    <h3 className="text-xl font-bold text-green-800 mb-3">💰 חבילות הרחבה – 100 הודעות בכל חבילה</h3>
-                    <div className="text-center mb-4">
-                      <div className="text-5xl font-bold text-green-600 mb-2">₪100</div>
-                      <div className="text-lg text-gray-700">לכל חבילה (100 הודעות)</div>
+                  <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-300 rounded-lg p-3 mb-3">
+                    <h3 className="text-base font-bold text-green-800 mb-1">💰 חבילות הרחבה – 100 הודעות / ₪100</h3>
+                    <p className="text-xs text-gray-700 font-semibold mb-2">בחר כמה חבילות לרכוש:</p>
+                    <div className="flex flex-wrap justify-center gap-1.5 mb-2">
+                      {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => (
+                        <button
+                          key={n}
+                          type="button"
+                          onClick={() => setPendingAddonCount(n)}
+                          className={`w-9 h-9 rounded-full font-bold border-2 text-sm transition-all ${
+                            numPackages === n
+                              ? 'bg-green-600 text-white border-green-700'
+                              : 'bg-white text-gray-700 border-gray-300 hover:border-green-500'
+                          }`}
+                        >
+                          {n}
+                        </button>
+                      ))}
                     </div>
-                    <div className="bg-white rounded-lg p-4 mb-4">
-                      <p className="text-gray-700 font-semibold mb-3">בחר כמה חבילות לרכוש:</p>
-                      <div className="flex flex-wrap justify-center gap-2 mb-4">
-                        {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => (
-                          <button
-                            key={n}
-                            type="button"
-                            onClick={() => setPendingAddonCount(n)}
-                            className={`min-w-[3rem] py-2 px-3 rounded-full font-bold border-2 transition-all ${
-                              numPackages === n
-                                ? 'bg-green-600 text-white border-green-700'
-                                : 'bg-white text-gray-700 border-gray-300 hover:border-green-500'
-                            }`}
-                          >
-                            {n}
-                          </button>
-                        ))}
-                      </div>
-                      <p className="text-gray-700">
-                        <strong>{numPackages}</strong> {numPackages === 1 ? 'חבילה' : 'חבילות'} = <strong>{totalMessages}</strong> הודעות נוספות<br/>
-                        <strong>סה"כ לתשלום:</strong> <span className="text-2xl font-bold text-green-600">₪{totalCost}</span>
-                      </p>
-                    </div>
+                    <p className="text-sm text-gray-700">
+                      <strong>{numPackages}</strong> {numPackages === 1 ? 'חבילה' : 'חבילות'} = <strong>{totalMessages}</strong> הודעות נוספות
+                      {' · '}
+                      <strong>סה"כ:</strong> <span className="text-lg font-bold text-green-600">₪{totalCost}</span>
+                    </p>
                   </div>
 
-                  <div className="flex justify-center gap-4 flex-wrap">
+                  <div className="flex justify-center gap-3">
                     <button
                       onClick={handlePurchaseAddon}
-                      className="bg-gradient-to-r from-green-600 to-emerald-600 text-white border-2 border-green-700 rounded-full px-10 py-5 font-bold text-xl hover:from-green-700 hover:to-emerald-700 transition-all shadow-lg transform hover:scale-105"
+                      className="bg-gradient-to-r from-green-600 to-emerald-600 text-white border-2 border-green-700 rounded-full px-6 py-3 font-bold text-base hover:from-green-700 hover:to-emerald-700 transition-all shadow-lg"
                     >
                       🛒 רכוש {numPackages} {numPackages === 1 ? 'חבילה' : 'חבילות'} (₪{totalCost})
                     </button>
@@ -3845,13 +3836,13 @@ React.useEffect(() => {
                         setShowPlanLimitWarning(false);
                         resetCapacityWarningGuests();
                       }}
-                      className="bg-gray-200 text-gray-700 border-2 border-gray-300 rounded-full px-8 py-4 font-medium text-lg hover:bg-gray-300 transition-all"
+                      className="bg-gray-200 text-gray-700 border border-gray-300 rounded-full px-5 py-3 font-medium text-sm hover:bg-gray-300 transition-all"
                     >
                       ביטול
                     </button>
                   </div>
 
-                  <p className="text-sm text-gray-500 mt-4">
+                  <p className="text-xs text-gray-400 mt-2">
                     * תשלום חד פעמי לאירוע • ללא מנויים
                   </p>
                 </div>
