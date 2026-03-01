@@ -61,6 +61,7 @@ const useTypewriter = (text, speed = 100, pauseDuration = 5000) => {
 export default forwardRef(function HeroSection({ onStart, onShowFeatures, onSignUpClick, onSignInClick, isLoggedIn, onPressCreateEvent, onPressReports }, ref) {
   const handleCreateNewEvent = () => typeof onPressCreateEvent === 'function' && onPressCreateEvent();
   const handleOpenReports = () => typeof onPressReports === 'function' && onPressReports();
+  const [showProcessModal, setShowProcessModal] = useState(false);
   // Full invitation text with line breaks
   const fullInvitationText = 'דוד & שרה\nמתחתנים\n\nבשמחה רבה אנו מזמינים אתכם לחגוג עמנו את יום נישואינו\n\nיום שלישי • 24.03.2026\n📍 ירושלים, ישראל\n\nקבלת פנים 19:00 • חופה וקידושין 21:00';
   const displayedInvitationText = useTypewriter(fullInvitationText, 80, 5000);
@@ -108,7 +109,10 @@ export default forwardRef(function HeroSection({ onStart, onShowFeatures, onSign
             <div className="flex flex-col sm:flex-row gap-3 justify-center lg:justify-start mb-8">
               <button
                 type="button"
-                onClick={() => typeof onStart === 'function' && onStart()}
+                onClick={() => {
+                  setShowProcessModal(true);
+                  if (typeof onStart === 'function') onStart();
+                }}
                 className="px-8 py-4 rounded-lg border border-gray-300 text-gray-700 font-medium hover:bg-gray-50 transition-colors text-lg"
                 aria-label="תיאור תהליך יצירת אירוע"
               >
@@ -237,6 +241,41 @@ export default forwardRef(function HeroSection({ onStart, onShowFeatures, onSign
           </div>
         </div>
       </div>
+
+      {/* Modal: תיאור תהליך יצירת אירוע – always available (desktop + mobile, with/without login) */}
+      {showProcessModal && (
+        <div className="fixed inset-0 z-[130] bg-black/50 flex items-center justify-center px-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-6 text-right rtl relative">
+            <button
+              onClick={() => setShowProcessModal(false)}
+              className="absolute top-3 left-3 text-2xl text-gray-500 hover:text-gray-700"
+              aria-label="סגור"
+            >
+              &times;
+            </button>
+            <h2 className="text-2xl font-bold text-gray-900 mb-4">תהליך יצירת אירוע ב‑Meet‑M</h2>
+            <ol className="space-y-3 text-gray-700 text-sm md:text-base list-decimal list-inside">
+              <li><strong>בחירת סוג אירוע</strong> – חתונה, בר/בת מצווה, ברית, אירוע עסקי ועוד.</li>
+              <li><strong>מילוי פרטי האירוע</strong> – תאריך, שעה, אולם, שמות, טקסט להזמנה.</li>
+              <li><strong>בחירת עיצוב להזמנה</strong> – בוחרים תבנית מעוצבת ומתאימים טקסט.</li>
+              <li><strong>הוספת אורחים</strong> – מזינים אורחים ידנית או מייבאים מאקסל.</li>
+              <li><strong>שליחת הזמנות</strong> – ב‑WhatsApp ו‑SMS, עם קישור לאישור הגעה.</li>
+              <li><strong>מעקב ודוחות</strong> – רואים כמה אישרו, כמה לא מגיעים וכמה טרם הגיבו.</li>
+            </ol>
+            <p className="mt-4 text-sm text-gray-600">
+              בכל רגע אפשר לחזור לדף הבית וללחוץ על <strong>“צור אירוע חדש”</strong> כדי להתחיל בפועל את התהליך.
+            </p>
+            <div className="mt-6 flex justify-center">
+              <button
+                onClick={() => setShowProcessModal(false)}
+                className="px-6 py-2 rounded-full bg-primary text-white font-semibold hover:bg-primary/90 transition-colors text-sm md:text-base"
+              >
+                הבנתי, תודה
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   );
 });

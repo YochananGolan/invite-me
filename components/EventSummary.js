@@ -120,7 +120,28 @@ export default function EventSummary() {
         } catch(e) { /* ignore */ }
       }
     })();
-  }, []);
+  }, [refreshKey]);
+
+  // Realtime sync: when event or its guests change, refresh summary.
+  useEffect(() => {
+    if (!event?.id) return;
+    const channel = supabase.channel(`event-summary-${event.id}`);
+    channel
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'events', filter: `id=eq.${event.id}` },
+        () => setRefreshKey((k) => k + 1)
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'invited_guests', filter: `event_id=eq.${event.id}` },
+        () => setRefreshKey((k) => k + 1)
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [event?.id]);
 
   if (!event) {
     return (

@@ -40,9 +40,28 @@ export default function Home({ session }) {
     setShowFeatures(true);
   };
 
+  const scrollToWizard = () => {
+    if (typeof window === 'undefined') return;
+    const el = document.getElementById('pricing');
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
+
   const handleShowReports = () => {
     stepRef.current?.goToReportsStep?.();
-    document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' });
+    scrollToWizard();
+  };
+
+  // Description of the creation process – should work גם בלי כניסה
+  const handleShowProcess = () => {
+    if (stepRef.current?.startFlow) {
+      stepRef.current.startFlow();
+      scrollToWizard();
+    } else {
+      // אם הוויזארד לא קיים (למשל בלי סשן) – הצג את מסך האודות/הסבר
+      handleShowFeatures();
+    }
   };
 
   const handleCreateEvent = () => {
@@ -72,7 +91,7 @@ export default function Home({ session }) {
         <main className="flex-1">
           <NavBar onAuthClick={handleAuthClick} onAboutClick={handleShowFeatures} onShowPricing={() => setShowPricingTable(true)} onShowReports={handleShowReports} />
           <HeroSection
-            onStart={() => stepRef.current?.startFlow?.()}
+            onStart={handleShowProcess}
             onPressCreateEvent={handleCreateEvent}
             onPressReports={handleShowReports}
             onShowFeatures={handleShowFeatures}

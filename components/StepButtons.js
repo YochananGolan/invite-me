@@ -411,12 +411,15 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick, trig
   },[]);
 
 const [additionalPackages, setAdditionalPackages] = useState([]);
+const [dbAddonCount, setDbAddonCount] = useState(null);
 const [planLimitWarningError, setPlanLimitWarningError] = useState('');
 const [planAddOnMode, setPlanAddOnMode] = useState(false);
 const [planSelectionError, setPlanSelectionError] = useState('');
 const [planWarningSuppressed, setPlanWarningSuppressed] = useState(false);
 const [eventMessagesSentCount, setEventMessagesSentCount] = useState(0);
 const [invitedGuestsCount, setInvitedGuestsCount] = useState(0);
+const [currentEventId,setCurrentEventId]=useState(null);
+const [eventRefreshKey, setEventRefreshKey] = useState(0);
 
   // Persist additionalPackages after currentEventId is known (see effect below).
 
@@ -1425,12 +1428,14 @@ const handleOpenAddonModal = React.useCallback(() => {
           0
         );
         const totalAllowedGuests = basePlanLimit + extraCapacity;
+        const addonCountForDb = additionalPackageCounts['addon'] || 0;
 
         // Build update object - only include progress_step if it exists
         const updateData = {
           event_details: eventDetails,
           invitation_path: designFile,
           allowed_guests: totalAllowedGuests,
+          additional_packages: addonCountForDb,
           event_type: selectedEventType || null,
         };
 
@@ -1458,6 +1463,7 @@ const handleOpenAddonModal = React.useCallback(() => {
                 event_details: eventDetails,
                 invitation_path: designFile,
                 allowed_guests: totalAllowedGuests,
+                additional_packages: addonCountForDb,
                 event_type: selectedEventType || null,
               })
               .eq('id', currentEventId)
@@ -1524,6 +1530,7 @@ const handleOpenAddonModal = React.useCallback(() => {
           event_details: eventDetails,
           invitation_path: designFile,
           allowed_guests: totalAllowedGuests,
+          additional_packages: addonCountForDb,
         };
 
         console.debug('[StepButtons] Inserting event', payload);
@@ -2593,15 +2600,17 @@ React.useEffect(() => {
           // עדכון סינכרוני: מערך מעודכן לכל המקומות (state, localStorage, DB) כדי שהמכסה תתעדכן מיד
           const updatedPackages = [...additionalPackages, ...newAddons];
           setAdditionalPackages(updatedPackages);
-          try {
-            const payload = JSON.stringify(updatedPackages);
-            if (currentEventId) {
-              localStorage.setItem(`additionalPackages:${currentEventId}`, payload);
-              localStorage.setItem('additionalPackagesEventId', String(currentEventId));
+          const newAddonTotal = updatedPackages.filter((p) => p === 'addon').length;
+          setDbAddonCount(newAddonTotal);
+          if (currentEventId) {
+            try {
+              await supabase
+                .from('events')
+                .update({ additional_packages: newAddonTotal })
+                .eq('id', currentEventId);
+            } catch (e) {
+              console.error('Failed to persist additional_packages in DB', e);
             }
-            localStorage.setItem('additionalPackages', payload);
-          } catch (e) {
-            console.warn('Failed to persist additionalPackages after addon purchase', e);
           }
           setPlanSelectionError('');
 
@@ -2725,7 +2734,7 @@ React.useEffect(() => {
         let messagesSent = 0;
         const { data: evData, error: evError } = await supabase
           .from('events')
-          .select('id,event_details,allowed_guests,messages_sent_count')
+          .select('id,event_details,allowed_guests,messages_sent_count,additional_packages')
           .eq('user_id',user.id)
           .order('created_at',{ascending:false})
           .limit(1)
@@ -2745,6 +2754,10 @@ React.useEffect(() => {
         }
         if(!ev) return;
         setEventMessagesSentCount(messagesSent);
+        if (typeof ev.additional_packages === 'number') {
+          setDbAddonCount(ev.additional_packages);
+          setAdditionalPackages(Array(ev.additional_packages).fill('addon'));
+        }
         // NEVER override selectedPlan from allowed_guests - user's choice should always be respected
         // Only set if there's absolutely no plan selected anywhere
         const storedPlan = typeof window !== 'undefined' ? localStorage.getItem('selectedPlan') : null;
@@ -2780,7 +2793,40 @@ React.useEffect(() => {
         }
       }catch(e){console.error('archive check failed',e);}  
     })();
-  },[]);
+  },[eventRefreshKey]);
+
+  // Realtime sync: when current event or its guests change in Supabase, refresh state.
+  React.useEffect(() => {
+    if (!currentEventId) return;
+    const channel = supabase.channel(`event-sync-${currentEventId}`);
+    channel
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'events', filter: `id=eq.${currentEventId}` },
+        (payload) => {
+          const ev = payload.new || payload.old || {};
+          if (typeof ev.messages_sent_count === 'number') {
+            setEventMessagesSentCount(ev.messages_sent_count);
+          }
+          if (typeof ev.additional_packages === 'number') {
+            setDbAddonCount(ev.additional_packages);
+            setAdditionalPackages(Array(ev.additional_packages).fill('addon'));
+          }
+          setEventRefreshKey((k) => k + 1);
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'invited_guests', filter: `event_id=eq.${currentEventId}` },
+        () => {
+          setGuestSummaryRefreshKey((k) => k + 1);
+        }
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [currentEventId]);
 
   const checkActiveEventExists = async () => {
     try{
@@ -2838,53 +2884,19 @@ React.useEffect(() => {
     if(selectedDesign) markStepDone(2);
   },[selectedDesign]);
 
-  const [currentEventId,setCurrentEventId]=useState(null);
   const [showActiveError,setShowActiveError]=useState(false);
 
-  // Load additionalPackages per-event (prevents leaking addons between events/users).
+  // When returning to the tab, refresh event state from Supabase (keeps web/mobile in sync).
   React.useEffect(() => {
     if (typeof window === 'undefined') return;
-    if (!currentEventId) return;
-    try {
-      const scopedKey = `additionalPackages:${currentEventId}`;
-      let stored = localStorage.getItem(scopedKey);
-
-      // Legacy fallback (only if it belongs to this event)
-      if (!stored) {
-        const legacyEventId = localStorage.getItem('additionalPackagesEventId');
-        const legacy = localStorage.getItem('additionalPackages');
-        if (legacy && legacyEventId === String(currentEventId)) {
-          stored = legacy;
-        }
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        setEventRefreshKey((k) => k + 1);
       }
-
-      if (!stored) {
-        setAdditionalPackages([]);
-        return;
-      }
-
-      const parsed = JSON.parse(stored);
-      setAdditionalPackages(Array.isArray(parsed) ? parsed : []);
-    } catch (e) {
-      console.warn('Failed to load additionalPackages for event', e);
-      setAdditionalPackages([]);
-    }
-  }, [currentEventId]);
-
-  // Persist additionalPackages for the current event.
-  React.useEffect(() => {
-    if (typeof window === 'undefined') return;
-    if (!currentEventId) return;
-    try {
-      const payload = JSON.stringify(additionalPackages);
-      localStorage.setItem(`additionalPackages:${currentEventId}`, payload);
-      // Legacy keys (kept to avoid breaking older sessions), guarded by event id.
-      localStorage.setItem('additionalPackages', payload);
-      localStorage.setItem('additionalPackagesEventId', String(currentEventId));
-    } catch (e) {
-      console.warn('Failed to persist additionalPackages', e);
-    }
-  }, [additionalPackages, currentEventId]);
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => document.removeEventListener('visibilitychange', onVisibility);
+  }, []);
 
   // Keep a robust count of invited guests for this event (fallback for message counter/report).
   React.useEffect(() => {
@@ -3128,7 +3140,7 @@ React.useEffect(() => {
           
           const { data: ev } = await supabase
             .from('events')
-            .select('id, event_details, allowed_guests, messages_sent_count')
+            .select('id, event_details, allowed_guests, messages_sent_count, additional_packages')
             .eq('user_id', user.id)
             .order('created_at', { ascending: false })
             .limit(1)
@@ -3151,6 +3163,10 @@ React.useEffect(() => {
                 console.log('Found future event in database, restoring...', ev);
                 setCurrentEventId(ev.id);
                 setEventMessagesSentCount(messagesSent);
+                if (typeof ev.additional_packages === 'number') {
+                  setDbAddonCount(ev.additional_packages);
+                  setAdditionalPackages(Array(ev.additional_packages).fill('addon'));
+                }
                 // NEVER override selectedPlan from allowed_guests - user's choice should always be respected
                 // Only set if there's absolutely no plan selected anywhere
                 const storedPlan = typeof window !== 'undefined' ? localStorage.getItem('selectedPlan') : null;
@@ -3201,7 +3217,7 @@ React.useEffect(() => {
         }
       }
     })();
-  }, [currentEventId, newEventStarted]);
+  }, [currentEventId, newEventStarted, eventRefreshKey]);
 
   // ---- Close modals when no active event ----
   React.useEffect(() => {
