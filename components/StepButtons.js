@@ -123,6 +123,7 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick, trig
     });
   }, [triggerCreateEvent, hasClearedExistingEvent]);
   const steps = ['צור אירוע חדש', '📅 שלב 1 - סוג אירוע', '📝 שלב 2 - פרטי האירוע', '🎨 שלב 3 - עיצוב הזמנה', '📤 שלב 4 - שליחת הזמנה לאורח', '📊 שלב 5 - דוחו"ת אישורי הגעה'];
+  const stepsMobile = ['', '📅 סוג אירוע', '📝 פרטי האירוע', '🎨 עיצוב', '📤 שליחה', '📊 דוחות'];
   const eventTypes = ['חתונה', 'חינה', 'מסיבת אירוסין', 'בר מצווה', 'בת מצווה', 'ברית', 'בריתה', 'יום הולדת', 'אירוע עסקי', 'הפרשת חלה'];
   const times = Array.from({ length: (24 - 8) * 2 }, (_, i) => {
     const totalHalfHours = 16 + i; // מתחילים מ-08:00
@@ -3791,66 +3792,85 @@ React.useEffect(() => {
         </div>
       )}
 
-      <div className="fixed left-0 right-0 bottom-0 z-20 w-full bg-white/95 backdrop-blur-sm border-t border-gray-200 shadow-[0_-4px_12px_rgba(0,0,0,0.08)] pt-3 px-2 overflow-x-auto overflow-y-hidden flex flex-row justify-center sm:justify-center gap-2 sm:gap-4 flex-nowrap sm:flex-wrap" style={{ paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom, 0.5rem))' }}>
-        {steps.slice(1).map((step, idx) => {
-          const realIdx = idx + 1;
-          console.log(`Rendering step ${realIdx} (${step}): finished=${finishedSteps.includes(realIdx)}`);
-          return (
-          <button
-            key={realIdx}
-            type="button"
-            style={{ cursor: 'pointer', position: 'relative', zIndex: 21, pointerEvents: 'auto' }}
-            onMouseDown={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-            }}
-            onTouchStart={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-            }}
-              onClick={(e) => {
-                console.log(`Step ${realIdx} clicked!`, { currentEventId, newEventStarted, selectedPlan });
-                e.preventDefault();
-                e.stopPropagation();
-                const mustStartFirst = !hasActiveEvent() || !selectedPlan;
-                const stepRequiresFlow = realIdx >= 1 && realIdx <= 4;
-                if (stepRequiresFlow && mustStartFirst) {
-                  setStepErrorMsg('יש תחילה ליצור אירוע ולבחור מסלול תשלום. לאחר מכן כפתורי השלבים 1–4 יהיו פעילים.');
-                  setShowStepError(true);
-                  return;
-                }
-                if (realIdx === 1) {
-                    setShowEventTypes(true);
-                    setStepErrorMsg('');
-                } else if (realIdx === 2) {
-                    setShowEventDetails(true);
-                    setStepErrorMsg('');
-                } else if (realIdx === 3) {
-                    setShowDesignChooser(true);
-                    setStepErrorMsg('');
-                } else if (realIdx === 4) {
-                    setShowGuestForm(true);
-                    setStepErrorMsg('');
-                } else if (realIdx === 5) {
-                    // שלב 5 (דוחות) זמין תמיד, גם כשאין אירוע פעיל
-                    setShowReportsOptions(true);
-                    setShowGuestListModal(false);
-                    setStepErrorMsg('');
-                }
-              }}
-            className={`${
-              finishedSteps.includes(realIdx) || (realIdx === 3 && finishedSteps.includes(2))
-                ? 'bg-primary text-white border border-primary rounded-full px-4 py-3 sm:px-8 sm:py-4 font-bold ring-2 ring-primary ring-offset-2 ring-offset-[#FCE6AC] hover:bg-[#FCE6AC]/90 transition-all text-sm sm:text-lg shrink-0' 
-                : realIdx === 3
-                  ? 'bg-gradient-to-r from-pink-100 to-purple-100 text-purple-800 border-2 border-purple-400 ring-2 ring-purple-400 ring-offset-2 ring-offset-purple-100 shadow-lg rounded-full px-4 py-3 sm:px-8 sm:py-4 font-bold transition-all text-sm sm:text-lg shrink-0' 
-                  : 'bg-[#FCE6AC] text-primary border border-primary rounded-full px-4 py-3 sm:px-8 sm:py-4 font-bold ring-2 ring-primary ring-offset-2 ring-offset-[#FCE6AC] hover:bg-[#FCE6AC]/90 transition-all text-sm sm:text-lg shrink-0'
-            }`}
-            title={`Step ${realIdx}: ${finishedSteps.includes(realIdx) ? 'Completed' : 'Not completed'}. FinishedSteps: [${finishedSteps.join(',')}]`}
-          >
-            {step}
-          </button>
-          );
-        })}
+      <div className="fixed left-0 right-0 bottom-0 z-20 w-full bg-white/95 backdrop-blur-sm border-t border-gray-200 shadow-[0_-4px_12px_rgba(0,0,0,0.08)] py-2 px-2 sm:pt-3 sm:px-2" style={{ paddingBottom: 'max(0.4rem, env(safe-area-inset-bottom, 0.4rem))' }}>
+        <div className="grid grid-cols-5 gap-1.5 sm:hidden max-w-md mx-auto">
+          {steps.slice(1).map((step, idx) => {
+            const realIdx = idx + 1;
+            const isFinished = finishedSteps.includes(realIdx) || (realIdx === 3 && finishedSteps.includes(2));
+            const isDesign = realIdx === 3;
+            return (
+              <button
+                key={realIdx}
+                type="button"
+                style={{ cursor: 'pointer', position: 'relative', zIndex: 21, pointerEvents: 'auto' }}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  const mustStartFirst = !hasActiveEvent() || !selectedPlan;
+                  const stepRequiresFlow = realIdx >= 1 && realIdx <= 4;
+                  if (stepRequiresFlow && mustStartFirst) {
+                    setStepErrorMsg('\u05D9\u05E9 \u05EA\u05D7\u05D9\u05DC\u05D4 \u05DC\u05D9\u05E6\u05D5\u05E8 \u05D0\u05D9\u05E8\u05D5\u05E2 \u05D5\u05DC\u05D1\u05D7\u05D5\u05E8 \u05DE\u05E1\u05DC\u05D5\u05DC \u05EA\u05E9\u05DC\u05D5\u05DD.');
+                    setShowStepError(true);
+                    return;
+                  }
+                  if (realIdx === 1) { setShowEventTypes(true); setStepErrorMsg(''); }
+                  else if (realIdx === 2) { setShowEventDetails(true); setStepErrorMsg(''); }
+                  else if (realIdx === 3) { setShowDesignChooser(true); setStepErrorMsg(''); }
+                  else if (realIdx === 4) { setShowGuestForm(true); setStepErrorMsg(''); }
+                  else if (realIdx === 5) { setShowReportsOptions(true); setShowGuestListModal(false); setStepErrorMsg(''); }
+                }}
+                className={`flex flex-col items-center justify-center rounded-xl py-2 px-1 text-center transition-all ${
+                  isFinished
+                    ? 'bg-primary text-white shadow-md'
+                    : isDesign
+                      ? 'bg-gradient-to-b from-pink-50 to-purple-50 text-purple-800 border border-purple-300 shadow'
+                      : 'bg-[#FCE6AC] text-primary border border-primary/40'
+                }`}
+              >
+                <span className="text-lg leading-none">{stepsMobile[realIdx].split(' ')[0]}</span>
+                <span className="text-[10px] font-bold leading-tight mt-0.5">{stepsMobile[realIdx].split(' ').slice(1).join(' ')}</span>
+              </button>
+            );
+          })}
+        </div>
+        <div className="hidden sm:flex flex-row justify-center gap-4 flex-wrap">
+          {steps.slice(1).map((step, idx) => {
+            const realIdx = idx + 1;
+            return (
+              <button
+                key={realIdx}
+                type="button"
+                style={{ cursor: 'pointer', position: 'relative', zIndex: 21, pointerEvents: 'auto' }}
+                onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  const mustStartFirst = !hasActiveEvent() || !selectedPlan;
+                  const stepRequiresFlow = realIdx >= 1 && realIdx <= 4;
+                  if (stepRequiresFlow && mustStartFirst) {
+                    setStepErrorMsg('\u05D9\u05E9 \u05EA\u05D7\u05D9\u05DC\u05D4 \u05DC\u05D9\u05E6\u05D5\u05E8 \u05D0\u05D9\u05E8\u05D5\u05E2 \u05D5\u05DC\u05D1\u05D7\u05D5\u05E8 \u05DE\u05E1\u05DC\u05D5\u05DC \u05EA\u05E9\u05DC\u05D5\u05DD.');
+                    setShowStepError(true);
+                    return;
+                  }
+                  if (realIdx === 1) { setShowEventTypes(true); setStepErrorMsg(''); }
+                  else if (realIdx === 2) { setShowEventDetails(true); setStepErrorMsg(''); }
+                  else if (realIdx === 3) { setShowDesignChooser(true); setStepErrorMsg(''); }
+                  else if (realIdx === 4) { setShowGuestForm(true); setStepErrorMsg(''); }
+                  else if (realIdx === 5) { setShowReportsOptions(true); setShowGuestListModal(false); setStepErrorMsg(''); }
+                }}
+                className={`${
+                  finishedSteps.includes(realIdx) || (realIdx === 3 && finishedSteps.includes(2))
+                    ? 'bg-primary text-white border border-primary rounded-full px-8 py-4 font-bold ring-2 ring-primary ring-offset-2 ring-offset-[#FCE6AC] hover:bg-[#FCE6AC]/90 transition-all text-lg shrink-0'
+                    : realIdx === 3
+                      ? 'bg-gradient-to-r from-pink-100 to-purple-100 text-purple-800 border-2 border-purple-400 ring-2 ring-purple-400 ring-offset-2 ring-offset-purple-100 shadow-lg rounded-full px-8 py-4 font-bold transition-all text-lg shrink-0'
+                      : 'bg-[#FCE6AC] text-primary border border-primary rounded-full px-8 py-4 font-bold ring-2 ring-primary ring-offset-2 ring-offset-[#FCE6AC] hover:bg-[#FCE6AC]/90 transition-all text-lg shrink-0'
+                }`}
+              >
+                {step}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* Error message is now displayed in HeroSection instead */}
