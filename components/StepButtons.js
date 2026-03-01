@@ -6051,93 +6051,89 @@ React.useEffect(() => {
       {/* Report Modal */}
       {showReportModal && (
         <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50">
-          <div className="relative bg-white rounded-lg p-6 w-full max-w-5xl event-form">
-            <button onClick={() => setShowReportModal(false)} className="absolute top-2 left-2 text-2xl text-gray-500 hover:text-gray-700">&times;</button>
-            <h2 className="text-xl font-medium mb-4 text-center">{reportTitle}</h2>
+          <div className="relative bg-white rounded-lg p-2 sm:p-6 w-full sm:max-w-5xl mx-1 sm:mx-auto event-form">
+            <button onClick={() => setShowReportModal(false)} className="absolute top-2 left-2 text-2xl text-gray-500 hover:text-gray-700 z-10">&times;</button>
+            <h2 className="text-base sm:text-xl font-medium mb-2 sm:mb-4 text-center pr-8">{reportTitle}</h2>
             {reportGuests.length === 0 ? (
               <p className="text-center text-gray-600">אין נתונים להצגה</p>
             ) : (
-              <div className="max-h-96 overflow-y-auto overflow-x-auto">
-                <table className="w-full text-right border text-sm min-w-max">
+              <div className="max-h-[75vh] overflow-y-auto overflow-x-auto">
+                <table className="w-full text-right border border-collapse" style={{fontSize: '11px'}}>
                   <thead>
                     <tr className="bg-gray-100">
-                      <th className="p-2 border">#</th>
-                      <th className="p-2 border">שם פרטי</th>
-                      <th className="p-2 border">שם משפחה</th>
-                      <th className="p-2 border">מספר שולחן</th>
-                      <th className="p-2 border">טלפון</th>
-                      <th className="p-2 border">בוגרים</th>
-                      <th className="p-2 border">ילדים</th>
-                      <th className="p-2 border">סה"כ</th>
-                      <th className="p-2 border">צמחוני</th>
-                      <th className="p-2 border">טבעוני</th>
-                      <th className="p-2 border">גלאט</th>
-                      <th className="p-2 border">צליאקים</th>
-                      <th className="p-2 border">אלרגיה</th>
-                      <th className="p-2 border">סוג אלרגיה</th>
+                      <th className="px-0.5 py-1 border whitespace-nowrap">#</th>
+                      <th className="px-0.5 py-1 border whitespace-nowrap">שם</th>
+                      <th className="px-0.5 py-1 border whitespace-nowrap">משפחה</th>
+                      <th className="px-0.5 py-1 border whitespace-nowrap">שולחן</th>
+                      <th className="px-0.5 py-1 border whitespace-nowrap">טלפון</th>
+                      <th className="px-0.5 py-1 border whitespace-nowrap">בוג׳</th>
+                      <th className="px-0.5 py-1 border whitespace-nowrap">ילד׳</th>
+                      <th className="px-0.5 py-1 border whitespace-nowrap">סה״כ</th>
+                      <th className="px-0.5 py-1 border whitespace-nowrap">צמח׳</th>
+                      <th className="px-0.5 py-1 border whitespace-nowrap">טבע׳</th>
+                      <th className="px-0.5 py-1 border whitespace-nowrap">גלאט</th>
+                      <th className="px-0.5 py-1 border whitespace-nowrap">צליא׳</th>
+                      <th className="px-0.5 py-1 border whitespace-nowrap">אלר׳</th>
+                      <th className="px-0.5 py-1 border whitespace-nowrap">הערה</th>
                     </tr>
                   </thead>
                   <tbody>
                     {reportGuests.map((g, idx) => {
                       if (g.isSummary) {
-                        // Summary row
                         return (
                           <tr key={`summary-${g.table_number}-${idx}`} className="bg-yellow-100 font-bold">
-                            <td className="p-2 border text-center"></td>
-                            <td className="p-2 border text-right" colSpan={3}>{g.summary_label}</td>
-                            <td className="p-2 border"></td>
-                            <td className="p-2 border text-center">{g.adults}</td>
-                            <td className="p-2 border text-center">{g.children}</td>
-                            <td className="p-2 border text-center">{g.total}</td>
-                            <td className="p-2 border text-center">{g.veg || '-'}</td>
-                            <td className="p-2 border text-center">{g.vegan || '-'}</td>
-                            <td className="p-2 border text-center">{g.glatt || '-'}</td>
-                            <td className="p-2 border text-center">{g.celiac || '-'}</td>
-                            <td className="p-2 border text-center">{g.allergy || '-'}</td>
-                            <td className="p-2 border"></td>
+                            <td className="px-0.5 py-0.5 border text-center"></td>
+                            <td className="px-0.5 py-0.5 border text-right" colSpan={3}>{g.summary_label}</td>
+                            <td className="px-0.5 py-0.5 border"></td>
+                            <td className="px-0.5 py-0.5 border text-center">{g.adults}</td>
+                            <td className="px-0.5 py-0.5 border text-center">{g.children}</td>
+                            <td className="px-0.5 py-0.5 border text-center">{g.total}</td>
+                            <td className="px-0.5 py-0.5 border text-center">{g.veg || '-'}</td>
+                            <td className="px-0.5 py-0.5 border text-center">{g.vegan || '-'}</td>
+                            <td className="px-0.5 py-0.5 border text-center">{g.glatt || '-'}</td>
+                            <td className="px-0.5 py-0.5 border text-center">{g.celiac || '-'}</td>
+                            <td className="px-0.5 py-0.5 border text-center">{g.allergy || '-'}</td>
+                            <td className="px-0.5 py-0.5 border"></td>
                           </tr>
                         );
                       }
-                      // Guest row - count only guest rows before this one
                       let rowNum = 0;
                       for (let i = 0; i < idx; i++) {
-                        if (!reportGuests[i].isSummary) {
-                          rowNum++;
-                        }
+                        if (!reportGuests[i].isSummary) rowNum++;
                       }
                       rowNum++;
                       return (
                         <tr key={g.id || `guest-${idx}`} className="odd:bg-white even:bg-gray-50">
-                          <td className="p-1 border text-center">{rowNum}</td>
-                          <td className="p-1 border">{g.first_name}</td>
-                          <td className="p-1 border">{g.last_name}</td>
-                          <td className="p-1 border text-center">{g.table_number || '-'}</td>
-                          <td className="p-1 border">{`="${g.phone}"`}</td>
-                          <td className="p-1 border text-center">{g.adults ?? '-'}</td>
-                          <td className="p-1 border text-center">{g.children ?? '-'}</td>
-                          <td className="p-1 border text-center">{(g.adults||0)+(g.children||0)}</td>
-                          <td className="p-1 border text-center">{(g.veg_adults+g.veg_children)|| '-'}</td>
-                          <td className="p-1 border text-center">{(g.vegan_adults+g.vegan_children)|| '-'}</td>
-                          <td className="p-1 border text-center">{(g.glatt_adults+g.glatt_children)|| '-'}</td>
-                          <td className="p-1 border text-center">{((g.celiac_adults||0)+(g.celiac_children||0))|| '-'}</td>
-                          <td className="p-1 border text-center">{(g.allergy_adults+g.allergy_children)|| '-'}</td>
-                          <td className="p-1 border text-center">{g.allergy_note || g.allergy_description || '-'}</td>
+                          <td className="px-0.5 py-0.5 border text-center">{rowNum}</td>
+                          <td className="px-0.5 py-0.5 border whitespace-nowrap">{g.first_name}</td>
+                          <td className="px-0.5 py-0.5 border whitespace-nowrap">{g.last_name}</td>
+                          <td className="px-0.5 py-0.5 border text-center">{g.table_number || '-'}</td>
+                          <td className="px-0.5 py-0.5 border whitespace-nowrap">{g.phone}</td>
+                          <td className="px-0.5 py-0.5 border text-center">{g.adults ?? '-'}</td>
+                          <td className="px-0.5 py-0.5 border text-center">{g.children ?? '-'}</td>
+                          <td className="px-0.5 py-0.5 border text-center">{(g.adults||0)+(g.children||0)}</td>
+                          <td className="px-0.5 py-0.5 border text-center">{(g.veg_adults+g.veg_children)|| '-'}</td>
+                          <td className="px-0.5 py-0.5 border text-center">{(g.vegan_adults+g.vegan_children)|| '-'}</td>
+                          <td className="px-0.5 py-0.5 border text-center">{(g.glatt_adults+g.glatt_children)|| '-'}</td>
+                          <td className="px-0.5 py-0.5 border text-center">{((g.celiac_adults||0)+(g.celiac_children||0))|| '-'}</td>
+                          <td className="px-0.5 py-0.5 border text-center">{(g.allergy_adults+g.allergy_children)|| '-'}</td>
+                          <td className="px-0.5 py-0.5 border text-center">{g.allergy_note || g.allergy_description || '-'}</td>
                         </tr>
                       );
                     })}
                   </tbody>
                   <tfoot>
-                    <tr className="bg-gray-100 font-bold text-lg">
-                      <td className="p-2 border text-center" colSpan={5}>סה"כ</td>
-                      <td className="p-2 border text-center">{totalReportAdults}</td>
-                      <td className="p-2 border text-center">{totalReportChildren}</td>
-                      <td className="p-2 border text-center">{totalReportAdults + totalReportChildren}</td>
-                      <td className="p-2 border text-center">{totalVeg}</td>
-                      <td className="p-2 border text-center">{totalVegan}</td>
-                      <td className="p-2 border text-center">{totalGlatt}</td>
-                      <td className="p-2 border text-center">{totalCeliac}</td>
-                      <td className="p-2 border text-center">{totalAllergy}</td>
-                      <td className="p-2 border text-center"></td>
+                    <tr className="bg-gray-100 font-bold text-xs sm:text-lg">
+                      <td className="px-0.5 py-1 border text-center" colSpan={5}>סה״כ</td>
+                      <td className="px-0.5 py-1 border text-center">{totalReportAdults}</td>
+                      <td className="px-0.5 py-1 border text-center">{totalReportChildren}</td>
+                      <td className="px-0.5 py-1 border text-center">{totalReportAdults + totalReportChildren}</td>
+                      <td className="px-0.5 py-1 border text-center">{totalVeg}</td>
+                      <td className="px-0.5 py-1 border text-center">{totalVegan}</td>
+                      <td className="px-0.5 py-1 border text-center">{totalGlatt}</td>
+                      <td className="px-0.5 py-1 border text-center">{totalCeliac}</td>
+                      <td className="px-0.5 py-1 border text-center">{totalAllergy}</td>
+                      <td className="px-0.5 py-1 border text-center"></td>
                     </tr>
                   </tfoot>
                 </table>
@@ -6384,61 +6380,61 @@ React.useEffect(() => {
       {/* Approved report modal */}
       {showApprovedReport && (
         <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50">
-          <div className="relative bg-white rounded-lg p-6 w-[90vw] max-w-none">
-            <button onClick={()=>{setShowApprovedReport(false);setShowReportsOptions(true);}} className="absolute top-2 left-2 text-2xl text-gray-500 hover:text-gray-700">&times;</button>
-            <h2 className="text-xl font-medium mb-4 text-center">דוח אורחים שאישרו הגעה</h2>
+          <div className="relative bg-white rounded-lg p-2 sm:p-6 w-full sm:w-[90vw] mx-1 sm:mx-auto max-w-none">
+            <button onClick={()=>{setShowApprovedReport(false);setShowReportsOptions(true);}} className="absolute top-2 left-2 text-2xl text-gray-500 hover:text-gray-700 z-10">&times;</button>
+            <h2 className="text-base sm:text-xl font-medium mb-2 sm:mb-4 text-center pr-8">דוח אורחים שאישרו הגעה</h2>
             <div className="max-h-[75vh] overflow-y-auto overflow-x-auto">
-              <table className="w-full text-right border text-xs min-w-max">
+              <table className="w-full text-right border border-collapse" style={{fontSize: '11px'}}>
                 <thead>
                   <tr className="bg-gray-100">
-                    <th className="p-1 border w-8">#</th>
-                    <th className="p-1 border w-20">שם פרטי</th>
-                    <th className="p-1 border w-20">שם משפחה</th>
-                    <th className="p-1 border w-16">מספר שולחן</th>
-                    <th className="p-1 border w-20">טלפון</th>
-                    <th className="p-1 border w-12">בוגרים</th>
-                    <th className="p-1 border w-12">ילדים</th>
-                    <th className="p-1 border w-12">סה"כ</th>
-                    <th className="p-1 border w-14">צמחוני</th>
-                    <th className="p-1 border w-14">טבעוני</th>
-                    <th className="p-1 border w-12">גלאט</th>
-                    <th className="p-1 border w-14">צליאקים</th>
-                    <th className="p-1 border w-14">אלרגיות</th>
-                    <th className="p-1 border w-24">הערות</th>
+                    <th className="px-0.5 py-1 border whitespace-nowrap">#</th>
+                    <th className="px-0.5 py-1 border whitespace-nowrap">שם</th>
+                    <th className="px-0.5 py-1 border whitespace-nowrap">משפחה</th>
+                    <th className="px-0.5 py-1 border whitespace-nowrap">שולחן</th>
+                    <th className="px-0.5 py-1 border whitespace-nowrap">טלפון</th>
+                    <th className="px-0.5 py-1 border whitespace-nowrap">בוג׳</th>
+                    <th className="px-0.5 py-1 border whitespace-nowrap">ילד׳</th>
+                    <th className="px-0.5 py-1 border whitespace-nowrap">סה״כ</th>
+                    <th className="px-0.5 py-1 border whitespace-nowrap">צמח׳</th>
+                    <th className="px-0.5 py-1 border whitespace-nowrap">טבע׳</th>
+                    <th className="px-0.5 py-1 border whitespace-nowrap">גלאט</th>
+                    <th className="px-0.5 py-1 border whitespace-nowrap">צליא׳</th>
+                    <th className="px-0.5 py-1 border whitespace-nowrap">אלר׳</th>
+                    <th className="px-0.5 py-1 border whitespace-nowrap">הערה</th>
                   </tr>
                 </thead>
                 <tbody>
                   {approvedGuests.map((g,idx)=>(
                     <tr key={idx} className="odd:bg-white even:bg-gray-50">
-                      <td className="p-1 border text-center">{idx+1}</td>
-                      <td className="p-1 border">{g.first_name}</td>
-                      <td className="p-1 border">{g.last_name}</td>
-                      <td className="p-1 border text-center">{g.table_number || '-'}</td>
-                      <td className="p-1 border">{`="${g.phone}"`}</td>
-                      <td className="p-1 border text-center">{g.adults}</td>
-                      <td className="p-1 border text-center">{g.children}</td>
-                      <td className="p-1 border text-center">{(g.adults||0)+(g.children||0)}</td>
-                      <td className="p-1 border text-center">{g.veg_adults+g.veg_children}</td>
-                      <td className="p-1 border text-center">{g.vegan_adults+g.vegan_children}</td>
-                      <td className="p-1 border text-center">{g.glatt_adults+g.glatt_children}</td>
-                      <td className="p-1 border text-center">{(g.celiac_adults||0)+(g.celiac_children||0)}</td>
-                      <td className="p-1 border text-center">{g.allergy_adults+g.allergy_children}</td>
-                      <td className="p-1 border text-center">{g.allergy_note || ((g.allergy_adults+g.allergy_children)>0? 'אלרגיה' : '-')}</td>
+                      <td className="px-0.5 py-0.5 border text-center">{idx+1}</td>
+                      <td className="px-0.5 py-0.5 border whitespace-nowrap">{g.first_name}</td>
+                      <td className="px-0.5 py-0.5 border whitespace-nowrap">{g.last_name}</td>
+                      <td className="px-0.5 py-0.5 border text-center">{g.table_number || '-'}</td>
+                      <td className="px-0.5 py-0.5 border whitespace-nowrap">{g.phone}</td>
+                      <td className="px-0.5 py-0.5 border text-center">{g.adults}</td>
+                      <td className="px-0.5 py-0.5 border text-center">{g.children}</td>
+                      <td className="px-0.5 py-0.5 border text-center">{(g.adults||0)+(g.children||0)}</td>
+                      <td className="px-0.5 py-0.5 border text-center">{g.veg_adults+g.veg_children}</td>
+                      <td className="px-0.5 py-0.5 border text-center">{g.vegan_adults+g.vegan_children}</td>
+                      <td className="px-0.5 py-0.5 border text-center">{g.glatt_adults+g.glatt_children}</td>
+                      <td className="px-0.5 py-0.5 border text-center">{(g.celiac_adults||0)+(g.celiac_children||0)}</td>
+                      <td className="px-0.5 py-0.5 border text-center">{g.allergy_adults+g.allergy_children}</td>
+                      <td className="px-0.5 py-0.5 border text-center">{g.allergy_note || ((g.allergy_adults+g.allergy_children)>0? 'אלרגיה' : '-')}</td>
                     </tr>
                   ))}
                 </tbody>
                 <tfoot>
-                  <tr className="bg-gray-200 font-bold">
-                    <td className="p-1 border text-center" colSpan={5}>סה"כ</td>
-                    <td className="p-1 border text-center">{approvedGuests.reduce((s,g)=>s+g.adults,0)}</td>
-                    <td className="p-1 border text-center">{approvedGuests.reduce((s,g)=>s+g.children,0)}</td>
-                    <td className="p-1 border text-center">{approvedGuests.reduce((s,g)=>s+g.adults+g.children,0)}</td>
-                    <td className="p-1 border text-center">{approvedGuests.reduce((s,g)=>s+g.veg_adults+g.veg_children,0)}</td>
-                    <td className="p-1 border text-center">{approvedGuests.reduce((s,g)=>s+g.vegan_adults+g.vegan_children,0)}</td>
-                    <td className="p-1 border text-center">{approvedGuests.reduce((s,g)=>s+g.glatt_adults+g.glatt_children,0)}</td>
-                    <td className="p-1 border text-center">{approvedGuests.reduce((s,g)=>s+(g.celiac_adults||0)+(g.celiac_children||0),0)}</td>
-                    <td className="p-1 border text-center">{approvedGuests.reduce((s,g)=>s+g.allergy_adults+g.allergy_children,0)}</td>
-                    <td className="p-1 border text-center"></td>
+                  <tr className="bg-gray-200 font-bold" style={{fontSize: '11px'}}>
+                    <td className="px-0.5 py-1 border text-center" colSpan={5}>סה״כ</td>
+                    <td className="px-0.5 py-1 border text-center">{approvedGuests.reduce((s,g)=>s+g.adults,0)}</td>
+                    <td className="px-0.5 py-1 border text-center">{approvedGuests.reduce((s,g)=>s+g.children,0)}</td>
+                    <td className="px-0.5 py-1 border text-center">{approvedGuests.reduce((s,g)=>s+g.adults+g.children,0)}</td>
+                    <td className="px-0.5 py-1 border text-center">{approvedGuests.reduce((s,g)=>s+g.veg_adults+g.veg_children,0)}</td>
+                    <td className="px-0.5 py-1 border text-center">{approvedGuests.reduce((s,g)=>s+g.vegan_adults+g.vegan_children,0)}</td>
+                    <td className="px-0.5 py-1 border text-center">{approvedGuests.reduce((s,g)=>s+g.glatt_adults+g.glatt_children,0)}</td>
+                    <td className="px-0.5 py-1 border text-center">{approvedGuests.reduce((s,g)=>s+(g.celiac_adults||0)+(g.celiac_children||0),0)}</td>
+                    <td className="px-0.5 py-1 border text-center">{approvedGuests.reduce((s,g)=>s+g.allergy_adults+g.allergy_children,0)}</td>
+                    <td className="px-0.5 py-1 border text-center"></td>
                   </tr>
                 </tfoot>
               </table>
@@ -6453,32 +6449,32 @@ React.useEffect(() => {
       {/* Rejected report modal */}
       {showRejectedReport && (
         <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50">
-          <div className="relative bg-white rounded-lg p-6 w-[90vw] max-w-none">
-            <button onClick={()=>{setShowRejectedReport(false);setShowReportsOptions(true);}} className="absolute top-2 left-2 text-2xl text-gray-500 hover:text-gray-700">&times;</button>
-            <h2 className="text-xl font-medium mb-4 text-center">דוח אורחים שלא מגיעים</h2>
+          <div className="relative bg-white rounded-lg p-2 sm:p-6 w-full sm:w-[90vw] mx-1 sm:mx-auto max-w-none">
+            <button onClick={()=>{setShowRejectedReport(false);setShowReportsOptions(true);}} className="absolute top-2 left-2 text-2xl text-gray-500 hover:text-gray-700 z-10">&times;</button>
+            <h2 className="text-base sm:text-xl font-medium mb-2 sm:mb-4 text-center pr-8">דוח אורחים שלא מגיעים</h2>
             <div className="max-h-[75vh] overflow-y-auto overflow-x-auto">
-              <table className="w-full table-fixed text-right border text-xs min-w-[1600px]">
+              <table className="w-full text-right border border-collapse" style={{fontSize: '11px'}}>
                 <thead>
-                  <tr className="bg-gray-100 text-sm font-bold whitespace-nowrap">
-                    <th className="p-1 border">#</th>
-                    <th className="p-1 border">שם פרטי</th>
-                    <th className="p-1 border">שם משפחה</th>
-                    <th className="p-1 border">טלפון</th>
+                  <tr className="bg-gray-100 font-bold whitespace-nowrap">
+                    <th className="px-0.5 py-1 border">#</th>
+                    <th className="px-0.5 py-1 border">שם</th>
+                    <th className="px-0.5 py-1 border">משפחה</th>
+                    <th className="px-0.5 py-1 border">טלפון</th>
                   </tr>
                 </thead>
                 <tbody>
                   {rejectedGuests.map((g,idx)=>(
                     <tr key={idx} className="odd:bg-white even:bg-gray-50">
-                      <td className="p-1 border text-center">{idx+1}</td>
-                      <td className="p-1 border">{g.first_name}</td>
-                      <td className="p-1 border">{g.last_name}</td>
-                      <td className="p-1 border">{`="${g.phone}"`}</td>
+                      <td className="px-0.5 py-0.5 border text-center">{idx+1}</td>
+                      <td className="px-0.5 py-0.5 border whitespace-nowrap">{g.first_name}</td>
+                      <td className="px-0.5 py-0.5 border whitespace-nowrap">{g.last_name}</td>
+                      <td className="px-0.5 py-0.5 border whitespace-nowrap">{g.phone}</td>
                     </tr>
                   ))}
                 </tbody>
                 <tfoot>
                   <tr className="bg-gray-200 font-bold">
-                    <td className="p-1 border text-center" colSpan={4}>סה"כ אורחים שלא מגיעים: {rejectedGuests.length}</td>
+                    <td className="px-0.5 py-1 border text-center" colSpan={4}>סה״כ לא מגיעים: {rejectedGuests.length}</td>
                   </tr>
                 </tfoot>
               </table>
@@ -6490,32 +6486,32 @@ React.useEffect(() => {
       {/* Pending report modal */}
       {showPendingReport && (
         <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50">
-          <div className="relative bg-white rounded-lg p-6 w-[90vw] max-w-none">
-            <button onClick={()=>{setShowPendingReport(false);setShowReportsOptions(true);}} className="absolute top-2 left-2 text-2xl text-gray-500 hover:text-gray-700">&times;</button>
-            <h2 className="text-xl font-medium mb-4 text-center">דוח אורחים שטרם הגיבו</h2>
+          <div className="relative bg-white rounded-lg p-2 sm:p-6 w-full sm:w-[90vw] mx-1 sm:mx-auto max-w-none">
+            <button onClick={()=>{setShowPendingReport(false);setShowReportsOptions(true);}} className="absolute top-2 left-2 text-2xl text-gray-500 hover:text-gray-700 z-10">&times;</button>
+            <h2 className="text-base sm:text-xl font-medium mb-2 sm:mb-4 text-center pr-8">דוח אורחים שטרם הגיבו</h2>
             <div className="max-h-[75vh] overflow-y-auto overflow-x-auto">
-              <table className="w-full table-fixed text-right border text-xs min-w-[1600px]">
+              <table className="w-full text-right border border-collapse" style={{fontSize: '11px'}}>
                 <thead>
-                  <tr className="bg-gray-100 text-sm font-bold whitespace-nowrap">
-                    <th className="p-1 border">#</th>
-                    <th className="p-1 border">שם פרטי</th>
-                    <th className="p-1 border">שם משפחה</th>
-                    <th className="p-1 border">טלפון</th>
+                  <tr className="bg-gray-100 font-bold whitespace-nowrap">
+                    <th className="px-0.5 py-1 border">#</th>
+                    <th className="px-0.5 py-1 border">שם</th>
+                    <th className="px-0.5 py-1 border">משפחה</th>
+                    <th className="px-0.5 py-1 border">טלפון</th>
                   </tr>
                 </thead>
                 <tbody>
                   {pendingGuests.map((g,idx)=>(
                     <tr key={idx} className="odd:bg-white even:bg-gray-50">
-                      <td className="p-1 border text-center">{idx+1}</td>
-                      <td className="p-1 border">{g.first_name}</td>
-                      <td className="p-1 border">{g.last_name}</td>
-                      <td className="p-1 border">{`="${g.phone}"`}</td>
+                      <td className="px-0.5 py-0.5 border text-center">{idx+1}</td>
+                      <td className="px-0.5 py-0.5 border whitespace-nowrap">{g.first_name}</td>
+                      <td className="px-0.5 py-0.5 border whitespace-nowrap">{g.last_name}</td>
+                      <td className="px-0.5 py-0.5 border whitespace-nowrap">{g.phone}</td>
                     </tr>
                   ))}
                 </tbody>
                 <tfoot>
                   <tr className="bg-gray-200 font-bold">
-                    <td className="p-1 border text-center" colSpan={4}>סה"כ אורחים שלא הגיבו: {pendingGuests.length}</td>
+                    <td className="px-0.5 py-1 border text-center" colSpan={4}>סה״כ טרם הגיבו: {pendingGuests.length}</td>
                   </tr>
                 </tfoot>
               </table>
@@ -6527,48 +6523,48 @@ React.useEffect(() => {
       {/* Guest status query modal */}
       {showSearchGuest && (
         <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50">
-          <div className="relative bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto event-form">
-            <button onClick={()=>{setShowSearchGuest(false); setShowReportsOptions(true);}} className="absolute top-2 left-2 text-2xl text-gray-500 hover:text-gray-700">&times;</button>
-            <h2 className="text-xl font-medium mb-4 text-center">חיפוש אורח</h2>
-            <div className="flex justify-center gap-2 mb-4">
+          <div className="relative bg-white rounded-lg p-2 sm:p-6 w-full max-w-2xl mx-1 sm:mx-auto max-h-[90vh] overflow-y-auto event-form">
+            <button onClick={()=>{setShowSearchGuest(false); setShowReportsOptions(true);}} className="absolute top-2 left-2 text-2xl text-gray-500 hover:text-gray-700 z-10">&times;</button>
+            <h2 className="text-base sm:text-xl font-medium mb-2 sm:mb-4 text-center pr-8">חיפוש אורח</h2>
+            <div className="flex justify-center gap-2 mb-4 px-1">
               <input
                 type="text"
-                placeholder="שם פרטי / שם משפחה / טלפון"
+                placeholder="שם / משפחה / טלפון"
                 value={searchTerm}
                 onChange={(e)=>setSearchTerm(e.target.value)}
-                className="w-full border rounded-md p-2"
+                className="w-full border rounded-md p-2 text-sm"
               />
-              <button onClick={handleGuestSearch} className="bg-primary text-white px-4 py-2 rounded-md hover:bg-primary/90 whitespace-nowrap">חפש</button>
+              <button onClick={handleGuestSearch} className="bg-primary text-white px-3 sm:px-4 py-2 rounded-md hover:bg-primary/90 whitespace-nowrap text-sm">חפש</button>
             </div>
-            {searchError && <p className="text-center text-red-600 mb-4">{searchError}</p>}
+            {searchError && <p className="text-center text-red-600 mb-4 text-sm">{searchError}</p>}
             {searchResults.length>0 && (
               <div className="max-h-[60vh] overflow-y-auto overflow-x-auto">
-                <table className="w-full text-right border text-sm min-w-max">
+                <table className="w-full text-right border border-collapse" style={{fontSize: '11px'}}>
                   <thead>
                     <tr className="bg-gray-100">
-                      <th className="p-2 border">#</th>
-                      <th className="p-2 border">שם פרטי</th>
-                      <th className="p-2 border">שם משפחה</th>
-                      <th className="p-2 border">טלפון</th>
-                      <th className="p-2 border">סטטוס</th>
+                      <th className="px-0.5 py-1 border whitespace-nowrap">#</th>
+                      <th className="px-0.5 py-1 border whitespace-nowrap">שם</th>
+                      <th className="px-0.5 py-1 border whitespace-nowrap">משפחה</th>
+                      <th className="px-0.5 py-1 border whitespace-nowrap">טלפון</th>
+                      <th className="px-0.5 py-1 border whitespace-nowrap">סטטוס</th>
                     </tr>
                   </thead>
                   <tbody>
                     {searchResults.map((g,idx)=>(
                       <tr key={g.id} className="odd:bg-white even:bg-gray-50">
-                        <td className="p-1 border text-center">{idx+1}</td>
-                        <td className="p-1 border">{g.first_name}</td>
-                        <td className="p-1 border">{g.last_name}</td>
-                        <td className="p-1 border">{`="${g.phone}"`}</td>
-                        <td className="p-1 border text-center">{g.status==='approved'? 'מגיע' : g.status==='rejected'? 'לא מגיע' : 'טרם הגיב'}</td>
+                        <td className="px-0.5 py-0.5 border text-center">{idx+1}</td>
+                        <td className="px-0.5 py-0.5 border whitespace-nowrap">{g.first_name}</td>
+                        <td className="px-0.5 py-0.5 border whitespace-nowrap">{g.last_name}</td>
+                        <td className="px-0.5 py-0.5 border whitespace-nowrap">{g.phone}</td>
+                        <td className="px-0.5 py-0.5 border text-center whitespace-nowrap">{g.status==='approved'? 'מגיע' : g.status==='rejected'? 'לא מגיע' : 'טרם הגיב'}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
             )}
-            <div className="flex justify-center mt-6">
-              <button onClick={()=>{setShowSearchGuest(false); setShowReportsOptions(true);}} className="bg-primary text-white border border-primary rounded-full px-8 py-3 font-medium hover:bg-primary/90 transition-all">סגור</button>
+            <div className="flex justify-center mt-4 sm:mt-6">
+              <button onClick={()=>{setShowSearchGuest(false); setShowReportsOptions(true);}} className="bg-primary text-white border border-primary rounded-full px-6 sm:px-8 py-2 sm:py-3 font-medium hover:bg-primary/90 transition-all text-sm sm:text-base">סגור</button>
             </div>
           </div>
         </div>
