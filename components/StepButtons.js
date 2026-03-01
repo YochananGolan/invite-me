@@ -3829,6 +3829,7 @@ React.useEffect(() => {
                         : 'bg-[#FCE6AC] text-primary border border-primary/40'
                   }`}
                 >
+                  <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-white/80 text-xs font-bold text-primary shrink-0">{realIdx}</span>
                   <span className="text-base leading-none">{stepsMobile[realIdx].split(' ')[0]}</span>
                   <span className="text-xs font-bold leading-tight">{stepsMobile[realIdx].split(' ').slice(1).join(' ')}</span>
                 </button>
@@ -3865,6 +3866,7 @@ React.useEffect(() => {
                       : 'bg-[#FCE6AC] text-primary border border-primary/40'
                   }`}
                 >
+                  <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-white/80 text-xs font-bold text-primary shrink-0">{realIdx}</span>
                   <span className="text-base leading-none">{stepsMobile[realIdx].split(' ')[0]}</span>
                   <span className="text-xs font-bold leading-tight">{stepsMobile[realIdx].split(' ').slice(1).join(' ')}</span>
                 </button>
