@@ -3719,7 +3719,7 @@ React.useEffect(() => {
                       <div className="text-4xl flex-shrink-0">{'\uD83C\uDFA8'}</div>
                       <div className="flex-1 text-right">
                         <h3 className="text-lg font-bold text-primary">{'\u05E9\u05DC\u05D1 3: \u05E2\u05D9\u05E6\u05D5\u05D1 \u05D4\u05D6\u05DE\u05E0\u05D4'}</h3>
-                        <p className="text-base text-gray-600">{'\u05D1\u05D7\u05E8 \u05DE\u05EA\u05D5\u05DA 21 \u05EA\u05D1\u05E0\u05D9\u05D5\u05EA \u05DE\u05E2\u05D5\u05E6\u05D1\u05D5\u05EA'}</p>
+                        <p className="text-base text-gray-600">{'\u05D1\u05D7\u05E8 \u05DE\u05EA\u05D5\u05DA 45 \u05EA\u05D1\u05E0\u05D9\u05D5\u05EA \u05DE\u05E2\u05D5\u05E6\u05D1\u05D5\u05EA'}</p>
                       </div>
                     </div>
                   </div>
@@ -6810,7 +6810,7 @@ React.useEffect(() => {
                   <div className="text-4xl flex-shrink-0">🎨</div>
                   <div className="flex-1 text-right">
                     <h3 className="text-lg font-bold text-primary">שלב 3: עיצוב הזמנה</h3>
-                    <p className="text-base text-gray-600">בחר מתוך 21 תבניות מעוצבות</p>
+                    <p className="text-base text-gray-600">בחר מתוך 45 תבניות מעוצבות</p>
                   </div>
                 </div>
               </div>
@@ -6921,7 +6921,7 @@ React.useEffect(() => {
                   <div className="space-y-3">
                     <p className="text-gray-700 leading-relaxed">בשלב זה תבחר את העיצוב המושלם להזמנה שלך:</p>
                     <ul className="list-disc list-inside space-y-2 mr-4">
-                      <li><strong>21 תבניות מעוצבות</strong> - מגוון רחב של עיצובים לכל סוג אירוע</li>
+                      <li><strong>45 תבניות מעוצבות</strong> - מגוון רחב של עיצובים לכל סוג אירוע</li>
                       <li><strong>התאמה אישית</strong> - הטקסט שלך יתווסף אוטומטית על התבנית</li>
                       <li><strong>צפייה מקדימה</strong> - ראה איך ההזמנה תיראה לפני השמירה</li>
                       <li><strong>שמירה בענן</strong> - ההזמנה נשמרת ב-Supabase Storage</li>

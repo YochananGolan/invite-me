@@ -148,7 +148,7 @@ export default function Home({ session }) {
                 <div className="bg-white p-4 rounded-lg shadow-sm">
                   <div className="text-3xl mb-2">🎨</div>
                   <h4 className="font-bold text-lg mb-2">עיצוב מקצועי</h4>
-                  <p className="text-sm text-gray-600">20 תבניות מעוצבות + עריכה מלאה</p>
+                  <p className="text-sm text-gray-600">45 תבניות מעוצבות + עריכה מלאה</p>
                 </div>
                 <div className="bg-white p-4 rounded-lg shadow-sm">
                   <div className="text-3xl mb-2">📱</div>
