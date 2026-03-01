@@ -517,6 +517,7 @@ const handleOpenAddonModal = React.useCallback(() => {
   const [showStep5Options, setShowStep5Options] = useState(false);
   const [showRsvpQuestion, setShowRsvpQuestion] = useState(false);
   const [showDesignChooser, setShowDesignChooser] = useState(false);
+  const [designMobileTab, setDesignMobileTab] = useState('templates');
   const [showCountModal, setShowCountModal] = useState(false);
   const [adultsCount, setAdultsCount] = useState(1);
   const [childrenCount, setChildrenCount] = useState(0);
@@ -5349,11 +5350,27 @@ React.useEffect(() => {
               </div>
             </div>
             
-            {/* Main content area - split into two columns */}
-            <div className="flex-1 flex overflow-hidden">
-              {/* Left side - Text editing section */}
-              <div className="w-1/2 border-r overflow-y-auto p-6">
-                <h3 className="text-xl font-semibold text-primary mb-4 text-center">א. עצב טקסט הזמנה.</h3>
+            {/* Mobile tabs */}
+            <div className="flex sm:hidden border-b">
+              <button
+                onClick={() => setDesignMobileTab('templates')}
+                className={`flex-1 py-3 text-center font-bold text-sm transition-all ${designMobileTab === 'templates' ? 'text-primary border-b-3 border-primary bg-primary/5' : 'text-gray-500'}`}
+              >
+                ב. בחירת תבנית
+              </button>
+              <button
+                onClick={() => setDesignMobileTab('text')}
+                className={`flex-1 py-3 text-center font-bold text-sm transition-all ${designMobileTab === 'text' ? 'text-primary border-b-3 border-primary bg-primary/5' : 'text-gray-500'}`}
+              >
+                א. עיצוב טקסט
+              </button>
+            </div>
+
+            {/* Main content area */}
+            <div className="flex-1 flex flex-col sm:flex-row overflow-hidden">
+              {/* Text editing section */}
+              <div className={`${designMobileTab === 'text' ? 'flex' : 'hidden'} sm:flex flex-col sm:w-1/2 sm:border-r overflow-y-auto p-4 sm:p-6`}>
+                <h3 className="hidden sm:block text-xl font-semibold text-primary mb-4 text-center">א. עצב טקסט הזמנה.</h3>
                 {/* Styled Container */}
                 <div className="bg-[#FFF9E8] border-2 border-primary rounded-lg p-4 shadow-sm space-y-4">
               {/* Font chooser */}
@@ -5493,13 +5510,13 @@ React.useEffect(() => {
             </div>
               </div>
 
-              {/* Right side - Background images section */}
-              <div className="w-1/2 overflow-y-auto p-6">
-                <h3 className="text-xl font-semibold text-primary mb-4 text-center">ב. לחץ לבחירת הזמנה.</h3>
+              {/* Templates section */}
+              <div className={`${designMobileTab === 'templates' ? 'flex' : 'hidden'} sm:flex flex-col sm:w-1/2 overflow-y-auto p-4 sm:p-6`}>
+                <h3 className="hidden sm:block text-xl font-semibold text-primary mb-4 text-center">ב. לחץ לבחירת הזמנה.</h3>
                 {designImages.length === 0 ? (
                   <p className="text-center text-gray-600 mt-10">לא נמצאו תמונות בתיקייה /public/images</p>
                 ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+                  <div className="grid grid-cols-2 gap-3 sm:gap-6">
                     {designImages.map((src) => {
                       // Improved comparison logic to handle different path formats
                       const isSelected = (()=>{ 
