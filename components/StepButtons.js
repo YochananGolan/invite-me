@@ -434,7 +434,7 @@ const [eventRefreshKey, setEventRefreshKey] = useState(0);
 
   React.useEffect(() => {
     if (!showPricingPlan) {
-      if (planWarningSuppressed) {
+      if (planWarningSuppressed && eventDataLoaded) {
         const baseLimit = getPlanBaseLimit(selectedPlan);
         const extraCapacity = additionalPackages.reduce((sum, planId) => sum + getPlanBaseLimit(planId), 0);
         const totalLimit = (baseLimit || 0) + extraCapacity;
@@ -446,7 +446,7 @@ const [eventRefreshKey, setEventRefreshKey] = useState(0);
       }
       setPlanSelectionError('');
     }
-  }, [showPricingPlan, planWarningSuppressed, effectiveMessagesSentCount, selectedPlan, additionalPackages, getPlanBaseLimit]);
+  }, [showPricingPlan, planWarningSuppressed, effectiveMessagesSentCount, selectedPlan, additionalPackages, getPlanBaseLimit, eventDataLoaded]);
 
 const basePlanLimit = getPlanBaseLimit(selectedPlan);
 const additionalCapacity = additionalPackages.reduce((sum, planId) => sum + getPlanBaseLimit(planId), 0);
@@ -3163,7 +3163,7 @@ React.useEffect(() => {
               if (eventDate >= today) {
                 console.log('Found future event in database, restoring...', ev);
                 setCurrentEventId(ev.id);
-                setEventMessagesSentCount(messagesSent);
+                setEventMessagesSentCount(ev.messages_sent_count ?? 0);
                 let restoreAddonCount = 0;
                 if (typeof ev.additional_packages === 'number') {
                   restoreAddonCount = ev.additional_packages;
@@ -3284,7 +3284,7 @@ React.useEffect(() => {
         let messagesSent = 0;
         const { data: evData, error: evError } = await supabase
           .from('events')
-          .select('id,event_details,allowed_guests,messages_sent_count')
+          .select('id,event_details,allowed_guests,messages_sent_count,additional_packages')
           .eq('user_id', user.id)
           .order('created_at',{ascending:false})
           .limit(1)
@@ -3306,17 +3306,27 @@ React.useEffect(() => {
         if(ev){
           setCurrentEventId(ev.id);
           setEventMessagesSentCount(messagesSent);
-          // NEVER override selectedPlan from allowed_guests - user's choice should always be respected
-          // Only set if there's absolutely no plan selected anywhere
+          let addonCount = 0;
+          if (typeof ev.additional_packages === 'number') {
+            addonCount = ev.additional_packages;
+          }
+          try {
+            const lsVal = parseInt(localStorage.getItem('additionalPackages_' + ev.id), 10);
+            if (!isNaN(lsVal) && lsVal > addonCount) addonCount = lsVal;
+          } catch (_) {}
+          setDbAddonCount((prev) => Math.max(prev ?? 0, addonCount));
+          setAdditionalPackages((prev) => {
+            const prevCount = prev ? prev.length : 0;
+            if (addonCount > prevCount) return Array(addonCount).fill('addon');
+            return prev;
+          });
+          setEventDataLoaded(true);
           const storedPlan = typeof window !== 'undefined' ? localStorage.getItem('selectedPlan') : null;
-          // If user explicitly chose 'free' or 'basic', NEVER override it
           if (storedPlan === 'free' || storedPlan === 'basic' || selectedPlan === 'free' || selectedPlan === 'basic') {
-            // User chose plan A, respect that choice always
             if (!selectedPlan && storedPlan) {
               setSelectedPlan(storedPlan);
             }
           } else if (ev.allowed_guests && !selectedPlan && !storedPlan) {
-            // Only infer plan if user hasn't selected anything at all
             const inferredPlan = ev.allowed_guests <= 50 ? 'free' :
                                  ev.allowed_guests <= 200 ? 'standard' :
                                  ev.allowed_guests <= 350 ? 'premium' :
@@ -3324,10 +3334,8 @@ React.useEffect(() => {
             setSelectedPlan(inferredPlan);
             try { localStorage.setItem('selectedPlan', inferredPlan); } catch(e){}
           } else if (storedPlan && !selectedPlan) {
-            // Restore from localStorage if exists but state is not set
             setSelectedPlan(storedPlan);
           }
-          // Parse event_details if it's a string
           const details = typeof ev.event_details === 'string' 
             ? JSON.parse(ev.event_details) 
             : ev.event_details;
@@ -3336,14 +3344,12 @@ React.useEffect(() => {
             setSelectedDesign(tpl);
             markStepDone(2);
           }
-          // also restore form data if empty
           if(Object.values(formData).every(v=>!v) && details){
             setFormData(prev=>({ ...prev, ...details }));
             setEventDetailsCompleted(true);
             markStepDone(1);
           }
         }
-        // Mark initial load as complete after first load attempt
         isInitialLoadRef.current = false;
       }catch(e){ console.error('restore event failed', e);}  
     })();
@@ -3660,8 +3666,8 @@ React.useEffect(() => {
     <>
       {/* Capacity Limit Warning Modal */}
       {showPlanLimitWarning && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black/70 z-[100]">
-          <div className="bg-white rounded-lg p-8 w-full max-w-2xl mx-4 text-center shadow-2xl">
+        <div className="fixed inset-0 flex items-center justify-center bg-black/70 z-[100] overflow-y-auto py-4">
+          <div className="bg-white rounded-lg p-6 sm:p-8 w-full max-w-2xl mx-4 my-auto text-center shadow-2xl max-h-[95vh] overflow-y-auto">
             {(() => {
               // חישוב מכסה אחיד בכל המסלולים (א–ו) + תוספות; אותה הצעת חבילות 100 הודעות
               const baseLimit = getPlanBaseLimit(selectedPlan) || 0;
