@@ -91,7 +91,7 @@ export default forwardRef(function HeroSection({ onStart, onShowFeatures, onSign
         <div className="flex flex-col lg:flex-row items-center gap-12 lg:gap-16">
           {/* Hero Text - Right side in RTL */}
           <div className="lg:flex-1 flex flex-col justify-center text-center lg:text-right order-2 lg:order-1">
-            <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold text-gray-800 mb-4 leading-tight">
+            <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold text-gray-800 mb-5 leading-tight">
               {'\u05E0\u05E2\u05D9\u05DD \u05DE\u05D0\u05D5\u05D3, \u05D0\u05E0\u05D7\u05E0\u05D5 Meet-M'}
             </h1>
             <p className="text-gray-600 text-lg md:text-xl mb-6 leading-relaxed max-w-xl lg:mr-0 lg:ml-auto mx-auto">
@@ -99,19 +99,25 @@ export default forwardRef(function HeroSection({ onStart, onShowFeatures, onSign
             </p>
             
             {/* Stats */}
-            <div className="mb-4">
-              <span className="text-primary font-bold text-2xl md:text-3xl">{'\u05D0\u05DC\u05E4\u05D9 \u05D0\u05D9\u05E8\u05D5\u05E2\u05D9\u05DD '}</span>
-              <span className="text-gray-700 font-medium text-lg md:text-xl">{'\u05D4\u05E6\u05D8\u05E8\u05E4\u05D5!'}</span>
+            <div className="mb-6">
+              <span className="text-primary font-bold text-2xl md:text-3xl">{'\u05D4\u05D0\u05D9\u05E8\u05D5\u05E2 \u05E9\u05DC\u05DB\u05DD '}</span>
+              <span className="text-gray-700 font-medium text-lg md:text-xl">{'\u05DE\u05EA\u05D7\u05D9\u05DC \u05DB\u05D0\u05DF \u2728'}</span>
             </div>
 
-            <div className="flex flex-col sm:flex-row gap-3 justify-center lg:justify-start mb-8">
+            <div className="flex flex-col sm:flex-row gap-3 justify-center lg:justify-start mb-3">
               <button
                 type="button"
                 onClick={() => { if (typeof onStart === 'function') onStart(); }}
-                className="px-8 py-4 rounded-lg border border-gray-300 text-gray-700 font-medium hover:bg-gray-50 transition-colors text-lg"
+                className="group inline-flex items-center gap-2 px-5 py-3 rounded-xl
+                           bg-white border-2 border-gray-300 text-gray-700 font-bold text-base
+                           shadow-sm hover:shadow-lg hover:border-primary hover:bg-primary hover:text-white
+                           transition-all duration-200 cursor-pointer"
                 aria-label={'\u05EA\u05D9\u05D0\u05D5\u05E8 \u05EA\u05D4\u05DC\u05D9\u05DA \u05D9\u05E6\u05D9\u05E8\u05EA \u05D0\u05D9\u05E8\u05D5\u05E2'}
               >
-                {'\u05EA\u05D9\u05D0\u05D5\u05E8 \u05EA\u05D4\u05DC\u05D9\u05DA \u05D9\u05E6\u05D9\u05E8\u05EA \u05D0\u05D9\u05E8\u05D5\u05E2'}
+                <span>{'\u05EA\u05D9\u05D0\u05D5\u05E8 \u05EA\u05D4\u05DC\u05D9\u05DA \u05D9\u05E6\u05D9\u05E8\u05EA \u05D0\u05D9\u05E8\u05D5\u05E2'}</span>
+                <svg className="w-4 h-4 mr-1 transition-transform duration-200 group-hover:-translate-x-1 rtl:rotate-180 rtl:group-hover:translate-x-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+                </svg>
               </button>
               <button
                 type="button"
@@ -137,7 +143,27 @@ export default forwardRef(function HeroSection({ onStart, onShowFeatures, onSign
               </button>
             </div>
 
-            <div className="flex flex-wrap justify-center lg:justify-start items-end gap-6 mt-10">
+            {typeof onPressReports === 'function' && (
+              <div className="flex justify-center lg:justify-start">
+                <button
+                  type="button"
+                  onClick={handleOpenReports}
+                  className="group flex items-center gap-3 px-7 py-3 rounded-xl
+                             bg-white border-2 border-primary/40 text-primary font-bold text-base
+                             shadow-sm hover:shadow-lg hover:border-primary hover:bg-primary hover:text-white
+                             transition-all duration-200 cursor-pointer"
+                  aria-label={'\u05D3\u05D5\u05D7\u05D5\u05EA \u05D1\u05E7\u05E8\u05D4'}
+                >
+                  <span className="text-xl">{'\uD83D\uDCCA'}</span>
+                  <span>{'\u05D3\u05D5\u05D7\u05D5\u05F4\u05EA \u05D1\u05E7\u05E8\u05D4'}</span>
+                  <svg className="w-4 h-4 mr-1 transition-transform duration-200 group-hover:-translate-x-1 rtl:rotate-180 rtl:group-hover:translate-x-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+                  </svg>
+                </button>
+              </div>
+            )}
+
+            <div className="flex flex-wrap justify-center lg:justify-start items-end gap-6 mt-8">
               {[
                 { icon: '\uD83C\uDFA8', label: '\u05E2\u05D9\u05E6\u05D5\u05D1 \u05DE\u05E7\u05E6\u05D5\u05E2\u05D9', sub: '45 \u05EA\u05D1\u05E0\u05D9\u05D5\u05EA' },
                 { icon: '\uD83D\uDCF1', label: '\u05D0\u05D9\u05E9\u05D5\u05E8\u05D9\u05DD \u05D1\u05D5\u05D5\u05D0\u05D8\u05E1\u05D0\u05E4 \u05D5\u05D1-SMS', sub: '\u05E9\u05DC\u05D9\u05D7\u05D4 \u05D0\u05D5\u05D8\u05D5\u05DE\u05D8\u05D9\u05EA' },
@@ -151,16 +177,6 @@ export default forwardRef(function HeroSection({ onStart, onShowFeatures, onSign
                   <span className="text-gray-500 text-xs">{f.sub}</span>
                 </div>
               ))}
-              {typeof onPressReports === 'function' && (
-                <button
-                  type="button"
-                  onClick={handleOpenReports}
-                  className="px-8 py-4 rounded-full bg-primary/15 text-primary font-bold border-2 border-primary hover:bg-primary hover:text-white transition-colors text-lg shadow-md shrink-0 self-center lg:-translate-x-24"
-                  aria-label={'\u05D3\u05D5\u05D7\u05D5\u05EA \u05D1\u05E7\u05E8\u05D4'}
-                >
-                  {'\u05D3\u05D5\u05D7\u05D5\u05F4\u05EA \u05D1\u05E7\u05E8\u05D4'}
-                </button>
-              )}
             </div>
           </div>
 
