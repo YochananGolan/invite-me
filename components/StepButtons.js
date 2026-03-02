@@ -5672,10 +5672,10 @@ React.useEffect(() => {
       {/* Lightbox for design preview */}
       {showLightbox && (
         <div className="fixed inset-0 flex items-center justify-center bg-black/70 z-50">
-          <div className="relative bg-white sm:rounded-lg p-1 sm:p-4 sm:max-w-3xl w-full max-h-[100vh] sm:max-h-[95vh] sm:w-full flex flex-col">
+          <div className="relative bg-white sm:rounded-lg p-1 sm:p-4 sm:max-w-3xl w-full max-h-[92vh] sm:max-h-[88vh] sm:w-full flex flex-col mx-1 sm:mx-auto">
             <button onClick={()=> setShowLightbox(false)} className="absolute top-2 left-2 text-2xl text-gray-500 sm:text-gray-200 hover:text-gray-800 sm:hover:text-white z-10">&times;</button>
             <div className="relative flex-1 flex items-center justify-center overflow-hidden min-h-0">
-              <img src={lightboxSrc} alt="preview" className="max-w-full max-h-full object-contain rounded-md" />
+              <img src={lightboxSrc} alt="preview" className="max-w-full max-h-[calc(88vh-60px)] sm:max-h-[calc(85vh-70px)] object-contain rounded-md" />
               <div className="absolute inset-0 rounded-md pointer-events-none" style={{ background: 'rgba(255,255,255,0.22)' }} aria-hidden />
               <div className="absolute inset-0 flex flex-col items-center justify-center px-4" dir="rtl">
                 {(customInvitationText || invitationText || 'דוגמת טקסט להזמנה').split('\n').map((line, lineIndex) => {
