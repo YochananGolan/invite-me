@@ -21,7 +21,7 @@ export default function Document() {
             var el = document.querySelector('.uwy');
             if (el) {
               var isMobile = window.innerWidth < 640;
-              el.style.setProperty('top', isMobile ? '80px' : '68px', 'important');
+              el.style.setProperty('top', isMobile ? '110px' : '68px', 'important');
               el.style.setProperty('bottom', 'auto', 'important');
               el.style.setProperty('right', '16px', 'important');
               el.style.setProperty('left', 'auto', 'important');
