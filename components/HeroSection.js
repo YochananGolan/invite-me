@@ -83,12 +83,12 @@ export default forwardRef(function HeroSection({ onStart, onShowFeatures, onSign
   const isLocationComplete = locationLine === allLines[6];
   const isTimesComplete = timesLine === allLines[8];
   return (
-    <section className="relative min-h-[85vh] flex items-center bg-white">
+    <section className="relative min-h-[70vh] md:min-h-[85vh] flex items-center bg-white">
       {/* Confetti background */}
       <ConfettiBackground />
 
-      <div className="container mx-auto relative z-10 py-12 md:py-16 px-4">
-        <div className="flex flex-col lg:flex-row items-center gap-12 lg:gap-16">
+      <div className="container mx-auto relative z-10 py-6 md:py-16 px-4">
+        <div className="flex flex-col lg:flex-row items-center gap-6 md:gap-12 lg:gap-16">
           {/* Hero Text - Right side in RTL */}
           <div className="lg:flex-1 flex flex-col justify-center text-center lg:text-right order-2 lg:order-1">
             <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold text-gray-800 mb-5 leading-tight">
@@ -107,25 +107,11 @@ export default forwardRef(function HeroSection({ onStart, onShowFeatures, onSign
             <div className="flex flex-col sm:flex-row gap-3 justify-center lg:justify-start mb-3">
               <button
                 type="button"
-                onClick={() => { if (typeof onStart === 'function') onStart(); }}
-                className="group inline-flex items-center gap-2 px-5 py-3 rounded-xl
-                           bg-white border-2 border-gray-300 text-gray-700 font-bold text-base
-                           shadow-sm hover:shadow-lg hover:border-primary hover:bg-primary hover:text-white
-                           transition-all duration-200 cursor-pointer"
-                aria-label={'\u05EA\u05D9\u05D0\u05D5\u05E8 \u05EA\u05D4\u05DC\u05D9\u05DA \u05D9\u05E6\u05D9\u05E8\u05EA \u05D0\u05D9\u05E8\u05D5\u05E2'}
-              >
-                <span>{'\u05EA\u05D9\u05D0\u05D5\u05E8 \u05EA\u05D4\u05DC\u05D9\u05DA \u05D9\u05E6\u05D9\u05E8\u05EA \u05D0\u05D9\u05E8\u05D5\u05E2'}</span>
-                <svg className="w-4 h-4 mr-1 transition-transform duration-200 group-hover:-translate-x-1 rtl:rotate-180 rtl:group-hover:translate-x-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-                </svg>
-              </button>
-              <button
-                type="button"
                 onClick={handleCreateNewEvent}
                 className="group relative px-9 py-4 rounded-xl text-white font-extrabold text-lg cursor-pointer overflow-hidden
                            bg-gradient-to-r from-purple-600 via-fuchsia-600 to-indigo-600
                            shadow-[0_14px_35px_rgba(124,58,237,0.35)] ring-4 ring-purple-300/60 ring-offset-2 ring-offset-white
-                           transition-all duration-200
+                           transition-all duration-200 order-first sm:order-last
                            hover:from-purple-900 hover:via-purple-900 hover:to-purple-900 hover:-translate-y-0.5 hover:shadow-[0_0_55px_rgba(88,28,135,0.8)] hover:ring-purple-900/80
                            active:from-purple-900 active:via-purple-900 active:to-purple-900 active:translate-y-0 active:scale-[0.98] active:shadow-inner
                            focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-purple-500"
@@ -141,6 +127,20 @@ export default forwardRef(function HeroSection({ onStart, onShowFeatures, onSign
                   className="absolute inset-0 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-200 bg-[radial-gradient(circle_at_30%_20%,rgba(255,255,255,0.2),transparent_50%)] pointer-events-none"
                 />
               </button>
+              <button
+                type="button"
+                onClick={() => { if (typeof onStart === 'function') onStart(); }}
+                className="group inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl
+                           bg-white border-2 border-gray-300 text-gray-700 font-bold text-base
+                           shadow-sm hover:shadow-lg hover:border-primary hover:bg-primary hover:text-white
+                           transition-all duration-200 cursor-pointer"
+                aria-label={'\u05EA\u05D9\u05D0\u05D5\u05E8 \u05EA\u05D4\u05DC\u05D9\u05DA \u05D9\u05E6\u05D9\u05E8\u05EA \u05D0\u05D9\u05E8\u05D5\u05E2'}
+              >
+                <span>{'\u05EA\u05D9\u05D0\u05D5\u05E8 \u05EA\u05D4\u05DC\u05D9\u05DA \u05D9\u05E6\u05D9\u05E8\u05EA \u05D0\u05D9\u05E8\u05D5\u05E2'}</span>
+                <svg className="w-4 h-4 mr-1 transition-transform duration-200 group-hover:-translate-x-1 rtl:rotate-180 rtl:group-hover:translate-x-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+                </svg>
+              </button>
             </div>
 
             {typeof onPressReports === 'function' && (
@@ -148,8 +148,8 @@ export default forwardRef(function HeroSection({ onStart, onShowFeatures, onSign
                 <button
                   type="button"
                   onClick={handleOpenReports}
-                  className="group flex items-center gap-3 px-7 py-3 rounded-xl
-                             bg-white border-2 border-primary/40 text-primary font-bold text-base
+                  className="group inline-flex items-center gap-2 sm:gap-3 px-5 sm:px-7 py-3 rounded-xl
+                             bg-white border-2 border-primary/40 text-primary font-bold text-sm sm:text-base
                              shadow-sm hover:shadow-lg hover:border-primary hover:bg-primary hover:text-white
                              transition-all duration-200 cursor-pointer"
                   aria-label={'\u05D3\u05D5\u05D7\u05D5\u05EA \u05D1\u05E7\u05E8\u05D4'}

@@ -90,19 +90,16 @@ export default function NavBar({ onAuthClick, onAboutClick, onShowPricing, onSho
         </div>
 
         {/* Auth Buttons - Left side in RTL */}
-        <div className="flex flex-col items-end gap-1 sm:flex-row sm:items-center sm:gap-3">
+        <div className="flex flex-row items-center gap-2 sm:gap-3">
           {session ? (
             <>
               <button
                 onClick={() => supabase.auth.signOut()}
-                className="text-primary font-semibold border-2 border-primary rounded-lg px-5 py-2.5 hover:bg-primary hover:text-white transition-colors text-base"
+                className="text-primary font-semibold border-2 border-primary rounded-lg px-3 py-1.5 sm:px-5 sm:py-2.5 hover:bg-primary hover:text-white transition-colors text-sm sm:text-base"
               >
                 התנתק
               </button>
               <span className="hidden sm:inline text-sm text-gray-600 truncate max-w-[120px] md:max-w-[180px]">
-                {session.user?.email}
-              </span>
-              <span className="block sm:hidden text-[11px] text-gray-600 truncate max-w-[180px] text-left">
                 {session.user?.email}
               </span>
             </>
@@ -110,13 +107,13 @@ export default function NavBar({ onAuthClick, onAboutClick, onShowPricing, onSho
             <>
               <button
                 onClick={() => onAuthClick('sign_in')}
-                className="text-primary font-semibold border-2 border-primary rounded-lg px-5 py-2.5 hover:bg-primary/5 transition-colors text-base whitespace-nowrap"
+                className="text-primary font-semibold border-2 border-primary rounded-lg px-3 py-1.5 sm:px-5 sm:py-2.5 hover:bg-primary/5 transition-colors text-sm sm:text-base whitespace-nowrap"
               >
                 כניסה
               </button>
               <button
                 onClick={() => onAuthClick('sign_up')}
-                className="bg-primary text-white font-semibold rounded-lg px-6 py-2.5 hover:bg-primary/90 transition-colors text-base whitespace-nowrap shadow-sm"
+                className="bg-primary text-white font-semibold rounded-lg px-4 py-2 sm:px-6 sm:py-2.5 hover:bg-primary/90 transition-colors text-sm sm:text-base whitespace-nowrap shadow-sm"
               >
                 הרשמה בחינם
               </button>
