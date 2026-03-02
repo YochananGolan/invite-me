@@ -5719,13 +5719,13 @@ React.useEffect(() => {
                 })}
               </div>
             </div>
-            <div className="flex justify-center mt-2 sm:mt-4 gap-3 sm:gap-4 pb-4 sm:pb-0 shrink-0">
-              <button onClick={() => setShowLightbox(false)} className="border px-4 sm:px-6 py-2 rounded-full hover:bg-gray-100 text-sm sm:text-base">סגור</button>
+            <div className="flex flex-row-reverse justify-center mt-2 sm:mt-4 gap-3 sm:gap-4 pb-4 sm:pb-0 shrink-0">
               {uploadingInvite ? (
                 <button disabled className="bg-gray-400 text-white px-4 sm:px-6 py-2 rounded-full cursor-not-allowed text-sm sm:text-base">מעלה...</button>
               ) : (
-                <button onClick={() => handleChooseDesign(lightboxSrc)} className="bg-primary text-white px-4 sm:px-6 py-2 rounded-full hover:bg-primary/90 text-sm sm:text-base">בחר עיצוב זה</button>
+                <button onClick={() => handleChooseDesign(lightboxSrc)} className="bg-green-600 text-white px-4 sm:px-6 py-2 rounded-full hover:bg-green-700 text-sm sm:text-base font-medium">בחר עיצוב זה</button>
               )}
+              <button onClick={() => setShowLightbox(false)} className="bg-red-500 text-white px-4 sm:px-6 py-2 rounded-full hover:bg-red-600 text-sm sm:text-base font-medium">אל תבחר</button>
             </div>
           </div>
         </div>
