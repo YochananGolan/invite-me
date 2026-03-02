@@ -35,7 +35,7 @@ export default function NavBar({ onAuthClick, onAboutClick, onShowPricing, onSho
     <nav className="w-full bg-white border-b border-gray-100">
       <div className="container mx-auto flex items-center justify-between py-5 px-4 md:px-6">
         {/* Logo - Right side in RTL */}
-        <Link href="/" className="flex items-center" passHref>
+        <Link href="/" className="flex items-center ml-8 sm:ml-0" passHref>
           <span className="text-2xl md:text-3xl font-bold text-gray-800 tracking-tight">
             Meet-M
           </span>
