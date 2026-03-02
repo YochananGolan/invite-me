@@ -11,7 +11,7 @@ export default function Document() {
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
         <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;600;700&family=Gloria+Hallelujah&family=M+PLUS+1p&family=Edu+NSW+ACT+Cursive:wght@400..700&family=Secular+One&family=Ojuju:wght@200..800&family=Macondo&display=swap" rel="stylesheet" />
-        <script src="https://cdn.userway.org/widget.js" data-account="qK2or1KFZX" data-position="3"></script>
+        <script src="https://cdn.userway.org/widget.js" data-account="qK2or1KFZX" data-position="2"></script>
       </Head>
       <body>
         <Main />

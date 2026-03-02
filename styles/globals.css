@@ -108,16 +108,14 @@ body {
   color: #1f2937 !important; /* gray-800 */
 }
 
-/* UserWay accessibility widget: move to bottom-left so it doesn't overlap logo */
+/* UserWay accessibility widget: nudge below navbar, between logo and hero */
 .uwy,
 .uwy[class*="userway_p"],
 div[data-userway-widget],
 .userway_buttons_wrapper,
 #userwayAccessibilityWidget {
-  top: auto !important;
-  bottom: 20px !important;
-  right: auto !important;
-  left: 20px !important;
+  top: 62px !important;
+  bottom: auto !important;
 }
 
 /* Mobile: prevent pull-to-refresh overscroll on modals */
