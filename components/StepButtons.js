@@ -4217,7 +4217,7 @@ React.useEffect(() => {
                             <XAxis
                               dataKey="name"
                               stroke="#1f2937"
-                              tick={{ fontSize: 16, fontWeight: 600 }}
+                              tick={{ fontSize: typeof window !== 'undefined' && window.innerWidth < 640 ? 12 : 16, fontWeight: 600 }}
                               interval={0}
                             />
                             <YAxis hide />
@@ -4380,9 +4380,10 @@ React.useEffect(() => {
                 const remainingMessagesRaw = messageLimit - messagesSent;
                 const remainingMessages = Math.max(0, remainingMessagesRaw);
                 const overMessages = remainingMessagesRaw < 0 ? Math.abs(remainingMessagesRaw) : 0;
+                const isMobileView = typeof window !== 'undefined' && window.innerWidth < 640;
                 const capacityChartData = [
-                  { key: 'limit', name: 'מגבלת הודעות', value: messageLimit, color: '#facc15' },
-                  { key: 'sent', name: 'הודעות שנשלחו', value: messagesSent, color: '#7c3aed' },
+                  { key: 'limit', name: isMobileView ? 'מגבלה' : 'מגבלת הודעות', value: messageLimit, color: '#facc15' },
+                  { key: 'sent', name: isMobileView ? 'נשלחו' : 'הודעות שנשלחו', value: messagesSent, color: '#7c3aed' },
                   {
                     key: overMessages > 0 ? 'over' : 'remaining',
                     name: overMessages > 0 ? 'חריגה' : 'יתרה',
@@ -4439,7 +4440,7 @@ React.useEffect(() => {
                               <XAxis
                                 dataKey="name"
                                 stroke="#1f2937"
-                                tick={{ fontSize: 16, fontWeight: 600 }}
+                                tick={{ fontSize: isMobileView ? 12 : 16, fontWeight: 600 }}
                                 interval={0}
                               />
                               <YAxis hide />
