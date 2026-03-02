@@ -5719,7 +5719,7 @@ React.useEffect(() => {
                 })}
               </div>
             </div>
-            <div className="flex flex-row-reverse justify-center mt-2 sm:mt-4 gap-3 sm:gap-4 pb-4 sm:pb-0 shrink-0">
+            <div className="flex justify-center mt-2 sm:mt-4 gap-3 sm:gap-4 pb-4 sm:pb-0 shrink-0" dir="rtl">
               {uploadingInvite ? (
                 <button disabled className="bg-gray-400 text-white px-4 sm:px-6 py-2 rounded-full cursor-not-allowed text-sm sm:text-base">מעלה...</button>
               ) : (
