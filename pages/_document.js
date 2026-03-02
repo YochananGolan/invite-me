@@ -17,19 +17,14 @@ export default function Document() {
         <Main />
         <NextScript />
         <script dangerouslySetInnerHTML={{ __html: `
-          function positionUW(el) {
-            var m = window.innerWidth < 640;
-            el.style.cssText = 'position:fixed!important;top:' + (m?'150px':'68px') + '!important;bottom:auto!important;right:16px!important;left:auto!important;z-index:99999!important;';
-          }
-          var obs = new MutationObserver(function() {
+          (function waitForUW() {
             var el = document.querySelector('.uwy');
-            if (el) positionUW(el);
-          });
-          obs.observe(document.body, { childList:true, subtree:true, attributes:true });
-          setInterval(function() {
-            var el = document.querySelector('.uwy');
-            if (el) positionUW(el);
-          }, 300);
+            if (!el) return setTimeout(waitForUW, 200);
+            var s = document.createElement('style');
+            s.textContent = '.uwy, .uwy[class*="userway_p"] { top: 68px !important; bottom: auto !important; right: 16px !important; left: auto !important; }' +
+              '@media(max-width:639px){ .uwy, .uwy[class*="userway_p"] { top: 100px !important; } }';
+            document.head.appendChild(s);
+          })();
         `}} />
       </body>
     </Html>
