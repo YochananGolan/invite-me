@@ -5465,7 +5465,7 @@ React.useEffect(() => {
                 {/* Preview of formatted text */}
                 <div className="mt-3 p-2 sm:p-4 border border-gray-300 rounded bg-white">
                   <h3 className="text-sm sm:text-lg font-bold mb-2 text-center">תצוגה מקדימה:</h3>
-                  <div className="bg-gray-50 p-2 sm:p-4 rounded border text-right">
+                  <div className="bg-gray-50 p-2 sm:p-4 rounded border text-center">
                     {customInvitationText.split('\n').map((line, index) => (
                       <div
                         key={index}
@@ -5475,7 +5475,7 @@ React.useEffect(() => {
                           fontWeight: lineStyles[index]?.fontWeight || 'normal',
                           lineHeight: lineStyles[index]?.lineHeight || 1.5,
                           letterSpacing: `${lineStyles[index]?.letterSpacing || 0}px`,
-                          textAlign: lineStyles[index]?.textAlign || 'right',
+                          textAlign: lineStyles[index]?.textAlign || 'center',
                           textDecoration: lineStyles[index]?.textDecoration || 'none',
                           fontStyle: 'normal',
                           textShadow: 'none',
@@ -5981,7 +5981,7 @@ React.useEffect(() => {
             {/* Preview - centered at bottom, above buttons */}
             <div className="flex flex-col items-center px-6 py-3 flex-shrink-0 border-t border-gray-200 bg-gray-50/50">
               <label className="block mb-1 font-bold text-center text-sm">תצוגה מקדימה</label>
-              <div className="w-full max-w-xl border border-gray-300 rounded-md p-3 bg-white min-h-[70px]" style={{ textAlign: lineStyles[showAdvancedEdit]?.textAlign || 'right' }}>
+              <div className="w-full max-w-xl border border-gray-300 rounded-md p-3 bg-white min-h-[70px]" style={{ textAlign: lineStyles[showAdvancedEdit]?.textAlign || 'center' }}>
                 <div
                   style={{
                     fontSize: `${lineStyles[showAdvancedEdit]?.fontSize || 16}px`,
@@ -5989,7 +5989,7 @@ React.useEffect(() => {
                     fontWeight: lineStyles[showAdvancedEdit]?.fontWeight || 'normal',
                     lineHeight: lineStyles[showAdvancedEdit]?.lineHeight || 1.5,
                     letterSpacing: `${lineStyles[showAdvancedEdit]?.letterSpacing || 0}px`,
-                    textAlign: lineStyles[showAdvancedEdit]?.textAlign || 'right',
+                    textAlign: lineStyles[showAdvancedEdit]?.textAlign || 'center',
                     textDecoration: lineStyles[showAdvancedEdit]?.textDecoration || 'none',
                     fontStyle: 'normal',
                     textShadow: 'none',
