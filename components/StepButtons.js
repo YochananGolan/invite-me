@@ -5664,10 +5664,10 @@ React.useEffect(() => {
       {/* Lightbox for design preview */}
       {showLightbox && (
         <div className="fixed inset-0 flex items-center justify-center bg-black/70 z-50">
-          <div className="relative bg-white sm:rounded-lg p-1 sm:p-4 sm:max-w-3xl w-full h-full sm:h-auto sm:w-full flex flex-col justify-center">
+          <div className="relative bg-white sm:rounded-lg p-1 sm:p-4 sm:max-w-3xl w-full h-full sm:h-auto sm:w-full flex flex-col">
             <button onClick={()=> setShowLightbox(false)} className="absolute top-2 left-2 text-2xl text-gray-500 sm:text-gray-200 hover:text-gray-800 sm:hover:text-white z-10">&times;</button>
-            <div className="relative">
-              <img src={lightboxSrc} alt="preview" className="w-full h-auto rounded-md" />
+            <div className="relative flex-1 flex items-center justify-center overflow-hidden">
+              <img src={lightboxSrc} alt="preview" className="w-full h-auto max-h-[calc(100vh-80px)] sm:max-h-none object-contain rounded-md" />
               <div className="absolute inset-0 rounded-md pointer-events-none" style={{ background: 'rgba(255,255,255,0.22)' }} aria-hidden />
               <div className="absolute inset-0 flex flex-col items-center justify-center px-4" dir="rtl">
                 {(customInvitationText || invitationText || 'דוגמת טקסט להזמנה').split('\n').map((line, lineIndex) => {
@@ -5711,7 +5711,7 @@ React.useEffect(() => {
                 })}
               </div>
             </div>
-            <div className="flex justify-center mt-2 sm:mt-4 gap-3 sm:gap-4 pb-2 sm:pb-0">
+            <div className="flex justify-center mt-2 sm:mt-4 gap-3 sm:gap-4 pb-4 sm:pb-0 shrink-0">
               <button onClick={() => setShowLightbox(false)} className="border px-4 sm:px-6 py-2 rounded-full hover:bg-gray-100 text-sm sm:text-base">סגור</button>
               {uploadingInvite ? (
                 <button disabled className="bg-gray-400 text-white px-4 sm:px-6 py-2 rounded-full cursor-not-allowed text-sm sm:text-base">מעלה...</button>
