@@ -108,16 +108,6 @@ body {
   color: #1f2937 !important; /* gray-800 */
 }
 
-/* UserWay accessibility widget: nudge below navbar, between logo and hero */
-.uwy,
-.uwy[class*="userway_p"],
-div[data-userway-widget],
-.userway_buttons_wrapper,
-#userwayAccessibilityWidget {
-  top: 62px !important;
-  bottom: auto !important;
-}
-
 /* Mobile: prevent pull-to-refresh overscroll on modals */
 .fixed.inset-0 {
   overscroll-behavior: contain;

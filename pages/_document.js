@@ -16,6 +16,20 @@ export default function Document() {
       <body>
         <Main />
         <NextScript />
+        <script dangerouslySetInnerHTML={{ __html: `
+          (function moveUW() {
+            var el = document.querySelector('.uwy');
+            if (el) {
+              var isMobile = window.innerWidth < 640;
+              el.style.setProperty('top', isMobile ? '80px' : '68px', 'important');
+              el.style.setProperty('bottom', 'auto', 'important');
+              el.style.setProperty('right', '16px', 'important');
+              el.style.setProperty('left', 'auto', 'important');
+              el.style.setProperty('position', 'fixed', 'important');
+            }
+            setTimeout(moveUW, 500);
+          })();
+        `}} />
       </body>
     </Html>
   );
