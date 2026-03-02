@@ -108,17 +108,16 @@ body {
   color: #1f2937 !important; /* gray-800 */
 }
 
-/* UserWay accessibility widget: move below logo on mobile */
-@media (max-width: 640px) {
-  .uwy.userway_p1,
-  .uwy.userway_p2,
-  .uwy.userway_p3,
-  .uwy.userway_p5,
-  .uwy.userway_p6,
-  .uwy {
-    top: 70px !important;
-    bottom: auto !important;
-  }
+/* UserWay accessibility widget: move to bottom-left so it doesn't overlap logo */
+.uwy,
+.uwy[class*="userway_p"],
+div[data-userway-widget],
+.userway_buttons_wrapper,
+#userwayAccessibilityWidget {
+  top: auto !important;
+  bottom: 20px !important;
+  right: auto !important;
+  left: 20px !important;
 }
 
 /* Mobile: prevent pull-to-refresh overscroll on modals */
