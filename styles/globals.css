@@ -108,6 +108,19 @@ body {
   color: #1f2937 !important; /* gray-800 */
 }
 
+/* UserWay accessibility widget: move below logo on mobile */
+@media (max-width: 640px) {
+  .uwy.userway_p1,
+  .uwy.userway_p2,
+  .uwy.userway_p3,
+  .uwy.userway_p5,
+  .uwy.userway_p6,
+  .uwy {
+    top: 70px !important;
+    bottom: auto !important;
+  }
+}
+
 /* Mobile: prevent pull-to-refresh overscroll on modals */
 .fixed.inset-0 {
   overscroll-behavior: contain;
