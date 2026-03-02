@@ -1272,11 +1272,19 @@ const handleOpenAddonModal = React.useCallback(() => {
       if (normalizeType(selectedEventType) === 'חתונה') {
         setLineStyles(defaultLineStylesForWedding);
       } else if (selectedEventType) {
-        // לכל שאר סוגי האירועים: שורה ראשונה מודגשת מאוד, ושורות תאריך (בדרך כלל 2–3) מודגשות
         const lines = (invitationTextDefault || '').split('\n');
-        const defaultStyles = { 0: { ...defaultFirstLineStyle } };
-        if (lines.length > 2) defaultStyles[2] = { fontSize: 18, fontWeight: 'bold', textAlign: 'center', color: 'black' };
-        if (lines.length > 3) defaultStyles[3] = { fontSize: 17, fontWeight: 'bold', textAlign: 'center', color: 'black' };
+        const defaultStyles = {};
+        lines.forEach((_, i) => {
+          if (i === 0) {
+            defaultStyles[i] = { ...defaultFirstLineStyle };
+          } else if (i === 2) {
+            defaultStyles[i] = { fontSize: 18, fontWeight: 'bold', textAlign: 'center', color: 'black' };
+          } else if (i === 3) {
+            defaultStyles[i] = { fontSize: 17, fontWeight: 'bold', textAlign: 'center', color: 'black' };
+          } else {
+            defaultStyles[i] = { fontSize: 16, textAlign: 'center', color: 'black' };
+          }
+        });
         setLineStyles(defaultStyles);
       }
     }
