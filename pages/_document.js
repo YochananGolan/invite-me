@@ -17,14 +17,15 @@ export default function Document() {
         <Main />
         <NextScript />
         <script dangerouslySetInnerHTML={{ __html: `
-          (function waitForUW() {
+          setInterval(function() {
             var el = document.querySelector('.uwy');
-            if (!el) return setTimeout(waitForUW, 200);
-            var s = document.createElement('style');
-            s.textContent = '.uwy, .uwy[class*="userway_p"] { top: 68px !important; bottom: auto !important; right: 16px !important; left: auto !important; }' +
-              '@media(max-width:639px){ .uwy, .uwy[class*="userway_p"] { top: 100px !important; } }';
-            document.head.appendChild(s);
-          })();
+            if (!el) return;
+            var t = window.innerWidth < 640 ? '100px' : '68px';
+            el.style.setProperty('top', t, 'important');
+            el.style.setProperty('bottom', 'auto', 'important');
+            el.style.setProperty('right', '16px', 'important');
+            el.style.setProperty('left', 'auto', 'important');
+          }, 1000);
         `}} />
       </body>
     </Html>
