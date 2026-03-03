@@ -184,7 +184,8 @@ export default function Home({ session }) {
                   <ol className="space-y-2 list-decimal list-inside">
                     <li>הזמנות מעוצבות מקצועית</li>
                     <li>שליחה אוטומטית לכל האורחים</li>
-                    <li>שליחת הודעות SMS ו-WhatsApp ב-2 סבבים</li>
+                    <li>שליחת הודעות SMS ו-WhatsApp</li>
+                    <li>שליחת תזכורת לפני אירוע</li>
                     <li>מעקב אחר אישורי הגעה</li>
                     <li>הצגת דוחות בקרה מתעדכנים בזמן אמת בדף הבית</li>
                   </ol>
