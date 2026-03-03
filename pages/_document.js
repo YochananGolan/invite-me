@@ -20,11 +20,18 @@ export default function Document() {
           setInterval(function() {
             var el = document.querySelector('.uwy');
             if (!el) return;
-            var t = window.innerWidth < 640 ? '100px' : '68px';
-            el.style.setProperty('top', t, 'important');
-            el.style.setProperty('bottom', 'auto', 'important');
-            el.style.setProperty('right', '16px', 'important');
-            el.style.setProperty('left', 'auto', 'important');
+            var isMobile = window.innerWidth < 640;
+            if (isMobile) {
+              el.style.setProperty('bottom', '16px', 'important');
+              el.style.setProperty('top', 'auto', 'important');
+              el.style.setProperty('left', '16px', 'important');
+              el.style.setProperty('right', 'auto', 'important');
+            } else {
+              el.style.setProperty('top', '68px', 'important');
+              el.style.setProperty('bottom', 'auto', 'important');
+              el.style.setProperty('right', '16px', 'important');
+              el.style.setProperty('left', 'auto', 'important');
+            }
           }, 1000);
         `}} />
       </body>

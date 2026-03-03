@@ -34,21 +34,21 @@ export default function NavBar({ onAuthClick, onAboutClick, onShowPricing, onSho
   return (
     <nav className="w-full bg-white border-b border-gray-100">
       <div className="container mx-auto flex items-center justify-between py-5 px-4 md:px-6">
-        {/* Logo - Right side in RTL */}
-        <Link href="/" className="flex items-center" passHref>
-          <span className="text-2xl md:text-3xl font-bold text-gray-800 tracking-tight">
-            Meet-M
-          </span>
-        </Link>
-
-        {/* Mobile menu button */}
-        <button
-          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-          className="lg:hidden p-2 -m-2 rounded-lg min-w-[44px] min-h-[44px] flex items-center justify-center text-gray-600 hover:bg-gray-100"
-          aria-label="תפריט"
-        >
-          <span className="text-2xl">{mobileMenuOpen ? '✕' : '☰'}</span>
-        </button>
+        {/* Logo + Hamburger - Right side in RTL */}
+        <div className="flex items-center gap-1">
+          <Link href="/" className="flex items-center" passHref>
+            <span className="text-2xl md:text-3xl font-bold text-gray-800 tracking-tight">
+              Meet-M
+            </span>
+          </Link>
+          <button
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            className="lg:hidden p-2 rounded-lg min-w-[44px] min-h-[44px] flex items-center justify-center text-gray-600 hover:bg-gray-100"
+            aria-label="תפריט"
+          >
+            <span className="text-2xl">{mobileMenuOpen ? '✕' : '☰'}</span>
+          </button>
+        </div>
 
         {/* Nav Links - Center (desktop) */}
         <div className="hidden lg:flex items-center gap-8">

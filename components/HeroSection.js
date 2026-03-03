@@ -97,7 +97,8 @@ export default forwardRef(function HeroSection({ onStart, onShowFeatures, onSign
               {'\u05E0\u05E2\u05D9\u05DD \u05DE\u05D0\u05D5\u05D3, \u05D0\u05E0\u05D7\u05E0\u05D5 Meet-M'}
             </h1>
             <p className="text-gray-600 text-base md:text-xl mb-8 leading-relaxed max-w-xl lg:mr-0 lg:ml-auto mx-auto">
-              {'\u05D9\u05E6\u05D9\u05E8\u05EA \u05D4\u05D6\u05DE\u05E0\u05D5\u05EA \u05DE\u05E2\u05D5\u05E6\u05D1\u05D5\u05EA, \u05E9\u05DC\u05D9\u05D7\u05D4 \u05D0\u05D5\u05D8\u05D5\u05DE\u05D8\u05D9\u05EA \u05D1-SMS \u05D5-WhatsApp, \u05DE\u05E2\u05E7\u05D1 \u05D0\u05D9\u05E9\u05D5\u05E8\u05D9 \u05D4\u05D2\u05E2\u05D4 \u05D1\u05D6\u05DE\u05DF \u05D0\u05DE\u05EA, \u05EA\u05D6\u05DB\u05D5\u05E8\u05EA \u05D0\u05D5\u05D8\u05D5\u05DE\u05D8\u05D9\u05EA \u05DC\u05E4\u05E0\u05D9 \u05D4\u05D0\u05D9\u05E8\u05D5\u05E2, \u05D3\u05D5\u05D7\u05D5\u05EA \u05D1\u05E7\u05E8\u05D4 \u05D5\u05D9\u05D9\u05E6\u05D5\u05D0 \u05DC\u05D0\u05E7\u05E1\u05DC \u2013 \u05D4\u05DB\u05DC \u05D1\u05DE\u05E7\u05D5\u05DD \u05D0\u05D7\u05D3.'}
+              <span className="hidden md:inline">{'\u05D9\u05E6\u05D9\u05E8\u05EA \u05D4\u05D6\u05DE\u05E0\u05D5\u05EA \u05DE\u05E2\u05D5\u05E6\u05D1\u05D5\u05EA, \u05E9\u05DC\u05D9\u05D7\u05D4 \u05D0\u05D5\u05D8\u05D5\u05DE\u05D8\u05D9\u05EA \u05D1-SMS \u05D5-WhatsApp, \u05DE\u05E2\u05E7\u05D1 \u05D0\u05D9\u05E9\u05D5\u05E8\u05D9 \u05D4\u05D2\u05E2\u05D4 \u05D1\u05D6\u05DE\u05DF \u05D0\u05DE\u05EA, \u05EA\u05D6\u05DB\u05D5\u05E8\u05EA \u05D0\u05D5\u05D8\u05D5\u05DE\u05D8\u05D9\u05EA \u05DC\u05E4\u05E0\u05D9 \u05D4\u05D0\u05D9\u05E8\u05D5\u05E2, \u05D3\u05D5\u05D7\u05D5\u05EA \u05D1\u05E7\u05E8\u05D4 \u05D5\u05D9\u05D9\u05E6\u05D5\u05D0 \u05DC\u05D0\u05E7\u05E1\u05DC \u2013 \u05D4\u05DB\u05DC \u05D1\u05DE\u05E7\u05D5\u05DD \u05D0\u05D7\u05D3.'}</span>
+              <span className="md:hidden">הזמנות מעוצבות, שליחה ב-SMS ו-WhatsApp, מעקב אישורים ודוחות בקרה &ndash; הכל במקום אחד.</span>
             </p>
             
             {/* Stats */}
@@ -133,7 +134,7 @@ export default forwardRef(function HeroSection({ onStart, onShowFeatures, onSign
                 type="button"
                 onClick={() => { if (typeof onStart === 'function') onStart(); }}
                 className="group inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl
-                           bg-white border-2 border-gray-300 text-gray-700 font-bold text-base
+                           bg-white border-2 border-primary/40 text-primary font-bold text-base
                            shadow-sm hover:shadow-lg hover:border-primary hover:bg-primary hover:text-white
                            transition-all duration-200 cursor-pointer"
                 aria-label={'\u05EA\u05D9\u05D0\u05D5\u05E8 \u05EA\u05D4\u05DC\u05D9\u05DA \u05D9\u05E6\u05D9\u05E8\u05EA \u05D0\u05D9\u05E8\u05D5\u05E2'}
@@ -165,18 +166,18 @@ export default forwardRef(function HeroSection({ onStart, onShowFeatures, onSign
               </div>
             )}
 
-            <div className="flex flex-wrap justify-center lg:justify-start items-end gap-6 mt-10">
+            <div className="flex justify-center lg:justify-start items-start gap-4 md:gap-6 mt-6 md:mt-10 pt-4 md:pt-0 border-t md:border-t-0 border-gray-200">
               {[
                 { icon: '\uD83C\uDFA8', label: '\u05E2\u05D9\u05E6\u05D5\u05D1 \u05DE\u05E7\u05E6\u05D5\u05E2\u05D9', sub: '45 \u05EA\u05D1\u05E0\u05D9\u05D5\u05EA' },
-                { icon: '\uD83D\uDCF1', label: '\u05D0\u05D9\u05E9\u05D5\u05E8\u05D9\u05DD \u05D1\u05D5\u05D5\u05D0\u05D8\u05E1\u05D0\u05E4 \u05D5\u05D1-SMS', sub: '\u05E9\u05DC\u05D9\u05D7\u05D4 \u05D0\u05D5\u05D8\u05D5\u05DE\u05D8\u05D9\u05EA' },
+                { icon: '\uD83D\uDCF1', label: '\u05E9\u05DC\u05D9\u05D7\u05D4 \u05D1-SMS \u05D5-WhatsApp', sub: '\u05D0\u05D5\u05D8\u05D5\u05DE\u05D8\u05D9\u05EA' },
                 { icon: '\uD83D\uDCAC', label: '\u05D0\u05D9\u05E9\u05D5\u05E8\u05D9 \u05D4\u05D2\u05E2\u05D4', sub: '\u05DE\u05E2\u05E7\u05D1 \u05D1\u05D6\u05DE\u05DF \u05D0\u05DE\u05EA' },
               ].map((f) => (
-                <div key={f.label} className="flex flex-col items-center lg:items-start">
-                  <div className="w-14 h-14 rounded-full bg-gray-100 flex items-center justify-center text-2xl mb-2">
+                <div key={f.label} className="flex flex-col items-center lg:items-start flex-1 min-w-0">
+                  <div className="w-10 h-10 md:w-14 md:h-14 rounded-full bg-gray-100 flex items-center justify-center text-xl md:text-2xl mb-1 md:mb-2">
                     {f.icon}
                   </div>
-                  <span className="text-primary font-semibold text-sm">{f.label}</span>
-                  <span className="text-gray-500 text-xs">{f.sub}</span>
+                  <span className="text-primary font-semibold text-xs md:text-sm text-center">{f.label}</span>
+                  <span className="text-gray-500 text-[10px] md:text-xs text-center">{f.sub}</span>
                 </div>
               ))}
             </div>
