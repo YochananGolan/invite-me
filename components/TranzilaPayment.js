@@ -355,19 +355,19 @@ export default function TranzilaPayment({
   const notifyUrl = `${baseUrl || 'https://invite-me-two.vercel.app'}/api/tranzila/notify`;
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center bg-black/70 z-[200] p-4">
-      <div className="relative bg-white rounded-lg w-full max-w-4xl max-h-[95vh] overflow-hidden shadow-2xl">
+    <div className="fixed inset-0 flex items-center justify-center bg-black/70 z-[200] p-0 sm:p-4">
+      <div className="relative bg-white w-full h-full sm:h-auto sm:rounded-lg sm:max-w-4xl sm:max-h-[95vh] overflow-hidden shadow-2xl flex flex-col">
         {/* Header */}
-        <div className="bg-gradient-to-r from-primary to-primary/80 text-white p-6 flex justify-between items-center">
+        <div className="bg-gradient-to-r from-primary to-primary/80 text-white p-2 sm:p-6 flex justify-between items-center flex-shrink-0">
           <div>
-            <h2 className="text-2xl font-bold">תשלום מאובטח</h2>
-            <p className="text-sm opacity-90 mt-1">
+            <h2 className="text-base sm:text-2xl font-bold">תשלום מאובטח</h2>
+            <p className="text-xs sm:text-sm opacity-90">
               {planName} - {amount} ₪
             </p>
           </div>
           <button
             onClick={onClose}
-            className="text-white hover:bg-white/20 rounded-full w-10 h-10 flex items-center justify-center text-3xl transition-colors"
+            className="text-white hover:bg-white/20 rounded-full w-8 h-8 sm:w-10 sm:h-10 flex items-center justify-center text-2xl sm:text-3xl transition-colors"
             aria-label="סגור"
           >
             &times;
@@ -375,8 +375,8 @@ export default function TranzilaPayment({
         </div>
 
         {/* Payment Form Container */}
-        <div className="p-6">
-          <div className="mb-4 bg-blue-50 border border-blue-200 rounded-lg p-4 text-right">
+        <div className="p-2 sm:p-6 flex-1 min-h-0 flex flex-col overflow-hidden">
+          <div className="hidden sm:block mb-4 bg-blue-50 border border-blue-200 rounded-lg p-4 text-right">
             <div className="flex items-start">
               <span className="text-blue-600 text-xl ml-3">🔒</span>
               <div>
@@ -452,8 +452,8 @@ export default function TranzilaPayment({
             )}
           </form>
 
-          {/* Iframe container */}
-          <div className="relative bg-gray-50 rounded-lg border-2 border-gray-200" style={{ height: '600px' }}>
+          {/* Iframe container - flex-grow on mobile to fill all remaining space */}
+          <div className="relative bg-gray-50 rounded-lg border-2 border-gray-200 flex-1 min-h-0 sm:flex-none sm:h-[600px]">
             {(isHandshakeLoading || isIframeLoading) && !handshakeError && (
               <div className="absolute inset-0 flex flex-col items-center justify-center bg-white z-10">
                 <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-primary mb-4"></div>
@@ -506,8 +506,8 @@ export default function TranzilaPayment({
             />
           </div>
 
-          {/* Payment methods info */}
-          <div className="mt-4 bg-gray-50 border border-gray-200 rounded-lg p-4">
+          {/* Payment methods info - hidden on mobile to maximize iframe space */}
+          <div className="hidden sm:block mt-4 bg-gray-50 border border-gray-200 rounded-lg p-4 flex-shrink-0">
             <p className="text-center font-semibold text-gray-800 mb-3">אפשרויות תשלום זמינות:</p>
             <div className="flex flex-wrap justify-center gap-4 items-center">
               <div className="flex items-center gap-2">
@@ -537,8 +537,8 @@ export default function TranzilaPayment({
             )}
           </div>
 
-          {/* Additional info */}
-          <div className="mt-4 text-center text-sm text-gray-600">
+          {/* Additional info - hidden on mobile */}
+          <div className="hidden sm:block mt-4 text-center text-sm text-gray-600 flex-shrink-0">
             <p>💳 מקבלים את כל סוגי כרטיסי האשראי</p>
             <p className="mt-1">🔐 אבטחה מלאה בתקן PCI-DSS</p>
           </div>
