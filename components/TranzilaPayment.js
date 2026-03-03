@@ -356,18 +356,19 @@ export default function TranzilaPayment({
 
   return (
     <div className="fixed inset-0 flex items-center justify-center bg-black/70 z-[200] p-0 sm:p-4">
-      <div className="relative bg-white w-full h-full sm:h-auto sm:rounded-lg sm:max-w-4xl sm:max-h-[95vh] overflow-hidden shadow-2xl flex flex-col">
-        {/* Header */}
-        <div className="bg-gradient-to-r from-primary to-primary/80 text-white p-2 sm:p-6 flex justify-between items-center flex-shrink-0">
-          <div>
-            <h2 className="text-base sm:text-2xl font-bold">תשלום מאובטח</h2>
-            <p className="text-xs sm:text-sm opacity-90">
-              {planName} - {amount} ₪
-            </p>
-          </div>
+      <div className="relative bg-white w-full h-[100dvh] sm:h-auto sm:rounded-lg sm:max-w-4xl sm:max-h-[95vh] overflow-hidden shadow-2xl flex flex-col">
+        {/* Header - single compact line on mobile */}
+        <div className="bg-gradient-to-r from-primary to-primary/80 text-white px-3 py-1.5 sm:p-6 flex justify-between items-center flex-shrink-0">
+          <p className="text-sm sm:text-2xl font-bold">
+            <span className="sm:hidden">תשלום - {planName} - {amount} ₪</span>
+            <span className="hidden sm:inline">תשלום מאובטח</span>
+          </p>
+          <p className="hidden sm:block text-sm opacity-90 mt-1">
+            {planName} - {amount} ₪
+          </p>
           <button
             onClick={onClose}
-            className="text-white hover:bg-white/20 rounded-full w-8 h-8 sm:w-10 sm:h-10 flex items-center justify-center text-2xl sm:text-3xl transition-colors"
+            className="text-white hover:bg-white/20 rounded-full w-7 h-7 sm:w-10 sm:h-10 flex items-center justify-center text-xl sm:text-3xl transition-colors flex-shrink-0"
             aria-label="סגור"
           >
             &times;
@@ -375,7 +376,7 @@ export default function TranzilaPayment({
         </div>
 
         {/* Payment Form Container */}
-        <div className="p-2 sm:p-6 flex-1 min-h-0 flex flex-col overflow-hidden">
+        <div className="p-0 sm:p-6 flex-1 min-h-0 flex flex-col overflow-hidden">
           <div className="hidden sm:block mb-4 bg-blue-50 border border-blue-200 rounded-lg p-4 text-right">
             <div className="flex items-start">
               <span className="text-blue-600 text-xl ml-3">🔒</span>
@@ -452,8 +453,8 @@ export default function TranzilaPayment({
             )}
           </form>
 
-          {/* Iframe container - flex-grow on mobile to fill all remaining space */}
-          <div className="relative bg-gray-50 rounded-lg border-2 border-gray-200 flex-1 min-h-0 sm:flex-none sm:h-[600px]">
+          {/* Iframe container - no border/padding on mobile to maximize space */}
+          <div className="relative bg-gray-50 sm:rounded-lg sm:border-2 sm:border-gray-200 flex-1 min-h-0 sm:flex-none sm:h-[600px]">
             {(isHandshakeLoading || isIframeLoading) && !handshakeError && (
               <div className="absolute inset-0 flex flex-col items-center justify-center bg-white z-10">
                 <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-primary mb-4"></div>
