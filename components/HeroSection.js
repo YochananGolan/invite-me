@@ -1,17 +1,19 @@
 import Image from 'next/image';
 import { forwardRef, useState, useEffect } from 'react';
 
-// Confetti shapes for festive background
 const ConfettiBackground = () => (
   <div className="absolute inset-0 overflow-hidden pointer-events-none" aria-hidden="true">
     {[...Array(24)].map((_, i) => (
       <div
         key={i}
-        className="absolute w-3 h-3 md:w-4 md:h-4 rounded-sm opacity-40"
+        className={`absolute rounded-sm ${i < 10 ? '' : 'hidden md:block'}`}
         style={{
+          width: i % 3 === 0 ? '10px' : '8px',
+          height: i % 3 === 0 ? '10px' : '8px',
           left: `${(i * 7 + 3) % 100}%`,
           top: `${(i * 11 + 5) % 100}%`,
-          backgroundColor: ['#93c5fd', '#fde047', '#f9a8d4', '#86efac', '#c4b5fd'][i % 5],
+          backgroundColor: ['#c4b5fd', '#fde68a', '#fbcfe8', '#bbf7d0', '#ddd6fe'][i % 5],
+          opacity: 0.25,
           transform: `rotate(${i * 15}deg)`,
           borderRadius: i % 3 === 0 ? '50%' : '2px',
         }}
@@ -83,28 +85,28 @@ export default forwardRef(function HeroSection({ onStart, onShowFeatures, onSign
   const isLocationComplete = locationLine === allLines[6];
   const isTimesComplete = timesLine === allLines[8];
   return (
-    <section className="relative min-h-[70vh] md:min-h-[85vh] flex items-center bg-white">
+    <section className="relative min-h-[auto] md:min-h-[85vh] flex items-center bg-gradient-to-b from-purple-50/60 via-white to-white md:bg-white">
       {/* Confetti background */}
       <ConfettiBackground />
 
-      <div className="container mx-auto relative z-10 py-10 md:py-16 px-4">
-        <div className="flex flex-col lg:flex-row items-center gap-8 md:gap-12 lg:gap-16">
+      <div className="container mx-auto relative z-10 py-8 md:py-16 px-5 md:px-4">
+        <div className="flex flex-col lg:flex-row items-center gap-10 md:gap-12 lg:gap-16">
           {/* Hero Text - Right side in RTL */}
           <div className="lg:flex-1 flex flex-col justify-center text-center lg:text-right order-2 lg:order-1">
             <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold text-gray-800 mb-4 md:mb-5 leading-tight">
               {'\u05E0\u05E2\u05D9\u05DD \u05DE\u05D0\u05D5\u05D3, \u05D0\u05E0\u05D7\u05E0\u05D5 Meet-M'}
             </h1>
-            <p className="text-gray-600 text-lg md:text-xl mb-6 leading-relaxed max-w-xl lg:mr-0 lg:ml-auto mx-auto">
+            <p className="text-gray-600 text-base md:text-xl mb-8 leading-relaxed max-w-xl lg:mr-0 lg:ml-auto mx-auto">
               {'\u05D9\u05E6\u05D9\u05E8\u05EA \u05D4\u05D6\u05DE\u05E0\u05D5\u05EA \u05DE\u05E2\u05D5\u05E6\u05D1\u05D5\u05EA, \u05E9\u05DC\u05D9\u05D7\u05D4 \u05D0\u05D5\u05D8\u05D5\u05DE\u05D8\u05D9\u05EA \u05D1-SMS \u05D5-WhatsApp, \u05DE\u05E2\u05E7\u05D1 \u05D0\u05D9\u05E9\u05D5\u05E8\u05D9 \u05D4\u05D2\u05E2\u05D4 \u05D1\u05D6\u05DE\u05DF \u05D0\u05DE\u05EA, \u05EA\u05D6\u05DB\u05D5\u05E8\u05EA \u05D0\u05D5\u05D8\u05D5\u05DE\u05D8\u05D9\u05EA \u05DC\u05E4\u05E0\u05D9 \u05D4\u05D0\u05D9\u05E8\u05D5\u05E2, \u05D3\u05D5\u05D7\u05D5\u05EA \u05D1\u05E7\u05E8\u05D4 \u05D5\u05D9\u05D9\u05E6\u05D5\u05D0 \u05DC\u05D0\u05E7\u05E1\u05DC \u2013 \u05D4\u05DB\u05DC \u05D1\u05DE\u05E7\u05D5\u05DD \u05D0\u05D7\u05D3.'}
             </p>
             
             {/* Stats */}
-            <div className="mb-6">
+            <div className="mb-8">
               <span className="text-primary font-bold text-2xl md:text-3xl">{'\u05D4\u05D0\u05D9\u05E8\u05D5\u05E2 \u05E9\u05DC\u05DB\u05DD '}</span>
               <span className="text-gray-700 font-medium text-lg md:text-xl">{'\u05DE\u05EA\u05D7\u05D9\u05DC \u05DB\u05D0\u05DF \u2728'}</span>
             </div>
 
-            <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start mb-4">
+            <div className="flex flex-col sm:flex-row gap-5 justify-center lg:justify-start mb-5">
               <button
                 type="button"
                 onClick={handleCreateNewEvent}
@@ -144,7 +146,7 @@ export default forwardRef(function HeroSection({ onStart, onShowFeatures, onSign
             </div>
 
             {typeof onPressReports === 'function' && (
-              <div className="flex justify-center lg:justify-start mb-2">
+              <div className="flex justify-center lg:justify-start mb-4">
                 <button
                   type="button"
                   onClick={handleOpenReports}
@@ -180,8 +182,8 @@ export default forwardRef(function HeroSection({ onStart, onShowFeatures, onSign
             </div>
           </div>
 
-          {/* Invitation Card */}
-          <div className="lg:flex-1 flex justify-center order-1 lg:order-2 -translate-y-8 md:-translate-y-12">
+          {/* Invitation Card - hidden on mobile to reduce clutter */}
+          <div className="hidden md:flex lg:flex-1 justify-center order-1 lg:order-2 -translate-y-8 md:-translate-y-12">
             <div className="w-full max-w-md">
               <div className="bg-white rounded-2xl shadow-xl overflow-hidden border border-gray-100">
                 {/* Card Image with all text overlay */}
