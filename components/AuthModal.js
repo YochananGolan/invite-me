@@ -26,6 +26,7 @@ export default function AuthModal({ initialMode = 'sign_in', open = false, onClo
         throw new Error('הסיסמאות אינן תואמות');
       }
       
+      const siteUrl = process.env.NEXT_PUBLIC_APP_URL || (typeof window !== 'undefined' ? window.location.origin : '');
       const { data, error } = await supabase.auth.signUp({
         email: e.target.email.value,
         password: password,
@@ -34,7 +35,8 @@ export default function AuthModal({ initialMode = 'sign_in', open = false, onClo
             first_name: firstName,
             last_name: lastName,
             phone: phone
-          }
+          },
+          emailRedirectTo: siteUrl
         }
       });
       
@@ -250,6 +252,7 @@ export default function AuthModal({ initialMode = 'sign_in', open = false, onClo
                 }}
                   providers={[]}
                   magicLink={false}
+                  redirectTo={typeof window !== 'undefined' ? (process.env.NEXT_PUBLIC_APP_URL || window.location.origin) : ''}
                   />
                 </div>
                 {/* Sign Up Button */}
