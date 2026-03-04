@@ -3859,7 +3859,7 @@ React.useEffect(() => {
       {showEventEndedNotice && (
         <div className="fixed left-4 right-4 bottom-32 z-40 max-w-2xl mx-auto bg-green-50 border-2 border-green-500 rounded-xl shadow-lg p-4 flex flex-col gap-3">
           <p className="text-green-900 font-semibold text-center text-lg">
-            האירוע הסתיים. כעת ניתן לפתוח אירוע חדש באותו מסלול.
+            האירוע הסתיים. כעת ניתן לפתוח אירוע חדש.
           </p>
           <div className="flex justify-center gap-3">
             <button
