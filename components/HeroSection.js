@@ -60,7 +60,7 @@ const useTypewriter = (text, speed = 100, pauseDuration = 5000) => {
   return displayedText;
 };
 
-export default forwardRef(function HeroSection({ onStart, onShowFeatures, onSignUpClick, onSignInClick, isLoggedIn, onPressCreateEvent, onPressReports }, ref) {
+export default forwardRef(function HeroSection({ onStart, onShowFeatures, isLoggedIn, onPressCreateEvent, onPressReports }, ref) {
   const handleCreateNewEvent = () => typeof onPressCreateEvent === 'function' && onPressCreateEvent();
   const handleOpenReports = () => typeof onPressReports === 'function' && onPressReports();
   // Full invitation text with line breaks

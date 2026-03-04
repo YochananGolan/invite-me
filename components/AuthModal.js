@@ -60,14 +60,6 @@ export default function AuthModal({ initialMode = 'sign_in', open = false, onClo
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_IN' && session) {
-        // Save email to localStorage for autofill on next login
-        if (session.user?.email) {
-          try {
-            localStorage.setItem('last_login_email', session.user.email);
-          } catch (e) {
-            console.error('Failed to save email to localStorage:', e);
-          }
-        }
         onClose();
       }
     });

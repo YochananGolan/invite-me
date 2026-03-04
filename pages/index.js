@@ -93,14 +93,6 @@ export default function Home({ session }) {
             onPressCreateEvent={handleCreateEvent}
             onPressReports={handleShowReports}
             onShowFeatures={handleShowFeatures}
-            onSignUpClick={() => {
-              setAuthMode('sign_in'); // Always start with sign_in
-              setShowAuth(true);
-            }}
-            onSignInClick={() => {
-              setAuthMode('sign_in');
-              setShowAuth(true);
-            }}
             isLoggedIn={!!session}
           />
           <div id="pricing" className="mb-8 scroll-mt-20 scroll-mb-28 pb-36 sm:pb-24">

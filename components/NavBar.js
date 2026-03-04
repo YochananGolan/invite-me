@@ -10,7 +10,7 @@ const navLinks = [
   { name: 'צור קשר', href: '/contact' },
 ];
 
-export default function NavBar({ onAuthClick, onAboutClick, onShowPricing, onShowReports }) {
+export default function NavBar({ onAuthClick = null, onAboutClick, onShowPricing, onShowReports }) {
   const [session, setSession] = useState(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -106,13 +106,13 @@ export default function NavBar({ onAuthClick, onAboutClick, onShowPricing, onSho
           ) : (
             <>
               <button
-                onClick={() => onAuthClick('sign_in')}
+                onClick={() => onAuthClick ? onAuthClick('sign_in') : (window.location.href = '/')}
                 className="text-primary font-semibold border-2 border-primary rounded-lg px-3 py-1.5 sm:px-5 sm:py-2.5 hover:bg-primary/5 transition-colors text-sm sm:text-base whitespace-nowrap"
               >
                 כניסה
               </button>
               <button
-                onClick={() => onAuthClick('sign_up')}
+                onClick={() => onAuthClick ? onAuthClick('sign_up') : (window.location.href = '/')}
                 className="bg-primary text-white font-semibold rounded-lg px-4 py-2 sm:px-6 sm:py-2.5 hover:bg-primary/90 transition-colors text-sm sm:text-base whitespace-nowrap shadow-sm"
               >
                 הרשמה בחינם
