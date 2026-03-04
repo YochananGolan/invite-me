@@ -3107,11 +3107,9 @@ React.useEffect(() => {
     const diffTime = eventDate.getTime() - today.getTime();
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     
-    // אם התאריך עבר – מסמנים את האירוע כ"archived" (אם יש עמודת status) ומציגים הודעה למשתמש
     if (diffDays < 0) {
       (async () => {
         try {
-          // ננסה לסמן את האירוע כ"archived" – אם אין עמודת status פשוט נתעלם מהשגיאה
           const { error } = await supabase
             .from('events')
             .update({ status: 'archived' })
@@ -3122,22 +3120,18 @@ React.useEffect(() => {
         } catch (e) {
           console.error('Failed to archive past event:', e);
         }
-        
-        // מנקים את סימון "אירוע בתהליך"
+
         setNewEventStarted(false);
         try { localStorage.removeItem('newEventStarted'); } catch(e){}
-
-        // מנקים את האירוע הפעיל כך שהמערכת תראה שאין אירוע פעיל כרגע
         setCurrentEventId(null);
-        
-        // מאחר שהאירוע הסתיים באופן טבעי (עבר התאריך) – המסלול הנוכחי "נצרך"
-        // וליצירת אירוע חדש יש לבחור ולשלם על מסלול מחדש.
         setSelectedPlan(null);
         setEventMessagesSentCount(0);
         try { localStorage.removeItem('selectedPlan'); } catch(e){}
-        
-        // מציגים למשתמש הודעה ברורה שאפשר לפתוח אירוע חדש
-        setShowEventEndedNotice(true);
+
+        // Show notice only within 7 days after event; after that, archive silently
+        if (diffDays >= -7) {
+          setShowEventEndedNotice(true);
+        }
       })();
     }
   }, [formData.date, currentEventId]);
