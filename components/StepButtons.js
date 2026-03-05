@@ -3010,7 +3010,7 @@ React.useEffect(() => {
         console.error('fetch approved guests failed', e);
       }
     })();
-  }, [showApprovedReport, currentEventId, selectedEventForReport]);
+  }, [showApprovedReport, currentEventId, selectedEventForReport, guestSummaryRefreshKey]);
 
   // fetch rejected guests
   React.useEffect(() => {
@@ -3037,7 +3037,7 @@ React.useEffect(() => {
         console.error('fetch rejected guests failed', e);
       }
     })();
-  }, [showRejectedReport, currentEventId, selectedEventForReport]);
+  }, [showRejectedReport, currentEventId, selectedEventForReport, guestSummaryRefreshKey]);
 
   // fetch pending guests
   React.useEffect(() => {
@@ -3064,7 +3064,54 @@ React.useEffect(() => {
         console.error('fetch pending guests failed', e);
       }
     })();
-  }, [showPendingReport, currentEventId, selectedEventForReport]);
+  }, [showPendingReport, currentEventId, selectedEventForReport, guestSummaryRefreshKey]);
+
+  // Refresh report modal data when RSVP changes (guestSummaryRefreshKey) and modal is open
+  React.useEffect(() => {
+    if (!showReportModal) return;
+    const eventIdToUse = selectedEventForReport?.id || currentEventId;
+    if (!eventIdToUse || reportTitle.includes('אין אירוע נבחר')) return;
+    (async () => {
+      try {
+        if (reportTitle === 'אורחים מגיעים' || reportTitle === 'אורחים מגיעים ממוינים לפי שולחן') {
+          const { data } = await supabase.from('invited_guests').select('*').eq('event_id', eventIdToUse).eq('status', 'approved');
+          if (reportTitle === 'אורחים מגיעים ממוינים לפי שולחן' && data?.length) {
+            const byTable = {};
+            data.forEach(g => {
+              const t = g.table_number || 'ללא';
+              if (!byTable[t]) byTable[t] = [];
+              byTable[t].push(g);
+            });
+            const tables = Object.keys(byTable).sort((a, b) => (a === 'ללא' ? 1 : b === 'ללא' ? -1 : String(a).localeCompare(String(b))));
+            const dataWithSummaries = [];
+            tables.forEach(table => {
+              byTable[table].forEach(g => dataWithSummaries.push(g));
+              const rows = byTable[table];
+              const tableTotalAdults = rows.reduce((s, g) => s + (g.adults || 0), 0);
+              const tableTotalChildren = rows.reduce((s, g) => s + (g.children || 0), 0);
+              const tableTotalVeg = rows.reduce((s, g) => s + (g.veg_adults || 0) + (g.veg_children || 0), 0);
+              const tableTotalVegan = rows.reduce((s, g) => s + (g.vegan_adults || 0) + (g.vegan_children || 0), 0);
+              const tableTotalGlatt = rows.reduce((s, g) => s + (g.glatt_adults || 0) + (g.glatt_children || 0), 0);
+              const tableTotalCeliac = rows.reduce((s, g) => s + (g.celiac_adults || 0) + (g.celiac_children || 0), 0);
+              const tableTotalAllergy = rows.reduce((s, g) => s + (g.allergy_adults || 0) + (g.allergy_children || 0), 0);
+              dataWithSummaries.push({ isSummary: true, table_number: table, summary_label: `סה"כ שולחן ${table}`, adults: tableTotalAdults, children: tableTotalChildren, total: tableTotalAdults + tableTotalChildren, veg: tableTotalVeg, vegan: tableTotalVegan, glatt: tableTotalGlatt, celiac: tableTotalCeliac, allergy: tableTotalAllergy });
+            });
+            setReportGuests(dataWithSummaries);
+          } else {
+            setReportGuests(data || []);
+          }
+        } else if (reportTitle === 'אורחים לא מגיעים') {
+          const { data } = await supabase.from('invited_guests').select('*').eq('event_id', eventIdToUse).eq('status', 'rejected');
+          setReportGuests(data || []);
+        } else if (reportTitle === 'אורחים שטרם הגיבו') {
+          const { data } = await supabase.from('invited_guests').select('*').eq('event_id', eventIdToUse).or('status.is.null,status.eq.pending,status.eq.""');
+          setReportGuests(data || []);
+        }
+      } catch (e) {
+        console.error('Failed to refresh report data', e);
+      }
+    })();
+  }, [showReportModal, guestSummaryRefreshKey, reportTitle, currentEventId, selectedEventForReport]);
 
   // Fetch guests when guest list modal opens - only if there's an active event
   React.useEffect(() => {
@@ -3097,7 +3144,7 @@ React.useEffect(() => {
         setDbGuests([]);
       }
     })();
-  }, [showGuestListModal, currentEventId]);
+  }, [showGuestListModal, currentEventId, guestSummaryRefreshKey]);
 
   // ---- Auto-archive when event ends (after date has passed) ----
   React.useEffect(() => {
