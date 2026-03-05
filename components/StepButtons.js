@@ -1,5 +1,6 @@
 import React, { useState, forwardRef, useImperativeHandle, useRef, useCallback, useEffect } from 'react';
 import { supabase } from '../lib/supabaseClient';
+import { getInviteBaseUrl } from '../lib/inviteUrl';
 import DatePicker, { registerLocale } from 'react-datepicker';
 import he from 'date-fns/locale/he';
 import 'react-datepicker/dist/react-datepicker.css';
@@ -793,7 +794,7 @@ const handleOpenAddonModal = React.useCallback(() => {
         setInvitedGuestsCount((prev) => prev + 1);
       }
 
-      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || (typeof window !== 'undefined' ? window.location.origin : 'https://meet-m.co.il');
+      const baseUrl = getInviteBaseUrl();
       const inviteLink = `${baseUrl}/${eventIdForInvite}/${newGuest.id}`;
 
       // Dev helper: log the RSVP link so it can be copied from the browser console
@@ -965,7 +966,7 @@ const handleOpenAddonModal = React.useCallback(() => {
         setInvitedGuestsCount((prev) => prev + 1);
       }
 
-      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || (typeof window !== 'undefined' ? window.location.origin : 'https://meet-m.co.il');
+      const baseUrl = getInviteBaseUrl();
       const inviteLink = `${baseUrl}/${eventIdForInvite}/${newGuest.id}`;
 
       // Send SMS via API - check message quota first (effective = sync with status panel)
@@ -1520,6 +1521,7 @@ const handleOpenAddonModal = React.useCallback(() => {
           0
         );
         const totalAllowedGuests = basePlanLimit + extraCapacity;
+        const addonCountForDb = additionalPackageCounts['addon'] || 0;
 
         const payload = {
           user_id: user?.id || null,
@@ -2062,7 +2064,7 @@ React.useEffect(() => {
 
       // Send SMS to all guests if requested
       if (sendSms && insertedGuests && insertedGuests.length > 0) {
-        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || (typeof window !== 'undefined' ? window.location.origin : 'https://meet-m.co.il');
+        const baseUrl = getInviteBaseUrl();
         const smsGuests = insertedGuests.map(g => {
           const inviteLink = `${baseUrl}/${bulkEventId}/${g.id}`;
           return {
@@ -2162,7 +2164,7 @@ React.useEffect(() => {
         }
       } else if (sendWhatsApp && insertedGuests && insertedGuests.length > 0) {
         // Save + open WhatsApp for first guest
-        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || (typeof window !== 'undefined' ? window.location.origin : 'https://meet-m.co.il');
+        const baseUrl = getInviteBaseUrl();
         const first = insertedGuests[0];
         const inviteLink = `${baseUrl}/${bulkEventId}/${first.id}`;
         const digitsOnly = (first.phone || '').replace(/\D/g, '');

@@ -4,7 +4,18 @@ import { supabase } from '../../lib/supabaseClient';
 
 export default function GuestPage() {
   const router = useRouter();
-  const { eventId, guestId } = router.query;
+  const { eventId: qEventId, guestId: qGuestId } = router.query;
+
+  // Fallback: parse from asPath when query is empty (e.g. direct URL load, some browsers)
+  const { eventId, guestId } = useMemo(() => {
+    if (qEventId && qGuestId) return { eventId: qEventId, guestId: qGuestId };
+    const path = (router.asPath || '').split('?')[0].split('#')[0].replace(/^\/+|\/+$/g, '');
+    const parts = path.split('/').filter(Boolean);
+    if (parts.length >= 2) {
+      return { eventId: parts[0], guestId: parts[1] };
+    }
+    return { eventId: qEventId, guestId: qGuestId };
+  }, [qEventId, qGuestId, router.asPath]);
 
   const [loading, setLoading] = useState(true);
   const [guest, setGuest] = useState(null);
@@ -107,7 +118,8 @@ export default function GuestPage() {
   const removeAllergy = (idx) => setAllergies((prev) => prev.filter((_, i) => i !== idx));
 
   useEffect(() => {
-    if (!router.isReady) return;
+    // Wait for router OR until we have ids from asPath
+    if (!router.isReady && !eventId && !guestId) return;
     if (!eventId || !guestId) {
       setLoading(false);
       setError('קישור לא תקין – חסרים פרטי אירוע או אורח');

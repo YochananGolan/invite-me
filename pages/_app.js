@@ -215,7 +215,7 @@ function MyApp({ Component, pageProps }) {
     // Public paths that don't require authentication
     // Home page, terms page, and guest RSVP pages should be accessible without session
     const publicPaths = ['/', '/terms'];
-    const isGuestPage = router.pathname.startsWith('/[eventId]/[guestId]');
+    const isGuestPage = router.pathname === '/[eventId]/[guestId]' || router.pathname.startsWith('/[eventId]/[guestId]');
     const isPublicPath = publicPaths.includes(router.pathname);
 
     if (!session && !isPublicPath && !isGuestPage) {
@@ -225,8 +225,9 @@ function MyApp({ Component, pageProps }) {
     // No additional redirect needed when authenticated or on public paths.
   }, [session, loading, router.pathname]); // Use router.pathname instead of router object
 
-  // Optional: could render a loader while checking auth
-  if (loading) return null;
+  // Guest pages: render immediately so they see "טוען..." instead of blank screen
+  const isGuestPage = router.pathname === '/[eventId]/[guestId]' || router.pathname.startsWith('/[eventId]/[guestId]');
+  if (loading && !isGuestPage) return null;
 
   return (
     <ToastProvider>

@@ -6,6 +6,7 @@
 
 import { createClient } from '@supabase/supabase-js';
 import { sendSmsToGuests } from '../../lib/activeTrailSms';
+import { getInviteBaseUrl } from '../../lib/inviteUrl';
 
 const ISRAEL_TZ = 'Asia/Jerusalem';
 
@@ -60,7 +61,7 @@ export default async function handler(req, res) {
     return targetDates.has(eventDateStr);
   });
 
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://meet-m.co.il';
+  const baseUrl = getInviteBaseUrl();
   const report = { targetDates: [...targetDates], eventsProcessed: 0, totalSent: 0, errors: [] };
 
   for (const event of eventsInRange) {
