@@ -2644,12 +2644,18 @@ React.useEffect(() => {
           try { localStorage.setItem('additionalPackages_' + (eventIdForSave || 'global'), JSON.stringify(newAddonTotal)); } catch (_) {}
           setPlanSelectionError('');
 
-          const totalGuestsAdded = pendingAddonCount * 100;
+          const totalMessagesAdded = pendingAddonCount * 100;
+          const totalPaid = pendingAddonCount * 100;
+          const msg = pendingAddonCount === 1
+            ? 'נרכשה חבילה של 100 והמכסה עודכנה.'
+            : `נרכשו ${pendingAddonCount} חבילות (${totalMessagesAdded} הודעות) בסכום ₪${totalPaid} והמכסה עודכנה.`;
           setPaymentResultType('success');
-          setPaymentResultMessage(`התשלום בוצע בהצלחה! ${totalGuestsAdded} מקומות נוספים נוספו לאירוע שלך.`);
+          setPaymentResultMessage(msg);
           setPaymentWasPlanPurchase(false);
 
-          // מכסת הודעות נגזרת מ-selectedPlan + additionalPackages (state/localStorage).
+          // סגירת הודעת שגיאת מכסה אם הייתה פתוחה – כדי שלא תוצג אחרי התשלום
+          setShowInvitationResultModal(false);
+          setInvitationResult({ type: null, message: '' });
 
           setShowPaymentModal(false);
           setShowPaymentResultModal(true);
