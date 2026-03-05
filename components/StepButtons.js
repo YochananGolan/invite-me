@@ -3546,12 +3546,12 @@ React.useEffect(() => {
     return () => document.removeEventListener('visibilitychange', onVisibility);
   }, [currentEventId]);
 
-  // Auto-refresh reports every 10s when reports/guest list are open (fallback when Realtime is unavailable)
+  // Auto-refresh reports every 5s when reports/guest list are open (fallback when Realtime is unavailable)
   React.useEffect(() => {
     if (!currentEventId) return;
     const reportsOpen = showReportsOptions || showReportModal || showGuestListModal;
     if (!reportsOpen) return;
-    const id = setInterval(() => setGuestSummaryRefreshKey((k) => k + 1), 10000);
+    const id = setInterval(() => setGuestSummaryRefreshKey((k) => k + 1), 5000);
     return () => clearInterval(id);
   }, [currentEventId, showReportsOptions, showReportModal, showGuestListModal]);
 
