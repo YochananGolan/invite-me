@@ -763,9 +763,10 @@ const handleOpenAddonModal = React.useCallback(() => {
         .from('events')
         .select('id')
         .eq('user_id', user.id)
+        .or('status.neq.archived,status.is.null')
         .order('created_at', { ascending: false })
         .limit(1)
-        .single();
+        .maybeSingle();
 
       const eventIdForInvite = currentEventId || evRow?.id || null;
 
@@ -817,9 +818,8 @@ const handleOpenAddonModal = React.useCallback(() => {
           .from('events')
           .select('invitation_path')
           .eq('user_id', user.id)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .single();
+          .eq('id', eventIdForInvite)
+          .maybeSingle();
 
         let inviteUrl = '';
         if (ev && ev.invitation_path) {
@@ -935,9 +935,10 @@ const handleOpenAddonModal = React.useCallback(() => {
         .from('events')
         .select('id')
         .eq('user_id', user.id)
+        .or('status.neq.archived,status.is.null')
         .order('created_at', { ascending: false })
         .limit(1)
-        .single();
+        .maybeSingle();
 
       const eventIdForInvite = currentEventId || evRow?.id || null;
 
@@ -2009,15 +2010,17 @@ React.useEffect(() => {
         .from('events')
         .select('id')
         .eq('user_id', user.id)
+        .or('status.neq.archived,status.is.null')
         .order('created_at', { ascending: false })
         .limit(1)
-        .single();
+        .maybeSingle();
 
-      if (!evRow) {
+      const bulkEventId = currentEventId || evRow?.id || null;
+      if (!bulkEventId) {
         setIsSavingExcelGuests(false);
-        setInvitationResult({ 
-          type: 'error', 
-          message: 'לא נמצא אירוע פעיל. יש ליצור אירוע תחילה.' 
+        setInvitationResult({
+          type: 'error',
+          message: 'לא נמצא אירוע פעיל. יש ליצור אירוע תחילה.'
         });
         setShowInvitationResultModal(true);
         return;
@@ -2027,7 +2030,7 @@ React.useEffect(() => {
       const { data: existingGuests } = await supabase
         .from('invited_guests')
         .select('adults, children')
-        .eq('event_id', evRow.id);
+        .eq('event_id', bulkEventId);
 
       const currentAdultsCount = (existingGuests || []).reduce((sum, g) => sum + (g.adults || 0), 0);
       const currentChildrenCount = (existingGuests || []).reduce((sum, g) => sum + (g.children || 0), 0);
@@ -2037,7 +2040,7 @@ React.useEffect(() => {
       // Prepare guests for bulk insert
       const guestsToInsert = validGuests.map(g => ({
         user_id: user.id,
-        event_id: evRow.id,
+        event_id: bulkEventId,
         first_name: g.guestFirstName.trim(),
         last_name: g.guestLastName.trim(),
         phone: g.guestPhone.toString().trim(),
@@ -2061,7 +2064,7 @@ React.useEffect(() => {
       if (sendSms && insertedGuests && insertedGuests.length > 0) {
         const baseUrl = process.env.NEXT_PUBLIC_APP_URL || (typeof window !== 'undefined' ? window.location.origin : 'https://meet-m.co.il');
         const smsGuests = insertedGuests.map(g => {
-          const inviteLink = `${baseUrl}/${evRow.id}/${g.id}`;
+          const inviteLink = `${baseUrl}/${bulkEventId}/${g.id}`;
           return {
             phone: g.phone,
             firstName: g.first_name,
@@ -2089,7 +2092,6 @@ React.useEffect(() => {
         }
 
         try {
-          const bulkEventId = currentEventId || evRow?.id || null;
           const smsResponse = await fetch('/api/send-sms', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -2162,7 +2164,7 @@ React.useEffect(() => {
         // Save + open WhatsApp for first guest
         const baseUrl = process.env.NEXT_PUBLIC_APP_URL || (typeof window !== 'undefined' ? window.location.origin : 'https://meet-m.co.il');
         const first = insertedGuests[0];
-        const inviteLink = `${baseUrl}/${evRow.id}/${first.id}`;
+        const inviteLink = `${baseUrl}/${bulkEventId}/${first.id}`;
         const digitsOnly = (first.phone || '').replace(/\D/g, '');
         const waText = encodeURIComponent(
           `${invitationText}\n\nלאישור הגעה:\n${inviteLink}`
