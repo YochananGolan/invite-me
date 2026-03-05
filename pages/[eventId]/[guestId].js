@@ -1,9 +1,10 @@
 import { useRouter } from 'next/router';
 import { useEffect, useMemo, useState } from 'react';
+import { fetchGuestRsvpData } from '../../lib/fetchGuestRsvp';
 
 const API = '/api/guest-rsvp';
 
-export default function GuestPage() {
+export default function GuestPage({ initialData, initialError }) {
   const router = useRouter();
   const { eventId: qEventId, guestId: qGuestId } = router.query;
 
@@ -18,10 +19,10 @@ export default function GuestPage() {
     return { eventId: qEventId, guestId: qGuestId };
   }, [qEventId, qGuestId, router.asPath]);
 
-  const [loading, setLoading] = useState(true);
-  const [guest, setGuest] = useState(null);
-  const [error, setError] = useState(null);
-  const [invitationUrl, setInvitationUrl] = useState('');
+  const [loading, setLoading] = useState(!initialData && !initialError);
+  const [guest, setGuest] = useState(initialData?.guest ?? null);
+  const [error, setError] = useState(initialError ?? null);
+  const [invitationUrl, setInvitationUrl] = useState(initialData?.invitationUrl ?? '');
   const [saved, setSaved] = useState(false);
   const [formError, setFormError] = useState('');
 
@@ -46,7 +47,7 @@ export default function GuestPage() {
 
   const [allergies, setAllergies] = useState([{ description: '', adults: 0, children: 0 }]);
   const [showMap, setShowMap] = useState(false);
-  const [eventDetails, setEventDetails] = useState(null);
+  const [eventDetails, setEventDetails] = useState(initialData?.eventDetails ?? null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
 
   const resolvedAddress = useMemo(() => {
@@ -118,8 +119,19 @@ export default function GuestPage() {
   const addAllergy = () => setAllergies((prev) => [...prev, { description: '', adults: 0, children: 0 }]);
   const removeAllergy = (idx) => setAllergies((prev) => prev.filter((_, i) => i !== idx));
 
+  // Hydrate from initialData (SSR)
   useEffect(() => {
-    // Wait for router OR until we have ids from asPath
+    if (initialData?.guest) {
+      const d = initialData.guest;
+      if (d.adults !== null) setAdults(d.adults);
+      if (d.children !== null) setChildren(d.children);
+      if (d.special_meals) setSpecialMeals((prev) => ({ ...prev, ...d.special_meals }));
+    }
+  }, [initialData]);
+
+  // Client fetch only when no SSR data (fallback)
+  useEffect(() => {
+    if (initialData) return;
     if (!router.isReady && !eventId && !guestId) return;
     if (!eventId || !guestId) {
       setLoading(false);
@@ -128,7 +140,8 @@ export default function GuestPage() {
     }
     (async () => {
       try {
-        const res = await fetch(`${API}?eventId=${encodeURIComponent(eventId)}&guestId=${encodeURIComponent(guestId)}`);
+        const base = typeof window !== 'undefined' ? window.location.origin : '';
+        const res = await fetch(`${base}${API}?eventId=${encodeURIComponent(eventId)}&guestId=${encodeURIComponent(guestId)}`);
         const json = await res.json();
         if (!res.ok) {
           throw new Error(json.error || 'Failed to load');
@@ -152,7 +165,7 @@ export default function GuestPage() {
         setLoading(false);
       }
     })();
-  }, [router.isReady, eventId, guestId]);
+  }, [initialData, router.isReady, eventId, guestId]);
 
   const handleSave = async () => {
     setFormError('');
@@ -819,4 +832,21 @@ export default function GuestPage() {
       )}
     </div>
   );
+}
+
+export async function getServerSideProps(context) {
+  const { eventId, guestId } = context.params || {};
+  if (!eventId || !guestId) {
+    return { props: { initialData: null, initialError: 'קישור לא תקין – חסרים פרטי אירוע או אורח' } };
+  }
+  try {
+    const result = await fetchGuestRsvpData(eventId, guestId);
+    if (result.error) {
+      return { props: { initialData: null, initialError: result.error === 'Guest not found' ? 'אורח לא נמצא' : 'שגיאה בטעינת הנתונים' } };
+    }
+    return { props: { initialData: result, initialError: null } };
+  } catch (e) {
+    console.error('[guest-rsvp] getServerSideProps error:', e);
+    return { props: { initialData: null, initialError: 'שגיאה בטעינת הנתונים' } };
+  }
 }

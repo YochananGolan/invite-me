@@ -3,6 +3,7 @@
  * Allows unauthenticated guests to view and update their RSVP.
  */
 import { createClient } from '@supabase/supabase-js';
+import { fetchGuestRsvpData } from '../../lib/fetchGuestRsvp';
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -24,71 +25,13 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Missing eventId or guestId' });
   }
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
-  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  if (!supabaseUrl || !supabaseKey) {
-    return res.status(500).json({ error: 'Server not configured' });
-  }
-
-  // Prefer service role to bypass RLS (guests are unauthenticated)
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || supabaseKey;
-
-  const supabase = createClient(supabaseUrl, key);
-
   if (req.method === 'GET') {
     try {
-      const { data: guest, error: guestErr } = await supabase
-        .from('invited_guests')
-        .select('*')
-        .eq('id', guestId)
-        .eq('event_id', eventId)
-        .single();
-
-      if (guestErr || !guest) {
-        return res.status(404).json({ error: 'Guest not found' });
+      const result = await fetchGuestRsvpData(eventId, guestId);
+      if (result.error) {
+        return res.status(result.error === 'Guest not found' ? 404 : 500).json({ error: result.error });
       }
-
-      const { data: ev, error: evErr } = await supabase
-        .from('events')
-        .select('invitation_path, event_details')
-        .eq('id', eventId)
-        .single();
-
-      if (evErr) {
-        return res.status(500).json({ error: 'Failed to load event' });
-      }
-
-      // Build invitation image URL
-      let invitationUrl = '';
-      const eventDetails = (() => {
-        const ed = ev?.event_details;
-        if (!ed) return {};
-        try {
-          return typeof ed === 'string' ? JSON.parse(ed) : ed;
-        } catch {
-          return {};
-        }
-      })();
-
-      if (ev?.invitation_path) {
-        if (ev.invitation_path.startsWith('http')) {
-          invitationUrl = ev.invitation_path;
-        } else {
-          const { data: urlData } = supabase.storage.from('invites').getPublicUrl(ev.invitation_path);
-          invitationUrl = urlData.publicUrl + (urlData.publicUrl.includes('?') ? '&' : '?') + 't=' + Date.now();
-        }
-      } else if (eventDetails?.template_src) {
-        const t = eventDetails.template_src;
-        invitationUrl = t.startsWith('http') ? t : (t.startsWith('/') ? t : '/' + t);
-      }
-
-      return res.status(200).json({
-        guest,
-        event: ev || {},
-        eventDetails,
-        invitationUrl,
-      });
+      return res.status(200).json(result);
     } catch (e) {
       console.error('[guest-rsvp] GET error:', e);
       return res.status(500).json({ error: 'Failed to load data' });
@@ -96,6 +39,13 @@ export default async function handler(req, res) {
   }
 
   if (req.method === 'POST') {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    if (!supabaseUrl || !supabaseKey) {
+      return res.status(500).json({ error: 'Server not configured' });
+    }
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
     const body = req.body || {};
     const {
       status,
