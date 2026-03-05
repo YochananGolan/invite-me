@@ -95,6 +95,7 @@ export default async function handler(req, res) {
     });
   } catch (err) {
     console.error('send-sms error:', err);
-    return res.status(500).json({ error: err.message || 'Failed to send SMS' });
+    const msg = err.message || 'Failed to send SMS';
+    return res.status(500).json({ error: msg, details: msg.includes('ACTIVETRAIL') ? 'הגדר ACTIVETRAIL_API_KEY ב-.env.local או ב-Vercel' : undefined });
   }
 }

@@ -115,9 +115,10 @@ export default function EventSummary() {
       // Fallback: check localStorage for draft
       if (!event) {
         try {
-          const draft = JSON.parse(localStorage.getItem('draftEvent'));
+          const raw = localStorage.getItem('draftEvent');
+          const draft = (raw && typeof raw === 'string' && raw.trim().startsWith('{')) ? JSON.parse(raw) : null;
           if (draft) setEvent(draft);
-        } catch(e) { /* ignore */ }
+        } catch (e) { /* ignore */ }
       }
     })();
   }, [refreshKey]);

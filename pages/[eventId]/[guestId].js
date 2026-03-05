@@ -142,7 +142,13 @@ export default function GuestPage({ initialData, initialError }) {
       try {
         const base = typeof window !== 'undefined' ? window.location.origin : '';
         const res = await fetch(`${base}${API}?eventId=${encodeURIComponent(eventId)}&guestId=${encodeURIComponent(guestId)}`);
-        const json = await res.json();
+        let json;
+        try {
+          const text = await res.text();
+          json = text && text.trim().startsWith('{') ? JSON.parse(text) : {};
+        } catch (parseErr) {
+          throw new Error('תשובה לא תקינה מהשרת');
+        }
         if (!res.ok) {
           throw new Error(json.error || 'Failed to load');
         }
@@ -254,7 +260,13 @@ export default function GuestPage({ initialData, initialError }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
-      const json = await res.json();
+      let json = {};
+      try {
+        const text = await res.text();
+        if (text && text.trim().startsWith('{')) json = JSON.parse(text);
+      } catch (parseErr) {
+        throw new Error('תשובה לא תקינה מהשרת');
+      }
       if (!res.ok) throw new Error(json.error || 'Failed to save');
 
       setSaved(attending ? 'approved' : 'rejected');
@@ -291,7 +303,13 @@ export default function GuestPage({ initialData, initialError }) {
           allergy_children: 0,
         }),
       });
-      const json = await res.json();
+      let json = {};
+      try {
+        const text = await res.text();
+        if (text && text.trim().startsWith('{')) json = JSON.parse(text);
+      } catch (parseErr) {
+        throw new Error('תשובה לא תקינה מהשרת');
+      }
       if (!res.ok) throw new Error(json.error || 'Failed to save');
       setSaved(isAttending ? 'approved' : 'rejected');
     } catch (e) {

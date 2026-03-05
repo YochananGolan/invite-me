@@ -168,7 +168,10 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick, trig
   // ---- finished steps persistence ----
   const [finishedSteps, setFinishedSteps] = useState(()=>{
     if(typeof window==='undefined') return [];
-    try{ return JSON.parse(localStorage.getItem('finishedSteps')||'[]'); }catch(e){return[];}
+    try {
+      const raw = localStorage.getItem('finishedSteps');
+      return (raw && typeof raw === 'string' && raw.trim().startsWith('[')) ? JSON.parse(raw) : [];
+    } catch(e) { return []; }
   });
 
   // ---- guest summary stats ----
@@ -974,6 +977,9 @@ const handleOpenAddonModal = React.useCallback(() => {
       if (totalLimitSms > 0 && effectiveMessagesSentCount >= totalLimitSms) {
         setInvitationResult({ type: 'error', message: 'אין מספיק הודעות במכסה. נא לרכוש חבילת הרחבה.' });
         setShowInvitationResultModal(true);
+        setPendingAddonCount(1);
+        setShowPlanLimitWarning(true);
+        setPlanAddOnMode(true);
         setIsSendingInvitation(false);
         return;
       }
@@ -994,7 +1000,13 @@ const handleOpenAddonModal = React.useCallback(() => {
           }),
         });
 
-        const smsResult = await smsResponse.json();
+        let smsResult = {};
+        try {
+          const text = await smsResponse.text();
+          if (text && text.trim().startsWith('{')) smsResult = JSON.parse(text);
+        } catch (parseErr) {
+          console.error('SMS response parse error:', parseErr);
+        }
 
         if (smsResult.success && smsResult.sent > 0) {
           if (typeof smsResult.updatedMessagesSentCount === 'number') {
@@ -1318,8 +1330,9 @@ const handleOpenAddonModal = React.useCallback(() => {
     if(!finishedSteps.includes(1)) return;
     if(Object.values(formData).some(v=>v)) return;
     try{
-      const saved=JSON.parse(localStorage.getItem('savedEventDetails')||'{}');
-      if(Object.keys(saved).length) setFormData(saved);
+      const raw = localStorage.getItem('savedEventDetails');
+      const saved = (raw && typeof raw === 'string' && raw.trim().startsWith('{')) ? JSON.parse(raw) : {};
+      if (saved && typeof saved === 'object' && Object.keys(saved).length) setFormData(saved);
     }catch{}
   },[finishedSteps]);
 
@@ -2090,6 +2103,9 @@ React.useEffect(() => {
             message: `נשמרו ${validGuests.length} אורחים. אין מספיק הודעות במכסה לשליחת SMS (נשלחו ${effectiveMessagesSentCount}, מכסה ${totalLimitBulk}). נא לרכוש חבילת הרחבה.` 
           });
           setShowInvitationResultModal(true);
+          setPendingAddonCount(Math.max(1, Math.ceil((effectiveMessagesSentCount + smsGuests.length - totalLimitBulk) / 100)));
+          setShowPlanLimitWarning(true);
+          setPlanAddOnMode(true);
           return;
         }
 
@@ -2107,7 +2123,15 @@ React.useEffect(() => {
             }),
           });
 
-          const smsResult = await smsResponse.json();
+          let smsResult = {};
+          try {
+            const text = await smsResponse.text();
+            if (text && text.trim().startsWith('{')) smsResult = JSON.parse(text);
+            else if (!smsResponse.ok && text) smsResult = { error: text.slice(0, 200) };
+          } catch (parseErr) {
+            console.error('SMS bulk response parse error:', parseErr);
+          }
+          if (!smsResponse.ok && !smsResult.error) smsResult.error = `שגיאת שרת ${smsResponse.status}`;
 
           // Close preview modal first
           setShowExcelPreview(false);
@@ -2139,26 +2163,31 @@ React.useEffect(() => {
             });
             setShowInvitationResultModal(true);
           } else {
-            // All failed
-            setInvitationResult({ 
-              type: 'error', 
-              message: `נשמרו ${validGuests.length} אורחים, אך אירעה שגיאה בשליחת ה-SMS.` 
-            });
+            // All failed - show actual error if available
+            const firstErr = smsResult.errors?.[0]?.error || smsResult.error;
+            const errHint = firstErr ? ` (${firstErr})` : '';
+            const apiErr = !smsResponse.ok ? ` קוד: ${smsResponse.status}` : '';
+            if (firstErr && firstErr.includes('ACTIVETRAIL')) {
+              setInvitationResult({ type: 'error', message: `נשמרו ${validGuests.length} אורחים. ${firstErr} הגדר ACTIVETRAIL_API_KEY ב-.env.local` });
+            } else {
+              setInvitationResult({ 
+                type: 'error', 
+                message: `נשמרו ${validGuests.length} אורחים, אך אירעה שגיאה בשליחת ה-SMS.${errHint}${apiErr}` 
+              });
+            }
             setShowInvitationResultModal(true);
           }
         } catch (smsError) {
           console.error('SMS sending error:', smsError);
-          // Close preview modal
           setShowExcelPreview(false);
           setExcelPreviewData([]);
           setExcelErrors([]);
           setIsSavingExcelGuests(false);
-          // Add to local state
           setSentGuests((prev) => [...prev, ...validGuests]);
-          // Show error modal
+          const errMsg = smsError?.message || '';
           setInvitationResult({ 
             type: 'error', 
-            message: `נשמרו ${validGuests.length} אורחים, אך אירעה שגיאה בשליחת ה-SMS.` 
+            message: `נשמרו ${validGuests.length} אורחים, אך אירעה שגיאה בשליחת ה-SMS. ${errMsg}` 
           });
           setShowInvitationResultModal(true);
         }
@@ -3203,8 +3232,13 @@ React.useEffect(() => {
       try {
         const response = await fetch('/api/tranzila/terminal-info');
         if (response.ok) {
-          const data = await response.json();
-          setTranzilaTerminalInfo(data);
+          try {
+            const text = await response.text();
+            const data = (text && text.trim().startsWith('{')) ? JSON.parse(text) : {};
+            setTranzilaTerminalInfo(data);
+          } catch (parseErr) {
+            console.error('Terminal info parse error:', parseErr);
+          }
         }
       } catch (e) {
         console.error('Failed to fetch terminal info:', e);
