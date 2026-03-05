@@ -2396,8 +2396,9 @@ React.useEffect(() => {
     setAdditionalPackages([]);
     
     try{ localStorage.removeItem('selectedDesign'); }catch{}
-    try{ localStorage.removeItem('finishedSteps'); }catch{} // Clear finished steps from local storage
-    try{ localStorage.removeItem('selectedEventType'); }catch{} // Clear selected event type from local storage
+    try{ localStorage.removeItem('finishedSteps'); }catch{}
+    try{ localStorage.removeItem('selectedEventType'); }catch{}
+    try{ localStorage.removeItem('savedEventDetails'); }catch{}
     try{ localStorage.removeItem('additionalPackages'); }catch{}
     try{ localStorage.removeItem('additionalPackagesEventId'); }catch{}
     try{ if (currentEventId) localStorage.removeItem(`additionalPackages:${currentEventId}`); }catch{}
@@ -2738,7 +2739,7 @@ React.useEffect(() => {
   // State for Tranzila terminal info
   const [tranzilaTerminalInfo, setTranzilaTerminalInfo] = useState(null);
 
-  // ---------------- helper to archive past event and check active -----------------
+  // ---------------- helper to sync event data on refresh -----------------
   React.useEffect(()=>{
     (async ()=>{
       try{
@@ -2748,8 +2749,9 @@ React.useEffect(() => {
         let messagesSent = 0;
         const { data: evData, error: evError } = await supabase
           .from('events')
-          .select('id,event_details,allowed_guests,messages_sent_count,additional_packages,selected_plan')
+          .select('id,event_details,allowed_guests,messages_sent_count,additional_packages,selected_plan,status')
           .eq('user_id',user.id)
+          .neq('status','archived')
           .order('created_at',{ascending:false})
           .limit(1)
           .single();
@@ -3099,16 +3101,45 @@ React.useEffect(() => {
   // ---- Auto-archive when event ends (after date has passed) ----
   React.useEffect(() => {
     if (!formData.date || !currentEventId) return;
-    
+
     const eventDate = new Date(formData.date);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     eventDate.setHours(0, 0, 0, 0);
     const diffTime = eventDate.getTime() - today.getTime();
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    
+
     if (diffDays < 0) {
       (async () => {
+        // Verify the date from the DB to avoid archiving due to stale formData
+        try {
+          const { data: dbEvent } = await supabase
+            .from('events')
+            .select('event_details')
+            .eq('id', currentEventId)
+            .maybeSingle();
+          if (dbEvent) {
+            const details = typeof dbEvent.event_details === 'string'
+              ? JSON.parse(dbEvent.event_details)
+              : dbEvent.event_details || {};
+            const dbDate = details.date || details.start_datetime;
+            if (dbDate) {
+              const dbEventDate = new Date(dbDate);
+              dbEventDate.setHours(0, 0, 0, 0);
+              if (dbEventDate >= today) {
+                // DB has a future date — formData is stale, skip archiving
+                return;
+              }
+            } else {
+              // No date in DB yet (event still being set up) — don't archive
+              return;
+            }
+          }
+        } catch (e) {
+          console.error('Failed to verify event date from DB:', e);
+          return;
+        }
+
         try {
           const { error } = await supabase
             .from('events')
@@ -3128,7 +3159,6 @@ React.useEffect(() => {
         setEventMessagesSentCount(0);
         try { localStorage.removeItem('selectedPlan'); } catch(e){}
 
-        // Show notice only within 7 days after event; after that, archive silently
         if (diffDays >= -7) {
           setShowEventEndedNotice(true);
         }
@@ -3153,91 +3183,95 @@ React.useEffect(() => {
 
   // ---- Check if there's an active event in database but currentEventId is null ----
   React.useEffect(() => {
+    if (currentEventId) return;
     (async () => {
-      if (!currentEventId && !newEventStarted) {
-        try {
-          const { data: { user } } = await supabase.auth.getUser();
-          if (!user) return;
-          
-          const { data: ev } = await supabase
-            .from('events')
-            .select('id, event_details, allowed_guests, messages_sent_count, additional_packages, selected_plan')
-            .eq('user_id', user.id)
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .maybeSingle();
-            
-          if (ev) {
-            const details = typeof ev.event_details === 'string' 
-              ? JSON.parse(ev.event_details) 
-              : ev.event_details;
-            
-            if (details && details.date) {
-              const eventDate = new Date(details.date);
-              eventDate.setHours(0, 0, 0, 0);
-              const today = new Date();
-              today.setHours(0, 0, 0, 0);
-              
-              if (eventDate >= today) {
-                console.log('Found future event in database, restoring...', ev);
-                setCurrentEventId(ev.id);
-                setEventMessagesSentCount(ev.messages_sent_count ?? 0);
-                let restoreAddonCount = 0;
-                if (typeof ev.additional_packages === 'number') {
-                  restoreAddonCount = ev.additional_packages;
-                }
-                try {
-                  const lsVal = parseInt(localStorage.getItem('additionalPackages_' + ev.id), 10);
-                  if (!isNaN(lsVal) && lsVal > restoreAddonCount) restoreAddonCount = lsVal;
-                } catch (_) {}
-                setDbAddonCount((prev) => Math.max(prev ?? 0, restoreAddonCount));
-                setAdditionalPackages((prev) => {
-                  const prevCount = prev ? prev.length : 0;
-                  if (restoreAddonCount > prevCount) return Array(restoreAddonCount).fill('addon');
-                  return prev;
-                });
-                setEventDataLoaded(true);
-                const dbPlan = ev.selected_plan || null;
-                const storedPlan = typeof window !== 'undefined' ? localStorage.getItem('selectedPlan') : null;
-                const planToUse = dbPlan || storedPlan || null;
-                if (planToUse && !selectedPlan) {
-                  setSelectedPlan(planToUse);
-                  try { localStorage.setItem('selectedPlan', planToUse); } catch(e){}
-                } else if (!planToUse && ev.allowed_guests && !selectedPlan) {
-                  const inferredPlan = ev.allowed_guests <= 50 ? 'free' :
-                                       ev.allowed_guests <= 200 ? 'standard' :
-                                       ev.allowed_guests <= 350 ? 'premium' :
-                                       ev.allowed_guests <= 500 ? 'luxury' : 'supreme';
-                  setSelectedPlan(inferredPlan);
-                  try { localStorage.setItem('selectedPlan', inferredPlan); } catch(e){}
-                }
-                setFormData(prev => ({ ...prev, ...details }));
-                
-                // Restore design if available
-                const tpl = details?.template_src || null;
-                if (tpl) {
-                  setSelectedDesign(tpl);
-                  markStepDone(2);
-                }
-              } else {
-                console.log('Event found but has ended, not restoring');
-                // Close any open modals when no active event
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        const { data: ev } = await supabase
+          .from('events')
+          .select('id, event_details, allowed_guests, messages_sent_count, additional_packages, selected_plan, status')
+          .eq('user_id', user.id)
+          .neq('status', 'archived')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (ev) {
+          const details = typeof ev.event_details === 'string'
+            ? JSON.parse(ev.event_details)
+            : ev.event_details;
+
+          if (details && details.date) {
+            const eventDate = new Date(details.date);
+            eventDate.setHours(0, 0, 0, 0);
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+
+            if (eventDate >= today) {
+              console.log('Found future event in database, restoring...', ev.id);
+              setCurrentEventId(ev.id);
+              if (newEventStarted) {
+                setNewEventStarted(false);
+                try { localStorage.removeItem('newEventStarted'); } catch(e){}
+              }
+              setEventMessagesSentCount(ev.messages_sent_count ?? 0);
+              let restoreAddonCount = 0;
+              if (typeof ev.additional_packages === 'number') {
+                restoreAddonCount = ev.additional_packages;
+              }
+              try {
+                const lsVal = parseInt(localStorage.getItem('additionalPackages_' + ev.id), 10);
+                if (!isNaN(lsVal) && lsVal > restoreAddonCount) restoreAddonCount = lsVal;
+              } catch (_) {}
+              setDbAddonCount((prev) => Math.max(prev ?? 0, restoreAddonCount));
+              setAdditionalPackages((prev) => {
+                const prevCount = prev ? prev.length : 0;
+                if (restoreAddonCount > prevCount) return Array(restoreAddonCount).fill('addon');
+                return prev;
+              });
+              setEventDataLoaded(true);
+              const dbPlan = ev.selected_plan || null;
+              const storedPlan = typeof window !== 'undefined' ? localStorage.getItem('selectedPlan') : null;
+              const planToUse = dbPlan || storedPlan || null;
+              if (planToUse && !selectedPlan) {
+                setSelectedPlan(planToUse);
+                try { localStorage.setItem('selectedPlan', planToUse); } catch(e){}
+              } else if (!planToUse && ev.allowed_guests && !selectedPlan) {
+                const inferredPlan = ev.allowed_guests <= 50 ? 'free' :
+                                     ev.allowed_guests <= 200 ? 'standard' :
+                                     ev.allowed_guests <= 350 ? 'premium' :
+                                     ev.allowed_guests <= 500 ? 'luxury' : 'supreme';
+                setSelectedPlan(inferredPlan);
+                try { localStorage.setItem('selectedPlan', inferredPlan); } catch(e){}
+              }
+              setFormData(prev => ({ ...prev, ...details }));
+
+              const tpl = details?.template_src || null;
+              if (tpl) {
+                setSelectedDesign(tpl);
+                markStepDone(2);
+              }
+            } else {
+              console.log('Event found but has ended, not restoring');
+              if (!newEventStarted) {
                 setShowGuestListModal(false);
                 setShowReportsOptions(false);
               }
             }
-          } else {
-            console.log('No event found in database');
-            // Close any open modals when no event exists
+          }
+        } else {
+          console.log('No event found in database');
+          if (!newEventStarted) {
             setShowGuestListModal(false);
             setShowReportsOptions(false);
           }
-          // Mark initial load as complete after first load attempt
-          isInitialLoadRef.current = false;
-        } catch (e) {
-          console.error('Failed to check for active event:', e);
-          isInitialLoadRef.current = false;
         }
+        isInitialLoadRef.current = false;
+      } catch (e) {
+        console.error('Failed to check for active event:', e);
+        isInitialLoadRef.current = false;
       }
     })();
   }, [currentEventId, newEventStarted, eventRefreshKey]);
@@ -3666,7 +3700,7 @@ React.useEffect(() => {
     setFinishedSteps([]);
     setSelectedEventType(null);
     setNewEventStarted(false);
-    try{ localStorage.removeItem('draftEvent'); localStorage.removeItem('newEventStarted'); }catch{}
+    try{ localStorage.removeItem('draftEvent'); localStorage.removeItem('newEventStarted'); localStorage.removeItem('savedEventDetails'); }catch{}
   },[currentEventId, newEventStarted]);
 
   if (!session) {
