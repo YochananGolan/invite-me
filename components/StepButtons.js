@@ -7293,12 +7293,15 @@ React.useEffect(() => {
                 <button
                   onClick={() => {
                     setShowPaymentResultModal(false);
-                    // If it was a plan purchase (not addon), continue with event creation
                     if (paymentWasPlanPurchase) {
+                      // רכישת מסלול – המשך ליצירת אירוע
                       if (typeof window !== 'undefined') {
                         try { localStorage.removeItem('pendingCreateEvent'); } catch(e){}
                       }
                       setShowEventTypes(true);
+                    } else {
+                      // רכישת חבילת הרחבה – חזרה למסך שליחת הזמנות
+                      setShowGuestForm(true);
                     }
                   }}
                   className="w-full bg-green-600 hover:bg-green-700 text-white font-bold text-lg md:text-xl py-4 px-8 rounded-full transition-all shadow-lg transform hover:scale-105"
