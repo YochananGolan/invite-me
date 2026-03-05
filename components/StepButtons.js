@@ -2297,43 +2297,23 @@ React.useEffect(() => {
     }
 
     if (!eventIdToDelete) {
-      // Nothing to delete in DB (e.g. event only existed in UI/localStorage).
       deletionCompleted = true;
     } else {
       try {
-        let skipDelete = false;
         const { data: eventData, error: fetchError } = await supabase
           .from('events')
           .select('id, status')
           .eq('id', eventIdToDelete)
           .maybeSingle();
-        if (!fetchError && eventData && eventData.status === 'archived') {
-          skipDelete = true;
-        }
-        if (!skipDelete) {
-          const { error: guestsError } = await supabase
-            .from('invited_guests')
-            .delete()
-            .eq('event_id', eventIdToDelete);
-          if (guestsError) {
-            console.error('Error deleting guests:', guestsError);
-            alert('שגיאה במחיקת האורחים של האירוע הקיים.');
-            deletionErrorAlertShown = true;
-            // If guests couldn't be deleted, don't show "success" at the end.
-            deletionCompleted = false;
-            throw guestsError;
-          }
-          const { error: rsvpsErr } = await supabase.from('event_rsvps').delete().eq('event_id', eventIdToDelete);
-          if (rsvpsErr) {
-            // event_rsvps או event_id אולי לא קיימים – לא חוסם
-          }
-          const { error: deleteError } = await supabase
+        if (!fetchError && eventData && eventData.status !== 'archived') {
+          // ארכוב במקום מחיקה – האירוע נשמר בארכיון עם כל הנתונים
+          const { error: archiveErr } = await supabase
             .from('events')
-            .delete()
+            .update({ status: 'archived' })
             .eq('id', eventIdToDelete);
-          if (deleteError) {
-            console.error('Error deleting current event:', deleteError);
-            alert('שגיאה במחיקת האירוע הקיים.');
+          if (archiveErr) {
+            console.error('Failed to archive event:', archiveErr);
+            alert('שגיאה בארכוב האירוע הקיים.');
             deletionErrorAlertShown = true;
             deletionCompleted = false;
           } else {
@@ -2341,13 +2321,12 @@ React.useEffect(() => {
             deletionCompleted = true;
           }
         } else {
-          // Event is archived (or treated as such) -> no hard delete is needed for "new event" flow.
           deletionCompleted = true;
         }
       } catch (err) {
-        console.error('Failed to delete current event:', err);
+        console.error('Failed to archive current event:', err);
         if (!deletionErrorAlertShown) {
-          alert('שגיאה במחיקת האירוע הקיים.');
+          alert('שגיאה בארכוב האירוע הקיים.');
         }
         deletionCompleted = false;
       }
@@ -6691,7 +6670,7 @@ React.useEffect(() => {
                     • במערכת זו לא ניתן לנהל שני אירועים במקביל. בכל פעם ניתן לנהל אירוע אחד בלבד.
                   </p>
                   <p className="text-base font-bold text-red-800">
-                    • יצירת אירוע חדש תתאפשר רק אחרי מחיקה מלאה של האירוע הקיים: כולל דוחות בקרה, רשימת אורחים וכל הנתונים. מה שבארכיון יישאר ללא שינוי.
+                    • האירוע הקיים יעבור לארכיון (יישמר עם כל הנתונים) ותוכל לפתוח אירוע חדש.
                   </p>
                 </div>
               </div>
@@ -6710,7 +6689,7 @@ React.useEffect(() => {
                 }}
                 className="w-full bg-red-600 text-white border border-red-700 rounded-full px-6 py-3 font-bold hover:bg-red-700 transition-all"
               >
-                מחק אירוע קיים
+                העבר לארכיון וצור אירוע חדש
               </button>
             </div>
           </div>
@@ -6733,19 +6712,19 @@ React.useEffect(() => {
               <h2 className="text-2xl font-bold text-red-800 mb-4">אישור סופי נדרש</h2>
               <div className="bg-orange-50 border-2 border-orange-200 rounded-lg p-4 mb-4 text-right">
                 <p className="text-base font-bold text-gray-800 mb-3">
-                  האם אתה בטוח שברצונך למחוק את האירוע הקיים וליצור אירוע חדש?
+                  האם אתה בטוח שברצונך להעביר את האירוע הקיים לארכיון וליצור אירוע חדש?
                 </p>
                 <div className="space-y-3 text-base text-gray-700">
                   <div className="flex items-start gap-2">
-                    <span className="text-red-600 font-bold text-lg">⚠️</span>
+                    <span className="text-orange-600 font-bold text-lg">📁</span>
                     <p className="text-right flex-1 text-base font-semibold">
-                      האירוע הקיים יימחק לגמרי מהמערכת ולא יהיה זמין יותר.
+                      האירוע הקיים יעבור לארכיון (יישמר עם כל הנתונים) ותוכל לגשת אליו מאוחר יותר.
                     </p>
                   </div>
                   <div className="flex items-start gap-2">
-                    <span className="text-red-600 font-bold text-lg">⚠️</span>
+                    <span className="text-orange-600 font-bold text-lg">✨</span>
                     <p className="text-right flex-1 text-base font-semibold">
-                      דוחות הבקרה וכל נתוני האירוע יימחקו לגמרי. יצירת אירוע חדש תתאפשר רק לאחר סיום המחיקה.
+                      כעת תוכל ליצור אירוע חדש.
                     </p>
                   </div>
                 </div>
@@ -6756,23 +6735,23 @@ React.useEffect(() => {
                 onClick={() => setShowArchiveConfirm(false)}
                 className="flex-1 bg-green-600 text-white border border-green-700 rounded-full px-6 py-3 font-bold text-lg hover:bg-green-700 transition-all"
               >
-                ביטול מחיקה
+                ביטול
               </button>
               <button
                 onClick={() => {
                   setShowArchiveConfirm(false);
                   handleNewEvent(true);
                 }}
-                className="flex-1 bg-red-600 text-white border border-red-700 rounded-full px-6 py-3 font-bold hover:bg-red-700 transition-all"
+                className="flex-1 bg-primary text-white border border-primary rounded-full px-6 py-3 font-bold hover:bg-primary/90 transition-all"
               >
-                מחק אירוע
+                העבר לארכיון וצור אירוע חדש
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Deletion Success Modal – מוצג מעל כל המודלים אחרי מחיקה מוצלחת */}
+      {/* Archive Success Modal – מוצג מעל כל המודלים אחרי ארכוב מוצלח */}
       {showDeletionSuccess && (
         <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-[60]">
           <div className="relative bg-white rounded-lg p-6 w-full max-w-md text-center shadow-2xl border-4 border-green-500">
@@ -6785,9 +6764,9 @@ React.useEffect(() => {
             </button>
             <div className="mb-6">
               <div className="text-5xl mb-4 text-green-600">✅</div>
-              <h2 className="text-2xl font-bold text-green-700 mb-3">המחיקה בוצעה בהצלחה</h2>
+              <h2 className="text-2xl font-bold text-green-700 mb-3">האירוע הועבר לארכיון</h2>
               <p className="text-base text-gray-700 leading-relaxed">
-                האירוע הקודם, דוחות הבקרה וכל הנתונים הוסרו מהמערכת. כעת ניתן ליצור אירוע חדש.
+                האירוע הקודם נשמר בארכיון עם כל הנתונים. כעת ניתן ליצור אירוע חדש.
               </p>
             </div>
             <button
