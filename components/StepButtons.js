@@ -360,6 +360,8 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick, trig
   const [paymentResultType, setPaymentResultType] = useState(null); // 'success' or 'error'
   const [paymentResultMessage, setPaymentResultMessage] = useState('');
   const [paymentWasPlanPurchase, setPaymentWasPlanPurchase] = useState(false); // true if plan purchase, false if addon
+  const [paymentFailureWasAddon, setPaymentFailureWasAddon] = useState(false); // when payment fails, was it addon attempt?
+  const [lastAddonCountForRetry, setLastAddonCountForRetry] = useState(1); // preserved for retry after addon payment failure
   // Message quota limit per plan – used for all plans (א–ו); same logic for blocking, balance panel, and addon modal
   const getPlanBaseLimit = React.useCallback((plan) => {
     switch(plan) {
@@ -2718,13 +2720,16 @@ React.useEffect(() => {
       setPaymentResultMessage(errorMessage);
       setShowPaymentModal(false);
       setShowPaymentResultModal(true);
+      setPaymentFailureWasAddon(pendingPlan === 'addon');
+      if (pendingPlan === 'addon') setLastAddonCountForRetry(pendingAddonCount);
 
       // Clear pending state
       setPendingPlan(null);
       setPendingAddonCount(1);
     } catch (error) {
       console.error('Error in handlePaymentFailure:', error);
-      // Fallback error message
+      setPaymentFailureWasAddon(pendingPlan === 'addon');
+      if (pendingPlan === 'addon') setLastAddonCountForRetry(pendingAddonCount);
       setPaymentResultType('error');
       setPaymentResultMessage('אירעה שגיאה בעיבוד התשלום. אנא נסה שוב או פנה לתמיכה.');
       setShowPaymentModal(false);
@@ -7307,11 +7312,21 @@ React.useEffect(() => {
                 <button
                   onClick={() => {
                     setShowPaymentResultModal(false);
-                    setShowPricingPlan(true);
+                    if (paymentFailureWasAddon) {
+                      const n = Math.max(1, lastAddonCountForRetry);
+                      setPendingPlan('addon');
+                      setPendingAddonCount(n);
+                      setPaymentAmount(n * 100);
+                      setPaymentPlanName(n === 1 ? 'חבילת הרחבה - 100 הודעות נוספות' : `${n} חבילות הרחבה - ${n * 100} הודעות (₪${n * 100})`);
+                      setShowPaymentModal(true);
+                      setPaymentFailureWasAddon(false);
+                    } else {
+                      setShowPricingPlan(true);
+                    }
                   }}
                   className="w-full bg-red-600 hover:bg-red-700 text-white font-bold text-lg md:text-xl py-4 px-8 rounded-full transition-all shadow-lg transform hover:scale-105"
                 >
-                  חזור למסלולים
+                  {paymentFailureWasAddon ? 'נסה שוב' : 'חזור למסלולים'}
                 </button>
               </>
             )}
