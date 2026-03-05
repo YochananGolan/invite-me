@@ -1,6 +1,7 @@
 import { useRouter } from 'next/router';
 import { useEffect, useMemo, useState } from 'react';
-import { supabase } from '../../lib/supabaseClient';
+
+const API = '/api/guest-rsvp';
 
 export default function GuestPage() {
   const router = useRouter();
@@ -127,106 +128,23 @@ export default function GuestPage() {
     }
     (async () => {
       try {
-        const { data, error: fetchErr } = await supabase
-          .from('invited_guests')
-          .select('*')
-          .eq('id', guestId)
-          .eq('event_id', eventId)
-          .single();
-        if (fetchErr) throw fetchErr;
+        const res = await fetch(`${API}?eventId=${encodeURIComponent(eventId)}&guestId=${encodeURIComponent(guestId)}`);
+        const json = await res.json();
+        if (!res.ok) {
+          throw new Error(json.error || 'Failed to load');
+        }
+        const { guest: data, eventDetails: details, invitationUrl: url } = json;
         setGuest(data);
-
-        // Fetch invitation image and event details
-        const { data: ev, error: evErr } = await supabase
-          .from('events')
-          .select('invitation_path, event_details')
-          .eq('id', eventId)
-          .single();
-          
-        let details = {};
-        if (!evErr && ev) {
-          // Parse event_details if it's a string
-          if (ev?.event_details) {
-            try {
-              details = typeof ev.event_details === 'string' 
-                ? JSON.parse(ev.event_details) 
-                : ev.event_details;
-            } catch (e) {
-              console.error('Error parsing event_details:', e);
-              details = ev.event_details || {};
-            }
-          } else {
-            console.warn('⚠️ No event_details found in event');
-          }
-          
-          setEventDetails(details);
-          
-          // Debug: Log text data
-          console.log('📝 Event details loaded:', {
-            has_event_details: !!ev?.event_details,
-            event_details_type: typeof ev?.event_details,
-            has_invitation_text_lines: !!details?.invitation_text_lines,
-            invitation_text_lines_count: details?.invitation_text_lines?.length || 0,
-            invitation_text_lines: details?.invitation_text_lines,
-            has_custom_invitation_text: !!details?.custom_invitation_text,
-            custom_invitation_text: details?.custom_invitation_text,
-            has_line_styles: !!details?.line_styles,
-            line_styles: details?.line_styles,
-            font_css: details?.font_css,
-            full_details: details
-          });
-        } else {
-          console.error('❌ Error loading event:', evErr);
+        setEventDetails(details || {});
+        if (url) setInvitationUrl(url);
+        else if (details?.template_src) {
+          let fallback = details.template_src;
+          if (!fallback.startsWith('http') && !fallback.startsWith('/')) fallback = '/' + fallback;
+          setInvitationUrl(fallback);
         }
-          
-        // Set invitation image - prefer invitation_path (final uploaded invitation with text)
-        // If not available, fall back to template_src (background design only)
-        let url = '';
-        
-        if (ev) {
-          console.log('🔍 Event data:', {
-            invitation_path: ev?.invitation_path,
-            has_template_src: !!details?.template_src,
-            template_src: details?.template_src,
-            fullEventRow: ev
-          });
-          
-          // First try to get invitation_path (final uploaded invitation WITH text overlay)
-          if (ev?.invitation_path) {
-            url = ev.invitation_path;
-            console.log('📷 Found invitation_path:', url);
-            if (!url.startsWith('http')) {
-              const { data: urlData } = supabase.storage
-                .from('invites')
-                .getPublicUrl(ev.invitation_path);
-              url = urlData.publicUrl;
-              console.log('📷 Generated public URL:', url);
-            }
-            // Add cache busting to ensure we get the latest version
-            url += (url.includes('?') ? '&' : '?') + 't=' + Date.now();
-            console.log('📷 Final invitation URL with cache busting:', url);
-            setInvitationUrl(url);
-          } 
-          // Fallback to template_src (background design only - no text)
-          else if (details?.template_src) {
-            url = details.template_src;
-            console.log('⚠️ Using template_src fallback (no text overlay):', url);
-            // If it's a relative path, make it absolute
-            if (!url.startsWith('http') && !url.startsWith('/')) {
-              url = '/' + url;
-            }
-            setInvitationUrl(url);
-          } else {
-            console.warn('⚠️ No invitation image found - neither invitation_path nor template_src');
-          }
-        }
-
-        // preload existing answers if any; keep attending null so user re-confirms each visit
-        // If you prefer to show last choice, uncomment and adjust:
-        // if (data.status !== null) setAttending(data.status === 'approved');
         if (data.adults !== null) setAdults(data.adults);
         if (data.children !== null) setChildren(data.children);
-        if (data.special_meals) setSpecialMeals({ ...specialMeals, ...data.special_meals });
+        if (data.special_meals) setSpecialMeals((prev) => ({ ...prev, ...data.special_meals }));
       } catch (e) {
         console.error(e);
         setError('שגיאה בטעינת הנתונים');
@@ -235,54 +153,6 @@ export default function GuestPage() {
       }
     })();
   }, [router.isReady, eventId, guestId]);
-
-  // Poll for event details updates (every 2 seconds)
-  useEffect(() => {
-    if (!eventId) return;
-    
-    const pollInterval = setInterval(async () => {
-      try {
-        const { data: ev, error: evErr } = await supabase
-          .from('events')
-          .select('event_details, updated_at')
-          .eq('id', eventId)
-          .single();
-          
-        if (!evErr && ev?.event_details) {
-          let details = {};
-          try {
-            details = typeof ev.event_details === 'string' 
-              ? JSON.parse(ev.event_details) 
-              : ev.event_details;
-          } catch (e) {
-            console.error('Error parsing event_details in poll:', e);
-            details = ev.event_details || {};
-          }
-          
-          // Always update - React will handle re-rendering only if changed
-          setEventDetails(prevDetails => {
-            const prevStr = JSON.stringify(prevDetails || {});
-            const newStr = JSON.stringify(details);
-            
-            if (prevStr !== newStr) {
-              console.log('🔄 Event details updated, refreshing...', {
-                has_line_styles: !!details?.line_styles,
-                line_styles: details?.line_styles,
-                line_styles_keys: Object.keys(details?.line_styles || {}),
-                first_line_style: details?.line_styles?.[0]
-              });
-              return details;
-            }
-            return prevDetails;
-          });
-        }
-      } catch (e) {
-        console.error('Error polling event details:', e);
-      }
-    }, 2000); // Check every 2 seconds
-    
-    return () => clearInterval(pollInterval);
-  }, [eventId]);
 
   const handleSave = async () => {
     setFormError('');
@@ -347,7 +217,9 @@ export default function GuestPage() {
       const allergyAdults = attending ? allergies.reduce((sum,a)=>sum+a.adults,0) : 0;
       const allergyChildren = attending ? allergies.reduce((sum,a)=>sum+a.children,0) : 0;
 
-      const updatePayload = {
+      const payload = {
+        eventId,
+        guestId,
         status: attending ? 'approved' : 'rejected',
         adults: sanitizedAdults,
         children: sanitizedChildren,
@@ -361,18 +233,16 @@ export default function GuestPage() {
         celiac_children: celiacChildren,
         allergy_adults: allergyAdults,
         allergy_children: allergyChildren,
+        allergy_note: allergies?.map((a) => a.description).filter(Boolean).join('; ') || '',
       };
 
-      // include allergy description text
-      if (allergies && allergies.length) {
-        updatePayload.allergy_note = allergies.map(a=>a.description).filter(Boolean).join('; ');
-      }
-
-      const { error: updErr } = await supabase
-        .from('invited_guests')
-        .update(updatePayload)
-        .match({ id: guestId, event_id: eventId });
-      if (updErr) throw updErr;
+      const res = await fetch(API, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || 'Failed to save');
 
       setSaved(attending ? 'approved' : 'rejected');
       setFormError('');
@@ -387,26 +257,29 @@ export default function GuestPage() {
   // Save status immediately (used for "לא מגיעים")
   const saveStatus = async (isAttending) => {
     try {
-      const updatePayload = {
-        status: isAttending ? 'approved' : 'rejected',
-        adults: isAttending ? adults : 0,
-        children: isAttending ? children : 0,
-        veg_adults: 0,
-        veg_children: 0,
-        vegan_adults: 0,
-        vegan_children: 0,
-        glatt_adults: 0,
-        glatt_children: 0,
-        allergy_adults: 0,
-        allergy_children: 0,
-      };
-
-      const { error: updErr } = await supabase
-        .from('invited_guests')
-        .update(updatePayload)
-        .match({ id: guestId, event_id: eventId });
-      if (updErr) throw updErr;
-
+      const res = await fetch(API, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          eventId,
+          guestId,
+          status: isAttending ? 'approved' : 'rejected',
+          adults: isAttending ? adults : 0,
+          children: isAttending ? children : 0,
+          veg_adults: 0,
+          veg_children: 0,
+          vegan_adults: 0,
+          vegan_children: 0,
+          glatt_adults: 0,
+          glatt_children: 0,
+          celiac_adults: 0,
+          celiac_children: 0,
+          allergy_adults: 0,
+          allergy_children: 0,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || 'Failed to save');
       setSaved(isAttending ? 'approved' : 'rejected');
     } catch (e) {
       console.error('save status failed', e);
