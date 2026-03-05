@@ -107,7 +107,12 @@ export default function GuestPage() {
   const removeAllergy = (idx) => setAllergies((prev) => prev.filter((_, i) => i !== idx));
 
   useEffect(() => {
-    if (!eventId || !guestId) return;
+    if (!router.isReady) return;
+    if (!eventId || !guestId) {
+      setLoading(false);
+      setError('קישור לא תקין – חסרים פרטי אירוע או אורח');
+      return;
+    }
     (async () => {
       try {
         const { data, error: fetchErr } = await supabase
@@ -217,7 +222,7 @@ export default function GuestPage() {
         setLoading(false);
       }
     })();
-  }, [eventId, guestId]);
+  }, [router.isReady, eventId, guestId]);
 
   // Poll for event details updates (every 2 seconds)
   useEffect(() => {
