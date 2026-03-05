@@ -3078,11 +3078,11 @@ React.useEffect(() => {
           if (reportTitle === 'אורחים מגיעים ממוינים לפי שולחן' && data?.length) {
             const byTable = {};
             data.forEach(g => {
-              const t = g.table_number || 'ללא';
+              const t = g.table_number || 'ללא שולחן';
               if (!byTable[t]) byTable[t] = [];
               byTable[t].push(g);
             });
-            const tables = Object.keys(byTable).sort((a, b) => (a === 'ללא' ? 1 : b === 'ללא' ? -1 : String(a).localeCompare(String(b))));
+            const tables = Object.keys(byTable).sort((a, b) => (a === 'ללא שולחן' ? 1 : b === 'ללא שולחן' ? -1 : String(a).localeCompare(String(b))));
             const dataWithSummaries = [];
             tables.forEach(table => {
               byTable[table].forEach(g => dataWithSummaries.push(g));
@@ -4403,6 +4403,7 @@ React.useEffect(() => {
                 <div className="flex items-center justify-center gap-2 mb-2">
                   <span className="text-xl">📊</span>
                   <h3 className="text-base font-bold text-purple-800">סטטוס אישורי הגעה</h3>
+                  <button onClick={()=>setGuestSummaryRefreshKey(k=>k+1)} className="text-xs bg-primary text-white px-2 py-1 rounded-full hover:bg-primary/90" title="רענן נתונים">רענן</button>
                 </div>
                 <div className="bg-white rounded-lg text-right p-2 mt-3">
                   {hasStatusData ? (
@@ -4834,6 +4835,7 @@ React.useEffect(() => {
         <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50">
           <div className="relative bg-white rounded-lg p-6 w-full max-w-md event-form">
             <button onClick={() => setShowGuestListModal(false)} className="absolute top-2 left-2 text-2xl text-gray-500 hover:text-gray-700">&times;</button>
+            <button onClick={()=>setGuestSummaryRefreshKey(k=>k+1)} className="absolute top-2 left-10 text-sm bg-primary text-white px-3 py-1 rounded-full hover:bg-primary/90">רענן</button>
             <h2 className="text-xl font-medium mb-4 text-center">דו"חות אישורי הגעה</h2>
             {/* filter buttons */}
             <div className="flex justify-center gap-2 mb-4">
@@ -6139,6 +6141,7 @@ React.useEffect(() => {
         <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50">
           <div className="relative bg-white rounded-lg p-2 sm:p-6 w-full sm:max-w-5xl mx-1 sm:mx-auto event-form">
             <button onClick={() => setShowReportModal(false)} className="absolute top-2 left-2 text-2xl text-gray-500 hover:text-gray-700 z-10">&times;</button>
+            <button onClick={() => setGuestSummaryRefreshKey(k=>k+1)} className="absolute top-2 left-10 z-10 bg-primary text-white text-sm px-3 py-1 rounded-full hover:bg-primary/90">רענן</button>
             <h2 className="text-base sm:text-xl font-medium mb-2 sm:mb-4 text-center pr-8">{reportTitle}</h2>
             {reportGuests.length === 0 ? (
               <p className="text-center text-gray-600">אין נתונים להצגה</p>
@@ -6252,6 +6255,7 @@ React.useEffect(() => {
           <div className="bg-white rounded-lg p-6 w-full max-w-sm text-center space-y-4 relative">
             <button onClick={()=>setShowReportsOptions(false)} className="absolute top-2 left-2 text-2xl text-gray-500 hover:text-gray-700">&times;</button>
             <h2 className="text-xl font-medium mb-2">בחר דו"ח להצגה</h2>
+            <button onClick={()=>setGuestSummaryRefreshKey(k=>k+1)} className="absolute top-2 left-10 text-sm bg-primary text-white px-3 py-1 rounded-full hover:bg-primary/90">רענן</button>
             {selectedEventForReport && (
               <p className="text-base md:text-lg font-bold text-gray-800 mb-4 rtl text-right">
                 אירוע מהעבר: {selectedEventForReport.event_type || 'אירוע'} – {selectedEventForReport._eventDate?format(selectedEventForReport._eventDate,'dd/MM/yyyy',{locale:he}):''}
