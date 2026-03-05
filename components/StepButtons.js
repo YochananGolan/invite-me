@@ -1527,6 +1527,7 @@ const handleOpenAddonModal = React.useCallback(() => {
           invitation_path: designFile,
           allowed_guests: totalAllowedGuests,
           additional_packages: addonCountForDb,
+          status: 'active',
         };
 
         console.debug('[StepButtons] Inserting event', payload);
@@ -2751,7 +2752,7 @@ React.useEffect(() => {
           .from('events')
           .select('id,event_details,allowed_guests,messages_sent_count,additional_packages,selected_plan,status')
           .eq('user_id',user.id)
-          .neq('status','archived')
+          .or('status.neq.archived,status.is.null')
           .order('created_at',{ascending:false})
           .limit(1)
           .single();
@@ -2866,7 +2867,7 @@ React.useEffect(() => {
         .from('events')
         .select('id,event_details,status,allowed_guests,messages_sent_count')
         .eq('user_id',user.id)
-        .neq('status','archived')
+        .or('status.neq.archived,status.is.null')
         .order('created_at',{ascending:false})
         .limit(1)
         .maybeSingle();
@@ -3193,7 +3194,7 @@ React.useEffect(() => {
           .from('events')
           .select('id, event_details, allowed_guests, messages_sent_count, additional_packages, selected_plan, status')
           .eq('user_id', user.id)
-          .neq('status', 'archived')
+          .or('status.neq.archived,status.is.null')
           .order('created_at', { ascending: false })
           .limit(1)
           .maybeSingle();

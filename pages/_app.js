@@ -103,7 +103,7 @@ function MyApp({ Component, pageProps }) {
           .from('events')
           .select('id, status, event_details')
           .eq('user_id', session.user.id)
-          .in('status', ['draft', 'active']);
+          .or('status.eq.draft,status.eq.active,status.is.null');
         if (evErr) {
           console.error('[auto-archive] Error fetching events:', evErr);
           throw evErr;
@@ -152,7 +152,7 @@ function MyApp({ Component, pageProps }) {
           .from('events')
           .select('id, status, event_details, created_at')
           .eq('user_id', session.user.id)
-          .neq('status', 'archived')
+          .or('status.neq.archived,status.is.null')
           .order('created_at', { ascending: false });
         if (error) throw error;
 

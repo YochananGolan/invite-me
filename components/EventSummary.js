@@ -59,7 +59,7 @@ export default function EventSummary() {
           .from('events')
           .select('id, event_type, event_details, status')
           .eq('user_id', user.id)
-          .neq('status', 'archived')
+          .or('status.neq.archived,status.is.null')
           .order('created_at', { ascending: false })
           .limit(1)
           .maybeSingle();
