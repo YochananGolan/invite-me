@@ -3160,7 +3160,7 @@ React.useEffect(() => {
         setEventMessagesSentCount(0);
         try { localStorage.removeItem('selectedPlan'); } catch(e){}
 
-        if (diffDays >= -7) {
+        if (diffDays >= -1) {
           setShowEventEndedNotice(true);
         }
       })();
