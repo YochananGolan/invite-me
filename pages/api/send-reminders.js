@@ -1,6 +1,7 @@
 /**
  * תזכורת אוטומטית – יומיים לפני האירוע.
  * נשלחת ב-SMS בלבד לכל מי שהזמנה נשלחה אליו (כל המופיעים ברשימת המוזמנים).
+ * התזכורת נשלחת פעם אחת בלבד לאירוע (reminder_sent_at).
  * מופעלת אוטומטית על ידי Vercel Cron מדי יום; אפשר גם להפעיל ידנית עם CRON_SECRET.
  */
 
@@ -73,6 +74,13 @@ export default async function handler(req, res) {
       eventDateDisplay = new Date(eventDateStr).toLocaleDateString('he-IL', { dateStyle: 'long', timeZone: ISRAEL_TZ });
     } catch (_) {}
 
+    // נוסח ההזמנה המלא – לשימוש בתזכורת
+    const fullInvitationText = details.custom_invitation_text ||
+      details.invitation_text ||
+      (details.invitation_text_lines && details.invitation_text_lines.length
+        ? details.invitation_text_lines.join('\n')
+        : `${eventName} בתאריך ${eventDateDisplay}`);
+
     const { data: guests, error: gError } = await supabase
       .from('invited_guests')
       .select('id, first_name, last_name, phone')
@@ -93,7 +101,8 @@ export default async function handler(req, res) {
       };
     });
 
-    const message = `שלום {firstName}, תזכורת: ${eventName} בתאריך ${eventDateDisplay}.\nלאישור הגעה לחצו כאן:\n{inviteLink}\nאין צורך לאשר שוב אם כבר אישרתם. Meet-M`;
+    // פורמט: הדגשת תזכורת, נוסח ההזמנה המלא, משפט ללא צורך באישור חוזר, לינק. התזכורת נשלחת פעם אחת בלבד (reminder_sent_at).
+    const message = `שלום {firstName}, *תזכורת*:\n\n${fullInvitationText}\n\nאין צורך לאשר שוב אם אין שינויים.\n\nלאישור הגעה לחצו כאן:\n{inviteLink}\n\nMeet-M`;
 
     try {
       const { sent, failed, errors: sendErrors } = await sendSmsToGuests(smsGuests, message, 'Reminder');
