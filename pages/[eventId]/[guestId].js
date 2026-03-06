@@ -661,12 +661,14 @@ export default function GuestPage({ initialData, initialError }) {
                     <div>
                       <label className="mb-1 block font-bold text-base sm:text-lg text-blue-900">סה"כ בוגרים</label>
                       <input
-                        type="number"
-                        min="0"
+                        type="text"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
                         className="w-full rounded-md border-2 border-blue-300 p-2 sm:p-3 text-lg sm:text-xl text-center font-semibold focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-                        value={adults}
+                        value={String(adults)}
                         onChange={(e) => {
-                          setAdults(Number(e.target.value));
+                          const v = e.target.value.replace(/[^0-9]/g, '');
+                          setAdults(v === '' ? 0 : Math.min(99, parseInt(v, 10)));
                           if (formError) setFormError('');
                         }}
                       />
@@ -674,12 +676,14 @@ export default function GuestPage({ initialData, initialError }) {
                     <div>
                       <label className="mb-1 block font-bold text-base sm:text-lg text-blue-900">סה"כ ילדים</label>
                       <input
-                        type="number"
-                        min="0"
+                        type="text"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
                         className="w-full rounded-md border-2 border-blue-300 p-2 sm:p-3 text-lg sm:text-xl text-center font-semibold focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-                        value={children}
+                        value={String(children)}
                         onChange={(e) => {
-                          setChildren(Number(e.target.value));
+                          const v = e.target.value.replace(/[^0-9]/g, '');
+                          setChildren(v === '' ? 0 : Math.min(99, parseInt(v, 10)));
                           if (formError) setFormError('');
                         }}
                       />
@@ -704,20 +708,28 @@ export default function GuestPage({ initialData, initialError }) {
                           <td className="border p-2 font-medium text-sm sm:text-lg">{c.label}</td>
                           <td className="border p-2">
                             <input
-                              type="number"
-                              min="0"
+                              type="text"
+                              inputMode="numeric"
+                              pattern="[0-9]*"
                               className="w-full rounded-md border p-1.5 text-sm sm:text-base text-center max-w-[60px] sm:max-w-[80px] mx-auto"
-                              value={specialMeals[c.key].adults}
-                              onChange={(e) => updateMeal(c.key, 'adults', Number(e.target.value))}
+                              value={String(specialMeals[c.key].adults)}
+                              onChange={(e) => {
+                                const v = e.target.value.replace(/[^0-9]/g, '');
+                                updateMeal(c.key, 'adults', v === '' ? 0 : Math.min(99, parseInt(v, 10)));
+                              }}
                             />
                           </td>
                           <td className="border p-2">
                             <input
-                              type="number"
-                              min="0"
+                              type="text"
+                              inputMode="numeric"
+                              pattern="[0-9]*"
                               className="w-full rounded-md border p-1.5 text-sm sm:text-base text-center max-w-[60px] sm:max-w-[80px] mx-auto"
-                              value={specialMeals[c.key].children}
-                              onChange={(e) => updateMeal(c.key, 'children', Number(e.target.value))}
+                              value={String(specialMeals[c.key].children)}
+                              onChange={(e) => {
+                                const v = e.target.value.replace(/[^0-9]/g, '');
+                                updateMeal(c.key, 'children', v === '' ? 0 : Math.min(99, parseInt(v, 10)));
+                              }}
                             />
                           </td>
                         </tr>
@@ -774,20 +786,28 @@ export default function GuestPage({ initialData, initialError }) {
                         </td>
                         <td className="border p-2 text-center">
                           <input
-                            type="number"
-                            min="0"
+                            type="text"
+                            inputMode="numeric"
+                            pattern="[0-9]*"
                             className="w-full rounded-md border p-1.5 text-sm md:text-base text-center max-w-[60px] md:max-w-[80px] mx-auto"
-                            value={a.adults}
-                            onChange={(e) => updateAllergy(idx, 'adults', Number(e.target.value))}
+                            value={String(a.adults)}
+                            onChange={(e) => {
+                              const v = e.target.value.replace(/[^0-9]/g, '');
+                              updateAllergy(idx, 'adults', v === '' ? 0 : Math.min(99, parseInt(v, 10)));
+                            }}
                           />
                         </td>
                         <td className="border p-2 text-center">
                           <input
-                            type="number"
-                            min="0"
+                            type="text"
+                            inputMode="numeric"
+                            pattern="[0-9]*"
                             className="w-full rounded-md border p-1.5 text-sm md:text-base text-center max-w-[60px] md:max-w-[80px] mx-auto"
-                            value={a.children}
-                            onChange={(e) => updateAllergy(idx, 'children', Number(e.target.value))}
+                            value={String(a.children)}
+                            onChange={(e) => {
+                              const v = e.target.value.replace(/[^0-9]/g, '');
+                              updateAllergy(idx, 'children', v === '' ? 0 : Math.min(99, parseInt(v, 10)));
+                            }}
                           />
                         </td>
                         <td className="border p-2 text-center">
