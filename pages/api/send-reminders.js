@@ -1,8 +1,9 @@
 /**
- * תזכורת אוטומטית – יומיים לפני האירוע.
- * נשלחת ב-SMS בלבד לכל מי שהזמנה נשלחה אליו (כל המופיעים ברשימת המוזמנים).
+ * תזכורת אוטומטית – בדיוק יומיים לפני האירוע.
+ * נשלחת ב-SMS לכל מי שהזמנה נשלחה אליו (כל המופיעים ברשימת המוזמנים), לכולם באותו זמן.
  * התזכורת נשלחת פעם אחת בלבד לאירוע (reminder_sent_at).
  * מופעלת אוטומטית על ידי Vercel Cron מדי יום; אפשר גם להפעיל ידנית עם CRON_SECRET.
+ * מספר הימים לפני האירוע ניתן להגדרה ב-REMINDER_DAYS_BEFORE (ברירת מחדל: 2).
  */
 
 import { createClient } from '@supabase/supabase-js';
@@ -36,16 +37,13 @@ export default async function handler(req, res) {
 
   const supabase = createClient(supabaseUrl, supabaseKey);
 
+  const REMINDER_DAYS_BEFORE = parseInt(process.env.REMINDER_DAYS_BEFORE || '2', 10);
   const now = new Date();
   const todayStr = getDateStringInIsrael(now);
-  const tomorrow = new Date(now); tomorrow.setDate(tomorrow.getDate() + 1);
-  const tomorrowStr = getDateStringInIsrael(tomorrow);
-  const inTwoDays = new Date(now); inTwoDays.setDate(inTwoDays.getDate() + 2);
-  const inTwoDaysStr = getDateStringInIsrael(inTwoDays);
-  const inThreeDays = new Date(now); inThreeDays.setDate(inThreeDays.getDate() + 3);
-  const inThreeDaysStr = getDateStringInIsrael(inThreeDays);
-  // חלון: יומיים לפני, יום לפני, ויום האירוע (למקרה של הבדלי timezone)
-  const targetDates = new Set([todayStr, tomorrowStr, inTwoDaysStr, inThreeDaysStr]);
+  const targetDate = new Date(now);
+  targetDate.setDate(targetDate.getDate() + REMINDER_DAYS_BEFORE);
+  const targetDateStr = getDateStringInIsrael(targetDate);
+  const targetDates = new Set([targetDateStr]);
 
   const { data: events, error: evError } = await supabase
     .from('events')
@@ -156,6 +154,8 @@ export default async function handler(req, res) {
 
   const response = {
     ok: true,
+    reminderDaysBefore: REMINDER_DAYS_BEFORE,
+    targetDateStr,
     targetDates: [...targetDates],
     todayStr,
     totalEventsInDb: (events || []).length,
@@ -166,7 +166,12 @@ export default async function handler(req, res) {
     errors: report.errors.length ? report.errors : undefined,
   };
   if (dryRun || eventsInRange.length === 0) {
-    response.debug = { samples: debugSamples, hint: 'Cron runs at 06:00 UTC. Events need status draft/active, reminder_sent_at null, and date in event_details.' };
+    response.debug = {
+      samples: debugSamples,
+      reminderDaysBefore: REMINDER_DAYS_BEFORE,
+      targetDateStr,
+      hint: 'Cron runs at 06:00 UTC. Reminder sent only when event date equals today + REMINDER_DAYS_BEFORE. Set REMINDER_DAYS_BEFORE env (default 2).',
+    };
   }
   return res.status(200).json(response);
 }
