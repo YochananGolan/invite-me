@@ -4330,7 +4330,7 @@ React.useEffect(() => {
                 <div className="mt-1">
                   <div className="bg-white p-3 rounded-lg border border-blue-100">
                     {hasGuestSummaryData ? (
-                      <div className="h-40 sm:h-56">
+                      <div className="h-56 min-h-[200px] sm:h-56">
                         <ResponsiveContainer width="100%" height="100%">
                           <BarChart
                             data={guestSummaryChartData}
@@ -4344,10 +4344,6 @@ React.useEffect(() => {
                               interval={0}
                             />
                             <YAxis hide />
-                            <Tooltip
-                              formatter={(value, name) => [`${value}`, name]}
-                              wrapperStyle={{ direction: 'rtl', textAlign: 'right' }}
-                            />
                             <Bar dataKey="value" radius={[8, 8, 0, 0]} maxBarSize={60}>
                               {guestSummaryChartData.map((item) => (
                                 <Cell key={item.key} fill={item.color} />
@@ -4443,7 +4439,7 @@ React.useEffect(() => {
                 </div>
                 <div className="bg-white rounded-lg text-right p-2 mt-3">
                     {hasStatusData ? (
-                    <div className="h-44 sm:h-60">
+                    <div className="h-60 min-h-[220px] sm:h-60">
                       <ResponsiveContainer width="100%" height="100%">
                         <PieChart>
                           <Pie
@@ -4553,7 +4549,7 @@ React.useEffect(() => {
 
                     <div className="bg-white p-3 rounded-lg border border-yellow-200">
                       {hasCapacityChartData ? (
-                        <div className="h-40 sm:h-56">
+                        <div className="h-56 min-h-[200px] sm:h-56">
                           <ResponsiveContainer width="100%" height="100%">
                             <BarChart
                               data={capacityChartData}
@@ -4567,10 +4563,6 @@ React.useEffect(() => {
                                 interval={0}
                               />
                               <YAxis hide />
-                              <Tooltip
-                                formatter={(value, name) => [`${value}`, name]}
-                                wrapperStyle={{ direction: 'rtl', textAlign: 'right' }}
-                              />
                               <Bar dataKey="value" radius={[8, 8, 0, 0]} maxBarSize={60}>
                                 {capacityChartData.map((item) => (
                                   <Cell key={item.key} fill={item.color} />
