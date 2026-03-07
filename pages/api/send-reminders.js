@@ -127,7 +127,7 @@ export default async function handler(req, res) {
     });
 
     // פורמט: הדגשת תזכורת, נוסח ההזמנה המלא, משפט ללא צורך באישור חוזר, לינק. התזכורת נשלחת פעם אחת בלבד (reminder_sent_at).
-    const message = `שלום {firstName}, *תזכורת*:\n\n${fullInvitationText}\n\nאין צורך לאשר שוב אם אין שינויים.\n\nלאישור הגעה לחצו כאן:\n{inviteLink}\n\nMeet-M`;
+    const message = `שלום {firstName}, *תזכורת*:\n\n${fullInvitationText}\n\nאין צורך לאשר שוב אם אין שינויים.\n\nלאישור הגעה לחצו כאן:\n{inviteLink}`;
 
     if (dryRun) {
       report.totalSent += smsGuests.length;

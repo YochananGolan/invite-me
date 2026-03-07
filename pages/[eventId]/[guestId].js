@@ -373,7 +373,7 @@ export default function GuestPage({ initialData, initialError }) {
               <img
                 src={invitationUrl}
                 alt="הזמנה"
-                className="absolute inset-0 w-full h-full object-cover"
+                className="absolute inset-0 w-full h-full object-cover object-top"
                 onLoad={() => console.log('✅ Invitation image loaded successfully from:', invitationUrl)}
                 onError={(e) => {
                   console.error('❌ Failed to load invitation image from:', invitationUrl);
