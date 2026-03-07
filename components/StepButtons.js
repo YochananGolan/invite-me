@@ -6189,14 +6189,14 @@ React.useEffect(() => {
                       <th className="px-0.5 py-1 border whitespace-nowrap">משפחה</th>
                       <th className="px-0.5 py-1 border whitespace-nowrap">שולחן</th>
                       <th className="px-0.5 py-1 border whitespace-nowrap">טלפון</th>
-                      <th className="px-0.5 py-1 border whitespace-nowrap">בוג׳</th>
-                      <th className="px-0.5 py-1 border whitespace-nowrap">ילד׳</th>
-                      <th className="px-0.5 py-1 border whitespace-nowrap">סה״כ</th>
-                      <th className="px-0.5 py-1 border whitespace-nowrap">צמח׳</th>
-                      <th className="px-0.5 py-1 border whitespace-nowrap">טבע׳</th>
+                      <th className="px-0.5 py-1 border whitespace-nowrap">בוגרים</th>
+                      <th className="px-0.5 py-1 border whitespace-nowrap">ילדים</th>
+                      <th className="px-0.5 py-1 border whitespace-nowrap">סה"כ</th>
+                      <th className="px-0.5 py-1 border whitespace-nowrap">צמחוני</th>
+                      <th className="px-0.5 py-1 border whitespace-nowrap">טבעוני</th>
                       <th className="px-0.5 py-1 border whitespace-nowrap">גלאט</th>
-                      <th className="px-0.5 py-1 border whitespace-nowrap">צליא׳</th>
-                      <th className="px-0.5 py-1 border whitespace-nowrap">אלר׳</th>
+                      <th className="px-0.5 py-1 border whitespace-nowrap">צליאקים</th>
+                      <th className="px-0.5 py-1 border whitespace-nowrap">אלרגיה</th>
                       <th className="px-0.5 py-1 border whitespace-nowrap">הערה</th>
                     </tr>
                   </thead>
@@ -6515,14 +6515,14 @@ React.useEffect(() => {
                     <th className="px-0.5 py-1 border whitespace-nowrap">משפחה</th>
                     <th className="px-0.5 py-1 border whitespace-nowrap">שולחן</th>
                     <th className="px-0.5 py-1 border whitespace-nowrap">טלפון</th>
-                    <th className="px-0.5 py-1 border whitespace-nowrap">בוג׳</th>
-                    <th className="px-0.5 py-1 border whitespace-nowrap">ילד׳</th>
-                    <th className="px-0.5 py-1 border whitespace-nowrap">סה״כ</th>
-                    <th className="px-0.5 py-1 border whitespace-nowrap">צמח׳</th>
-                    <th className="px-0.5 py-1 border whitespace-nowrap">טבע׳</th>
+                    <th className="px-0.5 py-1 border whitespace-nowrap">בוגרים</th>
+                    <th className="px-0.5 py-1 border whitespace-nowrap">ילדים</th>
+                    <th className="px-0.5 py-1 border whitespace-nowrap">סה"כ</th>
+                    <th className="px-0.5 py-1 border whitespace-nowrap">צמחוני</th>
+                    <th className="px-0.5 py-1 border whitespace-nowrap">טבעוני</th>
                     <th className="px-0.5 py-1 border whitespace-nowrap">גלאט</th>
-                    <th className="px-0.5 py-1 border whitespace-nowrap">צליא׳</th>
-                    <th className="px-0.5 py-1 border whitespace-nowrap">אלר׳</th>
+                    <th className="px-0.5 py-1 border whitespace-nowrap">צליאקים</th>
+                    <th className="px-0.5 py-1 border whitespace-nowrap">אלרגיה</th>
                     <th className="px-0.5 py-1 border whitespace-nowrap">הערה</th>
                   </tr>
                 </thead>
