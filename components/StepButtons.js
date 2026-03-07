@@ -8,7 +8,7 @@ import * as XLSX from 'xlsx';
 import { format } from 'date-fns';
 import { useToast } from './Toast';
 import TranzilaPayment from './TranzilaPayment';
-import { ResponsiveContainer, PieChart, Pie, Cell, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid, LabelList } from 'recharts';
+import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid, LabelList } from 'recharts';
 
 const RADIAN = Math.PI / 180;
 
@@ -4344,6 +4344,7 @@ React.useEffect(() => {
                               interval={0}
                             />
                             <YAxis hide />
+                            <Tooltip content={() => null} active={false} cursor={false} />
                             <Bar dataKey="value" radius={[8, 8, 0, 0]} maxBarSize={60}>
                               {guestSummaryChartData.map((item) => (
                                 <Cell key={item.key} fill={item.color} />
@@ -4456,6 +4457,7 @@ React.useEffect(() => {
                               <Cell key={item.key} fill={item.color} />
                             ))}
                           </Pie>
+                          <Tooltip content={() => null} active={false} cursor={false} />
                           <Legend
                             iconType="circle"
                             wrapperStyle={{ direction: 'rtl', textAlign: 'right', color: '#111827' }}
@@ -4559,6 +4561,7 @@ React.useEffect(() => {
                                 interval={0}
                               />
                               <YAxis hide />
+                              <Tooltip content={() => null} active={false} cursor={false} />
                               <Bar dataKey="value" radius={[8, 8, 0, 0]} maxBarSize={60}>
                                 {capacityChartData.map((item) => (
                                   <Cell key={item.key} fill={item.color} />
