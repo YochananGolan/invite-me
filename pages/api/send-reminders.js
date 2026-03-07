@@ -23,8 +23,9 @@ export default async function handler(req, res) {
 
   const authHeader = req.headers.authorization || '';
   const cronSecret = process.env.CRON_SECRET;
+  const dryRun = req.query?.dryRun === '1';
   if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
-    return res.status(401).json({ error: 'Unauthorized' });
+    return res.status(401).json({ error: 'Unauthorized', hint: 'Add header: Authorization: Bearer YOUR_CRON_SECRET' });
   }
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
@@ -41,7 +42,10 @@ export default async function handler(req, res) {
   const tomorrowStr = getDateStringInIsrael(tomorrow);
   const inTwoDays = new Date(now); inTwoDays.setDate(inTwoDays.getDate() + 2);
   const inTwoDaysStr = getDateStringInIsrael(inTwoDays);
-  const targetDates = new Set([todayStr, tomorrowStr, inTwoDaysStr]);
+  const inThreeDays = new Date(now); inThreeDays.setDate(inThreeDays.getDate() + 3);
+  const inThreeDaysStr = getDateStringInIsrael(inThreeDays);
+  // חלון: יומיים לפני, יום לפני, ויום האירוע (למקרה של הבדלי timezone)
+  const targetDates = new Set([todayStr, tomorrowStr, inTwoDaysStr, inThreeDaysStr]);
 
   const { data: events, error: evError } = await supabase
     .from('events')
@@ -54,12 +58,35 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: evError.message });
   }
 
+  const debugSamples = [];
   const eventsInRange = (events || []).filter((ev) => {
     const d = ev?.event_details || {};
     const dateStr = d.end_datetime || d.date || d.start_datetime;
     if (!dateStr) return false;
-    const eventDateStr = getDateStringInIsrael(new Date(dateStr));
-    return targetDates.has(eventDateStr);
+    try {
+      // תמיכה בפורמטים: "2026-03-09", "2026-03-09T19:00:00", "09.03.2026"
+      let parsed = new Date(dateStr);
+      if (isNaN(parsed.getTime())) {
+        const parts = String(dateStr).split(/[.\/-]/);
+        if (parts.length >= 3) {
+          const [a, b, c] = parts;
+          const y = a.length >= 4 ? parseInt(a, 10) : parseInt(c, 10);
+          const m = parseInt(b, 10) - 1;
+          const day = a.length >= 4 ? parseInt(c, 10) : parseInt(a, 10);
+          parsed = new Date(y, m, day);
+        }
+      }
+      if (isNaN(parsed.getTime())) return false;
+      const eventDateStr = getDateStringInIsrael(parsed);
+      const matched = targetDates.has(eventDateStr);
+      if (debugSamples.length < 5) {
+        debugSamples.push({ eventId: ev.id, dateStr, eventDateStr, matched, targetDates: [...targetDates] });
+      }
+      return matched;
+    } catch (_) {
+      if (debugSamples.length < 5) debugSamples.push({ eventId: ev.id, dateStr, error: 'parse failed' });
+      return false;
+    }
   });
 
   const baseUrl = getInviteBaseUrl();
@@ -104,6 +131,11 @@ export default async function handler(req, res) {
     // פורמט: הדגשת תזכורת, נוסח ההזמנה המלא, משפט ללא צורך באישור חוזר, לינק. התזכורת נשלחת פעם אחת בלבד (reminder_sent_at).
     const message = `שלום {firstName}, *תזכורת*:\n\n${fullInvitationText}\n\nאין צורך לאשר שוב אם אין שינויים.\n\nלאישור הגעה לחצו כאן:\n{inviteLink}\n\nMeet-M`;
 
+    if (dryRun) {
+      report.totalSent += smsGuests.length;
+      report.eventsProcessed += 1;
+      continue;
+    }
     try {
       const { sent, failed, errors: sendErrors } = await sendSmsToGuests(smsGuests, message, 'Reminder');
       report.totalSent += sent;
@@ -122,12 +154,19 @@ export default async function handler(req, res) {
     else report.eventsProcessed += 1;
   }
 
-  return res.status(200).json({
+  const response = {
     ok: true,
     targetDates: [...targetDates],
+    todayStr,
+    totalEventsInDb: (events || []).length,
     eventsFound: eventsInRange.length,
     eventsProcessed: report.eventsProcessed,
     totalRemindersSent: report.totalSent,
+    dryRun: dryRun || undefined,
     errors: report.errors.length ? report.errors : undefined,
-  });
+  };
+  if (dryRun || eventsInRange.length === 0) {
+    response.debug = { samples: debugSamples, hint: 'Cron runs at 06:00 UTC. Events need status draft/active, reminder_sent_at null, and date in event_details.' };
+  }
+  return res.status(200).json(response);
 }

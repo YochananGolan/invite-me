@@ -460,7 +460,7 @@ const totalPlanCapacity = (basePlanLimit || 0) + additionalCapacity;
 const basePlanOverCapacity = basePlanLimit ? effectiveMessagesSentCount > basePlanLimit : false;
 const activePlanDescription =
   selectedPlan === 'basic' || selectedPlan === 'free'
-    ? 'מסלול א - 5₪ לאירועים קטנים עם כל הפיצ\'רים הבסיסיים'
+    ? 'מסלול א - ₪5 לאירועים קטנים עם כל הפיצ\'רים הבסיסיים'
     : selectedPlan === 'standard'
       ? 'מסלול ב - מקצועי עם תמיכה מלאה ועיצובים מתקדמים'
       : selectedPlan === 'premium'
@@ -2454,7 +2454,7 @@ React.useEffect(() => {
     switch(plan) {
       case 'free':
       case 'basic':
-        return 'מסלול א - 5₪';
+        return 'מסלול א - ₪5';
       case 'standard':
         return 'מסלול ב - 149₪';
       case 'premium':
@@ -4146,12 +4146,12 @@ React.useEffect(() => {
               </div>
             )}
             {currentEventId ? (
-              <div className="bg-green-50 p-3 text-center shadow-lg w-full" style={{
+              <div className="bg-green-50 p-3 sm:p-4 text-center shadow-lg w-full" style={{
                 border: '3px solid #D4AF37',
                 outline: '2px solid #B8860B',
                 outlineOffset: '2px',
                 borderRadius: '8px',
-                minHeight: '280px'
+                minHeight: 'min(280px, 50vh)'
               }}>
                 <div className="flex items-center justify-center gap-2 mb-2">
                   <span className="text-2xl">✅</span>
@@ -4226,12 +4226,12 @@ React.useEffect(() => {
               </div>
             )}
             {session && selectedPlan && (
-              <div className="bg-yellow-50 p-3 text-center shadow-lg w-full" style={{
+              <div className="bg-yellow-50 p-3 sm:p-4 text-center shadow-lg w-full" style={{
                 border: '3px solid #D4AF37',
                 outline: '2px solid #B8860B',
                 outlineOffset: '2px',
                 borderRadius: '8px',
-                minHeight: '280px'
+                minHeight: 'min(280px, 50vh)'
               }}>
                 <div className="flex items-center justify-center gap-2 mb-2">
                   <span className="text-2xl">💰</span>
@@ -4258,7 +4258,7 @@ React.useEffect(() => {
                          selectedPlan === 'supreme' ? 'מסלול ו' : 'לא נבחר מסלול'}
                       </div>
                       <div className="text-base text-gray-700 font-semibold">
-                        {selectedPlan === 'basic' || selectedPlan === 'free' ? '5₪ - עד 5 הודעות' :
+                        {selectedPlan === 'basic' || selectedPlan === 'free' ? '₪5 - עד 5 הודעות' :
                          selectedPlan === 'standard' ? '149₪ - מ 51 עד 200 הודעות' :
                          selectedPlan === 'premium' ? '199₪ - מ 201 עד 350 הודעות' :
                          selectedPlan === 'luxury' ? '259₪ - מ 351 עד 500 הודעות' :
@@ -4316,12 +4316,12 @@ React.useEffect(() => {
           {/* Second Column - Guest Summary + Table Report */}
           {currentEventId && (
             <div className="w-full flex flex-col gap-6">
-              <div className="bg-blue-50 p-3 text-center shadow-lg w-full" style={{
+              <div className="bg-blue-50 p-3 sm:p-4 text-center shadow-lg w-full" style={{
                 border: '3px solid #D4AF37',
                 outline: '2px solid #B8860B',
                 outlineOffset: '2px',
                 borderRadius: '8px',
-                minHeight: '280px'
+                minHeight: 'min(280px, 50vh)'
               }}>
                 <div className="flex items-center justify-center gap-2 mb-2">
                   <span className="text-xl">👥</span>
@@ -4330,7 +4330,7 @@ React.useEffect(() => {
                 <div className="mt-1">
                   <div className="bg-white p-3 rounded-lg border border-blue-100">
                     {hasGuestSummaryData ? (
-                      <div className="h-56">
+                      <div className="h-40 sm:h-56">
                         <ResponsiveContainer width="100%" height="100%">
                           <BarChart
                             data={guestSummaryChartData}
@@ -4369,11 +4369,11 @@ React.useEffect(() => {
                     </div>
                     <div className="bg-white p-2 rounded-lg border border-orange-100 text-right">
                       <div className="text-sm font-semibold text-orange-600">ילדים</div>
-                      <div className="text-2ל font-bold text-orange-700">{guestSummary.children}</div>
+                      <div className="text-2xl font-bold text-orange-700">{guestSummary.children}</div>
                     </div>
                     <div className="bg-white p-2 rounded-lg border border-purple-100 text-right">
                       <div className="text-sm font-semibold text-purple-600">סה"כ</div>
-                      <div className="text-2ל font-bold text-purple-700">{guestSummary.adults + guestSummary.children}</div>
+                      <div className="text-2xl font-bold text-purple-700">{guestSummary.adults + guestSummary.children}</div>
                     </div>
                   </div>
                 </div>
@@ -4430,20 +4430,20 @@ React.useEffect(() => {
           {/* Third Column - Guest Status Summary */}
           {currentEventId && (
             <div className="w-full flex flex-col gap-6">
-              <div className="bg-purple-50 p-3 text-center shadow-lg w-full" style={{
+              <div className="bg-purple-50 p-3 sm:p-4 text-center shadow-lg w-full" style={{
                 border: '3px solid #D4AF37',
                 outline: '2px solid #B8860B',
                 outlineOffset: '2px',
                 borderRadius: '8px',
-                minHeight: '280px'
+                minHeight: 'min(280px, 50vh)'
               }}>
                 <div className="flex items-center justify-center gap-2 mb-2">
                   <span className="text-xl">📊</span>
                   <h3 className="text-base font-bold text-purple-800">סטטוס אישורי הגעה</h3>
                 </div>
                 <div className="bg-white rounded-lg text-right p-2 mt-3">
-                  {hasStatusData ? (
-                    <div className="h-60">
+                    {hasStatusData ? (
+                    <div className="h-44 sm:h-60">
                       <ResponsiveContainer width="100%" height="100%">
                         <PieChart>
                           <Pie
@@ -4553,7 +4553,7 @@ React.useEffect(() => {
 
                     <div className="bg-white p-3 rounded-lg border border-yellow-200">
                       {hasCapacityChartData ? (
-                        <div className="h-56">
+                        <div className="h-40 sm:h-56">
                           <ResponsiveContainer width="100%" height="100%">
                             <BarChart
                               data={capacityChartData}
