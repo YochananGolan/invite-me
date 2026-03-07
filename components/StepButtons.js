@@ -697,6 +697,15 @@ const handleOpenAddonModal = React.useCallback(() => {
       const days = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת'];
       return days[d.getDay()] || '';
     };
+    // פורמט תאריך קצר להזמנות: DD.M.YY (למשל 11.3.26)
+    const formatShortDate = (isoDate) => {
+      if (!isoDate) return '';
+      const [year, month, day] = isoDate.split('-');
+      const yy = year.slice(-2);
+      const m = parseInt(month, 10);
+      const d = parseInt(day, 10);
+      return `${d}.${m}.${yy}`;
+    };
 
     /**
      * Try to share an invitation image using the Web Share API (level 2 – files).
@@ -1121,16 +1130,16 @@ const handleOpenAddonModal = React.useCallback(() => {
 
   // ---------- Invitation text templates ----------
   const invitationTemplates = {
-    'חתונה': (d) => `${d.brideName} ו${d.groomName} מתחתנים\n\nשמחים להזמינכם לחגוג עמנו את יום הנישואין\nביום ${getDayOfWeekHebrew(d.date)} ${formatDateToHebrew(d.date)} בשעה ${d.time}\nבאולם ${d.hallName}, ${d.hallAddress}\nהחופה תתקיים בשעה ${d.chuppahTime}\n\nהורי הכלה: ${d.brideParents}\nהורי החתן: ${d.groomParents}`,
-    'חינה': (d) => `${d.brideParents} ובתם ${d.brideName} יחד עם ${d.groomParents} ובנם ${d.groomName}\nמזמינים אתכם לחגוג עמנו בחינה\nבתאריך ${formatDateToHebrew(d.date)} בשעה ${d.time}\nבאולם ${d.hallName}, ${d.hallAddress}`,
-    'מסיבת אירוסין': (d) => `של ${d.brideName} ו${d.groomName}\nשמחים להזמינכם למסיבת האירוסין שלנו\nבתאריך ${formatDateToHebrew(d.date)} בשעה ${d.time}\nבאולם ${d.hallName}, ${d.hallAddress}`,
-    'הפרשת חלה': (d) => `${d.hostName}\nמזמינה אתכן לטקס הפרשת חלה מרגש\nבתאריך ${formatDateToHebrew(d.date)} בשעה ${d.time}\nב${d.hallName}, ${d.hallAddress}`,
-    'בר מצווה': (d)=> `אנו, ${d.boyParents},\nמזמינים אתכם לחגוג עמנו את בר המצווה של בננו ${d.boyName}\nבתאריך ${formatDateToHebrew(d.date)} בשעה ${d.time}\nבאולם ${d.hallName}, ${d.hallAddress}`,
-    'בת מצווה': (d)=> `אנו, ${d.girlParents},\nמזמינים אתכם לחגוג עמנו את בת המצווה של בתנו ${d.girlName}\nבתאריך ${formatDateToHebrew(d.date)} בשעה ${d.time}\nבאולם ${d.hallName}, ${d.hallAddress}`,
-    'ברית': (d)=> `אנו, ${d.babyParents},\nשמחים להזמינכם לברית בננו\nבתאריך ${formatDateToHebrew(d.date)} בשעה ${d.time}\nבאולם ${d.hallName}, ${d.hallAddress}`,
-    'בריתה': (d)=> `אנו, ${d.babyParents},\nשמחים להזמינכם לבריתה בתנו\nבתאריך ${formatDateToHebrew(d.date)} בשעה ${d.time}\nבאולם ${d.hallName}, ${d.hallAddress}`,
-    'יום הולדת': (d)=> `את/ה מוזמנ/ת לחגוג עם ${d.birthdayName}\nיום הולדתו ה- ${d.birthdayAge}\nבתאריך ${formatDateToHebrew(d.date)} בשעה ${d.time}\nב-${d.hallName}, ${d.hallAddress}`,
-    'אירוע עסקי': (d)=> `חברת ${d.businessName} (${d.businessContact})\nמתכבדת להזמינך לאירוע העסקי שלנו\nבתאריך ${formatDateToHebrew(d.date)} בשעה ${d.time}\nב-${d.hallName}, ${d.hallAddress}`,
+    'חתונה': (d) => `${d.brideName} ו${d.groomName} מתחתנים\n\nשמחים להזמינכם לחגוג עמנו את יום הנישואין\nביום ${getDayOfWeekHebrew(d.date)} ${formatShortDate(d.date)} בשעה ${d.time}\nבאולם ${d.hallName}, ${d.hallAddress}\nהחופה תתקיים בשעה ${d.chuppahTime}\n\nהורי הכלה: ${d.brideParents}\nהורי החתן: ${d.groomParents}`,
+    'חינה': (d) => `${d.brideParents} ובתם ${d.brideName} יחד עם ${d.groomParents} ובנם ${d.groomName}\nמזמינים אתכם לחגוג עמנו בחינה\nביום ${getDayOfWeekHebrew(d.date)} ${formatShortDate(d.date)} בשעה ${d.time}\nבאולם ${d.hallName}, ${d.hallAddress}`,
+    'מסיבת אירוסין': (d) => `של ${d.brideName} ו${d.groomName}\nשמחים להזמינכם למסיבת האירוסין שלנו\nביום ${getDayOfWeekHebrew(d.date)} ${formatShortDate(d.date)} בשעה ${d.time}\nבאולם ${d.hallName}, ${d.hallAddress}`,
+    'הפרשת חלה': (d) => `${d.hostName}\nמזמינה אתכן לטקס הפרשת חלה מרגש\nביום ${getDayOfWeekHebrew(d.date)} ${formatShortDate(d.date)} בשעה ${d.time}\nב${d.hallName}, ${d.hallAddress}`,
+    'בר מצווה': (d)=> `אנו, ${d.boyParents},\nמזמינים אתכם לחגוג עמנו את בר המצווה של בננו ${d.boyName}\nביום ${getDayOfWeekHebrew(d.date)} ${formatShortDate(d.date)} בשעה ${d.time}\nבאולם ${d.hallName}, ${d.hallAddress}`,
+    'בת מצווה': (d)=> `אנו, ${d.girlParents},\nמזמינים אתכם לחגוג עמנו את בת המצווה של בתנו ${d.girlName}\nביום ${getDayOfWeekHebrew(d.date)} ${formatShortDate(d.date)} בשעה ${d.time}\nבאולם ${d.hallName}, ${d.hallAddress}`,
+    'ברית': (d)=> `אנו, ${d.babyParents},\nשמחים להזמינכם לברית בננו\nביום ${getDayOfWeekHebrew(d.date)} ${formatShortDate(d.date)} בשעה ${d.time}\nבאולם ${d.hallName}, ${d.hallAddress}`,
+    'בריתה': (d)=> `אנו, ${d.babyParents},\nשמחים להזמינכם לבריתה בתנו\nביום ${getDayOfWeekHebrew(d.date)} ${formatShortDate(d.date)} בשעה ${d.time}\nבאולם ${d.hallName}, ${d.hallAddress}`,
+    'יום הולדת': (d)=> `את/ה מוזמנ/ת לחגוג עם ${d.birthdayName}\nיום הולדתו ה- ${d.birthdayAge}\nביום ${getDayOfWeekHebrew(d.date)} ${formatShortDate(d.date)} בשעה ${d.time}\nב-${d.hallName}, ${d.hallAddress}`,
+    'אירוע עסקי': (d)=> `חברת ${d.businessName} (${d.businessContact})\nמתכבדת להזמינך לאירוע העסקי שלנו\nביום ${getDayOfWeekHebrew(d.date)} ${formatShortDate(d.date)} בשעה ${d.time}\nב-${d.hallName}, ${d.hallAddress}`,
   };
 
   const normalizeType = (t) => (t === 'ברית/ה' || t === 'בריתה' ? 'ברית' : t);
