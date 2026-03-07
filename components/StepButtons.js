@@ -8,7 +8,7 @@ import * as XLSX from 'xlsx';
 import { format } from 'date-fns';
 import { useToast } from './Toast';
 import TranzilaPayment from './TranzilaPayment';
-import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid, LabelList } from 'recharts';
+import { ResponsiveContainer, PieChart, Pie, Cell, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid, LabelList } from 'recharts';
 
 const RADIAN = Math.PI / 180;
 
@@ -4456,10 +4456,6 @@ React.useEffect(() => {
                               <Cell key={item.key} fill={item.color} />
                             ))}
                           </Pie>
-                          <Tooltip
-                            formatter={(value, name) => [`${value}`, name]}
-                            wrapperStyle={{ direction: 'rtl', textAlign: 'right' }}
-                          />
                           <Legend
                             iconType="circle"
                             wrapperStyle={{ direction: 'rtl', textAlign: 'right', color: '#111827' }}
