@@ -1,9 +1,9 @@
 /**
- * תזכורת אוטומטית – בדיוק יומיים לפני האירוע.
+ * תזכורת אוטומטית – בדיוק שלושה ימים לפני האירוע.
  * נשלחת ב-SMS לכל מי שהזמנה נשלחה אליו (כל המופיעים ברשימת המוזמנים), לכולם באותו זמן.
  * התזכורת נשלחת פעם אחת בלבד לאירוע (reminder_sent_at).
  * מופעלת אוטומטית על ידי Vercel Cron מדי יום; אפשר גם להפעיל ידנית עם CRON_SECRET.
- * מספר הימים לפני האירוע ניתן להגדרה ב-REMINDER_DAYS_BEFORE (ברירת מחדל: 2).
+ * מספר הימים לפני האירוע ניתן להגדרה ב-REMINDER_DAYS_BEFORE (ברירת מחדל: 3).
  */
 
 import { createClient } from '@supabase/supabase-js';
@@ -37,7 +37,7 @@ export default async function handler(req, res) {
 
   const supabase = createClient(supabaseUrl, supabaseKey);
 
-  const REMINDER_DAYS_BEFORE = parseInt(process.env.REMINDER_DAYS_BEFORE || '2', 10);
+  const REMINDER_DAYS_BEFORE = parseInt(process.env.REMINDER_DAYS_BEFORE || '3', 10);
   const now = new Date();
   const todayStr = getDateStringInIsrael(now);
   const targetDate = new Date(now);
@@ -170,7 +170,7 @@ export default async function handler(req, res) {
       samples: debugSamples,
       reminderDaysBefore: REMINDER_DAYS_BEFORE,
       targetDateStr,
-      hint: 'Cron runs at 06:00 UTC. Reminder sent only when event date equals today + REMINDER_DAYS_BEFORE. Set REMINDER_DAYS_BEFORE env (default 2).',
+      hint: 'Cron runs at 06:00 UTC. Reminder sent only when event date equals today + REMINDER_DAYS_BEFORE. Set REMINDER_DAYS_BEFORE env (default 3).',
     };
   }
   return res.status(200).json(response);
