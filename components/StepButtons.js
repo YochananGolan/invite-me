@@ -4360,12 +4360,11 @@ React.useEffect(() => {
           {/* Second Column - Guest Summary + Table Report */}
           {currentEventId && (
             <div className="w-full flex flex-col gap-6">
-              <div className="bg-blue-50 p-3 sm:p-4 text-center shadow-lg w-full" style={{
+              <div className="bg-blue-50 p-3 sm:p-4 text-center shadow-lg w-full min-h-[320px]" style={{
                 border: '3px solid #D4AF37',
                 outline: '2px solid #B8860B',
                 outlineOffset: '2px',
                 borderRadius: '8px',
-                minHeight: 'min(280px, 50vh)'
               }}>
                 <div className="flex items-center justify-center gap-2 mb-2">
                   <span className="text-xl">👥</span>
@@ -4471,12 +4470,11 @@ React.useEffect(() => {
           {/* Third Column - Guest Status Summary */}
           {currentEventId && (
             <div className="w-full flex flex-col gap-6">
-              <div className="bg-purple-50 p-3 sm:p-4 text-center shadow-lg w-full" style={{
+              <div className="bg-purple-50 p-3 sm:p-4 text-center shadow-lg w-full min-h-[320px]" style={{
                 border: '3px solid #D4AF37',
                 outline: '2px solid #B8860B',
                 outlineOffset: '2px',
                 borderRadius: '8px',
-                minHeight: 'min(280px, 50vh)'
               }}>
                 <div className="flex items-center justify-center gap-2 mb-2">
                   <span className="text-xl">📊</span>
@@ -4484,7 +4482,7 @@ React.useEffect(() => {
                 </div>
                 <div className="bg-white rounded-lg text-right p-2 mt-3">
                     {hasStatusData ? (
-                    <div className="h-60 min-h-[220px] sm:h-60">
+                    <div className="h-56 min-h-[200px] sm:h-56">
                       <ResponsiveContainer width="100%" height="100%">
                         <PieChart>
                           <Pie
@@ -4577,12 +4575,11 @@ React.useEffect(() => {
                 };
                 
                 return (
-                  <div className="bg-yellow-50 p-3 text-center shadow-lg w-full" style={{
+                  <div className="bg-yellow-50 p-3 sm:p-4 text-center shadow-lg w-full min-h-[320px]" style={{
                     border: '3px solid #D4AF37',
                     outline: '2px solid #B8860B',
                     outlineOffset: '2px',
                     borderRadius: '8px',
-                    minHeight: '280px'
                   }}>
                     <div className="flex items-center justify-center gap-2 mb-2">
                       <span className="text-xl">📈</span>
