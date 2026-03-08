@@ -714,22 +714,22 @@ const handleOpenAddonModal = React.useCallback(() => {
      * @param {string} guestFirstName Name of guest for greeting
      * @returns {Promise<boolean>} true if shared successfully, else false
      */
-    const shareInviteImage = async (url, guestFirstName, inviteLink) => {
+    const shareInviteImage = async (url, guestFirstName, inviteLink, customText) => {
       try {
         const res = await fetch(url);
         const blob = await res.blob();
-        const file = new File([blob], 'invite.jpg', { type: 'image/jpeg' });
+        const file = new File([blob], 'invite.jpg', { type: blob.type || 'image/jpeg' });
 
         if (navigator.canShare && navigator.canShare({ files: [file] })) {
           await navigator.share({
             files: [file],
             title: 'הזמנה',
-            text: `היי ${guestFirstName}, מצורפת ההזמנה שלנו.\nלאישור הגעה והזנת פרטי משתתפים:\n${inviteLink}`,
+            text: customText || `היי ${guestFirstName}, מצורפת ההזמנה שלנו.\nלאישור הגעה והזנת פרטי משתתפים:\n${inviteLink}`,
           });
           return true;
         }
       } catch (e) {
-        console.error('Share invite image failed', e);
+        if (e.name !== 'AbortError') console.error('Share invite image failed', e);
       }
       return false;
     };
@@ -831,7 +831,7 @@ const handleOpenAddonModal = React.useCallback(() => {
 
         const { data: ev } = await supabase
           .from('events')
-          .select('invitation_path')
+          .select('invitation_path, event_details')
           .eq('user_id', user.id)
           .eq('id', eventIdForInvite)
           .maybeSingle();
@@ -846,11 +846,46 @@ const handleOpenAddonModal = React.useCallback(() => {
               .getPublicUrl(ev.invitation_path);
             inviteUrl = urlData.publicUrl;
           }
+        } else if (ev && ev.event_details) {
+          const details = typeof ev.event_details === 'string' ? JSON.parse(ev.event_details || '{}') : ev.event_details || {};
+          const tpl = details.template_src;
+          if (tpl) {
+            const base = getInviteBaseUrl();
+            inviteUrl = tpl.startsWith('http') ? tpl : (base + (tpl.startsWith('/') ? tpl : '/' + tpl));
+          }
         }
 
-        // Compose a copy-friendly message: text, image URL, then RSVP link
-        const messageContent = `${invitationText}\n\n${inviteLink}`; // omit raw image URL in text
-        // Open WhatsApp with pre-filled message (image URL gives preview)
+        const shareText = `${invitationText}\n\nלאישור הגעה:\n${inviteLink}`;
+        if (inviteUrl) {
+          const shared = await shareInviteImage(inviteUrl, guestData.guestFirstName, inviteLink, shareText);
+          if (shared) {
+            if (eventIdForInvite) {
+              try {
+                const { data: newCount, error: rpcErr } = await supabase.rpc('increment_event_messages_sent', {
+                  p_event_id: eventIdForInvite,
+                  p_delta: 1
+                });
+                if (!rpcErr && typeof newCount === 'number') {
+                  setEventMessagesSentCount(newCount);
+                } else {
+                  const fallback = (eventMessagesSentCount || 0) + 1;
+                  setEventMessagesSentCount(fallback);
+                  await supabase.from('events').update({ messages_sent_count: fallback }).eq('id', eventIdForInvite);
+                }
+              } catch (e) {
+                const fallback = (eventMessagesSentCount || 0) + 1;
+                setEventMessagesSentCount(fallback);
+                try { await supabase.from('events').update({ messages_sent_count: fallback }).eq('id', eventIdForInvite); } catch (_) {}
+              }
+            } else {
+              setEventMessagesSentCount((prev) => prev + 1);
+            }
+            setInvitationResult({ type: 'success', message: 'ההזמנה נשלחה בהצלחה!' });
+            setShowInvitationResultModal(true);
+            return;
+          }
+        }
+
         const waNumber = digitsOnly;
         const waText = encodeURIComponent(
           `${invitationText}\n\n` +
