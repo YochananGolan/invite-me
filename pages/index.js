@@ -25,7 +25,10 @@ export default function Home({ session }) {
         if (typeof window !== 'undefined') {
           localStorage.removeItem('pendingCreateEvent');
         }
-        setTimeout(() => setTriggerCreateEvent(true), 500);
+        setTimeout(() => {
+          setTriggerCreateEvent(true);
+          scrollToWizard();
+        }, 500);
       }
     }
   }, [session, pendingCreateEvent]);
@@ -72,6 +75,7 @@ export default function Home({ session }) {
       setShowAuth(true);
     } else {
       setTriggerCreateEvent(true);
+      scrollToWizard(); // גלילה לאזור הוויזארד כדי שהמשתמש יראה את יצירת האירוע
     }
   };
 

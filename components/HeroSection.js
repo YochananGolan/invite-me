@@ -2,7 +2,7 @@ import Image from 'next/image';
 import { forwardRef, useState, useEffect } from 'react';
 
 const ConfettiBackground = () => (
-  <div className="absolute inset-0 overflow-hidden pointer-events-none" aria-hidden="true">
+  <div className="absolute inset-0 -z-10 overflow-hidden pointer-events-none" aria-hidden="true">
     {[...Array(24)].map((_, i) => (
       <div
         key={i}
@@ -61,7 +61,14 @@ const useTypewriter = (text, speed = 100, pauseDuration = 5000) => {
 };
 
 export default forwardRef(function HeroSection({ onStart, onShowFeatures, isLoggedIn, onPressCreateEvent, onPressReports }, ref) {
-  const handleCreateNewEvent = () => typeof onPressCreateEvent === 'function' && onPressCreateEvent();
+  const handleCreateNewEvent = (e) => {
+    e?.preventDefault?.();
+    if (typeof onPressCreateEvent === 'function') {
+      onPressCreateEvent();
+    } else if (typeof onStart === 'function') {
+      onStart(); // fallback: הצג תהליך יצירה
+    }
+  };
   const handleOpenReports = () => typeof onPressReports === 'function' && onPressReports();
   // Full invitation text with line breaks
   const fullInvitationText = '\u05D3\u05D5\u05D3 & \u05E9\u05E8\u05D4\n\u05DE\u05EA\u05D7\u05EA\u05E0\u05D9\u05DD\n\n\u05D1\u05E9\u05DE\u05D7\u05D4 \u05E8\u05D1\u05D4 \u05D0\u05E0\u05D5 \u05DE\u05D6\u05DE\u05D9\u05E0\u05D9\u05DD \u05D0\u05EA\u05DB\u05DD \u05DC\u05D7\u05D2\u05D5\u05D2 \u05E2\u05DE\u05E0\u05D5 \u05D0\u05EA \u05D9\u05D5\u05DD \u05E0\u05D9\u05E9\u05D5\u05D0\u05D9\u05E0\u05D5\n\n\u05D9\u05D5\u05DD \u05E9\u05DC\u05D9\u05E9\u05D9 \u2022 24.03.2026\n\uD83D\uDCCD \u05D9\u05E8\u05D5\u05E9\u05DC\u05D9\u05DD, \u05D9\u05E9\u05E8\u05D0\u05DC\n\n\u05E7\u05D1\u05DC\u05EA \u05E4\u05E0\u05D9\u05DD 19:00 \u2022 \u05D7\u05D5\u05E4\u05D4 \u05D5\u05E7\u05D9\u05D3\u05D5\u05E9\u05D9\u05DF 21:00';
@@ -107,11 +114,11 @@ export default forwardRef(function HeroSection({ onStart, onShowFeatures, isLogg
               <span className="text-gray-700 font-medium text-lg md:text-xl">{'\u05DE\u05EA\u05D7\u05D9\u05DC \u05DB\u05D0\u05DF \u2728'}</span>
             </div>
 
-            <div className="flex flex-col sm:flex-row gap-5 justify-center lg:justify-start mb-5">
+            <div className="relative z-20 flex flex-col sm:flex-row gap-5 justify-center lg:justify-start mb-5 pr-14 lg:pr-16">
               <button
                 type="button"
                 onClick={handleCreateNewEvent}
-                className="group relative px-9 py-4 rounded-xl text-white font-extrabold text-lg cursor-pointer overflow-hidden
+                className="relative z-30 px-9 py-4 rounded-xl text-white font-extrabold text-lg cursor-pointer
                            bg-gradient-to-r from-purple-600 via-fuchsia-600 to-indigo-600
                            shadow-[0_14px_35px_rgba(124,58,237,0.35)] ring-4 ring-purple-300/60 ring-offset-2 ring-offset-white
                            transition-all duration-200 order-first sm:order-last
@@ -120,15 +127,7 @@ export default forwardRef(function HeroSection({ onStart, onShowFeatures, isLogg
                            focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-purple-500"
                 aria-label={'\u05E6\u05D5\u05E8 \u05D0\u05D9\u05E8\u05D5\u05E2 \u05D7\u05D3\u05E9'}
               >
-                <span
-                  aria-hidden="true"
-                  className="absolute inset-0 rounded-xl bg-purple-900 animate-cta-dark-cover pointer-events-none"
-                />
-                <span className="relative z-10">{'\u05E6\u05D5\u05E8 \u05D0\u05D9\u05E8\u05D5\u05E2 \u05D7\u05D3\u05E9'}</span>
-                <span
-                  aria-hidden="true"
-                  className="absolute inset-0 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-200 bg-[radial-gradient(circle_at_30%_20%,rgba(255,255,255,0.2),transparent_50%)] pointer-events-none"
-                />
+                {'\u05E6\u05D5\u05E8 \u05D0\u05D9\u05E8\u05D5\u05E2 \u05D7\u05D3\u05E9'}
               </button>
               <button
                 type="button"
