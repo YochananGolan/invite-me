@@ -26,7 +26,10 @@ export default function AuthModal({ initialMode = 'sign_in', open = false, onClo
         throw new Error('הסיסמאות אינן תואמות');
       }
       
-      const siteUrl = process.env.NEXT_PUBLIC_APP_URL || (typeof window !== 'undefined' ? window.location.origin : '');
+      // Use current origin so redirect matches where user is (localhost for dev, meet-m.co.il for prod)
+      const siteUrl = typeof window !== 'undefined'
+        ? window.location.origin
+        : (process.env.NEXT_PUBLIC_APP_URL || '').replace(/\/$/, '');
       const redirectUrl = `${siteUrl.replace(/\/$/, '')}/verify-email`;
       const { data, error } = await supabase.auth.signUp({
         email: e.target.email.value,
@@ -253,7 +256,7 @@ export default function AuthModal({ initialMode = 'sign_in', open = false, onClo
                 }}
                   providers={[]}
                   magicLink={false}
-                  redirectTo={typeof window !== 'undefined' ? `${(process.env.NEXT_PUBLIC_APP_URL || window.location.origin).replace(/\/$/, '')}/verify-email` : ''}
+                  redirectTo={typeof window !== 'undefined' ? `${window.location.origin.replace(/\/$/, '')}/verify-email` : `${(process.env.NEXT_PUBLIC_APP_URL || '').replace(/\/$/, '')}/verify-email`}
                   />
                 </div>
                 {/* Sign Up Button */}

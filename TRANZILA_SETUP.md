@@ -82,6 +82,16 @@ Enable additional payment methods:
 - ✓ Google Pay (if needed)
 - ✓ Apple Pay (if needed)
 
+### Apple Pay – הגדרה מלאה
+
+כדי להפעיל Apple Pay באינטגרציית Iframe:
+
+1. **דרישות:** מסוף אשראי פעיל עם מספר סוחר אינטרנט, רשימת דומיינים שמועברת לטרנזילה
+2. **קובץ אימות:** צור קשר עם טרנזילה ובקש את קובץ האימות ל-Apple Pay. הורד, חלץ את קובץ ה-.dat, שנה את השם ל-`apple-developer-merchantid-domain-association` והצב ב-`public/.well-known/`
+3. **אימות הדומיין:** הקובץ חייב להיות נגיש ב-`https://your-domain.com/.well-known/apple-developer-merchantid-domain-association`
+4. **עדכון טרנזילה:** הודע לטרנזילה שהקובץ הותקן כדי שיפעילו את Apple Pay למסוף שלך
+5. **סקריפטים:** הקוד טוען אוטומטית את `tranzilanapple_v3.js` כשמודל התשלום נפתח. ה-iframe כבר כולל `allowpaymentrequest="true"`
+
 ### Display Settings (Optional)
 
 Customize the payment form:

@@ -1,5 +1,43 @@
 import { useState, useEffect, useRef } from 'react';
 
+// Load Tranzila Apple Pay JS when payment modal opens (required for Apple Pay in iframe)
+// טרנזילה: יש להשתמש ב-jQuery שלהם כדי למנוע התנגשויות עם ספריות קיימות
+function useTranzilaApplePayScript(isOpen) {
+  const loadedRef = useRef(false);
+  useEffect(() => {
+    if (!isOpen || loadedRef.current) return;
+    if (typeof window === 'undefined') return;
+
+    const loadScript = (src) =>
+      new Promise((resolve, reject) => {
+        if (document.querySelector(`script[src="${src}"]`)) {
+          resolve();
+          return;
+        }
+        const s = document.createElement('script');
+        s.src = src;
+        s.async = false;
+        s.onload = () => resolve();
+        s.onerror = () => reject(new Error(`Failed to load ${src}`));
+        document.head.appendChild(s);
+      });
+
+    (async () => {
+      try {
+        // jQuery של טרנזילה – מונע התנגשויות עם React/ספריות אחרות
+        await loadScript('https://direct.tranzila.com/Tranzila_files/jquery.js');
+        await loadScript(`https://direct.tranzila.com/js/tranzilanapple_v3.js?v=${Date.now()}`);
+        if (window.jQuery && !window.$n) {
+          window.$n = window.jQuery.noConflict(true);
+        }
+        loadedRef.current = true;
+      } catch (e) {
+        console.warn('Tranzila Apple Pay script load skipped:', e?.message);
+      }
+    })();
+  }, [isOpen]);
+}
+
 export default function TranzilaPayment({
   isOpen,
   onClose,
@@ -8,6 +46,7 @@ export default function TranzilaPayment({
   onSuccess,
   onFailure
 }) {
+  useTranzilaApplePayScript(isOpen);
   const [isIframeLoading, setIsIframeLoading] = useState(true);
   const [isHandshakeLoading, setIsHandshakeLoading] = useState(false);
   const [handshakeToken, setHandshakeToken] = useState(null);
