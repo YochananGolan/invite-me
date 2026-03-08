@@ -214,7 +214,7 @@ function MyApp({ Component, pageProps }) {
 
     // Public paths that don't require authentication
     // Home page, terms page, and guest RSVP pages should be accessible without session
-    const publicPaths = ['/', '/terms'];
+    const publicPaths = ['/', '/terms', '/verify-email'];
     const isGuestPage = router.pathname === '/[eventId]/[guestId]' || router.pathname.startsWith('/[eventId]/[guestId]');
     const isPublicPath = publicPaths.includes(router.pathname);
 

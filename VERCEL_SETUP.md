@@ -97,3 +97,4 @@
 | קישורים ב-SMS מובילים ל-localhost | ודא ש-`NEXT_PUBLIC_APP_URL` מוגדר לכתובת ייצור |
 | תזכורות לא נשלחות | ודא ש-`CRON_SECRET` מוגדר וב-Vercel Cron מופעל |
 | SMS לא נשלחים | ודא ש-`ACTIVETRAIL_API_KEY` מוגדר |
+| לינק אימות אימייל בהרשמה לא עובד | הוסף ב-Supabase: Authentication → URL Configuration → Redirect URLs את `https://meet-m.co.il/verify-email` |

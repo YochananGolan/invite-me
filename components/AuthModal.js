@@ -27,6 +27,7 @@ export default function AuthModal({ initialMode = 'sign_in', open = false, onClo
       }
       
       const siteUrl = process.env.NEXT_PUBLIC_APP_URL || (typeof window !== 'undefined' ? window.location.origin : '');
+      const redirectUrl = `${siteUrl.replace(/\/$/, '')}/verify-email`;
       const { data, error } = await supabase.auth.signUp({
         email: e.target.email.value,
         password: password,
@@ -36,7 +37,7 @@ export default function AuthModal({ initialMode = 'sign_in', open = false, onClo
             last_name: lastName,
             phone: phone
           },
-          emailRedirectTo: siteUrl
+          emailRedirectTo: redirectUrl
         }
       });
       
@@ -252,7 +253,7 @@ export default function AuthModal({ initialMode = 'sign_in', open = false, onClo
                 }}
                   providers={[]}
                   magicLink={false}
-                  redirectTo={typeof window !== 'undefined' ? (process.env.NEXT_PUBLIC_APP_URL || window.location.origin) : ''}
+                  redirectTo={typeof window !== 'undefined' ? `${(process.env.NEXT_PUBLIC_APP_URL || window.location.origin).replace(/\/$/, '')}/verify-email` : ''}
                   />
                 </div>
                 {/* Sign Up Button */}
