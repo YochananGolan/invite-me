@@ -38,12 +38,25 @@ function MyApp({ Component, pageProps }) {
       setLoading(false);
     };
 
+    // Clear event-related localStorage when user changes (localStorage is per-domain, not per-user)
+    const clearEventStorageIfUserChanged = (newUserId) => {
+      try {
+        const prevUserId = localStorage.getItem('user_id');
+        if (prevUserId && prevUserId !== newUserId) {
+          localStorage.removeItem('newEventStarted');
+          localStorage.removeItem('selectedPlan');
+          localStorage.removeItem('draftEvent');
+          localStorage.removeItem('savedEventDetails');
+        }
+      } catch (e) {}
+    };
+
     // Also check Supabase auth state and sync to localStorage
     const checkAndSyncSupabaseAuth = async () => {
       try {
         const { data: { session: supabaseSession } } = await supabase.auth.getSession();
         if (supabaseSession?.user) {
-          // Sync Supabase session to localStorage
+          clearEventStorageIfUserChanged(supabaseSession.user.id);
           localStorage.setItem('user_id', supabaseSession.user.id);
           localStorage.setItem('user_email', supabaseSession.user.email);
           checkSession();
@@ -64,14 +77,17 @@ function MyApp({ Component, pageProps }) {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, supabaseSession) => {
       if (event === 'SIGNED_IN' && supabaseSession?.user) {
-        // Sync to localStorage
+        clearEventStorageIfUserChanged(supabaseSession.user.id);
         localStorage.setItem('user_id', supabaseSession.user.id);
         localStorage.setItem('user_email', supabaseSession.user.email);
         checkSession();
       } else if (event === 'SIGNED_OUT') {
-        // Clear localStorage
         localStorage.removeItem('user_id');
         localStorage.removeItem('user_email');
+        localStorage.removeItem('newEventStarted');
+        localStorage.removeItem('selectedPlan');
+        localStorage.removeItem('draftEvent');
+        localStorage.removeItem('savedEventDetails');
         checkSession();
       }
       // Don't update on other events to prevent unnecessary refreshes

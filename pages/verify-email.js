@@ -30,8 +30,8 @@ export default function VerifyEmailPage() {
           localStorage.setItem('user_id', session.user.id);
           localStorage.setItem('user_email', session.user.email);
           localStorage.removeItem('pendingCreateEvent');
-          localStorage.setItem('showRegistrationSuccess', 'true'); // להצגת הודעת הצלחה בדף הבית
-          router.replace('/');
+          localStorage.setItem('showRegistrationSuccess', 'true');
+          router.replace('/?registration=success'); // גם query param למקרה ש-localStorage מתנקה
           return;
         }
         if (mounted) {
@@ -55,13 +55,13 @@ export default function VerifyEmailPage() {
         localStorage.setItem('user_email', session.user.email);
         localStorage.removeItem('pendingCreateEvent');
         localStorage.setItem('showRegistrationSuccess', 'true');
-        router.replace('/');
+        router.replace('/?registration=success');
       }
     });
 
     const fallback = setTimeout(() => {
       if (mounted && !error) {
-        router.replace('/');
+        router.replace('/?registration=success');
       }
     }, 5000);
 

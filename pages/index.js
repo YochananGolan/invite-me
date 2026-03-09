@@ -1,4 +1,5 @@
 import Head from 'next/head';
+import { useRouter } from 'next/router';
 import NavBar from '../components/NavBar';
 import HeroSection from '../components/HeroSection';
 import StepButtons from '../components/StepButtons';
@@ -9,6 +10,7 @@ import PricingTableModal from '../components/PricingTableModal';
 
 
 export default function Home({ session }) {
+  const router = useRouter();
   const [showAuth, setShowAuth] = useState(false);
   const [authMode, setAuthMode] = useState('sign_in');
   const [showFeatures, setShowFeatures] = useState(false);
@@ -19,11 +21,15 @@ export default function Home({ session }) {
   const stepRef = useRef();
 
   useEffect(() => {
-    if (session && typeof window !== 'undefined' && localStorage.getItem('showRegistrationSuccess') === 'true') {
+    if (!session) return;
+    const fromStorage = typeof window !== 'undefined' && localStorage.getItem('showRegistrationSuccess') === 'true';
+    const fromQuery = router.query?.registration === 'success';
+    if (fromStorage || fromQuery) {
       setShowRegistrationSuccess(true);
-      localStorage.removeItem('showRegistrationSuccess');
+      if (typeof window !== 'undefined') localStorage.removeItem('showRegistrationSuccess');
+      if (fromQuery && router.isReady) router.replace('/', undefined, { shallow: true });
     }
-  }, [session]);
+  }, [session, router.query?.registration, router.isReady]);
 
   useEffect(() => {
     if (session) {
