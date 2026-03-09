@@ -122,7 +122,7 @@ export default function AuthModal({ initialMode = 'sign_in', open = false, onClo
 
           <div className="border-2 border-purple-200 rounded-2xl p-6 bg-white/95 shadow-lg">
             {view === 'sign_up' ? (
-              <form key={formKey} onSubmit={handleSignUp} className="space-y-4">
+              <form key={formKey} onSubmit={handleSignUp} className="space-y-4" autoComplete="off">
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-lg font-bold text-gray-800 mb-2">
@@ -162,6 +162,9 @@ export default function AuthModal({ initialMode = 'sign_in', open = false, onClo
                     type="email"
                     name="email"
                     required
+                    autoComplete="off"
+                    readOnly
+                    onFocus={(e) => e.target.removeAttribute('readOnly')}
                     className="w-full h-12 rounded-xl border-2 border-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-lg px-3 shadow-sm font-medium"
                     placeholder="הכנס כתובת אימייל"
                   />
@@ -189,6 +192,9 @@ export default function AuthModal({ initialMode = 'sign_in', open = false, onClo
                     type="password"
                     name="password"
                     required
+                    autoComplete="new-password"
+                    readOnly
+                    onFocus={(e) => e.target.removeAttribute('readOnly')}
                     className="w-full h-12 rounded-xl border-2 border-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-lg px-3 shadow-sm font-medium"
                     placeholder="הכנס סיסמה"
                   />
@@ -202,6 +208,9 @@ export default function AuthModal({ initialMode = 'sign_in', open = false, onClo
                     type="password"
                     name="confirmPassword"
                     required
+                    autoComplete="new-password"
+                    readOnly
+                    onFocus={(e) => e.target.removeAttribute('readOnly')}
                     className="w-full h-12 rounded-xl border-2 border-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-lg px-3 shadow-sm font-medium"
                     placeholder="הכנס שוב את הסיסמה"
                   />
