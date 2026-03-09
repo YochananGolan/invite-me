@@ -11,6 +11,10 @@ function MyApp({ Component, pageProps }) {
 
   // --- Handle session state ---
   useEffect(() => {
+    // Capture auth hash early (Supabase may clear it) - for registration success popup
+    if (typeof window !== 'undefined' && window.location.hash?.includes('access_token')) {
+      try { sessionStorage.setItem('fromEmailConfirmation', 'true'); } catch (e) {}
+    }
     // First check localStorage for session
     const checkSession = () => {
       const userId = localStorage.getItem('user_id');

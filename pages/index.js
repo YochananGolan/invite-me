@@ -20,14 +20,31 @@ export default function Home({ session }) {
   const [showRegistrationSuccess, setShowRegistrationSuccess] = useState(false);
   const stepRef = useRef();
 
+  // Capture hash early (Supabase may clear it) - for direct redirect to / from email
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.location.hash?.includes('access_token')) {
+      sessionStorage.setItem('fromEmailConfirmation', 'true');
+    }
+  }, []);
+
   useEffect(() => {
     if (!session) return;
     const fromStorage = typeof window !== 'undefined' && localStorage.getItem('showRegistrationSuccess') === 'true';
     const fromQuery = router.query?.registration === 'success' ||
       (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('registration') === 'success');
-    if (fromStorage || fromQuery) {
+    // Supabase may redirect directly to / with hash (bypassing verify-email)
+    const fromHash = typeof window !== 'undefined' && window.location.hash &&
+      (window.location.hash.includes('access_token') || window.location.hash.includes('type='));
+    const fromSessionStorage = typeof window !== 'undefined' && sessionStorage.getItem('fromEmailConfirmation') === 'true';
+    if (fromStorage || fromQuery || fromHash || fromSessionStorage) {
       setShowRegistrationSuccess(true);
-      if (typeof window !== 'undefined') localStorage.removeItem('showRegistrationSuccess');
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('showRegistrationSuccess');
+        sessionStorage.removeItem('fromEmailConfirmation');
+        if ((fromHash || fromSessionStorage) && window.history.replaceState) {
+          window.history.replaceState(null, '', window.location.pathname + window.location.search);
+        }
+      }
       if (fromQuery) router.replace('/', undefined, { shallow: true });
     }
   }, [session, router.query?.registration, router.isReady]);

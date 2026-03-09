@@ -49,7 +49,7 @@ export default function VerifyEmailPage() {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (!mounted) return;
-      if (event === 'SIGNED_IN' && session) {
+      if ((event === 'SIGNED_IN' || event === 'USER_UPDATED') && session) {
         setStatus('האימייל אומת בהצלחה! מפנה...');
         localStorage.setItem('user_id', session.user.id);
         localStorage.setItem('user_email', session.user.email);
