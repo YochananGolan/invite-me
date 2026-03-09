@@ -5,6 +5,7 @@ import { ThemeSupa } from '@supabase/auth-ui-shared';
 
 export default function AuthModal({ initialMode = 'sign_in', open = false, onClose = () => {} }) {
   const [view, setView] = useState(initialMode);
+  const [formKey, setFormKey] = useState(0);
   const [successMsg, setSuccessMsg] = useState('');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -77,9 +78,17 @@ export default function AuthModal({ initialMode = 'sign_in', open = false, onClo
     return () => subscription.unsubscribe();
   }, [open, onClose]);
 
+  // Reset all form data when modal opens - clean screen every time (including passwords)
   useEffect(() => {
     if (open) {
       setView(initialMode);
+      setFormKey((k) => k + 1);
+      setSuccessMsg('');
+      setFirstName('');
+      setLastName('');
+      setPhone('');
+      setErrorMsg('');
+      setLoading(false);
     }
   }, [open, initialMode]);
 
@@ -113,7 +122,7 @@ export default function AuthModal({ initialMode = 'sign_in', open = false, onClo
 
           <div className="border-2 border-purple-200 rounded-2xl p-6 bg-white/95 shadow-lg">
             {view === 'sign_up' ? (
-              <form onSubmit={handleSignUp} className="space-y-4">
+              <form key={formKey} onSubmit={handleSignUp} className="space-y-4">
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-lg font-bold text-gray-800 mb-2">
