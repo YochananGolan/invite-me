@@ -38,11 +38,7 @@ export default function Home({ session }) {
     const fromSessionStorage = typeof window !== 'undefined' && sessionStorage.getItem('fromEmailConfirmation') === 'true';
     if (fromStorage || fromQuery || fromHash || fromSessionStorage) {
       setShowRegistrationSuccess(true);
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem('showRegistrationSuccess');
-        sessionStorage.removeItem('fromEmailConfirmation');
-      }
-      // Don't clean URL here - only when user clicks. Prevents popup from disappearing.
+      // Do NOT clear storage/URL here - only when user clicks. Keeps popup visible until user dismisses.
     }
   }, [session, router.query?.registration, router.isReady]);
 
@@ -162,8 +158,12 @@ export default function Home({ session }) {
             <div className="flex flex-col gap-3">
               <button
                 onClick={() => {
-                  if (typeof window !== 'undefined' && window.history.replaceState) {
-                    window.history.replaceState(null, '', window.location.pathname);
+                  if (typeof window !== 'undefined') {
+                    localStorage.removeItem('showRegistrationSuccess');
+                    sessionStorage.removeItem('fromEmailConfirmation');
+                    if (window.history.replaceState) {
+                      window.history.replaceState(null, '', window.location.pathname);
+                    }
                   }
                   if (router.query?.registration) router.replace('/', undefined, { shallow: true });
                   setShowRegistrationSuccess(false);
@@ -175,8 +175,12 @@ export default function Home({ session }) {
               </button>
               <button
                 onClick={() => {
-                  if (typeof window !== 'undefined' && window.history.replaceState) {
-                    window.history.replaceState(null, '', window.location.pathname);
+                  if (typeof window !== 'undefined') {
+                    localStorage.removeItem('showRegistrationSuccess');
+                    sessionStorage.removeItem('fromEmailConfirmation');
+                    if (window.history.replaceState) {
+                      window.history.replaceState(null, '', window.location.pathname);
+                    }
                   }
                   if (router.query?.registration) router.replace('/', undefined, { shallow: true });
                   setShowRegistrationSuccess(false);
