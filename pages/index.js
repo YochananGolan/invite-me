@@ -23,11 +23,12 @@ export default function Home({ session }) {
   useEffect(() => {
     if (!session) return;
     const fromStorage = typeof window !== 'undefined' && localStorage.getItem('showRegistrationSuccess') === 'true';
-    const fromQuery = router.query?.registration === 'success';
+    const fromQuery = router.query?.registration === 'success' ||
+      (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('registration') === 'success');
     if (fromStorage || fromQuery) {
       setShowRegistrationSuccess(true);
       if (typeof window !== 'undefined') localStorage.removeItem('showRegistrationSuccess');
-      if (fromQuery && router.isReady) router.replace('/', undefined, { shallow: true });
+      if (fromQuery) router.replace('/', undefined, { shallow: true });
     }
   }, [session, router.query?.registration, router.isReady]);
 

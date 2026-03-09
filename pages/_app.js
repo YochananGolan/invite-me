@@ -75,8 +75,8 @@ function MyApp({ Component, pageProps }) {
     // Listen for Supabase auth changes and sync to localStorage
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, supabaseSession) => {
-      if (event === 'SIGNED_IN' && supabaseSession?.user) {
+    } =     supabase.auth.onAuthStateChange(async (event, supabaseSession) => {
+      if ((event === 'SIGNED_IN' || event === 'USER_UPDATED') && supabaseSession?.user) {
         clearEventStorageIfUserChanged(supabaseSession.user.id);
         localStorage.setItem('user_id', supabaseSession.user.id);
         localStorage.setItem('user_email', supabaseSession.user.email);
@@ -102,9 +102,14 @@ function MyApp({ Component, pageProps }) {
     };
     window.addEventListener('storage', handleStorageChange);
 
+    // Re-sync session on route change (e.g. after verify-email redirect)
+    const handleRouteChange = () => checkAndSyncSupabaseAuth();
+    router.events.on('routeChangeComplete', handleRouteChange);
+
     return () => {
       subscription.unsubscribe();
       window.removeEventListener('storage', handleStorageChange);
+      router.events.off('routeChangeComplete', handleRouteChange);
     };
   }, []);
 
