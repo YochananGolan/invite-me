@@ -29,7 +29,8 @@ export default function VerifyEmailPage() {
           setStatus('האימייל אומת בהצלחה! מפנה...');
           localStorage.setItem('user_id', session.user.id);
           localStorage.setItem('user_email', session.user.email);
-          localStorage.removeItem('pendingCreateEvent'); // דף הבית הרגיל, לא מסלול יצירת אירוע
+          localStorage.removeItem('pendingCreateEvent');
+          localStorage.setItem('showRegistrationSuccess', 'true'); // להצגת הודעת הצלחה בדף הבית
           router.replace('/');
           return;
         }
@@ -52,7 +53,8 @@ export default function VerifyEmailPage() {
         setStatus('האימייל אומת בהצלחה! מפנה...');
         localStorage.setItem('user_id', session.user.id);
         localStorage.setItem('user_email', session.user.email);
-        localStorage.removeItem('pendingCreateEvent'); // דף הבית הרגיל, לא מסלול יצירת אירוע
+        localStorage.removeItem('pendingCreateEvent');
+        localStorage.setItem('showRegistrationSuccess', 'true');
         router.replace('/');
       }
     });

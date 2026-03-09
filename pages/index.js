@@ -15,7 +15,15 @@ export default function Home({ session }) {
   const [showPricingTable, setShowPricingTable] = useState(false);
   const [pendingCreateEvent, setPendingCreateEvent] = useState(false);
   const [triggerCreateEvent, setTriggerCreateEvent] = useState(false);
+  const [showRegistrationSuccess, setShowRegistrationSuccess] = useState(false);
   const stepRef = useRef();
+
+  useEffect(() => {
+    if (session && typeof window !== 'undefined' && localStorage.getItem('showRegistrationSuccess') === 'true') {
+      setShowRegistrationSuccess(true);
+      localStorage.removeItem('showRegistrationSuccess');
+    }
+  }, [session]);
 
   useEffect(() => {
     if (session) {
@@ -120,6 +128,36 @@ export default function Home({ session }) {
       />
 
       <PricingTableModal isOpen={showPricingTable} onClose={() => setShowPricingTable(false)} />
+
+      {/* Registration Success Modal - after email verification */}
+      {showRegistrationSuccess && (
+        <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4" dir="rtl">
+          <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full text-center">
+            <div className="text-5xl mb-4">✅</div>
+            <h2 className="text-2xl font-bold text-gray-800 mb-4">ההרשמה בוצעה בהצלחה!</h2>
+            <p className="text-gray-600 mb-6">
+              להתחלת העבודה יש ללחוץ על כפתור &quot;צור אירוע חדש&quot;.
+            </p>
+            <div className="flex flex-col gap-3">
+              <button
+                onClick={() => {
+                  setShowRegistrationSuccess(false);
+                  handleCreateEvent();
+                }}
+                className="w-full py-4 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-bold text-lg hover:from-purple-700 hover:to-indigo-700 transition-all"
+              >
+                צור אירוע חדש
+              </button>
+              <button
+                onClick={() => setShowRegistrationSuccess(false)}
+                className="w-full py-3 rounded-xl bg-gray-200 text-gray-700 font-medium hover:bg-gray-300 transition-colors"
+              >
+                המשך
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       
       {/* Features Modal */}
       {showFeatures && (
