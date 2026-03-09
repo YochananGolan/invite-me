@@ -52,7 +52,12 @@ export default function AuthModal({ initialMode = 'sign_in', open = false, onClo
       setPhone('');
       e.target.reset();
     } catch (error) {
-      setErrorMsg('שגיאה בהרשמה: ' + error.message);
+      const msg = error?.message || '';
+      if (msg.toLowerCase().includes('rate limit') || msg.toLowerCase().includes('rate_limit')) {
+        setErrorMsg('נשלחו יותר מדי מיילי אימות לאחרונה. אנא נסה שוב בעוד כשעה, או צור קשר לתמיכה.');
+      } else {
+        setErrorMsg('שגיאה בהרשמה: ' + msg);
+      }
     } finally {
       setLoading(false);
     }
