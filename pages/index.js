@@ -41,11 +41,8 @@ export default function Home({ session }) {
       if (typeof window !== 'undefined') {
         localStorage.removeItem('showRegistrationSuccess');
         sessionStorage.removeItem('fromEmailConfirmation');
-        if ((fromHash || fromSessionStorage) && window.history.replaceState) {
-          window.history.replaceState(null, '', window.location.pathname + window.location.search);
-        }
       }
-      if (fromQuery) router.replace('/', undefined, { shallow: true });
+      // Don't clean URL here - only when user clicks. Prevents popup from disappearing.
     }
   }, [session, router.query?.registration, router.isReady]);
 
@@ -153,7 +150,7 @@ export default function Home({ session }) {
 
       <PricingTableModal isOpen={showPricingTable} onClose={() => setShowPricingTable(false)} />
 
-      {/* Registration Success Modal - after email verification */}
+      {/* Registration Success Modal - after email verification - stays until user clicks */}
       {showRegistrationSuccess && (
         <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4" dir="rtl">
           <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full text-center">
@@ -165,6 +162,10 @@ export default function Home({ session }) {
             <div className="flex flex-col gap-3">
               <button
                 onClick={() => {
+                  if (typeof window !== 'undefined' && window.history.replaceState) {
+                    window.history.replaceState(null, '', window.location.pathname);
+                  }
+                  if (router.query?.registration) router.replace('/', undefined, { shallow: true });
                   setShowRegistrationSuccess(false);
                   handleCreateEvent();
                 }}
@@ -173,7 +174,13 @@ export default function Home({ session }) {
                 צור אירוע חדש
               </button>
               <button
-                onClick={() => setShowRegistrationSuccess(false)}
+                onClick={() => {
+                  if (typeof window !== 'undefined' && window.history.replaceState) {
+                    window.history.replaceState(null, '', window.location.pathname);
+                  }
+                  if (router.query?.registration) router.replace('/', undefined, { shallow: true });
+                  setShowRegistrationSuccess(false);
+                }}
                 className="w-full py-3 rounded-xl bg-gray-200 text-gray-700 font-medium hover:bg-gray-300 transition-colors"
               >
                 המשך
