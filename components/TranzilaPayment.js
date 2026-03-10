@@ -496,15 +496,17 @@ export default function TranzilaPayment({
             method="POST"
             className="hidden"
           >
-            {/* Hidden fields - sum must match handshake exactly (Tranzila validates; 004 = invalid amount) */}
+            {/* Hidden fields - sum must match handshake exactly (Tranzila validates; 004 = invalid amount).
+                Format "5.00" helps Payment Request API display amount in Google Pay sheet. */}
             <input
               type="hidden"
               name="sum"
               value={(() => {
                 const raw = handshakeDetails?.sum ?? handshakeDetails?.amount ?? amount;
+                if (typeof raw === 'string' && /^\d+(\.\d{1,2})?$/.test(raw)) return raw;
                 const num = typeof raw === 'number' ? raw : parseFloat(raw);
-                if (Number.isNaN(num) || num <= 0) return String(amount);
-                return Number.isInteger(num) ? String(num) : String(Math.round(num * 100) / 100);
+                if (Number.isNaN(num) || num <= 0) return String(Number(amount).toFixed(2));
+                return (Math.round(num * 100) / 100).toFixed(2);
               })()}
             />
             <input type="hidden" name="supplier" value={terminalName} />

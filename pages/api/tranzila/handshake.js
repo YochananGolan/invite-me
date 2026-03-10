@@ -34,12 +34,13 @@ export default async function handler(req, res) {
     if (terminalName === 'jira' && !terminalPassword) {
       console.log('Using Tranzila test terminal (jira) - returning mock handshake');
       const mockSum = Number.isInteger(amountNum) ? amountNum : Math.round(amountNum * 100) / 100;
+      const mockSumStr = Number.isInteger(mockSum) ? mockSum.toFixed(2) : String(mockSum);
       return res.status(200).json({
         success: true,
         thtk: 'mock-handshake-token-for-test-terminal',
         token: 'mock-handshake-token-for-test-terminal',
         amount: mockSum,
-        sum: mockSum,
+        sum: mockSumStr,
         mock: true
       });
     }
@@ -56,9 +57,10 @@ export default async function handler(req, res) {
 
     // Build handshake URL - Tranzila expects sum as positive decimal
     const sumValue = Number.isInteger(amountNum) ? amountNum : Math.round(amountNum * 100) / 100;
+    const sumStr = Number.isInteger(sumValue) ? sumValue.toFixed(2) : String(sumValue);
     const handshakeUrl = new URL('https://api.tranzila.com/v1/handshake/create');
     handshakeUrl.searchParams.append('supplier', terminalName);
-    handshakeUrl.searchParams.append('sum', String(sumValue));
+    handshakeUrl.searchParams.append('sum', sumStr);
     handshakeUrl.searchParams.append('TranzilaPW', terminalPassword);
 
     console.log('Requesting handshake:', {
@@ -119,13 +121,13 @@ export default async function handler(req, res) {
       });
     }
 
-    // Return the handshake token - use sumValue so form sum matches handshake (Tranzila requires identical)
+    // Return the handshake token - use sumStr so form sum matches handshake (Tranzila requires identical)
     return res.status(200).json({
       success: true,
       thtk,
       token: thtk, // alias for frontend expectations
       amount: sumValue,
-      sum: sumValue,
+      sum: sumStr,
     });
 
   } catch (error) {
