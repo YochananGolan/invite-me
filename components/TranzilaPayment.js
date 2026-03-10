@@ -68,7 +68,30 @@ export default function TranzilaPayment({
       setHandshakeError(null);
       setHandshakeAttempt(0);
       handshakeInProgressRef.current = false;
+      // Restore UserWay when payment modal closes
+      try {
+        if (typeof document !== 'undefined') document.body?.classList.remove('payment-modal-open');
+        if (typeof window !== 'undefined' && window.UserWay?.iconVisibilityOn) {
+          window.UserWay.iconVisibilityOn();
+        }
+      } catch (e) {}
+    } else {
+      // Hide UserWay during payment - prevents overlay from blocking name field in Google Pay form
+      try {
+        if (typeof document !== 'undefined') document.body?.classList.add('payment-modal-open');
+        if (typeof window !== 'undefined' && window.UserWay?.iconVisibilityOff) {
+          window.UserWay.iconVisibilityOff();
+        }
+      } catch (e) {}
     }
+    return () => {
+      try {
+        if (typeof document !== 'undefined') document.body?.classList.remove('payment-modal-open');
+        if (typeof window !== 'undefined' && window.UserWay?.iconVisibilityOn) {
+          window.UserWay.iconVisibilityOn();
+        }
+      } catch (e) {}
+    };
   }, [isOpen]);
 
   useEffect(() => {

@@ -16,6 +16,14 @@ body {
   overflow-x: hidden;
 }
 
+/* Hide UserWay during payment modal - prevents overlay blocking Google Pay name field */
+body.payment-modal-open .uwy,
+body.payment-modal-open [class*="userway"] {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
 /* Mobile-first: safe area for notched phones */
 @supports (padding: max(0px)) {
   body {
