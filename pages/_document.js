@@ -22,10 +22,10 @@ export default function Document() {
             if (!el) return;
             var isMobile = window.innerWidth < 640;
             if (isMobile) {
-              el.style.setProperty('bottom', '16px', 'important');
-              el.style.setProperty('top', 'auto', 'important');
-              el.style.setProperty('left', '16px', 'important');
-              el.style.setProperty('right', 'auto', 'important');
+              el.style.setProperty('top', '16px', 'important');
+              el.style.setProperty('bottom', 'auto', 'important');
+              el.style.setProperty('right', '16px', 'important');
+              el.style.setProperty('left', 'auto', 'important');
             } else {
               el.style.setProperty('top', '68px', 'important');
               el.style.setProperty('bottom', 'auto', 'important');
