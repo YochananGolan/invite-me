@@ -2332,8 +2332,9 @@ React.useEffect(() => {
     boyName: '', boyParents: '', girlName: '', girlParents: '', babyParents: '',
     birthdayName: '', birthdayAge: '', businessName: '', businessContact: '',
     date: '', time: '19:30', chuppahTime: '21:00', hallName: '', hallAddress: '',
-    customEventDescription: 'תיאור האירוע',
+    customEventDescription: 'תיאור האירוע', hostName: '',
   };
+
   const handleNewEvent = async (showDeletionMessage = false) => {
     setShowExistingEventWarning(false);
     setShowArchiveConfirm(false);
@@ -2410,6 +2411,7 @@ React.useEffect(() => {
     }
 
     // Now reset the state for new event
+    eventDetailsOpenedRef.current = false; // Allow reset when opening event details for this new event
     setSelectedEventType('');
     setFormData(initialFormState);
     setEventDetailsCompleted(false);
@@ -3421,6 +3423,18 @@ React.useEffect(() => {
   // ---- Debounced autosave of event_details to Supabase ----
   const formSaveTimer = useRef(null);
   const isInitialLoadRef = useRef(true); // Track if we're in initial load phase
+  const eventDetailsOpenedRef = useRef(false); // Prevent reset when reopening event details
+
+  // Reset form when opening event details for NEW event (first open only, not on reopen)
+  React.useEffect(() => {
+    if (!showEventDetails) return;
+    if (!currentEventId && selectedEventType && !eventDetailsOpenedRef.current) {
+      setFormData(initialFormState);
+      setFormErrors({});
+      try { localStorage.removeItem('savedEventDetails'); } catch(e){}
+      eventDetailsOpenedRef.current = true;
+    }
+  }, [showEventDetails, currentEventId, selectedEventType]);
 
   React.useEffect(()=>{
     if(!currentEventId) return;           // need event id
@@ -4671,7 +4685,13 @@ React.useEffect(() => {
               <button
                 onClick={() => { 
                   console.log('Save and close button clicked');
-                  setShowEventTypes(false); 
+                  setShowEventTypes(false);
+                  if (!currentEventId) {
+                    setFormData(initialFormState);
+                    setFormErrors({});
+                    try { localStorage.removeItem('savedEventDetails'); } catch(e){}
+                    eventDetailsOpenedRef.current = true; // Mark as opened so we don't reset on reopen
+                  }
                   setShowEventDetails(true);
                   markStepDone(0); // Mark step 1 as completed when saving
                   console.log('markStepDone(0) called');
@@ -4686,12 +4706,12 @@ React.useEffect(() => {
       )}
 
       {showEventDetails && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50">
-          <div className="relative bg-white rounded-lg p-6 w-full max-w-4xl h-[95vh] overflow-y-auto event-form">
+        <div className="fixed inset-0 flex items-end sm:items-center justify-center bg-black/50 z-50 p-0 sm:p-4">
+          <div className="relative bg-white rounded-t-2xl sm:rounded-lg p-6 w-full max-w-4xl max-h-[95vh] flex flex-col">
             <button onClick={() => setShowEventDetails(false)} className="absolute top-2 left-2 text-2xl text-gray-500 hover:text-gray-700">&times;</button>
-            <h2 className="text-3xl font-bold mb-6 text-center">{`פרטי האירוע - ${selectedEventType}`}</h2>
-            {errorMsg && <p className="text-red-600 text-xl text-center mb-3">{errorMsg}</p>}
-            <form className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <h2 className="text-2xl sm:text-3xl font-bold mb-4 text-center flex-shrink-0">{`פרטי האירוע - ${selectedEventType}`}</h2>
+            {errorMsg && <p className="text-red-600 text-lg sm:text-xl text-center mb-3 flex-shrink-0">{errorMsg}</p>}
+            <form className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 overflow-y-auto flex-1 min-h-0 pb-4">
               {/* Existing event details form (unchanged) */}
               {['חתונה', 'חינה', 'מסיבת אירוסין'].includes(selectedEventType) && (
                 <div>
@@ -4825,13 +4845,12 @@ React.useEffect(() => {
                 <label className="block mb-2 font-bold text-lg">כתובת האולם</label>
                 <input type="text" placeholder="כתובת האולם" value={formData.hallAddress} onChange={(e) => setFormData({ ...formData, hallAddress: e.target.value })} className={`w-full border-2 border-gray-300 rounded-lg p-3 text-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all ${formErrors.hallAddress ? 'border-red-500 ring-2 ring-red-200' : ''}`} />
               </div>
-              <div className="md:col-span-2 flex justify-center pt-4">
-                <button type="button" onClick={handleSaveDetails} className="bg-[#FCE6AC] text-primary border border-primary rounded-full px-10 py-4 font-bold text-xl ring-2 ring-primary ring-offset-2 ring-offset-[#FCE6AC] hover:bg-[#FCE6AC]/90 transition-all">
-                  שמור וסגור
-                </button>
-              </div>
-              {errorMsg && <p className="text-red-600 text-lg text-center mt-2">{errorMsg}</p>}
             </form>
+            <div className="flex-shrink-0 pt-4 border-t border-gray-100 mt-4">
+              <button type="button" onClick={handleSaveDetails} className="w-full bg-[#FCE6AC] text-primary border border-primary rounded-full px-10 py-4 font-bold text-xl ring-2 ring-primary ring-offset-2 ring-offset-[#FCE6AC] hover:bg-[#FCE6AC]/90 transition-all">
+                שמור וסגור
+              </button>
+            </div>
           </div>
         </div>
       )}
