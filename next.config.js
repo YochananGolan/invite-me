@@ -1,6 +1,17 @@
 const path = require('path');
 
 module.exports = {
+  async headers() {
+    return [
+      {
+        source: '/.well-known/apple-developer-merchantid-domain-association',
+        headers: [
+          { key: 'Content-Type', value: 'text/plain; charset=utf-8' },
+          { key: 'Content-Disposition', value: 'inline' },
+        ],
+      },
+    ];
+  },
   env: {
     SUPABASE_URL: process.env.SUPABASE_URL,
     SUPABASE_ANON_KEY: process.env.SUPABASE_ANON_KEY,
