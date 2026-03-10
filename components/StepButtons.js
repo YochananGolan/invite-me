@@ -76,10 +76,11 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick, trig
     sessionRef.current = session;
   }, [session]);
 
-  // כשאין כניסה – לא להציג מסלול שנשמר ב-localStorage (תיקון: בווב מוצג מסלול גם בלי סשן)
   useEffect(() => {
     if (!session) {
       setSelectedPlan(null);
+    } else {
+      setEventRefreshKey((k) => k + 1);
     }
   }, [session]);
 
@@ -345,6 +346,11 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick, trig
   // Pricing plan selection modal
   const [showPricingPlan, setShowPricingPlan] = useState(false);
   React.useEffect(() => {
+    if (showPricingPlan) {
+      setEventRefreshKey((k) => k + 1);
+    }
+  }, [showPricingPlan]);
+  React.useEffect(() => {
     if (!showPricingPlan) {
       setPlanAddOnMode(false);
       setPlanSelectionError('');
@@ -387,17 +393,7 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick, trig
     }
   },[]);
 
-  const [selectedPlan, setSelectedPlan] = useState(() => {
-    if (typeof window === 'undefined') return null;
-    try {
-      const stored = localStorage.getItem('selectedPlan');
-      // If user explicitly chose 'free' or 'basic', always respect that choice
-      if (stored === 'free' || stored === 'basic') {
-        return stored;
-      }
-      return stored || null;
-    } catch(e) { return null; }
-  });
+  const [selectedPlan, setSelectedPlan] = useState(null);
 
   const getPlanLabel = React.useCallback((plan) => {
     switch(plan){
@@ -2539,7 +2535,7 @@ React.useEffect(() => {
   };
 
   // Handle plan selection in pricing modal
-  const handleSelectPlan = (plan) => {
+  const handleSelectPlan = async (plan) => {
     // Check if user is logged in
     if (!session) {
       setInvitationResult({ 
@@ -2551,6 +2547,28 @@ React.useEffect(() => {
       onAuthClick('sign_in');
       return;
     }
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: ev } = await supabase
+          .from('events')
+          .select('selected_plan')
+          .eq('user_id', user.id)
+          .or('status.neq.archived,status.is.null')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .single();
+        if (ev?.selected_plan === plan) {
+          setInvitationResult({ type: 'success', message: 'המסלול כבר מופעל באירוע שלך' });
+          setShowInvitationResultModal(true);
+          setShowPricingPlan(false);
+          setSelectedPlan(plan);
+          try { localStorage.setItem('selectedPlan', plan); } catch(e){}
+          return;
+        }
+      }
+    } catch (e) { console.warn('Pre-payment sync check failed:', e); }
 
     const price = getPlanPrice(plan);
 
@@ -2875,31 +2893,21 @@ React.useEffect(() => {
         if (typeof ev.additional_packages === 'number') {
           addonCount = ev.additional_packages;
         }
-        try {
-          const lsKey = 'additionalPackages_' + ev.id;
-          const lsVal = parseInt(localStorage.getItem(lsKey), 10);
-          if (!isNaN(lsVal) && lsVal > addonCount) addonCount = lsVal;
-        } catch (_) {}
         setDbAddonCount((prev) => Math.max(prev ?? 0, addonCount));
         setAdditionalPackages((prev) => {
           const prevCount = prev ? prev.length : 0;
           if (addonCount > prevCount) return Array(addonCount).fill('addon');
           return prev;
         });
+        try { localStorage.setItem('additionalPackages_' + ev.id, String(addonCount)); } catch (_) {}
         setEventDataLoaded(true);
         const dbPlan = ev.selected_plan || null;
-        const storedPlan = typeof window !== 'undefined' ? localStorage.getItem('selectedPlan') : null;
-        const planToUse = dbPlan || storedPlan || null;
-        if (planToUse && !selectedPlan) {
+        const planToUse = dbPlan || (ev.allowed_guests ? (ev.allowed_guests <= 50 ? 'free' :
+          ev.allowed_guests <= 200 ? 'standard' : ev.allowed_guests <= 350 ? 'premium' :
+          ev.allowed_guests <= 500 ? 'luxury' : 'supreme') : null) || null;
+        if (planToUse) {
           setSelectedPlan(planToUse);
           try { localStorage.setItem('selectedPlan', planToUse); } catch(e){}
-        } else if (!planToUse && ev.allowed_guests && !selectedPlan) {
-          const inferredPlan = ev.allowed_guests <= 50 ? 'free' :
-                               ev.allowed_guests <= 200 ? 'standard' :
-                               ev.allowed_guests <= 350 ? 'premium' :
-                               ev.allowed_guests <= 500 ? 'luxury' : 'supreme';
-          setSelectedPlan(inferredPlan);
-          try { localStorage.setItem('selectedPlan', inferredPlan); } catch(e){}
         }
         const details=typeof ev.event_details==='string'?JSON.parse(ev.event_details):ev.event_details||{};
         const dateStr=details.date||details.start_datetime;
@@ -3400,30 +3408,21 @@ React.useEffect(() => {
               if (typeof ev.additional_packages === 'number') {
                 restoreAddonCount = ev.additional_packages;
               }
-              try {
-                const lsVal = parseInt(localStorage.getItem('additionalPackages_' + ev.id), 10);
-                if (!isNaN(lsVal) && lsVal > restoreAddonCount) restoreAddonCount = lsVal;
-              } catch (_) {}
               setDbAddonCount((prev) => Math.max(prev ?? 0, restoreAddonCount));
               setAdditionalPackages((prev) => {
                 const prevCount = prev ? prev.length : 0;
                 if (restoreAddonCount > prevCount) return Array(restoreAddonCount).fill('addon');
                 return prev;
               });
+              try { localStorage.setItem('additionalPackages_' + ev.id, String(restoreAddonCount)); } catch (_) {}
               setEventDataLoaded(true);
               const dbPlan = ev.selected_plan || null;
-              const storedPlan = typeof window !== 'undefined' ? localStorage.getItem('selectedPlan') : null;
-              const planToUse = dbPlan || storedPlan || null;
-              if (planToUse && !selectedPlan) {
+              const planToUse = dbPlan || (ev.allowed_guests ? (ev.allowed_guests <= 50 ? 'free' :
+                ev.allowed_guests <= 200 ? 'standard' : ev.allowed_guests <= 350 ? 'premium' :
+                ev.allowed_guests <= 500 ? 'luxury' : 'supreme') : null) || null;
+              if (planToUse) {
                 setSelectedPlan(planToUse);
                 try { localStorage.setItem('selectedPlan', planToUse); } catch(e){}
-              } else if (!planToUse && ev.allowed_guests && !selectedPlan) {
-                const inferredPlan = ev.allowed_guests <= 50 ? 'free' :
-                                     ev.allowed_guests <= 200 ? 'standard' :
-                                     ev.allowed_guests <= 350 ? 'premium' :
-                                     ev.allowed_guests <= 500 ? 'luxury' : 'supreme';
-                setSelectedPlan(inferredPlan);
-                try { localStorage.setItem('selectedPlan', inferredPlan); } catch(e){}
               }
               setFormData(prev => ({ ...prev, ...details }));
 
@@ -3548,30 +3547,21 @@ React.useEffect(() => {
           if (typeof ev.additional_packages === 'number') {
             addonCount = ev.additional_packages;
           }
-          try {
-            const lsVal = parseInt(localStorage.getItem('additionalPackages_' + ev.id), 10);
-            if (!isNaN(lsVal) && lsVal > addonCount) addonCount = lsVal;
-          } catch (_) {}
           setDbAddonCount((prev) => Math.max(prev ?? 0, addonCount));
           setAdditionalPackages((prev) => {
             const prevCount = prev ? prev.length : 0;
             if (addonCount > prevCount) return Array(addonCount).fill('addon');
             return prev;
           });
+          try { localStorage.setItem('additionalPackages_' + ev.id, String(addonCount)); } catch (_) {}
           setEventDataLoaded(true);
           const dbPlan = ev.selected_plan || null;
-          const storedPlan = typeof window !== 'undefined' ? localStorage.getItem('selectedPlan') : null;
-          const planToUse = dbPlan || storedPlan || null;
-          if (planToUse && !selectedPlan) {
+          const planToUse = dbPlan || (ev.allowed_guests ? (ev.allowed_guests <= 50 ? 'free' :
+            ev.allowed_guests <= 200 ? 'standard' : ev.allowed_guests <= 350 ? 'premium' :
+            ev.allowed_guests <= 500 ? 'luxury' : 'supreme') : null) || null;
+          if (planToUse) {
             setSelectedPlan(planToUse);
             try { localStorage.setItem('selectedPlan', planToUse); } catch(e){}
-          } else if (!planToUse && ev.allowed_guests && !selectedPlan) {
-            const inferredPlan = ev.allowed_guests <= 50 ? 'free' :
-                                 ev.allowed_guests <= 200 ? 'standard' :
-                                 ev.allowed_guests <= 350 ? 'premium' :
-                                 ev.allowed_guests <= 500 ? 'luxury' : 'supreme';
-            setSelectedPlan(inferredPlan);
-            try { localStorage.setItem('selectedPlan', inferredPlan); } catch(e){}
           }
           const details = typeof ev.event_details === 'string' 
             ? JSON.parse(ev.event_details) 
