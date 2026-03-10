@@ -1194,9 +1194,11 @@ const handleOpenAddonModal = React.useCallback(() => {
 
   // ברירת מחדל לכל סוגי האירועים: שורה ראשונה (שמות/כותרת) גדולה ומודגשת – גם בנייד
   const defaultFirstLineStyle = { fontSize: 28, fontWeight: 'bold', textAlign: 'center', color: 'black' };
+  const defaultOtherLineStyle = { fontSize: 16, fontWeight: 'normal', textAlign: 'center', color: 'black', lineHeight: 1.5, letterSpacing: 0, textDecoration: 'none', fontStyle: 'normal' };
+  const getDefaultStyleForRow = (index) => index === 0 ? { ...defaultFirstLineStyle } : { ...defaultOtherLineStyle };
   const getEffectiveLineStyle = (index) => {
     const style = lineStyles[index] || {};
-    const def = index === 0 ? defaultFirstLineStyle : { fontSize: 16, fontWeight: 'normal', textAlign: 'center', color: 'black', lineHeight: 1.5, letterSpacing: 0, textDecoration: 'none', fontStyle: 'normal' };
+    const def = getDefaultStyleForRow(index);
     return { ...def, ...style };
   };
 
@@ -6188,7 +6190,7 @@ React.useEffect(() => {
               <button
                 onClick={() => {
                   const updatedStyles = { ...lineStyles };
-                  delete updatedStyles[showAdvancedEdit];
+                  updatedStyles[showAdvancedEdit] = getDefaultStyleForRow(showAdvancedEdit);
                   setLineStyles(updatedStyles);
                 }}
                 className="flex-1 bg-red-500 text-white border border-red-600 rounded-full px-6 py-3 font-bold hover:bg-red-600 transition-all"
