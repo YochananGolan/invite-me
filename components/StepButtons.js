@@ -1192,8 +1192,13 @@ const handleOpenAddonModal = React.useCallback(() => {
     8: { fontSize: 15, textAlign: 'center', color: 'black' },
   };
 
-  // ברירת מחדל לכל סוגי האירועים: שורה ראשונה (שמות/כותרת) מודגשת מאוד
+  // ברירת מחדל לכל סוגי האירועים: שורה ראשונה (שמות/כותרת) גדולה ומודגשת – גם בנייד
   const defaultFirstLineStyle = { fontSize: 28, fontWeight: 'bold', textAlign: 'center', color: 'black' };
+  const getEffectiveLineStyle = (index) => {
+    const style = lineStyles[index] || {};
+    const def = index === 0 ? defaultFirstLineStyle : { fontSize: 16, fontWeight: 'normal', textAlign: 'center', color: 'black', lineHeight: 1.5, letterSpacing: 0, textDecoration: 'none', fontStyle: 'normal' };
+    return { ...def, ...style };
+  };
 
   const [customInvitationText, setCustomInvitationText] = useState('');
   const [lineStyles, setLineStyles] = useState({});
@@ -5587,9 +5592,9 @@ React.useEffect(() => {
                         onChange={(e) => updateLineText(index, e.target.value)}
                         className="w-full border border-gray-300 rounded p-2 text-right text-sm sm:text-base"
                         style={{
-                          fontSize: `${Math.min(lineStyles[index]?.fontSize || 16, 16)}px`,
-                          color: lineStyles[index]?.color || 'black',
-                          fontWeight: lineStyles[index]?.fontWeight || 'normal'
+                          fontSize: `${getEffectiveLineStyle(index).fontSize}px`,
+                          color: getEffectiveLineStyle(index).color || 'black',
+                          fontWeight: getEffectiveLineStyle(index).fontWeight || 'normal'
                         }}
                         rows={1}
                       />
@@ -5632,6 +5637,8 @@ React.useEffect(() => {
                       setCustomInvitationText('');
                       if (normalizeType(selectedEventType) === 'חתונה') {
                         setLineStyles(defaultLineStylesForWedding);
+                      } else {
+                        setLineStyles({ 0: { ...defaultFirstLineStyle } });
                       }
                     }}
                     className="text-base underline font-bold text-primary hover:text-primary/80"
@@ -5642,20 +5649,22 @@ React.useEffect(() => {
                 <div className="mt-3 p-2 sm:p-4 border border-gray-300 rounded bg-white">
                   <h3 className="text-sm sm:text-lg font-bold mb-2 text-center">תצוגה מקדימה:</h3>
                   <div className="bg-gray-50 p-2 sm:p-4 rounded border text-center">
-                    {customInvitationText.split('\n').map((line, index) => (
+                    {customInvitationText.split('\n').map((line, index) => {
+                      const s = getEffectiveLineStyle(index);
+                      return (
                       <div
                         key={index}
                         style={{
-                          fontSize: `${lineStyles[index]?.fontSize || 16}px`,
-                          color: lineStyles[index]?.color || 'black',
-                          fontWeight: lineStyles[index]?.fontWeight || 'normal',
-                          lineHeight: lineStyles[index]?.lineHeight || 1.5,
-                          letterSpacing: `${lineStyles[index]?.letterSpacing || 0}px`,
-                          textAlign: lineStyles[index]?.textAlign || 'center',
-                          textDecoration: lineStyles[index]?.textDecoration || 'none',
+                          fontSize: `${s.fontSize}px`,
+                          color: s.color || 'black',
+                          fontWeight: s.fontWeight || 'normal',
+                          lineHeight: s.lineHeight || 1.5,
+                          letterSpacing: `${s.letterSpacing || 0}px`,
+                          textAlign: s.textAlign || 'center',
+                          textDecoration: s.textDecoration || 'none',
                           fontStyle: 'normal',
                           textShadow: 'none',
-                          transform: lineStyles[index]?.fontStyle === 'italic' ? 'skewX(20deg)' : lineStyles[index]?.fontStyle === 'back-slant' ? 'skewX(-20deg)' : 'none',
+                          transform: s.fontStyle === 'italic' ? 'skewX(20deg)' : s.fontStyle === 'back-slant' ? 'skewX(-20deg)' : 'none',
                           whiteSpace: 'pre-wrap',
                           wordBreak: 'break-word',
                           marginBottom: '8px'
@@ -5663,7 +5672,7 @@ React.useEffect(() => {
                       >
                         {line}
                       </div>
-                    ))}
+                    );})}
                   </div>
                 </div>
               </div>
@@ -5780,9 +5789,8 @@ React.useEffect(() => {
                               <div className="absolute inset-0 flex flex-col items-center justify-center px-4" dir="rtl">
                                 {(customInvitationText || invitationText || 'דוגמת טקסט להזמנה').split('\n').map((line, lineIndex) => {
                                   if (!line || !line.trim()) return <div key={lineIndex} style={{ height: '0.5em' }} />;
-                                  const style = lineStyles[lineIndex] || {};
-                                  const baseFontSize = style.fontSize ? parseInt(style.fontSize) : 20;
-                                  const fontSize = lineIndex === 0 ? baseFontSize + 6 : baseFontSize;
+                                  const style = getEffectiveLineStyle(lineIndex);
+                                  const fontSize = style.fontSize ? parseInt(style.fontSize) : (lineIndex === 0 ? 28 : 20);
                                   let textColor = style.color || '#000000';
                                   if (!textColor.startsWith('#')) {
                                     const colorMap = {
@@ -5798,8 +5806,7 @@ React.useEffect(() => {
                                       style={{
                                         fontSize: `${fontSize}px`,
                                         fontFamily: selectedFontCss || 'Assistant, sans-serif',
-                                        // Requirement: first line is always bold (all event types)
-                                        fontWeight: lineIndex === 0 ? 'bold' : (style.fontWeight || 'normal'),
+                                        fontWeight: style.fontWeight || 'normal',
                                         color: textColor,
                                     lineHeight: style.lineHeight ? `${style.lineHeight}` : '1.4',
                                         letterSpacing: style.letterSpacing ? `${style.letterSpacing}px` : '0',
@@ -5848,9 +5855,8 @@ React.useEffect(() => {
               <div className="absolute inset-0 flex flex-col items-center justify-center px-4" dir="rtl">
                 {(customInvitationText || invitationText || 'דוגמת טקסט להזמנה').split('\n').map((line, lineIndex) => {
                   if (!line || !line.trim()) return <div key={lineIndex} style={{ height: '0.5em' }} />;
-                  const style = lineStyles[lineIndex] || {};
-                  const baseFontSize = style.fontSize ? parseInt(style.fontSize) : 24;
-                  const fontSize = lineIndex === 0 ? baseFontSize + 6 : baseFontSize;
+                  const style = getEffectiveLineStyle(lineIndex);
+                  const fontSize = style.fontSize ? parseInt(style.fontSize) : (lineIndex === 0 ? 28 : 24);
                   let textColor = style.color || '#000000';
                   if (!textColor.startsWith('#')) {
                     const colorMap = {
@@ -5866,8 +5872,7 @@ React.useEffect(() => {
                       style={{
                         fontSize: `${fontSize}px`,
                         fontFamily: selectedFontCss || 'Assistant, sans-serif',
-                        // Requirement: first line is always bold (all event types)
-                        fontWeight: lineIndex === 0 ? 'bold' : (style.fontWeight || 'normal'),
+                        fontWeight: style.fontWeight || 'normal',
                         color: textColor,
                         lineHeight: style.lineHeight ? `${style.lineHeight}` : '1.5',
                         letterSpacing: style.letterSpacing ? `${style.letterSpacing}px` : '0',
@@ -5964,7 +5969,7 @@ React.useEffect(() => {
                 <div>
                   <label className="block mb-2 font-bold text-right">גודל פונט</label>
                   <select
-                    value={lineStyles[showAdvancedEdit]?.fontSize || '16'}
+                    value={lineStyles[showAdvancedEdit]?.fontSize ?? (showAdvancedEdit === 0 ? '28' : '16')}
                     onChange={(e) => updateLineStyle(showAdvancedEdit, 'fontSize', e.target.value)}
                     className="w-full border border-gray-300 rounded-md p-2"
                   >
@@ -5986,7 +5991,7 @@ React.useEffect(() => {
                 <div>
                   <label className="block mb-2 font-bold text-right">הדגשת פונט</label>
                   <select
-                    value={lineStyles[showAdvancedEdit]?.fontWeight || 'normal'}
+                    value={lineStyles[showAdvancedEdit]?.fontWeight ?? (showAdvancedEdit === 0 ? 'bold' : 'normal')}
                     onChange={(e) => updateLineStyle(showAdvancedEdit, 'fontWeight', e.target.value)}
                     className="w-full border border-gray-300 rounded-md p-2"
                   >
@@ -6157,19 +6162,19 @@ React.useEffect(() => {
             {/* Preview - centered at bottom, above buttons */}
             <div className="flex flex-col items-center px-6 py-3 flex-shrink-0 border-t border-gray-200 bg-gray-50/50">
               <label className="block mb-1 font-bold text-center text-sm">תצוגה מקדימה</label>
-              <div className="w-full max-w-xl border border-gray-300 rounded-md p-3 bg-white min-h-[70px]" style={{ textAlign: lineStyles[showAdvancedEdit]?.textAlign || 'center' }}>
+              <div className="w-full max-w-xl border border-gray-300 rounded-md p-3 bg-white min-h-[70px]" style={{ textAlign: getEffectiveLineStyle(showAdvancedEdit).textAlign || 'center' }}>
                 <div
                   style={{
-                    fontSize: `${lineStyles[showAdvancedEdit]?.fontSize || 16}px`,
-                    color: lineStyles[showAdvancedEdit]?.color || 'black',
-                    fontWeight: lineStyles[showAdvancedEdit]?.fontWeight || 'normal',
-                    lineHeight: lineStyles[showAdvancedEdit]?.lineHeight || 1.5,
-                    letterSpacing: `${lineStyles[showAdvancedEdit]?.letterSpacing || 0}px`,
-                    textAlign: lineStyles[showAdvancedEdit]?.textAlign || 'center',
-                    textDecoration: lineStyles[showAdvancedEdit]?.textDecoration || 'none',
+                    fontSize: `${getEffectiveLineStyle(showAdvancedEdit).fontSize}px`,
+                    color: getEffectiveLineStyle(showAdvancedEdit).color || 'black',
+                    fontWeight: getEffectiveLineStyle(showAdvancedEdit).fontWeight || 'normal',
+                    lineHeight: getEffectiveLineStyle(showAdvancedEdit).lineHeight || 1.5,
+                    letterSpacing: `${getEffectiveLineStyle(showAdvancedEdit).letterSpacing || 0}px`,
+                    textAlign: getEffectiveLineStyle(showAdvancedEdit).textAlign || 'center',
+                    textDecoration: getEffectiveLineStyle(showAdvancedEdit).textDecoration || 'none',
                     fontStyle: 'normal',
                     textShadow: 'none',
-                    transform: lineStyles[showAdvancedEdit]?.fontStyle === 'italic' ? 'skewX(20deg)' : lineStyles[showAdvancedEdit]?.fontStyle === 'back-slant' ? 'skewX(-20deg)' : 'none',
+                    transform: getEffectiveLineStyle(showAdvancedEdit).fontStyle === 'italic' ? 'skewX(20deg)' : getEffectiveLineStyle(showAdvancedEdit).fontStyle === 'back-slant' ? 'skewX(-20deg)' : 'none',
                     whiteSpace: 'pre-wrap',
                     wordBreak: 'break-word'
                   }}
