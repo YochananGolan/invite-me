@@ -57,9 +57,14 @@ export default function TranzilaPayment({
   const handshakeInProgressRef = useRef(false);
   const iframeRef = useRef(null);
   const formRef = useRef(null);
+  const failureTimeoutRef = useRef(null);
 
   useEffect(() => {
     if (!isOpen) {
+      if (failureTimeoutRef.current) {
+        clearTimeout(failureTimeoutRef.current);
+        failureTimeoutRef.current = null;
+      }
       setIsIframeLoading(true);
       setIsHandshakeLoading(false);
       setHandshakeToken(null);
@@ -118,16 +123,23 @@ export default function TranzilaPayment({
           try {
             const parsed = JSON.parse(data);
             if (isOwnOrigin && (parsed.success || parsed.Response === '000')) {
+              if (failureTimeoutRef.current) {
+                clearTimeout(failureTimeoutRef.current);
+                failureTimeoutRef.current = null;
+              }
               onSuccess && onSuccess(parsed);
               onClose();
               return;
             }
             if (isOwnOrigin && (parsed.error || parsed.Response)) {
-              onFailure && onFailure(parsed);
+              if (failureTimeoutRef.current) clearTimeout(failureTimeoutRef.current);
+          failureTimeoutRef.current = setTimeout(() => {
+            failureTimeoutRef.current = null;
+            onFailure && onFailure(parsed);
+          }, 5000);
               return;
             }
           } catch (e) {
-            // Not JSON, ignore
             return;
           }
         }
@@ -173,6 +185,10 @@ export default function TranzilaPayment({
                          (data.transactionData && (data.transactionData.Response === '000' || data.transactionData.Response === 0));
 
         if (isSuccess && isOwnOrigin) {
+          if (failureTimeoutRef.current) {
+            clearTimeout(failureTimeoutRef.current);
+            failureTimeoutRef.current = null;
+          }
           console.log('Payment successful, calling onSuccess with:', data);
           const transactionData = data.transactionData || data;
           onSuccess && onSuccess(transactionData);
@@ -180,11 +196,16 @@ export default function TranzilaPayment({
           return;
         }
 
-        // Handle failed payment - only from our failure page (after Tranzila redirect)
+        // Handle failed payment - delay 3s to avoid spurious failure during Google Pay flow.
+        // When user clicks Continue, Tranzila may send false failure; success often follows.
         if (isOwnOrigin && (data.error || data.Response || (data.transactionData && data.transactionData.Response))) {
-          console.log('Payment failed, calling onFailure with:', data);
-          const errorData = data.transactionData || data;
-          onFailure && onFailure(errorData);
+          if (failureTimeoutRef.current) clearTimeout(failureTimeoutRef.current);
+          failureTimeoutRef.current = setTimeout(() => {
+            failureTimeoutRef.current = null;
+            console.log('Payment failed (after delay), calling onFailure with:', data);
+            const errorData = data.transactionData || data;
+            onFailure && onFailure(errorData);
+          }, 5000);
           return;
         }
 
@@ -475,11 +496,16 @@ export default function TranzilaPayment({
             method="POST"
             className="hidden"
           >
-            {/* Hidden fields */}
+            {/* Hidden fields - sum must match handshake exactly (Tranzila validates; 004 = invalid amount) */}
             <input
               type="hidden"
               name="sum"
-              value={`${handshakeDetails?.sum ?? handshakeDetails?.amount ?? amount}`}
+              value={(() => {
+                const raw = handshakeDetails?.sum ?? handshakeDetails?.amount ?? amount;
+                const num = typeof raw === 'number' ? raw : parseFloat(raw);
+                if (Number.isNaN(num) || num <= 0) return String(amount);
+                return Number.isInteger(num) ? String(num) : String(Math.round(num * 100) / 100);
+              })()}
             />
             <input type="hidden" name="supplier" value={terminalName} />
             <input type="hidden" name="currency" value="1" />
@@ -506,10 +532,16 @@ export default function TranzilaPayment({
             <input type="hidden" name="trButtonColor" value="D4AF37" />
             <input type="hidden" name="nologo" value="1" />
             <input type="hidden" name="bit_pay" value="1" />
-            {/* Google Pay - Note: Only works on HTTPS (not on HTTP/localhost) */}
-            <input type="hidden" name="google_pay" value="1" />
+            {/* Google Pay - can conflict with credit card form; disable via NEXT_PUBLIC_DISABLE_GOOGLE_PAY=1 */}
+            {process.env.NEXT_PUBLIC_DISABLE_GOOGLE_PAY !== '1' &&
+             process.env.NEXT_PUBLIC_DISABLE_GOOGLE_PAY !== 'true' && (
+              <input type="hidden" name="google_pay" value="1" />
+            )}
             {/* Apple Pay - Requires Tranzila Apple Pay enablement and supported Apple devices/browsers */}
-            <input type="hidden" name="apple_pay" value="1" />
+            {process.env.NEXT_PUBLIC_DISABLE_APPLE_PAY !== '1' &&
+             process.env.NEXT_PUBLIC_DISABLE_APPLE_PAY !== 'true' && (
+              <input type="hidden" name="apple_pay" value="1" />
+            )}
             {handshakeDetails?.response?.index && (
               <input
                 type="hidden"
@@ -564,12 +596,9 @@ export default function TranzilaPayment({
               ref={iframeRef}
               name="tranzila-iframe"
               className="w-full h-full rounded-lg"
-              onLoad={() => {
-                // Only hide loading after iframe actually loads content
-                setTimeout(() => setIsIframeLoading(false), 500);
-              }}
-              allow="payment"
-              allowpaymentrequest="true"
+              onLoad={() => setTimeout(() => setIsIframeLoading(false), 500)}
+              allow="payment *"
+              allowPaymentRequest
             />
           </div>
 
@@ -585,6 +614,8 @@ export default function TranzilaPayment({
                 <span className="text-2xl">📱</span>
                 <span className="text-sm text-gray-700">Bit</span>
               </div>
+              {process.env.NEXT_PUBLIC_DISABLE_GOOGLE_PAY !== '1' &&
+               process.env.NEXT_PUBLIC_DISABLE_GOOGLE_PAY !== 'true' && (
               <div className="flex items-center gap-2">
                 <span className="text-2xl">🟢</span>
                 <span className="text-sm text-gray-700">Google Pay</span>
@@ -592,12 +623,18 @@ export default function TranzilaPayment({
                   <span className="text-xs text-amber-600 mr-1">(זמין רק ב-HTTPS)</span>
                 )}
               </div>
+              )}
+              {process.env.NEXT_PUBLIC_DISABLE_APPLE_PAY !== '1' &&
+               process.env.NEXT_PUBLIC_DISABLE_APPLE_PAY !== 'true' && (
               <div className="flex items-center gap-2">
-                <span className="text-2xl"></span>
+                <span className="text-2xl">&#63743;</span>
                 <span className="text-sm text-gray-700">Apple Pay</span>
               </div>
+              )}
             </div>
-            {typeof window !== 'undefined' && window.location.protocol === 'http:' && (
+            {process.env.NEXT_PUBLIC_DISABLE_GOOGLE_PAY !== '1' &&
+             process.env.NEXT_PUBLIC_DISABLE_GOOGLE_PAY !== 'true' &&
+             typeof window !== 'undefined' && window.location.protocol === 'http:' && (
               <p className="text-center text-xs text-amber-600 mt-2">
                 ⚠️ Google Pay זמין רק באתרים מאובטחים (HTTPS). באתר ייצור Google Pay יופיע אוטומטית.
               </p>

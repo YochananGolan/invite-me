@@ -79,8 +79,8 @@ Without these, payments will fail with 400 in production.
 
 Enable additional payment methods:
 - ✓ Bit Pay (if needed)
-- ✓ Google Pay (if needed)
-- ✓ Apple Pay (if needed)
+- ✓ Google Pay (if needed) – if it conflicts with credit card payment, set `NEXT_PUBLIC_DISABLE_GOOGLE_PAY=1`
+- ✓ Apple Pay (if needed) – can be disabled with `NEXT_PUBLIC_DISABLE_APPLE_PAY=1`
 
 ### Apple Pay – הגדרה מלאה
 
@@ -220,6 +220,13 @@ To update prices, edit the `getPlanPrice()` function in `components/StepButtons.
 - Verify localStorage is working
 - Check browser console for errors
 - Ensure success callback sends proper data
+
+### Google Pay conflicts with credit card payment
+If Google Pay causes issues with regular credit card form (payment stuck, failures, UI glitches), disable it by adding to `.env.local` or Vercel:
+```
+NEXT_PUBLIC_DISABLE_GOOGLE_PAY=1
+```
+See `docs/GOOGLE-PAY-TROUBLESHOOTING.md` for details.
 
 ## Security Best Practices
 
