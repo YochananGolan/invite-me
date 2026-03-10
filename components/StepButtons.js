@@ -5538,13 +5538,13 @@ React.useEffect(() => {
             <div className="flex sm:hidden border-b">
               <button
                 onClick={() => setDesignMobileTab('text')}
-                className={`flex-1 py-3 text-center font-bold text-lg transition-all ${designMobileTab === 'text' ? 'text-primary border-b-3 border-primary bg-primary/5' : 'text-gray-500'}`}
+                className={`flex-1 py-3 text-center font-bold text-xl transition-all ${designMobileTab === 'text' ? 'text-primary border-b-3 border-primary bg-primary/5' : 'text-gray-500'}`}
               >
                 א. עיצוב טקסט
               </button>
               <button
                 onClick={() => setDesignMobileTab('templates')}
-                className={`flex-1 py-3 text-center font-bold text-lg transition-all ${designMobileTab === 'templates' ? 'text-primary border-b-3 border-primary bg-primary/5' : 'text-gray-500'}`}
+                className={`flex-1 py-3 text-center font-bold text-xl transition-all ${designMobileTab === 'templates' ? 'text-primary border-b-3 border-primary bg-primary/5' : 'text-gray-500'}`}
               >
                 ב. בחירת תבנית
               </button>
