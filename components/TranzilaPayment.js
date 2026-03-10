@@ -77,14 +77,6 @@ export default function TranzilaPayment({
     // Listen for messages from Tranzila iframe
     const handleMessage = (event) => {
       try {
-        // Security: Verify the origin if needed
-        // Allow messages from Tranzila domains
-        const allowedOrigins = [
-          'https://direct.tranzila.com',
-          'https://secure5.tranzila.com',
-          window.location.origin // Allow same-origin for API callbacks
-        ];
-        
         // Log all messages for debugging
         console.log('Received message from iframe:', {
           origin: event.origin,
@@ -94,16 +86,25 @@ export default function TranzilaPayment({
 
         const data = event.data;
 
-        // Handle string messages (from API callbacks)
+        // Origin validation - closePayment/retryPayment only from our pages; success/failure from our pages or Tranzila
+        const isOwnOrigin = typeof window !== 'undefined' && event.origin === window.location.origin;
+        const allowedOrigins = [
+          'https://direct.tranzila.com',
+          'https://secure5.tranzila.com',
+          ...(typeof window !== 'undefined' ? [window.location.origin] : [])
+        ];
+        const isAllowedOrigin = isOwnOrigin || allowedOrigins.includes(event.origin);
+
+        // Handle string messages (from API callbacks) - validate origin
         if (typeof data === 'string') {
           try {
             const parsed = JSON.parse(data);
-            if (parsed.success || parsed.Response === '000') {
+            if (isAllowedOrigin && (parsed.success || parsed.Response === '000')) {
               onSuccess && onSuccess(parsed);
               onClose();
               return;
             }
-            if (parsed.error || parsed.Response) {
+            if (isAllowedOrigin && (parsed.error || parsed.Response)) {
               onFailure && onFailure(parsed);
               return;
             }
@@ -118,25 +119,35 @@ export default function TranzilaPayment({
           return;
         }
 
-        // Handle close payment request
+        // closePayment and retryPayment are ONLY sent from our success/failure pages (same origin).
+        // Ignore from Tranzila or other origins - prevents Google Pay sheet from being interrupted
+        // when Tranzila or browser sends spurious messages during payment flow.
+
+        // Handle close payment request - only from our success page
         if (data.closePayment) {
+          if (!isOwnOrigin) return;
           onClose();
           return;
         }
 
-        // Handle retry payment request
-      if (data.retryPayment) {
-        handshakeInProgressRef.current = false;
-        setHandshakeToken(null);
-        setHandshakeDetails(null);
-        setHandshakeError(null);
-        setIsIframeLoading(true);
-        setIsHandshakeLoading(false);
-        setHandshakeAttempt((prev) => prev + 1);
-        return;
-      }
+        // Handle retry payment request - only from our failure page (user clicked "נסה שוב")
+        if (data.retryPayment) {
+          if (!isOwnOrigin) return;
+          handshakeInProgressRef.current = false;
+          setHandshakeToken(null);
+          setHandshakeDetails(null);
+          setHandshakeError(null);
+          setIsIframeLoading(true);
+          setIsHandshakeLoading(false);
+          setHandshakeAttempt((prev) => prev + 1);
+          return;
+        }
 
-        // Handle successful payment
+        // Success/failure messages come from our success/failure pages (same origin after redirect)
+        // or from Tranzila. Validate origin for security.
+        const allowedForPaymentResult = isAllowedOrigin;
+
+        // Handle successful payment - only from trusted origins
         // Response can be '000', 0, or success: true
         const isSuccess = data.success === true || 
                          data.Response === '000' || 
@@ -144,7 +155,7 @@ export default function TranzilaPayment({
                          data.Response === '0' ||
                          (data.transactionData && (data.transactionData.Response === '000' || data.transactionData.Response === 0));
 
-        if (isSuccess) {
+        if (isSuccess && allowedForPaymentResult) {
           console.log('Payment successful, calling onSuccess with:', data);
           const transactionData = data.transactionData || data;
           onSuccess && onSuccess(transactionData);
@@ -152,9 +163,8 @@ export default function TranzilaPayment({
           return;
         }
 
-        // Handle failed payment
-        // Response codes other than '000' indicate failure
-        if (data.error || data.Response || (data.transactionData && data.transactionData.Response)) {
+        // Handle failed payment - only from trusted origins
+        if (allowedForPaymentResult && (data.error || data.Response || (data.transactionData && data.transactionData.Response))) {
           console.log('Payment failed, calling onFailure with:', data);
           const errorData = data.transactionData || data;
           onFailure && onFailure(errorData);
