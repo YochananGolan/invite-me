@@ -4646,16 +4646,16 @@ React.useEffect(() => {
       </div>
 
       {showEventTypes && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50">
-          <div className="relative bg-white rounded-lg p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 flex items-end sm:items-center justify-center bg-black/50 z-50 p-0 sm:p-4">
+          <div className="relative bg-white rounded-t-2xl sm:rounded-lg p-6 w-full max-w-md max-h-[90vh] flex flex-col">
             <button onClick={() => setShowEventTypes(false)} className="absolute top-2 left-2 text-2xl text-gray-500 hover:text-gray-700">&times;</button>
-            <h2 className="text-xl font-medium mb-4 text-center">בחר סוג אירוע</h2>
-            <ul className="space-y-3">
+            <h2 className="text-xl font-medium mb-4 text-center flex-shrink-0">בחר סוג אירוע</h2>
+            <ul className="space-y-2 overflow-y-auto flex-1 min-h-0 pb-2">
               {eventTypes.map((type) => (
                 <li key={type}>
                   <button
                     onClick={() => handleSelectEvent(type)}
-                     className={`w-full ${selectedEventType === type ? 'bg-primary text-white' : 'bg-[#FCE6AC] text-primary'} border border-primary rounded-full px-4 py-2 text-lg font-medium hover:bg-[#FCE6AC]/90 transition-all`}
+                     className={`w-full ${selectedEventType === type ? 'bg-primary text-white' : 'bg-[#FCE6AC] text-primary'} border border-primary rounded-full px-4 py-2 text-base sm:text-lg font-medium hover:bg-[#FCE6AC]/90 transition-all`}
                   >
                     {type}
                   </button>
@@ -4663,22 +4663,24 @@ React.useEffect(() => {
               ))}
             </ul>
 
-            {selectedEventType && (
-              <p className="text-center text-primary font-medium text-xl mt-4">האירוע הנבחר: {selectedEventType}</p>
-            )}
+            <div className="flex-shrink-0 pt-2 border-t border-gray-100">
+              {selectedEventType && (
+                <p className="text-center text-primary font-medium text-lg sm:text-xl mb-3">האירוע הנבחר: {selectedEventType}</p>
+              )}
 
-            <button
-              onClick={() => { 
-                console.log('Save and close button clicked');
-                setShowEventTypes(false); 
-                setShowEventDetails(true);
-                markStepDone(0); // Mark step 1 as completed when saving
-                console.log('markStepDone(0) called');
-              }}
-              className="mt-6 w-full bg-primary text-white border border-primary rounded-full px-4 py-2 font-medium hover:bg-primary/90 transition-all"
-            >
-              שמור וסגור
-            </button>
+              <button
+                onClick={() => { 
+                  console.log('Save and close button clicked');
+                  setShowEventTypes(false); 
+                  setShowEventDetails(true);
+                  markStepDone(0); // Mark step 1 as completed when saving
+                  console.log('markStepDone(0) called');
+                }}
+                className="w-full bg-primary text-white border border-primary rounded-full px-4 py-3 font-medium hover:bg-primary/90 transition-all"
+              >
+                שמור וסגור
+              </button>
+            </div>
           </div>
         </div>
       )}
