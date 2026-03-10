@@ -61,6 +61,22 @@ export default async function handler(req, res) {
             .details p {
               margin: 0.5rem 0;
             }
+            .continue-btn {
+              display: inline-block;
+              margin-top: 1.5rem;
+              padding: 0.75rem 2rem;
+              font-size: 1.125rem;
+              font-weight: 600;
+              color: white;
+              background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+              border: none;
+              border-radius: 0.5rem;
+              cursor: pointer;
+              transition: opacity 0.2s;
+            }
+            .continue-btn:hover {
+              opacity: 0.9;
+            }
           </style>
         </head>
         <body>
@@ -74,9 +90,7 @@ export default async function handler(req, res) {
                 ${transactionData.sum ? `<p><strong>סכום:</strong> ${transactionData.sum} ₪</p>` : ''}
               </div>
             ` : ''}
-            <p style="margin-top: 2rem; color: #9ca3af; font-size: 0.875rem;">
-              החלון ייסגר אוטומטית...
-            </p>
+            <button class="continue-btn" onclick="handleContinue()">המשך</button>
           </div>
           <script>
             // Send success message to parent window
@@ -96,8 +110,7 @@ export default async function handler(req, res) {
               console.error('Error sending success message:', error);
             }
 
-            // Close window after delay
-            setTimeout(() => {
+            function handleContinue() {
               try {
                 if (window.parent && window.parent !== window) {
                   window.parent.postMessage({ closePayment: true }, '*');
@@ -105,7 +118,7 @@ export default async function handler(req, res) {
               } catch (error) {
                 console.error('Error closing payment window:', error);
               }
-            }, 3000);
+            }
           </script>
         </body>
       </html>
