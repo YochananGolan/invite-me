@@ -109,25 +109,20 @@ export default function TranzilaPayment({
 
         const data = event.data;
 
-        // Origin validation - closePayment/retryPayment only from our pages; success/failure from our pages or Tranzila
+        // Origin validation - success/failure ONLY from our callback pages (Tranzila redirects iframe to our URLs).
+        // Ignore messages from Tranzila during Google Pay flow - they send intermediate status that we wrongly treated as failure.
         const isOwnOrigin = typeof window !== 'undefined' && event.origin === window.location.origin;
-        const allowedOrigins = [
-          'https://direct.tranzila.com',
-          'https://secure5.tranzila.com',
-          ...(typeof window !== 'undefined' ? [window.location.origin] : [])
-        ];
-        const isAllowedOrigin = isOwnOrigin || allowedOrigins.includes(event.origin);
 
-        // Handle string messages (from API callbacks) - validate origin
+        // Handle string messages (from API callbacks) - only from our success/failure pages
         if (typeof data === 'string') {
           try {
             const parsed = JSON.parse(data);
-            if (isAllowedOrigin && (parsed.success || parsed.Response === '000')) {
+            if (isOwnOrigin && (parsed.success || parsed.Response === '000')) {
               onSuccess && onSuccess(parsed);
               onClose();
               return;
             }
-            if (isAllowedOrigin && (parsed.error || parsed.Response)) {
+            if (isOwnOrigin && (parsed.error || parsed.Response)) {
               onFailure && onFailure(parsed);
               return;
             }
@@ -166,19 +161,18 @@ export default function TranzilaPayment({
           return;
         }
 
-        // Success/failure messages come from our success/failure pages (same origin after redirect)
-        // or from Tranzila. Validate origin for security.
-        const allowedForPaymentResult = isAllowedOrigin;
+        // Success/failure ONLY from our callback pages - Tranzila redirects iframe to our success/fail URL.
+        // Ignore messages from Tranzila (direct.tranzila.com) - they send intermediate status during Google Pay
+        // that we wrongly treated as failure (e.g. when user clicks Continue, card shows, then "failed").
 
-        // Handle successful payment - only from trusted origins
-        // Response can be '000', 0, or success: true
+        // Handle successful payment - only from our success page
         const isSuccess = data.success === true || 
                          data.Response === '000' || 
                          data.Response === 0 ||
                          data.Response === '0' ||
                          (data.transactionData && (data.transactionData.Response === '000' || data.transactionData.Response === 0));
 
-        if (isSuccess && allowedForPaymentResult) {
+        if (isSuccess && isOwnOrigin) {
           console.log('Payment successful, calling onSuccess with:', data);
           const transactionData = data.transactionData || data;
           onSuccess && onSuccess(transactionData);
@@ -186,8 +180,8 @@ export default function TranzilaPayment({
           return;
         }
 
-        // Handle failed payment - only from trusted origins
-        if (allowedForPaymentResult && (data.error || data.Response || (data.transactionData && data.transactionData.Response))) {
+        // Handle failed payment - only from our failure page (after Tranzila redirect)
+        if (isOwnOrigin && (data.error || data.Response || (data.transactionData && data.transactionData.Response))) {
           console.log('Payment failed, calling onFailure with:', data);
           const errorData = data.transactionData || data;
           onFailure && onFailure(errorData);
