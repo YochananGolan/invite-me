@@ -23,16 +23,9 @@ export default function NavBar({ onAuthClick = null, onAboutClick, onShowPricing
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, newSession) => {
       setSession(newSession);
-      // Reload only when returning from OAuth/email verification - NOT on token refresh or tab refocus.
-      // Supabase fires SIGNED_IN on token refresh & tab focus (issue #7250), which would interrupt
-      // Google Pay / payment flows on mobile. Reload only when URL indicates auth redirect.
-      if (event === 'SIGNED_IN' && typeof window !== 'undefined') {
-        const fromAuthRedirect =
-          window.location.hash?.includes('access_token') ||
-          window.location.hash?.includes('type=') ||
-          window.location.pathname === '/verify-email';
-        if (fromAuthRedirect) window.location.reload();
-      }
+      // Do NOT reload on SIGNED_IN - Supabase fires it on token refresh, tab refocus, and when
+      // Google Pay sheet opens on mobile (document loses focus). Reload would interrupt payment.
+      // Session propagates via setSession; verify-email page handles its own router.replace.
     });
 
     return () => subscription.unsubscribe();

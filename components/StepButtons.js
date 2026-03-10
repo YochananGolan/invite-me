@@ -2994,16 +2994,17 @@ React.useEffect(() => {
   const [showActiveError,setShowActiveError]=useState(false);
 
   // When returning to the tab, refresh event state from Supabase (keeps web/mobile in sync).
+  // Skip refresh when payment modal is open - prevents interrupting Google Pay on mobile.
   React.useEffect(() => {
     if (typeof window === 'undefined') return;
     const onVisibility = () => {
-      if (document.visibilityState === 'visible') {
+      if (document.visibilityState === 'visible' && !showPaymentModal) {
         setEventRefreshKey((k) => k + 1);
       }
     };
     document.addEventListener('visibilitychange', onVisibility);
     return () => document.removeEventListener('visibilitychange', onVisibility);
-  }, []);
+  }, [showPaymentModal]);
 
   // Keep a robust count of invited guests for this event (fallback for message counter/report).
   React.useEffect(() => {
@@ -3634,11 +3635,12 @@ React.useEffect(() => {
   React.useEffect(() => {
     if (typeof window === 'undefined') return;
     const onVisibility = () => {
-      if (document.visibilityState === 'visible' && currentEventId) setGuestSummaryRefreshKey((k) => k + 1);
+      // Skip when payment modal open - prevents interrupting Google Pay on mobile
+      if (document.visibilityState === 'visible' && currentEventId && !showPaymentModal) setGuestSummaryRefreshKey((k) => k + 1);
     };
     document.addEventListener('visibilitychange', onVisibility);
     return () => document.removeEventListener('visibilitychange', onVisibility);
-  }, [currentEventId]);
+  }, [currentEventId, showPaymentModal]);
 
   // Auto-refresh reports every 5s when reports/guest list are open (fallback when Realtime is unavailable)
   React.useEffect(() => {
