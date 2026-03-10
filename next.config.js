@@ -1,16 +1,17 @@
 const path = require('path');
 
 module.exports = {
-  async headers() {
-    return [
-      {
-        source: '/.well-known/apple-developer-merchantid-domain-association',
-        headers: [
-          { key: 'Content-Type', value: 'text/plain; charset=utf-8' },
-          { key: 'Content-Disposition', value: 'inline' },
-        ],
-      },
-    ];
+  async rewrites() {
+    return {
+      // beforeFiles = רץ לפני קבצים סטטיים. ברירת מחדל (מערך) = afterFiles = רץ אחרי,
+      // ולכן הקובץ הסטטי נשלח קודם עם octet-stream ומופעיל הורדה.
+      beforeFiles: [
+        {
+          source: '/.well-known/apple-developer-merchantid-domain-association',
+          destination: '/api/apple-pay-file',
+        },
+      ],
+    };
   },
   env: {
     SUPABASE_URL: process.env.SUPABASE_URL,
