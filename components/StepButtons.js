@@ -4899,19 +4899,19 @@ React.useEffect(() => {
             <form className="space-y-4">
               <div>
                 <label className="block mb-1 font-medium">שם פרטי</label>
-                <input type="text" placeholder="שם פרטי" value={guestData.guestFirstName} onChange={(e) => setGuestData({ ...guestData, guestFirstName: e.target.value })} className={`w-full border rounded-md p-2 ${guestErrors.guestFirstName ? 'border-red-500' : ''}`} />
+                <input type="text" placeholder="שם פרטי" value={guestData.guestFirstName} onChange={(e) => setGuestData({ ...guestData, guestFirstName: e.target.value })} className={`w-full border rounded-md p-2 pr-12 sm:pr-2 ${guestErrors.guestFirstName ? 'border-red-500' : ''}`} />
               </div>
               <div>
                 <label className="block mb-1 font-medium">שם משפחה</label>
-                <input type="text" placeholder="שם משפחה" value={guestData.guestLastName} onChange={(e) => setGuestData({ ...guestData, guestLastName: e.target.value })} className={`w-full border rounded-md p-2 ${guestErrors.guestLastName ? 'border-red-500' : ''}`} />
+                <input type="text" placeholder="שם משפחה" value={guestData.guestLastName} onChange={(e) => setGuestData({ ...guestData, guestLastName: e.target.value })} className={`w-full border rounded-md p-2 pr-12 sm:pr-2 ${guestErrors.guestLastName ? 'border-red-500' : ''}`} />
               </div>
               <div>
                 <label className="block mb-1 font-medium">מספר שולחן</label>
-                <input type="text" placeholder="מספר שולחן" value={guestData.guestTable} onChange={(e) => setGuestData({ ...guestData, guestTable: e.target.value })} required className={`w-full border rounded-md p-2 ${guestErrors.guestTable ? 'border-red-500' : ''}`} />
+                <input type="text" placeholder="מספר שולחן" value={guestData.guestTable} onChange={(e) => setGuestData({ ...guestData, guestTable: e.target.value })} required className={`w-full border rounded-md p-2 pr-12 sm:pr-2 ${guestErrors.guestTable ? 'border-red-500' : ''}`} />
               </div>
               <div>
                 <label className="block mb-1 font-medium">טלפון</label>
-                <input type="tel" placeholder="טלפון" value={guestData.guestPhone} onChange={(e) => setGuestData({ ...guestData, guestPhone: e.target.value })} className={`w-full border rounded-md p-2 ${guestErrors.guestPhone ? 'border-red-500' : ''}`} />
+                <input type="tel" placeholder="טלפון" value={guestData.guestPhone} onChange={(e) => setGuestData({ ...guestData, guestPhone: e.target.value })} className={`w-full border rounded-md p-2 pr-12 sm:pr-2 ${guestErrors.guestPhone ? 'border-red-500' : ''}`} />
               </div>
               <div className="flex flex-col sm:flex-row justify-center gap-3 pt-4">
                 <button type="button" onClick={handleSendInvitationSms} className="bg-green-600 text-white border border-green-700 rounded-full px-8 py-3 font-medium hover:bg-green-700 transition-all">
