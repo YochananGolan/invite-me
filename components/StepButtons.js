@@ -2936,6 +2936,7 @@ React.useEffect(() => {
 
   const checkActiveEventExists = async () => {
     try{
+      if (currentEventId || newEventStarted) return true;
       const { data:{user} } = await supabase.auth.getUser();
       if(!user) return false;
       let ev = null;
