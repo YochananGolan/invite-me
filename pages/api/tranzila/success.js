@@ -84,10 +84,10 @@ export default async function handler(req, res) {
             <div class="success-icon">✓</div>
             <h1>התשלום בוצע בהצלחה!</h1>
             <p>תודה על הרכישה. פרטי האירוע שלך מוכנים.</p>
-            ${transactionData.ConfirmationCode ? `
+            ${transactionData.ConfirmationCode || transactionData.sum ? `
               <div class="details">
-                <p><strong>מספר אישור:</strong> ${transactionData.ConfirmationCode}</p>
-                ${transactionData.sum ? `<p><strong>סכום:</strong> ${transactionData.sum} ₪</p>` : ''}
+                ${transactionData.ConfirmationCode ? `<p><strong>מספר אישור:</strong> ${transactionData.ConfirmationCode}</p>` : ''}
+                ${transactionData.sum != null ? `<p><strong>סכום:</strong> ${(typeof transactionData.sum === 'number' ? transactionData.sum : (parseFloat(String(transactionData.sum).replace(/[^0-9.]/g, '')) || transactionData.sum))} ₪</p>` : ''}
               </div>
             ` : ''}
             <button class="continue-btn" onclick="handleContinue()">המשך</button>
@@ -114,6 +114,12 @@ export default async function handler(req, res) {
               try {
                 if (window.parent && window.parent !== window) {
                   window.parent.postMessage({ closePayment: true }, '*');
+                } else {
+                  var tx = ${JSON.stringify(transactionData)};
+                  try {
+                    sessionStorage.setItem('payment_success_transaction', JSON.stringify(tx));
+                  } catch (e) {}
+                  window.location.href = '/?payment_success=1';
                 }
               } catch (error) {
                 console.error('Error closing payment window:', error);

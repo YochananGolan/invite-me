@@ -1,4 +1,5 @@
 import React, { useState, forwardRef, useImperativeHandle, useRef, useCallback, useEffect } from 'react';
+import { useRouter } from 'next/router';
 import { supabase } from '../lib/supabaseClient';
 import { getInviteBaseUrl } from '../lib/inviteUrl';
 import DatePicker, { registerLocale } from 'react-datepicker';
@@ -61,6 +62,7 @@ const fieldLabels = {
 };
 
 const StepButtons = forwardRef(function StepButtons({ session, onAuthClick, triggerCreateEvent, onConsumedCreateTrigger }, ref) {
+  const router = useRouter();
   const { addToast } = useToast();
   const sessionRef = useRef(session);
   // After the user מחק אירוע קיים once successfully in this session, we don't need
@@ -2557,6 +2559,13 @@ React.useEffect(() => {
     setPaymentAmount(price);
     setPaymentPlanName(getPlanDisplayName(plan));
     setShowPricingPlan(false);
+    try {
+      localStorage.setItem('payment_pending_plan', plan);
+      localStorage.setItem('payment_pending_amount', String(price));
+      localStorage.setItem('payment_pending_planName', getPlanDisplayName(plan));
+      localStorage.setItem('payment_pending_addonCount', '1');
+      if (currentEventId) localStorage.setItem('payment_pending_eventId', currentEventId);
+    } catch (e) { console.warn('Failed to save payment pending to localStorage', e); }
     setShowPaymentModal(true);
   };
 
@@ -2594,14 +2603,24 @@ React.useEffect(() => {
     setPendingPlan('addon');
     setPaymentAmount(totalCost);
     setPaymentPlanName(numPackages === 1 ? getAddonDisplayName() : `${numPackages} חבילות הרחבה - ${numPackages * 100} הודעות (₪${totalCost})`);
+    try {
+      localStorage.setItem('payment_pending_plan', 'addon');
+      localStorage.setItem('payment_pending_amount', String(totalCost));
+      localStorage.setItem('payment_pending_planName', numPackages === 1 ? getAddonDisplayName() : `${numPackages} חבילות הרחבה - ${numPackages * 100} הודעות (₪${totalCost})`);
+      localStorage.setItem('payment_pending_addonCount', String(numPackages));
+      if (currentEventId) localStorage.setItem('payment_pending_eventId', currentEventId);
+    } catch (e) { console.warn('Failed to save payment pending to localStorage', e); }
     setShowPaymentModal(true);
     setShowPlanLimitWarning(false);
     resetCapacityWarningGuests();
   };
 
-  // Handle successful payment
-  const handlePaymentSuccess = async (transactionData) => {
+  // Handle successful payment (override: { plan, addonCount, eventId } when from redirect)
+  const handlePaymentSuccess = async (transactionData, override) => {
     try {
+      const plan = override?.plan ?? pendingPlan;
+      const addonCount = override?.addonCount ?? pendingAddonCount;
+      const eventIdForPlan = override?.eventId ?? currentEventId;
       console.log('Payment successful:', transactionData);
 
       // Validate transaction data
@@ -2626,19 +2645,19 @@ React.useEffect(() => {
       }
 
       // Handle plan purchase (ב, ג, ד)
-      if (pendingPlan && pendingPlan !== 'addon') {
+      if (plan && plan !== 'addon') {
         try {
-          setSelectedPlan(pendingPlan);
-          try { localStorage.setItem('selectedPlan', pendingPlan); } catch(e){
+          setSelectedPlan(plan);
+          try { localStorage.setItem('selectedPlan', plan); } catch(e){
             console.warn('Failed to save plan to localStorage:', e);
           }
-          if (currentEventId) {
-            supabase.from('events').update({ selected_plan: pendingPlan }).eq('id', currentEventId).then(({ error }) => {
+          if (eventIdForPlan) {
+            supabase.from('events').update({ selected_plan: plan }).eq('id', eventIdForPlan).then(({ error }) => {
               if (error) console.error('Failed to persist selected_plan to DB', error);
             });
           }
 
-          const planDisplayName = getPlanDisplayName(pendingPlan);
+          const planDisplayName = getPlanDisplayName(plan);
           // Show success modal instead of toast
           setPaymentResultType('success');
           setPaymentResultMessage(`התשלום בוצע בהצלחה! ${planDisplayName} הופעל`);
@@ -2654,14 +2673,19 @@ React.useEffect(() => {
         }
       }
       // Handle addon packages (100 guests for 100 shekel each)
-      else if (pendingPlan === 'addon') {
+      else if (plan === 'addon') {
         try {
-          const newAddons = Array(pendingAddonCount).fill('addon');
+          let existingAddonCount = additionalPackages.filter((p) => p === 'addon').length;
+          if (override && eventIdForPlan) {
+            const { data: ev } = await supabase.from('events').select('additional_packages').eq('id', eventIdForPlan).single();
+            existingAddonCount = (ev?.additional_packages ?? 0);
+          }
+          const newAddonTotal = existingAddonCount + addonCount;
+          const newAddons = Array(addonCount).fill('addon');
           const updatedPackages = [...additionalPackages, ...newAddons];
           setAdditionalPackages(updatedPackages);
-          const newAddonTotal = updatedPackages.filter((p) => p === 'addon').length;
           setDbAddonCount(newAddonTotal);
-          let eventIdForSave = currentEventId;
+          let eventIdForSave = eventIdForPlan;
           if (!eventIdForSave) {
             try {
               const { data: { user } } = await supabase.auth.getUser();
@@ -2697,11 +2721,11 @@ React.useEffect(() => {
           try { localStorage.setItem('additionalPackages_' + (eventIdForSave || 'global'), JSON.stringify(newAddonTotal)); } catch (_) {}
           setPlanSelectionError('');
 
-          const totalMessagesAdded = pendingAddonCount * 100;
-          const totalPaid = pendingAddonCount * 100;
-          const msg = pendingAddonCount === 1
+          const totalMessagesAdded = addonCount * 100;
+          const totalPaid = addonCount * 100;
+          const msg = addonCount === 1
             ? 'נרכשה חבילה של 100 והמכסה עודכנה.'
-            : `נרכשו ${pendingAddonCount} חבילות (${totalMessagesAdded} הודעות) בסכום ₪${totalPaid} והמכסה עודכנה.`;
+            : `נרכשו ${addonCount} חבילות (${totalMessagesAdded} הודעות) בסכום ₪${totalPaid} והמכסה עודכנה.`;
           setPaymentResultType('success');
           setPaymentResultMessage(msg);
           setPaymentWasPlanPurchase(false);
@@ -2992,6 +3016,30 @@ React.useEffect(() => {
   },[selectedDesign]);
 
   const [showActiveError,setShowActiveError]=useState(false);
+
+  // Handle payment success from redirect (Google Pay may redirect whole page to success URL)
+  const processedPaymentRedirectRef = React.useRef(false);
+  React.useEffect(() => {
+    if (typeof window === 'undefined' || !session || !router?.isReady) return;
+    if (processedPaymentRedirectRef.current) return;
+    const q = router?.query?.payment_success || new URLSearchParams(window.location.search).get('payment_success');
+    const txJson = typeof sessionStorage !== 'undefined' && sessionStorage.getItem('payment_success_transaction');
+    if (q !== '1' || !txJson) return;
+    processedPaymentRedirectRef.current = true;
+    try {
+      const transactionData = JSON.parse(txJson);
+      const plan = localStorage.getItem('payment_pending_plan');
+      const addonCount = parseInt(localStorage.getItem('payment_pending_addonCount') || '1', 10);
+      const eventId = localStorage.getItem('payment_pending_eventId') || undefined;
+      sessionStorage.removeItem('payment_success_transaction');
+      ['payment_pending_plan', 'payment_pending_amount', 'payment_pending_planName', 'payment_pending_addonCount', 'payment_pending_eventId'].forEach(k => localStorage.removeItem(k));
+      router.replace('/', undefined, { shallow: true });
+      handlePaymentSuccess(transactionData, { plan: plan || null, addonCount, eventId });
+    } catch (e) {
+      console.error('Payment success from redirect failed:', e);
+      processedPaymentRedirectRef.current = false;
+    }
+  }, [session, router?.query?.payment_success, router?.isReady]);
 
   // When returning to the tab, refresh event state from Supabase (keeps web/mobile in sync).
   // Skip refresh when payment modal is open - prevents interrupting Google Pay on mobile.

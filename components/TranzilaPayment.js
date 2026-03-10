@@ -551,6 +551,11 @@ export default function TranzilaPayment({
             )}
           </form>
 
+          {/* Amount banner - always visible, especially for Google Pay where Tranzila may not show it */}
+          <div className="mb-3 py-2 px-4 bg-amber-50 border border-amber-200 rounded-lg text-center">
+            <p className="text-lg font-bold text-amber-900">סכום לתשלום: {amount} ₪</p>
+            <p className="text-sm text-amber-700">{planName}</p>
+          </div>
           {/* Iframe container - no border/padding on mobile to maximize space */}
           <div className="relative bg-gray-50 sm:rounded-lg sm:border-2 sm:border-gray-200 flex-1 min-h-0 sm:flex-none sm:h-[600px]">
             {(isHandshakeLoading || isIframeLoading) && !handshakeError && (
