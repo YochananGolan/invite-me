@@ -9,8 +9,20 @@ export default async function handler(req, res) {
 
     console.log('Tranzila Failure Callback:', transactionData);
 
-    // Log the failure for monitoring
-    // You can save this to your database for tracking failed transactions
+    const errorCodes = {
+      '001': 'כרטיס אשראי נדחה על ידי הבנק',
+      '002': 'פג תוקף כרטיס האשראי',
+      '003': 'מספר כרטיס לא תקין',
+      '004': 'סכום לא תקין',
+      '005': 'בעיה בשרת התשלומים',
+      '006': 'כרטיס חסום',
+      '007': 'סכום חריג - נדרש אישור מהבנק',
+      '008': 'בעיה בהתחברות למערכת הסליקה',
+    };
+    const failureReason = transactionData.reason
+      || errorCodes[String(transactionData.Response)]
+      || (transactionData.Response ? `שגיאה בתשלום (קוד: ${transactionData.Response})` : null)
+      || 'שגיאה בעיבוד התשלום';
 
     // Return HTML that will communicate with the parent window
     const html = `
@@ -88,7 +100,7 @@ export default async function handler(req, res) {
             ${transactionData.Response || transactionData.reason ? `
               <div class="details">
                 <p><strong>סיבת הכישלון:</strong></p>
-                <p>${transactionData.reason || 'שגיאה בעיבוד התשלום'}</p>
+                <p>${failureReason}</p>
                 ${transactionData.Response ? `<p><strong>קוד שגיאה:</strong> ${transactionData.Response}</p>` : ''}
               </div>
             ` : ''}
@@ -98,34 +110,39 @@ export default async function handler(req, res) {
             </p>
           </div>
           <script>
-            // Send failure message to parent window
-            try {
-              if (window.parent && window.parent !== window) {
-                const message = {
-                  success: false,
-                  error: true,
-                  Response: ${transactionData.Response ? JSON.stringify(transactionData.Response) : 'null'},
-                  transactionData: ${JSON.stringify(transactionData)},
-                  reason: ${transactionData.reason ? JSON.stringify(transactionData.reason) : JSON.stringify(transactionData.Response || 'שגיאה בעיבוד התשלום')}
-                };
-                console.log('Sending failure message to parent:', message);
-                window.parent.postMessage(message, '*');
-              }
-            } catch (error) {
-              console.error('Error sending failure message:', error);
+            var txData = ${JSON.stringify(transactionData)};
+            var failureReason = ${JSON.stringify(failureReason)};
+            var failureMsg = {
+              success: false,
+              error: true,
+              Response: txData.Response || null,
+              transactionData: txData,
+              reason: failureReason
+            };
+
+            if (window.parent && window.parent !== window) {
+              try {
+                window.parent.postMessage(failureMsg, '*');
+              } catch (e) { console.error(e); }
+            } else {
+              try {
+                sessionStorage.setItem('payment_failure_data', JSON.stringify(failureMsg));
+                window.location.replace('/?payment_failure=1');
+              } catch (e) { console.error(e); }
             }
 
             function tryAgain() {
               try {
                 if (window.parent && window.parent !== window) {
                   window.parent.postMessage({ retryPayment: true }, '*');
+                } else {
+                  sessionStorage.setItem('payment_failure_data', JSON.stringify(failureMsg));
+                  window.location.href = '/?payment_failure=1';
                 }
               } catch (error) {
                 console.error('Error sending retry message:', error);
               }
             }
-
-            // Don't auto-close on failure - let user decide
           </script>
         </body>
       </html>

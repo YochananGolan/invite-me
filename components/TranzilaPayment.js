@@ -133,10 +133,8 @@ export default function TranzilaPayment({
             }
             if (isOwnOrigin && (parsed.error || parsed.Response)) {
               if (failureTimeoutRef.current) clearTimeout(failureTimeoutRef.current);
-          failureTimeoutRef.current = setTimeout(() => {
-            failureTimeoutRef.current = null;
-            onFailure && onFailure(parsed);
-          }, 5000);
+              failureTimeoutRef.current = null;
+              onFailure && onFailure(parsed);
               return;
             }
           } catch (e) {
@@ -196,16 +194,14 @@ export default function TranzilaPayment({
           return;
         }
 
-        // Handle failed payment - delay 3s to avoid spurious failure during Google Pay flow.
-        // When user clicks Continue, Tranzila may send false failure; success often follows.
+        // Handle failed payment - from our failure page (Tranzila redirects iframe to our URL).
+        // Show popup immediately with failure reason and button to return to payment.
         if (isOwnOrigin && (data.error || data.Response || (data.transactionData && data.transactionData.Response))) {
           if (failureTimeoutRef.current) clearTimeout(failureTimeoutRef.current);
-          failureTimeoutRef.current = setTimeout(() => {
-            failureTimeoutRef.current = null;
-            console.log('Payment failed (after delay), calling onFailure with:', data);
-            const errorData = data.transactionData || data;
-            onFailure && onFailure(errorData);
-          }, 5000);
+          failureTimeoutRef.current = null;
+          console.log('Payment failed, calling onFailure with:', data);
+          const errorData = data.transactionData || data;
+          onFailure && onFailure(errorData);
           return;
         }
 

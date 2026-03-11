@@ -3025,6 +3025,26 @@ React.useEffect(() => {
 
   const [showActiveError,setShowActiveError]=useState(false);
 
+  // Handle payment failure from redirect (Apple Pay / Google Pay may redirect whole page to failure URL)
+  const processedPaymentFailureRedirectRef = React.useRef(false);
+  React.useEffect(() => {
+    if (typeof window === 'undefined' || !session || !router?.isReady) return;
+    if (processedPaymentFailureRedirectRef.current) return;
+    const q = router?.query?.payment_failure || new URLSearchParams(window.location.search).get('payment_failure');
+    const fdJson = typeof sessionStorage !== 'undefined' && sessionStorage.getItem('payment_failure_data');
+    if (q !== '1' || !fdJson) return;
+    processedPaymentFailureRedirectRef.current = true;
+    try {
+      const failureData = JSON.parse(fdJson);
+      sessionStorage.removeItem('payment_failure_data');
+      router.replace('/', undefined, { shallow: true });
+      handlePaymentFailure(failureData);
+    } catch (e) {
+      console.error('Payment failure from redirect failed:', e);
+      processedPaymentFailureRedirectRef.current = false;
+    }
+  }, [session, router?.query?.payment_failure, router?.isReady]);
+
   // Handle payment success from redirect (Google Pay may redirect whole page to success URL)
   const processedPaymentRedirectRef = React.useRef(false);
   React.useEffect(() => {
@@ -7431,12 +7451,22 @@ React.useEffect(() => {
                       setShowPaymentModal(true);
                       setPaymentFailureWasAddon(false);
                     } else {
-                      setShowPricingPlan(true);
+                      const pendingPlan = typeof localStorage !== 'undefined' && localStorage.getItem('payment_pending_plan');
+                      const pendingAmount = parseInt(localStorage.getItem('payment_pending_amount') || '0', 10);
+                      const pendingPlanName = localStorage.getItem('payment_pending_planName') || '';
+                      if (pendingPlan && pendingPlan !== 'addon' && pendingAmount > 0) {
+                        setPendingPlan(pendingPlan);
+                        setPaymentAmount(pendingAmount);
+                        setPaymentPlanName(pendingPlanName);
+                        setShowPaymentModal(true);
+                      } else {
+                        setShowPricingPlan(true);
+                      }
                     }
                   }}
                   className="w-full bg-red-600 hover:bg-red-700 text-white font-bold text-lg md:text-xl py-4 px-8 rounded-full transition-all shadow-lg transform hover:scale-105"
                 >
-                  {paymentFailureWasAddon ? 'נסה שוב' : 'חזור למסלולים'}
+                  {paymentFailureWasAddon ? 'נסה שוב' : 'חזור למסך תשלומים'}
                 </button>
               </>
             )}
