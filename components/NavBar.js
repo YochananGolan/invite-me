@@ -33,11 +33,11 @@ export default function NavBar({ onAuthClick = null, onAboutClick, onShowPricing
 
   return (
     <nav className="w-full bg-white border-b border-gray-100">
-      <div className="container mx-auto flex items-center justify-between py-5 px-4 md:px-6">
+      <div className="container mx-auto flex items-center justify-between py-4 px-3 sm:px-4 md:px-6">
         {/* Logo + Hamburger - Right side in RTL */}
         <div className="flex items-center gap-1">
           <Link href="/" className="flex items-center" passHref>
-            <span className="text-2xl md:text-3xl font-bold text-gray-800 tracking-tight">
+            <span className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-800 tracking-tight">
               Meet-M
             </span>
           </Link>
@@ -90,7 +90,7 @@ export default function NavBar({ onAuthClick = null, onAboutClick, onShowPricing
         </div>
 
         {/* Auth Buttons - Left side in RTL */}
-        <div className="flex flex-row items-center gap-2 sm:gap-3">
+        <div className="flex flex-row items-center gap-1 sm:gap-3">
           {session ? (
             <div className="flex flex-col items-start sm:flex-row sm:items-center gap-0.5 sm:gap-3">
               <button
@@ -107,15 +107,16 @@ export default function NavBar({ onAuthClick = null, onAboutClick, onShowPricing
             <>
               <button
                 onClick={() => onAuthClick ? onAuthClick('sign_in') : (window.location.href = '/')}
-                className="text-primary font-semibold border-2 border-primary rounded-lg px-3 py-1.5 sm:px-5 sm:py-2.5 hover:bg-primary/5 transition-colors text-sm sm:text-base whitespace-nowrap"
+                className="text-primary font-semibold border-2 border-primary rounded-lg px-2.5 py-1.5 sm:px-5 sm:py-2.5 hover:bg-primary/5 transition-colors text-xs sm:text-base whitespace-nowrap"
               >
                 כניסה
               </button>
               <button
                 onClick={() => onAuthClick ? onAuthClick('sign_up') : (window.location.href = '/')}
-                className="bg-primary text-white font-semibold rounded-lg px-4 py-2 sm:px-6 sm:py-2.5 hover:bg-primary/90 transition-colors text-sm sm:text-base whitespace-nowrap shadow-sm"
+                className="bg-primary text-white font-semibold rounded-lg px-2.5 py-1.5 sm:px-6 sm:py-2.5 hover:bg-primary/90 transition-colors text-xs sm:text-base whitespace-nowrap shadow-sm max-[430px]:hidden"
               >
-                הרשמה בחינם
+                <span className="sm:hidden">הרשמה</span>
+                <span className="hidden sm:inline">הרשמה בחינם</span>
               </button>
             </>
           )}

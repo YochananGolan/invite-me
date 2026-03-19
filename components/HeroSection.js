@@ -114,7 +114,7 @@ export default forwardRef(function HeroSection({ onStart, onShowFeatures, isLogg
               <span className="text-gray-700 font-medium text-lg md:text-xl">{'\u05DE\u05EA\u05D7\u05D9\u05DC \u05DB\u05D0\u05DF \u2728'}</span>
             </div>
 
-            <div className="relative z-20 flex flex-col sm:flex-row gap-5 justify-center lg:justify-start mb-5 pr-14 lg:pr-16">
+            <div className="relative z-20 flex flex-col sm:flex-row gap-5 justify-center lg:justify-start mb-5 pr-0 lg:pr-16">
               <button
                 type="button"
                 onClick={handleCreateNewEvent}

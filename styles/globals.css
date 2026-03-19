@@ -2,6 +2,12 @@
 @tailwind components;
 @tailwind utilities;
 
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
 html[dir='rtl'] {
   direction: rtl;
 }
@@ -9,10 +15,18 @@ html[dir='rtl'] {
 html {
   -webkit-text-size-adjust: 100%;
   -webkit-tap-highlight-color: transparent;
+  max-width: 100%;
+  overflow-x: hidden;
 }
 
 body {
   font-family: theme('fontFamily.sans');
+  overflow-x: hidden;
+  max-width: 100%;
+}
+
+#__next {
+  max-width: 100%;
   overflow-x: hidden;
 }
 
