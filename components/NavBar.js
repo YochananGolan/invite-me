@@ -113,7 +113,7 @@ export default function NavBar({ onAuthClick = null, onAboutClick, onShowPricing
               </button>
               <button
                 onClick={() => onAuthClick ? onAuthClick('sign_up') : (window.location.href = '/')}
-                className="bg-primary text-white font-semibold rounded-lg px-2.5 py-1.5 sm:px-6 sm:py-2.5 hover:bg-primary/90 transition-colors text-xs sm:text-base whitespace-nowrap shadow-sm max-[430px]:hidden"
+                className="bg-primary text-white font-semibold rounded-lg px-2 py-1.5 sm:px-6 sm:py-2.5 hover:bg-primary/90 transition-colors text-xs sm:text-base whitespace-nowrap shadow-sm"
               >
                 <span className="sm:hidden">הרשמה</span>
                 <span className="hidden sm:inline">הרשמה בחינם</span>
