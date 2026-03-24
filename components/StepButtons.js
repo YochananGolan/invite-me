@@ -4531,12 +4531,6 @@ React.useEffect(() => {
                               tickLine={false}
                               axisLine={false}
                                 tickMargin={isSmallView ? 12 : 16}
-                              label={{
-                                value: 'קטגוריה',
-                                position: 'insideBottom',
-                                offset: -4,
-                                  style: { fontSize: 12, fontWeight: 600, fill: axisTickFill }
-                              }}
                             />
                             <YAxis hide />
                             <Tooltip content={() => null} active={false} cursor={false} />
@@ -4766,12 +4760,6 @@ React.useEffect(() => {
                                 tickLine={false}
                                 axisLine={false}
                                 tickMargin={isMobileView ? 12 : 16}
-                                label={{
-                                  value: 'קטגוריה',
-                                  position: 'insideBottom',
-                                  offset: -4,
-                                  style: { fontSize: 12, fontWeight: 600, fill: isMobileView ? '#FDE68A' : '#1f2937' }
-                                }}
                               />
                               <YAxis hide />
                               <Tooltip content={() => null} active={false} cursor={false} />
