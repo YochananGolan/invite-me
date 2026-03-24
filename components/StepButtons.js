@@ -2594,6 +2594,13 @@ React.useEffect(() => {
     setShowPricingPlan(false);
   };
 
+  const closePricingPlanModal = () => {
+    setShowPricingPlan(false);
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
   // Helper function to get addon package price (100 guests for 100 shekel)
   const getAddonPrice = () => {
     return 100;
@@ -7242,13 +7249,13 @@ React.useEffect(() => {
           <div className="min-h-screen flex items-center justify-center p-4">
             <div className="relative bg-white rounded-lg px-6 pb-6 pt-12 sm:p-8 sm:pt-10 w-full max-w-[98vw] my-8">
               <button
-                onClick={() => setShowPricingPlan(false)}
-                className="absolute top-4 right-4 text-2xl sm:text-3xl text-gray-500 hover:text-gray-700"
+                onClick={closePricingPlanModal}
+                className="absolute top-4 left-4 text-2xl sm:text-3xl text-gray-500 hover:text-gray-700"
                 aria-label="סגור"
               >
                 &times;
               </button>
-              <h2 className="text-2xl md:text-3xl font-bold mb-4 text-center text-primary px-12">
+              <h2 className="text-2xl md:text-3xl font-bold mb-4 text-center text-primary pl-16 pr-10">
                 <span className="hidden sm:inline">בחר את המסלול המתאים לאירוע שלך</span>
                 <span className="sm:hidden">בחר מסלול מתאים</span>
               </h2>
