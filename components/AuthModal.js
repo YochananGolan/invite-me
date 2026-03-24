@@ -59,7 +59,7 @@ export default function AuthModal({ initialMode = 'sign_in', open = false, onClo
   const [signInPassword, setSignInPassword] = useState('');
   const [showSignInPassword, setShowSignInPassword] = useState(false);
   const [signInLoading, setSignInLoading] = useState(false);
-  const [signInError, setSignInError] = useState('');
+  const [signInError, setSignInError] = useState({ code: '', message: '' });
   const [passwordResetSent, setPasswordResetSent] = useState(false);
 
   // Handle custom registration with additional fields
@@ -115,18 +115,20 @@ export default function AuthModal({ initialMode = 'sign_in', open = false, onClo
 
   const handleSignIn = async (e) => {
     e.preventDefault();
-    setSignInLoading(true);
-    setSignInError('');
     setPasswordResetSent(false);
 
+    const email = signInEmail.trim().toLowerCase();
+    const password = signInPassword;
+
+    if (!email || !password) {
+      setSignInError({ code: 'missing_credentials', message: 'הזן אימייל וסיסמה כדי להיכנס' });
+      return;
+    }
+
+    setSignInLoading(true);
+    setSignInError({ code: '', message: '' });
+
     try {
-      const email = signInEmail.trim();
-      const password = signInPassword;
-
-      if (!email || !password) {
-        throw new Error('הזן אימייל וסיסמה כדי להיכנס');
-      }
-
       const { error } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -136,18 +138,47 @@ export default function AuthModal({ initialMode = 'sign_in', open = false, onClo
 
       onClose();
     } catch (error) {
-      setSignInError(error?.message || 'שגיאה בהתחברות');
+      console.error('signIn error:', error);
+      const errMsg = (error?.message || '').toLowerCase();
+
+      if (errMsg.includes('invalid login credentials')) {
+        try {
+          const response = await fetch('/api/auth/check-email', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email }),
+          });
+
+          if (!response.ok) {
+            throw new Error(`check-email failed with status ${response.status}`);
+          }
+
+          const data = await response.json();
+          if (data.exists) {
+            setSignInError({ code: 'invalid_password', message: 'סיסמה שגויה' });
+          } else {
+            setSignInError({ code: 'user_not_found', message: 'האימייל לא רשום במערכת. ניתן להירשם כעת.' });
+          }
+        } catch (checkErr) {
+          console.error('check-email error:', checkErr);
+          setSignInError({ code: 'invalid_password', message: 'סיסמה שגויה' });
+        }
+      } else if (errMsg.includes('email not confirmed')) {
+        setSignInError({ code: 'email_not_confirmed', message: 'האימייל קיים אבל טרם אומת. בדוק את תיבת הדואר שלך.' });
+      } else {
+        setSignInError({ code: 'unknown', message: error?.message || 'שגיאה בהתחברות' });
+      }
     } finally {
       setSignInLoading(false);
     }
   };
 
   const handlePasswordReset = async () => {
-    setSignInError('');
+    setSignInError({ code: '', message: '' });
     setPasswordResetSent(false);
 
     if (!signInEmail.trim()) {
-      setSignInError('הזן אימייל כדי לקבל קישור לאיפוס סיסמה');
+      setSignInError({ code: 'missing_email', message: 'הזן אימייל כדי לקבל קישור לאיפוס סיסמה' });
       return;
     }
 
@@ -155,7 +186,7 @@ export default function AuthModal({ initialMode = 'sign_in', open = false, onClo
       await supabase.auth.resetPasswordForEmail(signInEmail.trim());
       setPasswordResetSent(true);
     } catch (error) {
-      setSignInError(error?.message || 'שגיאה בשליחת קישור לאיפוס סיסמה');
+      setSignInError({ code: 'reset_error', message: error?.message || 'שגיאה בשליחת קישור לאיפוס סיסמה' });
     }
   };
 
@@ -189,7 +220,7 @@ export default function AuthModal({ initialMode = 'sign_in', open = false, onClo
       setSignInEmail('');
       setSignInPassword('');
       setShowSignInPassword(false);
-      setSignInError('');
+      setSignInError({ code: '', message: '' });
       setSignInLoading(false);
       setPasswordResetSent(false);
     }
@@ -386,12 +417,46 @@ export default function AuthModal({ initialMode = 'sign_in', open = false, onClo
                       </div>
                     </div>
 
-                    {signInError && (
-                      <div className="text-red-600 text-base font-medium">
-                        {signInError}
+                    {signInError.code === 'user_not_found' && (
+                      <div className="bg-orange-100 border border-orange-300 text-orange-900 text-sm font-semibold px-4 py-3 rounded-lg text-center space-y-3">
+                        <p>האימייל לא רשום במערכת. ניתן לבצע הרשמה בלחיצה על הכפתור.</p>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setView('sign_up');
+                            setSignInError({ code: '', message: '' });
+                          }}
+                          className="w-full bg-orange-500 hover:bg-orange-600 text-white font-semibold py-2 rounded-full transition-colors"
+                        >
+                          עבור למסך הרשמה
+                        </button>
                       </div>
                     )}
-                    {passwordResetSent && (
+
+                    {signInError.code && signInError.code !== 'user_not_found' && (
+                      <div className="bg-red-100 border border-red-300 text-red-800 text-sm font-semibold px-4 py-3 rounded-lg text-center space-y-3">
+                        <p>{signInError.message}</p>
+                        {signInError.code === 'invalid_password' ? (
+                          <div className="flex flex-col gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setSignInError({ code: '', message: '' })}
+                              className="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-2 rounded-full transition-colors"
+                            >
+                              נסה שוב
+                            </button>
+                            <button
+                              type="button"
+                              onClick={handlePasswordReset}
+                              className="w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2 rounded-full transition-colors"
+                            >
+                              שלח אימייל לאיפוס סיסמה
+                            </button>
+                          </div>
+                        ) : null}
+                      </div>
+                    )}
+                    {passwordResetSent && !signInError.code && (
                       <div className="text-green-600 text-base font-medium">
                         שלחנו אליך אימייל לאיפוס הסיסמה
                       </div>
@@ -407,11 +472,11 @@ export default function AuthModal({ initialMode = 'sign_in', open = false, onClo
                       </button>
                       <button
                         type="button"
-                        onClick={() => {
-                          setView('sign_up');
-                          setSignInError('');
-                          setPasswordResetSent(false);
-                        }}
+                      onClick={() => {
+                        setView('sign_up');
+                        setSignInError({ code: '', message: '' });
+                        setPasswordResetSent(false);
+                      }}
                         className="text-blue-600 hover:text-blue-700 text-base"
                       >
                         להרשמה
