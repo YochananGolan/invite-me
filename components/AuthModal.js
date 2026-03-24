@@ -447,26 +447,41 @@ export default function AuthModal({ initialMode = 'sign_in', open = false, onClo
                     )}
 
                     {signInError.code && signInError.code !== 'user_not_found' && (
-                      <div className="bg-red-100 border border-red-300 text-red-800 text-sm font-semibold px-4 py-3 rounded-lg text-center space-y-3">
-                        <p>{signInError.message}</p>
-                        {signInError.code === 'invalid_password' ? (
-                          <div className="flex flex-col gap-2">
+                      <div className="fixed inset-0 flex items-center justify-center bg-black/70 z-[200] px-6">
+                        <div className="bg-white border-4 border-red-400 rounded-2xl shadow-2xl max-w-sm w-full text-center px-6 py-8 space-y-5">
+                          <div className="text-3xl font-extrabold text-red-600">
+                            {signInError.code === 'invalid_password' ? 'סיסמה שגויה' : 'שגיאה בהתחברות'}
+                          </div>
+                          <div className="text-base font-semibold text-red-700">
+                            {signInError.message}
+                          </div>
+                          {signInError.code === 'invalid_password' ? (
+                            <div className="flex flex-col gap-3">
+                              <button
+                                type="button"
+                                onClick={() => setSignInError({ code: '', message: '' })}
+                                className="w-full border-2 border-red-600 text-red-600 hover:bg-red-600 hover:text-white font-semibold py-2 rounded-full transition-colors"
+                              >
+                                נסה שוב
+                              </button>
+                              <button
+                                type="button"
+                                onClick={handlePasswordReset}
+                                className="w-full border-2 border-purple-600 text-purple-600 hover:bg-purple-600 hover:text-white font-semibold py-2 rounded-full transition-colors"
+                              >
+                                שלח אימייל לאיפוס סיסמה
+                              </button>
+                            </div>
+                          ) : (
                             <button
                               type="button"
                               onClick={() => setSignInError({ code: '', message: '' })}
-                              className="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-2 rounded-full transition-colors"
+                              className="w-full border-2 border-red-600 text-red-600 hover:bg-red-600 hover:text-white font-semibold py-2 rounded-full transition-colors"
                             >
-                              נסה שוב
+                              סגור
                             </button>
-                            <button
-                              type="button"
-                              onClick={handlePasswordReset}
-                              className="w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2 rounded-full transition-colors"
-                            >
-                              שלח אימייל לאיפוס סיסמה
-                            </button>
-                          </div>
-                        ) : null}
+                          )}
+                        </div>
                       </div>
                     )}
                     {passwordResetSent && !signInError.code && (
