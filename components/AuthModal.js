@@ -102,7 +102,7 @@ export default function AuthModal({ initialMode = 'sign_in', open = false, onClo
           <button
             onClick={onClose}
             aria-label="סגור"
-            className="absolute top-2 left-2 text-3xl text-gray-500 hover:text-gray-700 focus:outline-none leading-none w-8 h-8 flex items-center justify-center"
+            className="absolute top-6 left-4 text-2xl text-gray-500 hover:text-gray-700 focus:outline-none leading-none w-8 h-8 flex items-center justify-center sm:top-2 sm:text-3xl"
           >
             &times;
           </button>
