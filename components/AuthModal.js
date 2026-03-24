@@ -174,20 +174,37 @@ export default function AuthModal({ initialMode = 'sign_in', open = false, onClo
   };
 
   const handlePasswordReset = async () => {
-    setSignInError({ code: '', message: '' });
     setPasswordResetSent(false);
+    const email = signInEmail.trim().toLowerCase();
 
-    if (!signInEmail.trim()) {
-      setSignInError({ code: 'missing_email', message: 'הזן אימייל כדי לקבל קישור לאיפוס סיסמה' });
+    if (!email) {
+      setSignInError({
+        code: 'missing_email',
+        message: 'הזן אימייל כדי לקבל קישור לאיפוס סיסמה',
+      });
       return false;
     }
 
     try {
-      await supabase.auth.resetPasswordForEmail(signInEmail.trim());
+      const response = await fetch('/api/auth/reset-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        throw new Error(body?.error || `reset-password failed (${response.status})`);
+      }
+
       setPasswordResetSent(true);
       return true;
     } catch (error) {
-      setSignInError({ code: 'reset_error', message: error?.message || 'שגיאה בשליחת קישור לאיפוס סיסמה' });
+      console.error('reset password error:', error);
+      setSignInError({
+        code: 'reset_error',
+        message: error?.message || 'שגיאה בשליחת קישור לאיפוס סיסמה',
+      });
       return false;
     }
   };
