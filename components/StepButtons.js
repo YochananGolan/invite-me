@@ -4502,6 +4502,10 @@ React.useEffect(() => {
                 <div className="mt-1">
                   <div className="bg-white p-3 rounded-lg border border-blue-100">
                     {hasGuestSummaryData ? (
+                      (() => {
+                        const isSmallView = typeof window !== 'undefined' && window.innerWidth < 640;
+                        const axisTickFill = isSmallView ? '#FDE68A' : '#1f2937';
+                        return (
                       <div className="h-56 min-h-[200px] sm:h-56">
                         <ResponsiveContainer width="100%" height="100%">
                           <BarChart
@@ -4512,7 +4516,11 @@ React.useEffect(() => {
                             <XAxis
                               dataKey="name"
                               stroke="#1f2937"
-                              tick={{ fontSize: typeof window !== 'undefined' && window.innerWidth < 640 ? 12 : 16, fontWeight: 600 }}
+                                tick={{
+                                  fontSize: isSmallView ? 12 : 16,
+                                  fontWeight: 600,
+                                  fill: axisTickFill
+                                }}
                               interval={0}
                               tickFormatter={(value) => {
                                 if (value === 'adults') return 'מבוגרים';
@@ -4520,11 +4528,14 @@ React.useEffect(() => {
                                 if (value === 'total') return "סה\"כ";
                                 return value;
                               }}
+                              tickLine={false}
+                              axisLine={false}
+                                tickMargin={isSmallView ? 12 : 16}
                               label={{
                                 value: 'קטגוריה',
-                                position: typeof window !== 'undefined' && window.innerWidth < 640 ? 'insideBottom' : 'insideBottom',
+                                position: 'insideBottom',
                                 offset: -4,
-                                style: { fontSize: 12, fontWeight: 600, fill: '#1f2937' }
+                                  style: { fontSize: 12, fontWeight: 600, fill: axisTickFill }
                               }}
                             />
                             <YAxis hide />
@@ -4538,6 +4549,8 @@ React.useEffect(() => {
                           </BarChart>
                         </ResponsiveContainer>
                       </div>
+                        );
+                      })()
                     ) : (
                       <div className="py-10 text-sm text-gray-500 text-center">אין נתונים להצגה עדיין</div>
                     )}
@@ -4748,7 +4761,7 @@ React.useEffect(() => {
                               <XAxis
                                 dataKey="name"
                                 stroke="#1f2937"
-                                tick={{ fontSize: isMobileView ? 12 : 16, fontWeight: 600, fill: '#1f2937' }}
+                                tick={{ fontSize: isMobileView ? 12 : 16, fontWeight: 600, fill: isMobileView ? '#FDE68A' : '#1f2937' }}
                                 interval={0}
                                 tickLine={false}
                                 axisLine={false}
@@ -4757,7 +4770,7 @@ React.useEffect(() => {
                                   value: 'קטגוריה',
                                   position: 'insideBottom',
                                   offset: -4,
-                                  style: { fontSize: 12, fontWeight: 600, fill: '#1f2937' }
+                                  style: { fontSize: 12, fontWeight: 600, fill: isMobileView ? '#FDE68A' : '#1f2937' }
                                 }}
                               />
                               <YAxis hide />
