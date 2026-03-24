@@ -31,12 +31,12 @@ export default async function handler(req, res) {
               direction: rtl;
             }
             .container {
-              background: white;
+              background: radial-gradient(circle at top, rgba(255,255,255,0.95), rgba(255,255,255,0.88));
               padding: 3rem;
-              border-radius: 1rem;
-              box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+              border-radius: 1.5rem;
+              box-shadow: 0 18px 45px rgba(0,0,0,0.25);
               text-align: center;
-              max-width: 500px;
+              max-width: 520px;
             }
             .success-icon {
               font-size: 5rem;
@@ -77,7 +77,7 @@ export default async function handler(req, res) {
             .continue-btn:hover {
               opacity: 0.9;
             }
-            @media (max-width: 640px) {
+            @media (max-width: 768px) {
               body {
                 align-items: stretch;
                 padding: 0;
@@ -87,29 +87,34 @@ export default async function handler(req, res) {
                 width: 100%;
                 min-height: 100vh;
                 border-radius: 0;
-                padding: 3.5rem 1.75rem 2.5rem;
+                box-shadow: none;
+                background: radial-gradient(circle at top, rgba(255,255,255,0.92), rgba(255,255,255,0.86));
+                padding: 4rem 1.75rem 2.75rem;
                 display: flex;
                 flex-direction: column;
                 justify-content: center;
-                gap: 1.5rem;
+                align-items: center;
+                gap: 2rem;
               }
               .success-icon {
-                font-size: 6rem;
+                font-size: 7rem;
               }
               h1 {
-                font-size: 2rem;
+                font-size: 2.35rem;
                 margin-bottom: 0.5rem;
               }
               p {
-                font-size: 1.1rem;
+                font-size: 1.25rem;
+                max-width: 22rem;
               }
               .details {
-                font-size: 1.05rem;
+                font-size: 1.2rem;
+                width: 100%;
               }
               .continue-btn {
                 width: 100%;
-                font-size: 1.25rem;
-                padding: 1rem;
+                font-size: 1.35rem;
+                padding: 1.1rem;
               }
             }
           </style>
