@@ -4514,6 +4514,18 @@ React.useEffect(() => {
                               stroke="#1f2937"
                               tick={{ fontSize: typeof window !== 'undefined' && window.innerWidth < 640 ? 12 : 16, fontWeight: 600 }}
                               interval={0}
+                              tickFormatter={(value) => {
+                                if (value === 'adults') return 'מבוגרים';
+                                if (value === 'children') return 'ילדים';
+                                if (value === 'total') return "סה\"כ";
+                                return value;
+                              }}
+                              label={{
+                                value: 'קטגוריה',
+                                position: typeof window !== 'undefined' && window.innerWidth < 640 ? 'insideBottom' : 'insideBottom',
+                                offset: -4,
+                                style: { fontSize: 12, fontWeight: 600, fill: '#1f2937' }
+                              }}
                             />
                             <YAxis hide />
                             <Tooltip content={() => null} active={false} cursor={false} />
