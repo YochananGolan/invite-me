@@ -6950,7 +6950,7 @@ React.useEffect(() => {
                 onClick={() => setShowArchiveConfirm(false)}
                 className="flex-1 bg-green-600 text-white border border-green-700 rounded-full px-6 py-3 font-bold text-lg hover:bg-green-700 transition-all"
               >
-                ביטול
+                חזור לאירוע הקיים
               </button>
               <button
                 onClick={() => {
