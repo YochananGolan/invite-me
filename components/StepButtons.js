@@ -7316,9 +7316,9 @@ React.useEffect(() => {
                 <h3 className="text-xl font-bold mb-2 text-primary">מסלול א</h3>
                 <p className="text-gray-600 mb-4">מתאים לאירועים קטנים</p>
                 <div className="mb-4 text-primary">
-                  <div className="flex items-baseline justify-center gap-2 sm:hidden" dir="rtl">
-                    <span className="text-3xl">5 ₪</span>
-                    <span className="text-3xl font-semibold">עד 5 הודעות</span>
+                  <div className="sm:hidden text-center space-y-1 text-2xl font-semibold" dir="rtl">
+                    <div>מס' הודעות: <span className="font-bold">עד 5</span></div>
+                    <div className="text-3xl font-bold">מחיר: 5 ₪</div>
                   </div>
                   <span className="hidden sm:inline text-base md:text-xl font-bold">5 ₪</span>
                 </div>
@@ -7355,9 +7355,9 @@ React.useEffect(() => {
                 <h3 className="text-xl font-bold mb-2 text-primary">מסלול ב</h3>
                 <p className="text-gray-600 mb-4">מתאים לרוב האירועים</p>
                 <div className="mb-4 text-primary">
-                  <div className="flex items-baseline justify-center gap-2 sm:hidden" dir="rtl">
-                    <span className="text-3xl">149 ₪</span>
-                    <span className="text-3xl font-semibold">מ־51 עד 200 הודעות</span>
+                  <div className="sm:hidden text-center space-y-1 text-2xl font-semibold" dir="rtl">
+                    <div>מס' הודעות: <span className="font-bold">מ־51 עד 200</span></div>
+                    <div className="text-3xl font-bold">מחיר: 149 ₪</div>
                   </div>
                   <span className="hidden sm:inline text-base md:text-xl font-bold">149 ₪</span>
                 </div>
@@ -7390,9 +7390,9 @@ React.useEffect(() => {
                 <h3 className="text-xl font-bold mb-2 text-primary">מסלול ג</h3>
                 <p className="text-gray-600 mb-4">לאירועים גדולים</p>
                 <div className="mb-4 text-primary">
-                  <div className="flex items-baseline justify-center gap-2 sm:hidden" dir="rtl">
-                    <span className="text-3xl">199 ₪</span>
-                    <span className="text-3xl font-semibold">מ־201 עד 350 הודעות</span>
+                  <div className="sm:hidden text-center space-y-1 text-2xl font-semibold" dir="rtl">
+                    <div>מס' הודעות: <span className="font-bold">מ־201 עד 350</span></div>
+                    <div className="text-3xl font-bold">מחיר: 199 ₪</div>
                   </div>
                   <span className="hidden sm:inline text-base md:text-xl font-bold">199 ₪</span>
                 </div>
@@ -7425,9 +7425,9 @@ React.useEffect(() => {
                 <h3 className="text-xl font-bold mb-2 text-primary">מסלול ד</h3>
                 <p className="text-gray-600 mb-4">לאירועים גדולים מאוד</p>
                 <div className="mb-4 text-primary">
-                  <div className="flex items-baseline justify-center gap-2 sm:hidden" dir="rtl">
-                    <span className="text-3xl">259 ₪</span>
-                    <span className="text-3xl font-semibold">מ־351 עד 500 הודעות</span>
+                  <div className="sm:hidden text-center space-y-1 text-2xl font-semibold" dir="rtl">
+                    <div>מס' הודעות: <span className="font-bold">מ־351 עד 500</span></div>
+                    <div className="text-3xl font-bold">מחיר: 259 ₪</div>
                   </div>
                   <span className="hidden sm:inline text-base md:text-xl font-bold">259 ₪</span>
                 </div>
