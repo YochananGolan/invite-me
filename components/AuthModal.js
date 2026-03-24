@@ -38,7 +38,7 @@ const VisibilityToggle = ({ isVisible, onToggle, label }) => (
     type="button"
     onClick={onToggle}
     aria-label={isVisible ? `הסתר ${label}` : `הצג ${label}`}
-    className="absolute inset-y-0 left-3 flex items-center text-gray-500 hover:text-gray-700 focus:outline-none"
+    className="absolute inset-y-0 -left-10 flex items-center text-gray-500 hover:text-gray-700 focus:outline-none"
   >
     <EyeIcon isOpen={isVisible} />
   </button>
@@ -330,7 +330,7 @@ export default function AuthModal({ initialMode = 'sign_in', open = false, onClo
                       autoComplete="new-password"
                       readOnly
                       onFocus={(e) => e.target.removeAttribute('readOnly')}
-                      className="w-full h-12 rounded-xl border-2 border-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-lg pr-3 pl-12 shadow-sm font-medium"
+                      className="w-full h-12 rounded-xl border-2 border-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-lg px-3 shadow-sm font-medium"
                       placeholder="הכנס סיסמה"
                     />
                     <VisibilityToggle
@@ -353,7 +353,7 @@ export default function AuthModal({ initialMode = 'sign_in', open = false, onClo
                       autoComplete="new-password"
                       readOnly
                       onFocus={(e) => e.target.removeAttribute('readOnly')}
-                      className="w-full h-12 rounded-xl border-2 border-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-lg pr-3 pl-12 shadow-sm font-medium"
+                      className="w-full h-12 rounded-xl border-2 border-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-lg px-3 shadow-sm font-medium"
                       placeholder="הכנס שוב את הסיסמה"
                     />
                     <VisibilityToggle
@@ -404,7 +404,7 @@ export default function AuthModal({ initialMode = 'sign_in', open = false, onClo
                           type={showSignInPassword ? 'text' : 'password'}
                           value={signInPassword}
                           onChange={(e) => setSignInPassword(e.target.value)}
-                          className="w-full h-12 rounded-xl border-2 border-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-lg pr-3 pl-12 shadow-sm font-medium"
+                          className="w-full h-12 rounded-xl border-2 border-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-lg px-3 shadow-sm font-medium"
                           placeholder="הכנס סיסמה"
                           autoComplete="current-password"
                           required
