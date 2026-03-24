@@ -7240,9 +7240,17 @@ React.useEffect(() => {
       {showPricingPlan && (
         <div className="fixed inset-0 bg-black/50 z-50 overflow-y-auto">
           <div className="min-h-screen flex items-center justify-center p-4">
-            <div className="relative bg-white rounded-lg p-6 sm:p-8 w-full max-w-[98vw] my-8">
-            <button onClick={()=>setShowPricingPlan(false)} className="absolute top-4 left-4 text-3xl text-gray-500 hover:text-gray-700" aria-label="סגור">&times;</button>
-            <h2 className="text-2xl md:text-3xl font-bold mb-4 text-center text-primary">בחר את המסלול המתאים לאירוע שלך</h2>
+            <div className="relative bg-white rounded-lg px-6 pb-6 pt-12 sm:p-8 sm:pt-10 w-full max-w-[98vw] my-8">
+              <button
+                onClick={() => setShowPricingPlan(false)}
+                className="absolute top-4 right-4 text-2xl sm:text-3xl text-gray-500 hover:text-gray-700"
+                aria-label="סגור"
+              >
+                &times;
+              </button>
+              <h2 className="text-2xl md:text-3xl font-bold mb-4 text-center text-primary px-12">
+                בחר את המסלול המתאים לאירוע שלך
+              </h2>
             {planAddOnMode && (
               <div className="text-center text-sm font-semibold text-primary mb-4">
                 בחר חבילת הרחבה בתשלום כדי להוסיף עוד הודעות למכסה.

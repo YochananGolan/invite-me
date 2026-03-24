@@ -12,16 +12,16 @@ export default function PricingTableModal({ isOpen, onClose }) {
   return (
     <div className="fixed inset-0 bg-black/50 z-50 overflow-y-auto" dir="rtl">
       <div className="min-h-screen flex items-center justify-center p-4">
-        <div className="relative bg-white rounded-xl shadow-xl p-6 sm:p-8 w-full max-w-2xl">
+        <div className="relative bg-white rounded-xl shadow-xl px-6 pb-6 pt-12 sm:px-8 sm:pb-8 sm:pt-10 w-full max-w-2xl">
           <button
             onClick={onClose}
-            className="absolute top-4 left-4 text-3xl text-gray-500 hover:text-gray-700 leading-none"
+            className="absolute top-4 right-4 text-2xl sm:text-3xl text-gray-500 hover:text-gray-700 leading-none"
             aria-label="סגור"
           >
             &times;
           </button>
 
-          <h2 className="text-2xl font-bold text-center text-primary mb-6">
+          <h2 className="text-2xl font-bold text-center text-primary mb-6 pr-14 pl-10 sm:px-0">
             חבילות ומחירים
           </h2>
 
