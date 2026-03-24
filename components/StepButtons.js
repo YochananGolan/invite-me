@@ -2648,6 +2648,46 @@ React.useEffect(() => {
       const eventIdForPlan = override?.eventId ?? currentEventId;
       console.log('Payment successful:', transactionData);
 
+      const parseAmount = (value) => {
+        if (value === undefined || value === null) return null;
+        if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+        const parsed = parseFloat(String(value).replace(/[^0-9.]/g, ''));
+        return Number.isFinite(parsed) ? parsed : null;
+      };
+
+      const rawAmount =
+        transactionData?.sum ??
+        transactionData?.Sum ??
+        transactionData?.amount ??
+        transactionData?.Amount ??
+        transactionData?.total ??
+        transactionData?.Total ??
+        transactionData?.price ??
+        transactionData?.Price ??
+        null;
+      const paidAmount = parseAmount(rawAmount);
+      const addonUnitPrice = getAddonPrice ? getAddonPrice() : 100;
+      const expectedAddonAmount =
+        addonCount && addonUnitPrice ? addonCount * addonUnitPrice : null;
+      const planPrice = plan ? getPlanPrice(plan) : null;
+      const looksLikeAddonPayment =
+        plan === 'addon' ||
+        (!!addonCount &&
+          addonCount > 0 &&
+          paidAmount !== null &&
+          expectedAddonAmount !== null &&
+          Math.abs(paidAmount - expectedAddonAmount) < 0.51 &&
+          (!planPrice || Math.abs(paidAmount - planPrice) > 0.51));
+      const effectivePlan = looksLikeAddonPayment ? 'addon' : plan;
+      if (looksLikeAddonPayment && plan !== 'addon') {
+        console.warn('Normalizing payment as addon despite pending plan', {
+          pendingPlan: plan,
+          addonCount,
+          paidAmount,
+          expectedAddonAmount,
+        });
+      }
+
       // Validate transaction data
       if (!transactionData) {
         console.error('No transaction data received');
@@ -2670,19 +2710,19 @@ React.useEffect(() => {
       }
 
       // Handle plan purchase (ב, ג, ד)
-      if (plan && plan !== 'addon') {
+      if (effectivePlan && effectivePlan !== 'addon') {
         try {
-          setSelectedPlan(plan);
-          try { localStorage.setItem('selectedPlan', plan); } catch(e){
+          setSelectedPlan(effectivePlan);
+          try { localStorage.setItem('selectedPlan', effectivePlan); } catch(e){
             console.warn('Failed to save plan to localStorage:', e);
           }
           if (eventIdForPlan) {
-            supabase.from('events').update({ selected_plan: plan }).eq('id', eventIdForPlan).then(({ error }) => {
+            supabase.from('events').update({ selected_plan: effectivePlan }).eq('id', eventIdForPlan).then(({ error }) => {
               if (error) console.error('Failed to persist selected_plan to DB', error);
             });
           }
 
-          const planDisplayName = getPlanDisplayName(plan);
+          const planDisplayName = getPlanDisplayName(effectivePlan);
           // Show success modal instead of toast
           setPaymentResultType('success');
           setPaymentResultMessage(`התשלום בוצע בהצלחה! ${planDisplayName} הופעל`);
@@ -2698,7 +2738,7 @@ React.useEffect(() => {
         }
       }
       // Handle addon packages (100 guests for 100 shekel each)
-      else if (plan === 'addon') {
+      else if (effectivePlan === 'addon') {
         try {
           let existingAddonCount = additionalPackages.filter((p) => p === 'addon').length;
           if (override && eventIdForPlan) {
