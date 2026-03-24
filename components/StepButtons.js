@@ -7275,15 +7275,17 @@ React.useEffect(() => {
               <div className="border-2 border-gray-300 rounded-lg p-6 hover:border-primary transition-all hover:shadow-lg text-center">
                 <h3 className="text-xl font-bold mb-2 text-primary">מסלול א</h3>
                 <p className="text-gray-600 mb-4">מתאים לאירועים קטנים</p>
-                <div className="mb-4">
-                  <div className="flex flex-col items-center gap-2 text-primary">
-                    <div className="flex items-baseline justify-center gap-2" dir="rtl">
-                      <span className="text-3xl md:text-4xl font-bold">5 ₪</span>
-                      <span className="text-xl md:text-2xl font-semibold">עד 5 הודעות</span>
-                    </div>
+                <div className="mb-4 text-primary">
+                  <div className="flex items-baseline justify-center gap-2 sm:hidden" dir="rtl">
+                    <span className="text-3xl font-bold">5 ₪</span>
+                    <span className="text-xl font-semibold">עד 5 הודעות</span>
                   </div>
+                  <span className="hidden sm:inline text-base md:text-xl font-bold">5 ₪</span>
                 </div>
                 <div className="mb-6 text-right">
+                  <p className="text-base md:text-xl font-semibold text-primary mb-3 whitespace-nowrap tracking-wide hidden sm:block">
+                    ✓ עד 5 הודעות
+                  </p>
                   <p className="text-gray-600 mb-2">✓ הזמנות מעוצבות מקצועית</p>
                   <p className="text-gray-600 mb-2">✓ שליחה אוטומטית לכל האורחים</p>
                   <p className="text-gray-600 mb-2">✓ שליחת הודעות SMS ו-WhatsApp</p>
@@ -7312,15 +7314,17 @@ React.useEffect(() => {
                 </div>
                 <h3 className="text-xl font-bold mb-2 text-primary">מסלול ב</h3>
                 <p className="text-gray-600 mb-4">מתאים לרוב האירועים</p>
-                <div className="mb-4">
-                  <div className="flex flex-col items-center gap-2 text-primary">
-                    <div className="flex items-baseline justify-center gap-2" dir="rtl">
-                      <span className="text-3xl md:text-4xl font-bold">149 ₪</span>
-                      <span className="text-xl md:text-2xl font-semibold">מ־51 עד 200 הודעות</span>
-                    </div>
+                <div className="mb-4 text-primary">
+                  <div className="flex items-baseline justify-center gap-2 sm:hidden" dir="rtl">
+                    <span className="text-3xl font-bold">149 ₪</span>
+                    <span className="text-xl font-semibold">מ־51 עד 200 הודעות</span>
                   </div>
+                  <span className="hidden sm:inline text-base md:text-xl font-bold">149 ₪</span>
                 </div>
                 <div className="mb-6 text-right">
+                  <p className="text-base md:text-xl font-semibold text-primary mb-3 whitespace-nowrap tracking-wide hidden sm:block">
+                    ✓ מ־51 עד 200 הודעות
+                  </p>
                   <p className="text-gray-600 mb-2">✓ הזמנות מעוצבות מקצועית</p>
                   <p className="text-gray-600 mb-2">✓ שליחה אוטומטית לכל האורחים</p>
                   <p className="text-gray-600 mb-2">✓ שליחת הודעות SMS ו-WhatsApp</p>
@@ -7345,15 +7349,17 @@ React.useEffect(() => {
               <div className="border-2 border-gray-300 rounded-lg p-6 hover:border-primary transition-all hover:shadow-lg text-center">
                 <h3 className="text-xl font-bold mb-2 text-primary">מסלול ג</h3>
                 <p className="text-gray-600 mb-4">לאירועים גדולים</p>
-                <div className="mb-4">
-                  <div className="flex flex-col items-center gap-2 text-primary">
-                    <div className="flex items-baseline justify-center gap-2" dir="rtl">
-                      <span className="text-3xl md:text-4xl font-bold">199 ₪</span>
-                      <span className="text-xl md:text-2xl font-semibold">מ־201 עד 350 הודעות</span>
-                    </div>
+                <div className="mb-4 text-primary">
+                  <div className="flex items-baseline justify-center gap-2 sm:hidden" dir="rtl">
+                    <span className="text-3xl font-bold">199 ₪</span>
+                    <span className="text-xl font-semibold">מ־201 עד 350 הודעות</span>
                   </div>
+                  <span className="hidden sm:inline text-base md:text-xl font-bold">199 ₪</span>
                 </div>
                 <div className="mb-6 text-right">
+                  <p className="text-base md:text-xl font-semibold text-primary mb-3 whitespace-nowrap tracking-wide hidden sm:block">
+                    ✓ מ־201 עד 350 הודעות
+                  </p>
                   <p className="text-gray-600 mb-2">✓ הזמנות מעוצבות מקצועית</p>
                   <p className="text-gray-600 mb-2">✓ שליחה אוטומטית לכל האורחים</p>
                   <p className="text-gray-600 mb-2">✓ שליחת הודעות SMS ו-WhatsApp</p>
@@ -7378,15 +7384,17 @@ React.useEffect(() => {
               <div className="border-2 border-gray-300 rounded-lg p-6 hover:border-primary transition-all hover:shadow-lg text-center">
                 <h3 className="text-xl font-bold mb-2 text-primary">מסלול ד</h3>
                 <p className="text-gray-600 mb-4">לאירועים גדולים מאוד</p>
-                <div className="mb-4">
-                  <div className="flex flex-col items-center gap-2 text-primary">
-                    <div className="flex items-baseline justify-center gap-2" dir="rtl">
-                      <span className="text-3xl md:text-4xl font-bold">259 ₪</span>
-                      <span className="text-xl md:text-2xl font-semibold">מ־351 עד 500 הודעות</span>
-                    </div>
+                <div className="mb-4 text-primary">
+                  <div className="flex items-baseline justify-center gap-2 sm:hidden" dir="rtl">
+                    <span className="text-3xl font-bold">259 ₪</span>
+                    <span className="text-xl font-semibold">מ־351 עד 500 הודעות</span>
                   </div>
+                  <span className="hidden sm:inline text-base md:text-xl font-bold">259 ₪</span>
                 </div>
                 <div className="mb-6 text-right">
+                  <p className="text-base md:text-xl font-semibold text-primary mb-3 whitespace-nowrap tracking-wide hidden sm:block">
+                    ✓ מ־351 עד 500 הודעות
+                  </p>
                   <p className="text-gray-600 mb-2">✓ הזמנות מעוצבות מקצועית</p>
                   <p className="text-gray-600 mb-2">✓ שליחה אוטומטית לכל האורחים</p>
                   <p className="text-gray-600 mb-2">✓ שליחת הודעות SMS ו-WhatsApp</p>
