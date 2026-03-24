@@ -7318,7 +7318,7 @@ React.useEffect(() => {
                 <div className="mb-4 text-primary">
                   <div className="sm:hidden text-center space-y-1 text-2xl font-semibold" dir="rtl">
                     <div>מס' הודעות: <span className="font-bold">עד 5</span></div>
-                    <div className="text-3xl font-bold">מחיר: 5 ₪</div>
+                    <div className="font-bold">מחיר: 5 ₪</div>
                   </div>
                   <span className="hidden sm:inline text-base md:text-xl font-bold">5 ₪</span>
                 </div>
@@ -7341,7 +7341,7 @@ React.useEffect(() => {
                 <button
                   onClick={() => planAddOnMode ? handleAddPackagePlan('free') : handleSelectPlan('free')}
                   disabled={planAddOnMode}
-                  className={`w-full ${planAddOnMode ? 'bg-gray-300 text-gray-600 cursor-not-allowed' : selectedPlan === 'free' ? 'bg-primary text-white' : 'bg-[#FCE6AC] text-primary hover:bg-primary hover:text-white'} border border-primary rounded-full px-6 py-3 font-medium transition-all`}
+                  className={`w-full ${planAddOnMode ? 'bg-gray-300 text-gray-600 cursor-not-allowed' : selectedPlan === 'free' ? 'bg-primary text-white' : 'bg-[#FCE6AC] text-primary hover:bg-primary hover:text-white'} border border-primary rounded-full px-6 py-3 text-lg sm:text-xl font-semibold transition-all`}
                 >
                   {planAddOnMode ? 'לא זמין להרחבה' : 'בחר מסלול זה'}
                 </button>
@@ -7357,7 +7357,7 @@ React.useEffect(() => {
                 <div className="mb-4 text-primary">
                   <div className="sm:hidden text-center space-y-1 text-2xl font-semibold" dir="rtl">
                     <div>מס' הודעות: <span className="font-bold">מ־51 עד 200</span></div>
-                    <div className="text-3xl font-bold">מחיר: 149 ₪</div>
+                    <div className="font-bold">מחיר: 149 ₪</div>
                   </div>
                   <span className="hidden sm:inline text-base md:text-xl font-bold">149 ₪</span>
                 </div>
@@ -7379,7 +7379,7 @@ React.useEffect(() => {
                 </div>
                 <button
                   onClick={() => planAddOnMode ? handleAddPackagePlan('standard') : handleSelectPlan('standard')}
-                  className={`w-full ${planAddOnMode ? 'bg-green-600 text-white hover:bg-green-700' : selectedPlan === 'standard' ? 'bg-primary text-white' : 'bg-[#FCE6AC] text-primary hover:bg-primary hover:text-white'} border border-primary rounded-full px-6 py-3 font-medium transition-all`}
+                  className={`w-full ${planAddOnMode ? 'bg-green-600 text-white hover:bg-green-700' : selectedPlan === 'standard' ? 'bg-primary text-white' : 'bg-[#FCE6AC] text-primary hover:bg-primary hover:text-white'} border border-primary rounded-full px-6 py-3 text-lg sm:text-xl font-semibold transition-all`}
                 >
                   {planAddOnMode ? 'הוסף חבילת מסלול ב' : 'בחר מסלול זה'}
                 </button>
@@ -7392,7 +7392,7 @@ React.useEffect(() => {
                 <div className="mb-4 text-primary">
                   <div className="sm:hidden text-center space-y-1 text-2xl font-semibold" dir="rtl">
                     <div>מס' הודעות: <span className="font-bold">מ־201 עד 350</span></div>
-                    <div className="text-3xl font-bold">מחיר: 199 ₪</div>
+                    <div className="font-bold">מחיר: 199 ₪</div>
                   </div>
                   <span className="hidden sm:inline text-base md:text-xl font-bold">199 ₪</span>
                 </div>
@@ -7414,7 +7414,7 @@ React.useEffect(() => {
                 </div>
                 <button
                   onClick={() => planAddOnMode ? handleAddPackagePlan('premium') : handleSelectPlan('premium')}
-                  className={`w-full ${planAddOnMode ? 'bg-green-600 text-white hover:bg-green-700' : selectedPlan === 'premium' ? 'bg-primary text-white' : 'bg-[#FCE6AC] text-primary hover:bg-primary hover:text-white'} border border-primary rounded-full px-6 py-3 font-medium transition-all`}
+                  className={`w-full ${planAddOnMode ? 'bg-green-600 text-white hover:bg-green-700' : selectedPlan === 'premium' ? 'bg-primary text-white' : 'bg-[#FCE6AC] text-primary hover:bg-primary hover:text-white'} border border-primary rounded-full px-6 py-3 text-lg sm:text-xl font-semibold transition-all`}
                 >
                   {planAddOnMode ? 'הוסף חבילת מסלול ג' : 'בחר מסלול זה'}
                 </button>
@@ -7427,7 +7427,7 @@ React.useEffect(() => {
                 <div className="mb-4 text-primary">
                   <div className="sm:hidden text-center space-y-1 text-2xl font-semibold" dir="rtl">
                     <div>מס' הודעות: <span className="font-bold">מ־351 עד 500</span></div>
-                    <div className="text-3xl font-bold">מחיר: 259 ₪</div>
+                    <div className="font-bold">מחיר: 259 ₪</div>
                   </div>
                   <span className="hidden sm:inline text-base md:text-xl font-bold">259 ₪</span>
                 </div>
@@ -7449,7 +7449,7 @@ React.useEffect(() => {
                 </div>
                 <button
                   onClick={() => planAddOnMode ? handleAddPackagePlan('luxury') : handleSelectPlan('luxury')}
-                  className={`w-full ${planAddOnMode ? 'bg-green-600 text-white hover:bg-green-700' : selectedPlan === 'luxury' ? 'bg-primary text-white' : 'bg-[#FCE6AC] text-primary hover:bg-primary hover:text-white'} border border-primary rounded-full px-6 py-3 font-medium transition-all`}
+                  className={`w-full ${planAddOnMode ? 'bg-green-600 text-white hover:bg-green-700' : selectedPlan === 'luxury' ? 'bg-primary text-white' : 'bg-[#FCE6AC] text-primary hover:bg-primary hover:text-white'} border border-primary rounded-full px-6 py-3 text-lg sm:text-xl font-semibold transition-all`}
                 >
                   {planAddOnMode ? 'הוסף חבילת מסלול ד' : 'בחר מסלול זה'}
                 </button>
