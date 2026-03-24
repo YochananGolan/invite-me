@@ -4642,8 +4642,17 @@ React.useEffect(() => {
                           </Pie>
                           <Tooltip content={() => null} active={false} cursor={false} />
                           <Legend
+                          verticalAlign={isMobileView ? 'bottom' : 'middle'}
+                          align={isMobileView ? 'center' : 'right'}
+                          layout={isMobileView ? 'horizontal' : 'vertical'}
                             iconType="circle"
-                            wrapperStyle={{ direction: 'rtl', textAlign: 'right', color: '#111827' }}
+                          wrapperStyle={{
+                            direction: 'rtl',
+                            textAlign: isMobileView ? 'center' : 'right',
+                            color: '#111827',
+                            marginTop: isMobileView ? 8 : 0,
+                            fontSize: isMobileView ? 12 : 14
+                          }}
                             formatter={(value) => (
                               <span style={{ color: '#111827', fontWeight: 600 }}>{value}</span>
                             )}
