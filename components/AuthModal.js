@@ -1,7 +1,48 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabaseClient';
-import { Auth } from '@supabase/auth-ui-react';
-import { ThemeSupa } from '@supabase/auth-ui-shared';
+
+const EyeIcon = ({ isOpen }) => (
+  <svg
+    className="w-5 h-5"
+    viewBox="0 0 24 24"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    <path
+      d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <path
+      d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    {!isOpen && (
+      <path
+        d="M4 4l16 16"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+      />
+    )}
+  </svg>
+);
+
+const VisibilityToggle = ({ isVisible, onToggle, label }) => (
+  <button
+    type="button"
+    onClick={onToggle}
+    aria-label={isVisible ? `הסתר ${label}` : `הצג ${label}`}
+    className="absolute inset-y-0 left-3 flex items-center text-gray-500 hover:text-gray-700 focus:outline-none"
+  >
+    <EyeIcon isOpen={isVisible} />
+  </button>
+);
 
 export default function AuthModal({ initialMode = 'sign_in', open = false, onClose = () => {} }) {
   const [view, setView] = useState(initialMode);
@@ -12,6 +53,14 @@ export default function AuthModal({ initialMode = 'sign_in', open = false, onClo
   const [phone, setPhone] = useState('');
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const [showSignUpPassword, setShowSignUpPassword] = useState(false);
+  const [showSignUpConfirmPassword, setShowSignUpConfirmPassword] = useState(false);
+  const [signInEmail, setSignInEmail] = useState('');
+  const [signInPassword, setSignInPassword] = useState('');
+  const [showSignInPassword, setShowSignInPassword] = useState(false);
+  const [signInLoading, setSignInLoading] = useState(false);
+  const [signInError, setSignInError] = useState('');
+  const [passwordResetSent, setPasswordResetSent] = useState(false);
 
   // Handle custom registration with additional fields
   const handleSignUp = async (e) => {
@@ -64,6 +113,52 @@ export default function AuthModal({ initialMode = 'sign_in', open = false, onClo
     }
   };
 
+  const handleSignIn = async (e) => {
+    e.preventDefault();
+    setSignInLoading(true);
+    setSignInError('');
+    setPasswordResetSent(false);
+
+    try {
+      const email = signInEmail.trim();
+      const password = signInPassword;
+
+      if (!email || !password) {
+        throw new Error('הזן אימייל וסיסמה כדי להיכנס');
+      }
+
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) throw error;
+
+      onClose();
+    } catch (error) {
+      setSignInError(error?.message || 'שגיאה בהתחברות');
+    } finally {
+      setSignInLoading(false);
+    }
+  };
+
+  const handlePasswordReset = async () => {
+    setSignInError('');
+    setPasswordResetSent(false);
+
+    if (!signInEmail.trim()) {
+      setSignInError('הזן אימייל כדי לקבל קישור לאיפוס סיסמה');
+      return;
+    }
+
+    try {
+      await supabase.auth.resetPasswordForEmail(signInEmail.trim());
+      setPasswordResetSent(true);
+    } catch (error) {
+      setSignInError(error?.message || 'שגיאה בשליחת קישור לאיפוס סיסמה');
+    }
+  };
+
   // Close modal automatically after successful sign-in / sign-up
   useEffect(() => {
     if (!open) return; // Only listen when modal is open
@@ -89,6 +184,14 @@ export default function AuthModal({ initialMode = 'sign_in', open = false, onClo
       setPhone('');
       setErrorMsg('');
       setLoading(false);
+      setShowSignUpPassword(false);
+      setShowSignUpConfirmPassword(false);
+      setSignInEmail('');
+      setSignInPassword('');
+      setShowSignInPassword(false);
+      setSignInError('');
+      setSignInLoading(false);
+      setPasswordResetSent(false);
     }
   }, [open, initialMode]);
 
@@ -188,32 +291,46 @@ export default function AuthModal({ initialMode = 'sign_in', open = false, onClo
                   <label className="block text-lg font-bold text-gray-800 mb-2">
                     סיסמה *
                   </label>
-                  <input
-                    type="password"
-                    name="password"
-                    required
-                    autoComplete="new-password"
-                    readOnly
-                    onFocus={(e) => e.target.removeAttribute('readOnly')}
-                    className="w-full h-12 rounded-xl border-2 border-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-lg px-3 shadow-sm font-medium"
-                    placeholder="הכנס סיסמה"
-                  />
+                  <div className="relative">
+                    <input
+                      type={showSignUpPassword ? 'text' : 'password'}
+                      name="password"
+                      required
+                      autoComplete="new-password"
+                      readOnly
+                      onFocus={(e) => e.target.removeAttribute('readOnly')}
+                      className="w-full h-12 rounded-xl border-2 border-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-lg pr-3 pl-12 shadow-sm font-medium"
+                      placeholder="הכנס סיסמה"
+                    />
+                    <VisibilityToggle
+                      isVisible={showSignUpPassword}
+                      onToggle={() => setShowSignUpPassword((prev) => !prev)}
+                      label="סיסמה"
+                    />
+                  </div>
                 </div>
                 
                 <div>
                   <label className="block text-lg font-bold text-gray-800 mb-2">
                     אימות סיסמה *
                   </label>
-                  <input
-                    type="password"
-                    name="confirmPassword"
-                    required
-                    autoComplete="new-password"
-                    readOnly
-                    onFocus={(e) => e.target.removeAttribute('readOnly')}
-                    className="w-full h-12 rounded-xl border-2 border-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-lg px-3 shadow-sm font-medium"
-                    placeholder="הכנס שוב את הסיסמה"
-                  />
+                  <div className="relative">
+                    <input
+                      type={showSignUpConfirmPassword ? 'text' : 'password'}
+                      name="confirmPassword"
+                      required
+                      autoComplete="new-password"
+                      readOnly
+                      onFocus={(e) => e.target.removeAttribute('readOnly')}
+                      className="w-full h-12 rounded-xl border-2 border-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-lg pr-3 pl-12 shadow-sm font-medium"
+                      placeholder="הכנס שוב את הסיסמה"
+                    />
+                    <VisibilityToggle
+                      isVisible={showSignUpConfirmPassword}
+                      onToggle={() => setShowSignUpConfirmPassword((prev) => !prev)}
+                      label="אימות סיסמה"
+                    />
+                  </div>
                 </div>
                 
                 {errorMsg && (
@@ -230,59 +347,86 @@ export default function AuthModal({ initialMode = 'sign_in', open = false, onClo
               </form>
             ) : (
               <>
-                <div className="rounded-2xl border-2 border-gray-400 p-5 bg-white shadow-sm signin-strong">
-                  <Auth
-                    supabaseClient={supabase}
-                    appearance={{
-                  theme: ThemeSupa,
-                  variables: {
-                    default: {
-                      colors: {
-                        brand: '#7c3aed', // purple-600
-                        brandAccent: '#6d28d9',
-                        inputBorder: '#e5e7eb',
-                        inputText: '#111827',
-                        messageText: '#ef4444'
-                      },
-                      radii: {
-                        inputBorderRadius: '12px',
-                        buttonBorderRadius: '12px'
-                      }
-                    }
-                  },
-                  className: {
-                    container: 'space-y-3',
-                    label: 'text-lg font-bold text-gray-800',
-                    input: 'h-12 rounded-xl border-2 border-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-lg shadow-sm font-medium',
-                    button: 'h-12 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-semibold shadow-sm text-base',
-                    anchor: 'text-purple-700 hover:text-purple-800 font-medium text-base',
-                    message: 'text-base'
-                  }
-                }}
-                  view={view}
-                  onViewChange={(v) => setView(v)}
-                  localization={{
-                  variables: {
-                    sign_in: {
-                      email_label: 'אימייל',
-                      password_label: 'סיסמה',
-                      link_text: '',
-                    },
-                    sign_up: {
-                      email_label: 'אימייל',
-                      password_label: 'סיסמה',
-                      password_confirm_label: 'אימות סיסמה',
-                      button_label: 'לחץ להודעת אימות לאימייל',
-                      link_text: '',
-                    },
-                  },
-                }}
-                  providers={[]}
-                  magicLink={false}
-                  redirectTo={typeof window !== 'undefined' ? `${window.location.origin.replace(/\/$/, '')}/verify-email` : `${(process.env.NEXT_PUBLIC_APP_URL || '').replace(/\/$/, '')}/verify-email`}
-                  />
+                <div className="rounded-2xl border-2 border-gray-400 p-5 bg-white shadow-sm">
+                  <form onSubmit={handleSignIn} className="space-y-4" autoComplete="off">
+                    <div>
+                      <label className="block text-lg font-bold text-gray-800 mb-2">
+                        אימייל
+                      </label>
+                      <input
+                        type="email"
+                        value={signInEmail}
+                        onChange={(e) => setSignInEmail(e.target.value)}
+                        className="w-full h-12 rounded-xl border-2 border-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-lg px-3 shadow-sm font-medium"
+                        placeholder="הכנס אימייל"
+                        autoComplete="email"
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-lg font-bold text-gray-800 mb-2">
+                        סיסמה
+                      </label>
+                      <div className="relative">
+                        <input
+                          type={showSignInPassword ? 'text' : 'password'}
+                          value={signInPassword}
+                          onChange={(e) => setSignInPassword(e.target.value)}
+                          className="w-full h-12 rounded-xl border-2 border-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-lg pr-3 pl-12 shadow-sm font-medium"
+                          placeholder="הכנס סיסמה"
+                          autoComplete="current-password"
+                          required
+                        />
+                        <VisibilityToggle
+                          isVisible={showSignInPassword}
+                          onToggle={() => setShowSignInPassword((prev) => !prev)}
+                          label="סיסמה"
+                        />
+                      </div>
+                    </div>
+
+                    {signInError && (
+                      <div className="text-red-600 text-base font-medium">
+                        {signInError}
+                      </div>
+                    )}
+                    {passwordResetSent && (
+                      <div className="text-green-600 text-base font-medium">
+                        שלחנו אליך אימייל לאיפוס הסיסמה
+                      </div>
+                    )}
+
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-sm font-medium">
+                      <button
+                        type="button"
+                        onClick={handlePasswordReset}
+                        className="text-purple-700 hover:text-purple-800 text-base text-left"
+                      >
+                        שכחת סיסמה?
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setView('sign_up');
+                          setSignInError('');
+                          setPasswordResetSent(false);
+                        }}
+                        className="text-blue-600 hover:text-blue-700 text-base"
+                      >
+                        להרשמה
+                      </button>
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={signInLoading}
+                      className="w-full h-12 rounded-xl bg-purple-600 hover:bg-purple-700 disabled:bg-purple-400 text-white font-semibold shadow-sm text-base transition-colors"
+                    >
+                      {signInLoading ? 'מתחבר...' : 'התחבר'}
+                    </button>
+                  </form>
                 </div>
-                {/* Sign Up Button */}
                 <div className="mt-4 text-center">
                   <button
                     onClick={() => setView('sign_up')}
