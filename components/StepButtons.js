@@ -7249,7 +7249,8 @@ React.useEffect(() => {
                 &times;
               </button>
               <h2 className="text-2xl md:text-3xl font-bold mb-4 text-center text-primary px-12">
-                בחר את המסלול המתאים לאירוע שלך
+                <span className="hidden sm:inline">בחר את המסלול המתאים לאירוע שלך</span>
+                <span className="sm:hidden">בחר מסלול מתאים</span>
               </h2>
             {planAddOnMode && (
               <div className="text-center text-sm font-semibold text-primary mb-4">
