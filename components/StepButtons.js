@@ -4739,8 +4739,17 @@ React.useEffect(() => {
                               <XAxis
                                 dataKey="name"
                                 stroke="#1f2937"
-                                tick={{ fontSize: isMobileView ? 12 : 16, fontWeight: 600 }}
+                                tick={{ fontSize: isMobileView ? 12 : 16, fontWeight: 600, fill: '#1f2937' }}
                                 interval={0}
+                                tickLine={false}
+                                axisLine={false}
+                                tickMargin={isMobileView ? 12 : 16}
+                                label={{
+                                  value: 'קטגוריה',
+                                  position: 'insideBottom',
+                                  offset: -4,
+                                  style: { fontSize: 12, fontWeight: 600, fill: '#1f2937' }
+                                }}
                               />
                               <YAxis hide />
                               <Tooltip content={() => null} active={false} cursor={false} />
