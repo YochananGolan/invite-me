@@ -420,16 +420,29 @@ export default function AuthModal({ initialMode = 'sign_in', open = false, onClo
                     {signInError.code === 'user_not_found' && (
                       <div className="bg-orange-100 border border-orange-300 text-orange-900 text-sm font-semibold px-4 py-3 rounded-lg text-center space-y-3">
                         <p>האימייל לא רשום במערכת. ניתן לבצע הרשמה בלחיצה על הכפתור.</p>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setView('sign_up');
-                            setSignInError({ code: '', message: '' });
-                          }}
-                          className="w-full bg-orange-500 hover:bg-orange-600 text-white font-semibold py-2 rounded-full transition-colors"
-                        >
-                          עבור למסך הרשמה
-                        </button>
+                        <div className="flex flex-col gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSignInEmail('');
+                              setSignInPassword('');
+                              setSignInError({ code: '', message: '' });
+                            }}
+                            className="w-full bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-2 rounded-full transition-colors"
+                          >
+                            נסה מייל אחר
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setView('sign_up');
+                              setSignInError({ code: '', message: '' });
+                            }}
+                            className="w-full bg-orange-500 hover:bg-orange-600 text-white font-semibold py-2 rounded-full transition-colors"
+                          >
+                            בצע הרשמה
+                          </button>
+                        </div>
                       </div>
                     )}
 
