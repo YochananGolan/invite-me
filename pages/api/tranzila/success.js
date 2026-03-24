@@ -77,6 +77,41 @@ export default async function handler(req, res) {
             .continue-btn:hover {
               opacity: 0.9;
             }
+            @media (max-width: 640px) {
+              body {
+                align-items: stretch;
+                padding: 0;
+              }
+              .container {
+                max-width: none;
+                width: 100%;
+                min-height: 100vh;
+                border-radius: 0;
+                padding: 3.5rem 1.75rem 2.5rem;
+                display: flex;
+                flex-direction: column;
+                justify-content: center;
+                gap: 1.5rem;
+              }
+              .success-icon {
+                font-size: 6rem;
+              }
+              h1 {
+                font-size: 2rem;
+                margin-bottom: 0.5rem;
+              }
+              p {
+                font-size: 1.1rem;
+              }
+              .details {
+                font-size: 1.05rem;
+              }
+              .continue-btn {
+                width: 100%;
+                font-size: 1.25rem;
+                padding: 1rem;
+              }
+            }
           </style>
         </head>
         <body>
