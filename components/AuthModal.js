@@ -483,36 +483,18 @@ export default function AuthModal({ initialMode = 'sign_in', open = false, onClo
                       >
                         שכחת סיסמה?
                       </button>
-                      <button
-                        type="button"
-                      onClick={() => {
-                        setView('sign_up');
-                        setSignInError({ code: '', message: '' });
-                        setPasswordResetSent(false);
-                      }}
-                        className="text-blue-600 hover:text-blue-700 text-base"
-                      >
-                        להרשמה
-                      </button>
                     </div>
 
                     <button
                       type="submit"
                       disabled={signInLoading}
-                      className="w-full h-12 rounded-xl bg-purple-600 hover:bg-purple-700 disabled:bg-purple-400 text-white font-semibold shadow-sm text-base transition-colors"
+                      className="w-full h-12 rounded-xl border-4 border-purple-600 text-purple-600 hover:bg-purple-600 hover:text-white disabled:border-purple-400 disabled:text-purple-400 font-semibold shadow-sm text-base transition-colors"
                     >
                       {signInLoading ? 'מתחבר...' : 'התחבר'}
                     </button>
                   </form>
                 </div>
-                <div className="mt-4 text-center">
-                  <button
-                    onClick={() => setView('sign_up')}
-                    className="w-full h-12 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-sm text-base transition-colors"
-                  >
-                    הרשמה
-                  </button>
-                </div>
+
               </>
             )}
           </div>
