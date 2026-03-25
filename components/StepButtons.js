@@ -415,6 +415,45 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick, trig
     }
   },[]);
 
+const planPersistenceRef = useRef(new Set());
+const computePlanFromCapacity = React.useCallback((allowedGuestsValue, addonCountValue) => {
+  const totalCapacity = typeof allowedGuestsValue === 'number' ? allowedGuestsValue : 0;
+  const addonCount = Math.max(0, addonCountValue || 0);
+  const addonUnit = getPlanBaseLimit('addon') || 100;
+  const baseCapacity = Math.max(0, totalCapacity - addonCount * addonUnit);
+  if (baseCapacity <= 0) return null;
+  if (baseCapacity <= getPlanBaseLimit('basic')) return 'basic';
+  if (baseCapacity <= getPlanBaseLimit('standard')) return 'standard';
+  if (baseCapacity <= getPlanBaseLimit('premium')) return 'premium';
+  if (baseCapacity <= getPlanBaseLimit('luxury')) return 'luxury';
+  if (baseCapacity <= getPlanBaseLimit('elite')) return 'elite';
+  return 'supreme';
+}, [getPlanBaseLimit]);
+const derivePlanFromRecord = React.useCallback((record) => {
+  if (!record) return null;
+  const dbPlan = record.selected_plan || null;
+  if (dbPlan) return dbPlan;
+  const addonCount = typeof record.additional_packages === 'number' ? record.additional_packages : 0;
+  const derivedPlan = computePlanFromCapacity(record.allowed_guests, addonCount);
+  if (derivedPlan && record.id && !planPersistenceRef.current.has(record.id)) {
+    planPersistenceRef.current.add(record.id);
+    supabase
+      .from('events')
+      .update({ selected_plan: derivedPlan })
+      .eq('id', record.id)
+      .then(({ error }) => {
+        if (error) {
+          console.error('Failed to persist derived selected_plan', error);
+          planPersistenceRef.current.delete(record.id);
+        }
+      })
+      .catch((persistError) => {
+        console.error('Failed to persist derived selected_plan', persistError);
+        planPersistenceRef.current.delete(record.id);
+      });
+  }
+  return derivedPlan;
+}, [computePlanFromCapacity]);
 const [additionalPackages, setAdditionalPackages] = useState([]);
 const [dbAddonCount, setDbAddonCount] = useState(null);
 const [eventDataLoaded, setEventDataLoaded] = useState(false);
@@ -2948,10 +2987,7 @@ React.useEffect(() => {
         });
         try { localStorage.setItem('additionalPackages_' + ev.id, String(addonCount)); } catch (_) {}
         setEventDataLoaded(true);
-        const dbPlan = ev.selected_plan || null;
-        const planToUse = dbPlan || (ev.allowed_guests ? (ev.allowed_guests <= 50 ? 'free' :
-          ev.allowed_guests <= 200 ? 'standard' : ev.allowed_guests <= 350 ? 'premium' :
-          ev.allowed_guests <= 500 ? 'luxury' : 'supreme') : null) || null;
+        const planToUse = derivePlanFromRecord(ev);
         if (planToUse) {
           setSelectedPlan(planToUse);
           try { localStorage.setItem('selectedPlan', planToUse); } catch(e){}
@@ -2993,9 +3029,10 @@ React.useEffect(() => {
               return prev;
             });
           }
-          if (ev.selected_plan) {
-            setSelectedPlan(ev.selected_plan);
-            try { localStorage.setItem('selectedPlan', ev.selected_plan); } catch (_) {}
+          const planFromEvent = derivePlanFromRecord(ev);
+          if (planFromEvent) {
+            setSelectedPlan(planFromEvent);
+            try { localStorage.setItem('selectedPlan', planFromEvent); } catch (_) {}
           }
           setEventRefreshKey((k) => k + 1);
         }
@@ -3483,10 +3520,7 @@ React.useEffect(() => {
               });
               try { localStorage.setItem('additionalPackages_' + ev.id, String(restoreAddonCount)); } catch (_) {}
               setEventDataLoaded(true);
-              const dbPlan = ev.selected_plan || null;
-              const planToUse = dbPlan || (ev.allowed_guests ? (ev.allowed_guests <= 50 ? 'free' :
-                ev.allowed_guests <= 200 ? 'standard' : ev.allowed_guests <= 350 ? 'premium' :
-                ev.allowed_guests <= 500 ? 'luxury' : 'supreme') : null) || null;
+              const planToUse = derivePlanFromRecord(ev);
               if (planToUse) {
                 setSelectedPlan(planToUse);
                 try { localStorage.setItem('selectedPlan', planToUse); } catch(e){}
@@ -3622,10 +3656,7 @@ React.useEffect(() => {
           });
           try { localStorage.setItem('additionalPackages_' + ev.id, String(addonCount)); } catch (_) {}
           setEventDataLoaded(true);
-          const dbPlan = ev.selected_plan || null;
-          const planToUse = dbPlan || (ev.allowed_guests ? (ev.allowed_guests <= 50 ? 'free' :
-            ev.allowed_guests <= 200 ? 'standard' : ev.allowed_guests <= 350 ? 'premium' :
-            ev.allowed_guests <= 500 ? 'luxury' : 'supreme') : null) || null;
+          const planToUse = derivePlanFromRecord(ev);
           if (planToUse) {
             setSelectedPlan(planToUse);
             try { localStorage.setItem('selectedPlan', planToUse); } catch(e){}
