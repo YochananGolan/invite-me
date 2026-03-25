@@ -209,6 +209,19 @@ export default function AuthModal({ initialMode = 'sign_in', open = false, onClo
       });
 
       if (!response.ok) {
+        if (response.status === 500) {
+          const body = await response.json().catch(() => ({}));
+          if (body?.error?.toLowerCase().includes('missing supabase configuration')) {
+            console.warn('reset-password: missing server configuration, falling back to Supabase client.');
+            const supabaseResp = await supabase.auth.resetPasswordForEmail(email);
+            if (supabaseResp.error) {
+              throw supabaseResp.error;
+            }
+            setPasswordResetSent(true);
+            return true;
+          }
+        }
+
         const body = await response.json().catch(() => ({}));
         throw new Error(body?.error || `reset-password failed (${response.status})`);
       }
