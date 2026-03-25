@@ -263,15 +263,35 @@ export default function AuthModal({ initialMode = 'sign_in', open = false, onClo
 
   // Parent component will hide/show modal based on session state.
 
-  if (open && signInError.code && signInError.code !== 'user_not_found') {
+  if (open && signInError.code) {
     const isInvalidPassword = signInError.code === 'invalid_password';
-    const overlayTitle = isInvalidPassword ? 'סיסמה שגויה' : 'שגיאה בהתחברות';
+    const isUserNotFound = signInError.code === 'user_not_found';
+
+    const overlayTitle = isInvalidPassword
+      ? 'סיסמה שגויה'
+      : isUserNotFound
+      ? 'האימייל לא קיים'
+      : 'שגיאה בהתחברות';
 
     return (
       <div className="fixed inset-0 flex items-center justify-center bg-black/70 z-[200] px-6">
-        <div className="bg-white border-4 border-red-400 rounded-3xl shadow-2xl w-full max-w-sm text-center px-6 py-10 space-y-6">
-          <div className="text-3xl font-extrabold text-red-600">{overlayTitle}</div>
-          <div className="text-base font-semibold text-red-700 leading-relaxed">
+        <div
+          className={`bg-white border-4 rounded-3xl shadow-2xl w-full max-w-sm text-center px-6 py-10 space-y-6 ${
+            isUserNotFound ? 'border-orange-400' : 'border-red-400'
+          }`}
+        >
+          <div
+            className={`text-3xl font-extrabold ${
+              isUserNotFound ? 'text-orange-600' : 'text-red-600'
+            }`}
+          >
+            {overlayTitle}
+          </div>
+          <div
+            className={`text-base font-semibold leading-relaxed ${
+              isUserNotFound ? 'text-orange-700' : 'text-red-700'
+            }`}
+          >
             {signInError.message}
           </div>
 
@@ -295,6 +315,30 @@ export default function AuthModal({ initialMode = 'sign_in', open = false, onClo
                 className="w-full border-2 border-purple-600 text-purple-600 hover:bg-purple-600 hover:text-white font-semibold py-2 rounded-full transition-colors"
               >
                 שלח אימייל לאיפוס סיסמה
+              </button>
+            </div>
+          ) : isUserNotFound ? (
+            <div className="flex flex-col gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setSignInEmail('');
+                  setSignInPassword('');
+                  setSignInError({ code: '', message: '' });
+                }}
+                className="w-full border-2 border-orange-400 text-orange-600 hover:bg-orange-400 hover:text-white font-semibold py-2 rounded-full transition-colors"
+              >
+                נסה מייל אחר
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setView('sign_up');
+                  setSignInError({ code: '', message: '' });
+                }}
+                className="w-full border-2 border-orange-500 text-white bg-orange-500 hover:bg-orange-600 font-semibold py-2 rounded-full transition-colors"
+              >
+                בצע הרשמה
               </button>
             </div>
           ) : (
@@ -499,35 +543,6 @@ export default function AuthModal({ initialMode = 'sign_in', open = false, onClo
                         />
                       </div>
                     </div>
-
-                    {signInError.code === 'user_not_found' && (
-                      <div className="bg-orange-100 border border-orange-300 text-orange-900 text-sm font-semibold px-4 py-3 rounded-lg text-center space-y-3">
-                        <p>האימייל לא רשום במערכת. ניתן לבצע הרשמה בלחיצה על הכפתור.</p>
-                        <div className="flex flex-col gap-2">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setSignInEmail('');
-                              setSignInPassword('');
-                              setSignInError({ code: '', message: '' });
-                            }}
-                            className="w-full bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-2 rounded-full transition-colors"
-                          >
-                            נסה מייל אחר
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setView('sign_up');
-                              setSignInError({ code: '', message: '' });
-                            }}
-                            className="w-full bg-orange-500 hover:bg-orange-600 text-white font-semibold py-2 rounded-full transition-colors"
-                          >
-                            בצע הרשמה
-                          </button>
-                        </div>
-                      </div>
-                    )}
 
                     {signInError.code && signInError.code !== 'user_not_found' && (
                       <div className="fixed inset-0 flex items-center justify-center bg-black/70 z-[200] px-6">
