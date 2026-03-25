@@ -75,11 +75,41 @@ export default function AuthModal({ initialMode = 'sign_in', open = false, onClo
     setErrorMsg('');
     
     try {
+      const emailInput = e.target.email.value;
+      const emailNormalized = emailInput.trim().toLowerCase();
       const password = e.target.password.value;
       const confirmPassword = e.target.confirmPassword.value;
       
       if (password !== confirmPassword) {
         throw new Error('הסיסמאות אינן תואמות');
+      }
+      
+      try {
+        const checkResponse = await fetch('/api/auth/check-email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: emailNormalized }),
+        });
+
+        if (checkResponse.ok) {
+          const checkData = await checkResponse.json();
+          if (checkData?.exists) {
+            setExistingEmailNotice({
+              show: true,
+              email: emailInput,
+            });
+            setLoading(false);
+            return;
+          }
+
+          if (checkData?.skipped && checkData?.exists === false) {
+            console.warn('signUp: email check skipped due to missing configuration');
+          }
+        } else {
+          console.warn('signUp: email pre-check failed with status', checkResponse.status);
+        }
+      } catch (checkError) {
+        console.warn('signUp: email pre-check threw error', checkError);
       }
       
       // Use current origin so redirect matches where user is (localhost for dev, meet-m.co.il for prod)
@@ -88,7 +118,7 @@ export default function AuthModal({ initialMode = 'sign_in', open = false, onClo
         : (process.env.NEXT_PUBLIC_APP_URL || '').replace(/\/$/, '');
       const redirectUrl = `${siteUrl.replace(/\/$/, '')}/verify-email`;
       const { data, error } = await supabase.auth.signUp({
-        email: e.target.email.value,
+        email: emailInput,
         password: password,
         options: {
           data: {
@@ -118,7 +148,7 @@ export default function AuthModal({ initialMode = 'sign_in', open = false, onClo
       if (isExistingEmail) {
         setExistingEmailNotice({
           show: true,
-          email: e.target.email.value,
+          email: emailInput,
         });
         setErrorMsg('');
         return;
