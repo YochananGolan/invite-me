@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/router';
 import { supabase } from '../lib/supabaseClient';
 
 const EyeIcon = ({ isOpen }) => (
@@ -45,6 +46,7 @@ const VisibilityToggle = ({ isVisible, onToggle, label }) => (
 );
 
 export default function AuthModal({ initialMode = 'sign_in', open = false, onClose = () => {} }) {
+  const router = useRouter();
   const [view, setView] = useState(initialMode);
   const [formKey, setFormKey] = useState(0);
   const [successMsg, setSuccessMsg] = useState('');
@@ -61,6 +63,10 @@ export default function AuthModal({ initialMode = 'sign_in', open = false, onClo
   const [signInLoading, setSignInLoading] = useState(false);
   const [signInError, setSignInError] = useState({ code: '', message: '' });
   const [passwordResetSent, setPasswordResetSent] = useState(false);
+  const [existingEmailNotice, setExistingEmailNotice] = useState({
+    show: false,
+    email: '',
+  });
 
   // Handle custom registration with additional fields
   const handleSignUp = async (e) => {
@@ -103,6 +109,20 @@ export default function AuthModal({ initialMode = 'sign_in', open = false, onClo
       e.target.reset();
     } catch (error) {
       const msg = error?.message || '';
+      const isExistingEmail =
+        error?.status === 422 ||
+        msg.toLowerCase().includes('already registered') ||
+        msg.toLowerCase().includes('already exists') ||
+        msg.toLowerCase().includes('duplicate key');
+
+      if (isExistingEmail) {
+        setExistingEmailNotice({
+          show: true,
+          email: e.target.email.value,
+        });
+        setErrorMsg('');
+        return;
+      }
       if (msg.toLowerCase().includes('rate limit') || msg.toLowerCase().includes('rate_limit')) {
         setErrorMsg('נשלחו יותר מדי מיילי אימות לאחרונה. אנא נסה שוב בעוד כשעה, או צור קשר לתמיכה.');
       } else {
@@ -286,10 +306,52 @@ export default function AuthModal({ initialMode = 'sign_in', open = false, onClo
       setSignInError({ code: '', message: '' });
       setSignInLoading(false);
       setPasswordResetSent(false);
+      setExistingEmailNotice({ show: false, email: '' });
     }
   }, [open, initialMode]);
 
   // Parent component will hide/show modal based on session state.
+
+  if (open && existingEmailNotice.show) {
+    return (
+      <div className="fixed inset-0 flex items-center justify-center bg-black/70 z-[200] px-6">
+        <div className="bg-white border-4 border-purple-400 rounded-3xl shadow-2xl w-full max-w-sm text-center px-6 py-10 space-y-6">
+          <div className="text-3xl font-extrabold text-purple-700">
+            האימייל כבר רשום
+          </div>
+          <div className="text-base font-semibold leading-relaxed text-purple-800">
+            הכתובת {existingEmailNotice.email.trim()} כבר קיימת במערכת. ניתן להמשיך לכניסה או לחזור לדף הבית.
+          </div>
+          <div className="flex flex-col gap-3">
+            <button
+              type="button"
+              onClick={() => {
+                setExistingEmailNotice({ show: false, email: '' });
+                onClose();
+                router.push('/').catch(() => {});
+              }}
+              className="w-full border-2 border-purple-500 text-purple-600 hover:bg-purple-500 hover:text-white font-semibold py-2 rounded-full transition-colors"
+            >
+              חזרה לדף הבית
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setExistingEmailNotice({ show: false, email: '' });
+                setView('sign_in');
+                setSignInEmail(existingEmailNotice.email.trim());
+                setSignInPassword('');
+                setSignInError({ code: '', message: '' });
+              }}
+              className="w-full border-2 border-purple-600 bg-purple-600 text-white hover:bg-purple-700 font-semibold py-2 rounded-full transition-colors"
+            >
+              כניסה למערכת
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (open && signInError.code) {
     const isInvalidPassword = signInError.code === 'invalid_password';

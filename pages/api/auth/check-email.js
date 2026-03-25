@@ -3,6 +3,8 @@ import { createClient } from '@supabase/supabase-js';
 const SUPABASE_URL =
   process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
 const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const SUPABASE_ANON_KEY =
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -15,27 +17,59 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Email is required.' });
   }
 
-  if (!SUPABASE_URL || !SERVICE_ROLE_KEY) {
-    console.warn(
-      'check-email: missing Supabase configuration – defaulting to exists=false'
-    );
+  if (!SUPABASE_URL) {
+    console.warn('check-email: missing Supabase URL – defaulting to exists=false');
     return res.status(200).json({ exists: false, skipped: true });
   }
 
   try {
-    const supabaseAdmin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
+    const normalizedEmail = email.trim().toLowerCase();
+
+    if (SERVICE_ROLE_KEY) {
+      const supabaseAdmin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false,
+        },
+      });
+
+      const { data, error } = await supabaseAdmin.auth.admin.getUserByEmail(
+        normalizedEmail
+      );
+
+      if (error && error.message && !/user not found/i.test(error.message)) {
+        console.error('check-email admin error:', error);
+        return res
+          .status(200)
+          .json({ exists: false, skipped: true, error: error.message });
+      }
+
+      return res.status(200).json({ exists: !!data });
+    }
+
+    if (!SUPABASE_ANON_KEY) {
+      console.warn(
+        'check-email: missing anon key – defaulting to exists=false'
+      );
+      return res.status(200).json({ exists: false, skipped: true });
+    }
+
+    console.warn(
+      'check-email: service key missing, falling back to RPC email_exists'
+    );
+    const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
       auth: {
         autoRefreshToken: false,
         persistSession: false,
       },
     });
 
-    const { data, error } = await supabaseAdmin.auth.admin.getUserByEmail(
-      email.trim().toLowerCase()
-    );
+    const { data, error } = await supabaseClient.rpc('email_exists', {
+      p_email: normalizedEmail,
+    });
 
-    if (error && error.message && !/user not found/i.test(error.message)) {
-      console.error('check-email admin error:', error);
+    if (error) {
+      console.error('check-email rpc error:', error);
       return res
         .status(200)
         .json({ exists: false, skipped: true, error: error.message });
