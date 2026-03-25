@@ -141,8 +141,15 @@ export default function AuthModal({ initialMode = 'sign_in', open = false, onClo
       if (checkResponse.ok) {
         const emailData = await checkResponse.json();
         if (emailData?.skipped) {
-          console.warn('check-email skipped (missing config); continuing to password validation.');
-        } else if (emailData && emailData.exists === false) {
+          setSignInError({
+            code: 'unknown',
+            message: 'לא ניתן לבדוק את האימייל כרגע. נסה שוב מאוחר יותר.',
+          });
+          setSignInLoading(false);
+          return;
+        }
+
+        if (emailData && emailData.exists === false) {
           setSignInError({
             code: 'user_not_found',
             message: 'האימייל לא רשום במערכת. ניתן להירשם כעת.',
@@ -152,6 +159,12 @@ export default function AuthModal({ initialMode = 'sign_in', open = false, onClo
         }
       } else {
         console.warn('check-email failed, skipping pre-check:', checkResponse.status);
+        setSignInError({
+          code: 'unknown',
+          message: 'לא ניתן לבדוק את האימייל כרגע. נסה שוב מאוחר יותר.',
+        });
+        setSignInLoading(false);
+        return;
       }
 
       const { error } = await supabase.auth.signInWithPassword({
