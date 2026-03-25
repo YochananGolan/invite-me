@@ -140,7 +140,9 @@ export default function AuthModal({ initialMode = 'sign_in', open = false, onClo
 
       if (checkResponse.ok) {
         const emailData = await checkResponse.json();
-        if (emailData && emailData.exists === false && !emailData.skipped) {
+        if (emailData?.skipped) {
+          console.warn('check-email skipped (missing config); continuing to password validation.');
+        } else if (emailData && emailData.exists === false) {
           setSignInError({
             code: 'user_not_found',
             message: 'האימייל לא רשום במערכת. ניתן להירשם כעת.',

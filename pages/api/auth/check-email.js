@@ -36,12 +36,16 @@ export default async function handler(req, res) {
 
     if (error && error.message && !/user not found/i.test(error.message)) {
       console.error('check-email admin error:', error);
-      return res.status(200).json({ exists: false, error: error.message });
+      return res
+        .status(200)
+        .json({ exists: false, skipped: true, error: error.message });
     }
 
     return res.status(200).json({ exists: !!data });
   } catch (err) {
     console.error('check-email unexpected error:', err);
-    return res.status(200).json({ exists: false, error: err?.message });
+    return res
+      .status(200)
+      .json({ exists: false, skipped: true, error: err?.message });
   }
 }
