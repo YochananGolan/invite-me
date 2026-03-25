@@ -121,56 +121,67 @@ export default function AuthModal({ initialMode = 'sign_in', open = false, onClo
     const password = signInPassword;
 
     if (!email || !password) {
-      setSignInError({ code: 'missing_credentials', message: 'הזן אימייל וסיסמה כדי להיכנס' });
+      setSignInError({
+        code: 'missing_credentials',
+        message: 'הזן אימייל וסיסמה כדי להיכנס',
+      });
       return;
     }
 
     setSignInLoading(true);
     setSignInError({ code: '', message: '' });
 
-    try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
 
-      if (error) throw error;
-
+    if (!error) {
+      setSignInLoading(false);
       onClose();
-    } catch (error) {
-      console.error('signIn error:', error);
-      const errMsg = (error?.message || '').toLowerCase();
+      return;
+    }
 
-      if (errMsg.includes('invalid login credentials')) {
-        try {
-          const response = await fetch('/api/auth/check-email', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email }),
-          });
+    const errMsg = (error.message || '').toLowerCase();
 
-          if (!response.ok) {
-            throw new Error(`check-email failed with status ${response.status}`);
-          }
+    if (errMsg.includes('invalid login credentials')) {
+      try {
+        const response = await fetch('/api/auth/check-email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email }),
+        });
 
+        if (response.ok) {
           const data = await response.json();
           if (data.exists) {
             setSignInError({ code: 'invalid_password', message: 'סיסמה שגויה' });
           } else {
-            setSignInError({ code: 'user_not_found', message: 'האימייל לא רשום במערכת. ניתן להירשם כעת.' });
+            setSignInError({
+              code: 'user_not_found',
+              message: 'האימייל לא רשום במערכת. ניתן להירשם כעת.',
+            });
           }
-        } catch (checkErr) {
-          console.error('check-email error:', checkErr);
+        } else {
           setSignInError({ code: 'invalid_password', message: 'סיסמה שגויה' });
         }
-      } else if (errMsg.includes('email not confirmed')) {
-        setSignInError({ code: 'email_not_confirmed', message: 'האימייל קיים אבל טרם אומת. בדוק את תיבת הדואר שלך.' });
-      } else {
-        setSignInError({ code: 'unknown', message: error?.message || 'שגיאה בהתחברות' });
+      } catch (checkErr) {
+        console.error('check-email error:', checkErr);
+        setSignInError({ code: 'invalid_password', message: 'סיסמה שגויה' });
       }
-    } finally {
-      setSignInLoading(false);
+    } else if (errMsg.includes('email not confirmed')) {
+      setSignInError({
+        code: 'email_not_confirmed',
+        message: 'האימייל קיים אבל טרם אומת. בדוק את תיבת הדואר שלך.',
+      });
+    } else {
+      setSignInError({
+        code: 'unknown',
+        message: error.message || 'שגיאה בהתחברות',
+      });
     }
+
+    setSignInLoading(false);
   };
 
   const handlePasswordReset = async () => {
