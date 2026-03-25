@@ -132,7 +132,6 @@ export default function AuthModal({ initialMode = 'sign_in', open = false, onClo
     setSignInError({ code: '', message: '' });
 
     try {
-      // First check if email exists
       const checkResponse = await fetch('/api/auth/check-email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -140,17 +139,17 @@ export default function AuthModal({ initialMode = 'sign_in', open = false, onClo
       });
 
       if (!checkResponse.ok) {
-        throw new Error(`check-email failed (${checkResponse.status})`);
-      }
-
-      const emailData = await checkResponse.json();
-      if (!emailData.exists) {
-        setSignInError({
-          code: 'user_not_found',
-          message: 'האימייל לא רשום במערכת. ניתן להירשם כעת.',
-        });
-        setSignInLoading(false);
-        return;
+        console.warn('check-email failed, skipping pre-check:', checkResponse.status);
+      } else {
+        const emailData = await checkResponse.json();
+        if (emailData && emailData.exists === false && !emailData.skipped) {
+          setSignInError({
+            code: 'user_not_found',
+            message: 'האימייל לא רשום במערכת. ניתן להירשם כעת.',
+          });
+          setSignInLoading(false);
+          return;
+        }
       }
 
       const { error } = await supabase.auth.signInWithPassword({
@@ -173,6 +172,7 @@ export default function AuthModal({ initialMode = 'sign_in', open = false, onClo
             message: error.message || 'שגיאה בהתחברות',
           });
         }
+
         setSignInLoading(false);
         return;
       }
