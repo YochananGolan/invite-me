@@ -138,9 +138,7 @@ export default function AuthModal({ initialMode = 'sign_in', open = false, onClo
         body: JSON.stringify({ email }),
       });
 
-      if (!checkResponse.ok) {
-        console.warn('check-email failed, skipping pre-check:', checkResponse.status);
-      } else {
+      if (checkResponse.ok) {
         const emailData = await checkResponse.json();
         if (emailData && emailData.exists === false && !emailData.skipped) {
           setSignInError({
@@ -150,6 +148,8 @@ export default function AuthModal({ initialMode = 'sign_in', open = false, onClo
           setSignInLoading(false);
           return;
         }
+      } else {
+        console.warn('check-email failed, skipping pre-check:', checkResponse.status);
       }
 
       const { error } = await supabase.auth.signInWithPassword({
