@@ -395,6 +395,7 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick, trig
 
   const [selectedPlan, setSelectedPlan] = useState(null);
   const selectionSourceRef = useRef('manual');
+  const isMobileView = typeof window !== 'undefined' && window.innerWidth < 640;
 
 const getPlanLabel = React.useCallback((plan) => {
     switch(plan){
@@ -4863,7 +4864,6 @@ React.useEffect(() => {
                 const remainingMessagesRaw = messageLimit - messagesSent;
                 const remainingMessages = Math.max(0, remainingMessagesRaw);
                 const overMessages = remainingMessagesRaw < 0 ? Math.abs(remainingMessagesRaw) : 0;
-                const isMobileView = typeof window !== 'undefined' && window.innerWidth < 640;
                 const capacityChartData = [
                   { key: 'limit', name: isMobileView ? 'מגבלה' : 'מגבלת הודעות', value: messageLimit, color: '#facc15' },
                   { key: 'sent', name: isMobileView ? 'נשלחו' : 'הודעות שנשלחו', value: messagesSent, color: '#7c3aed' },
