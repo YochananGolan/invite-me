@@ -488,7 +488,11 @@ const persistUserPlanSettings = React.useCallback(async (planCode, addonCount) =
 const loadUserPlanSettings = React.useCallback(async () => {
   try {
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return null;
+    if (!user) {
+      setUserPlanSettings({ plan: null, addonCount: 0 });
+      setSelectedPlan(null);
+      return { plan: null, addonCount: 0 };
+    }
     const { data, error } = await supabase
       .from('user_settings')
       .select('plan_code, addon_balance')
@@ -501,6 +505,8 @@ const loadUserPlanSettings = React.useCallback(async () => {
     if (!data) {
       await persistUserPlanSettings(null, 0);
       selectionSourceRef.current = 'manual';
+      setSelectedPlan(null);
+      setUserPlanSettings({ plan: null, addonCount: 0 });
       return { plan: null, addonCount: 0 };
     }
     const plan = data.plan_code || null;
@@ -535,19 +541,31 @@ const [eventRefreshKey, setEventRefreshKey] = useState(0);
   // Persist additionalPackages after currentEventId is known (see effect below).
 
   React.useEffect(() => {
-    if (!session) return;
-    loadUserPlanSettings();
-  }, [session, loadUserPlanSettings]);
+    if (!session) {
+      setSelectedPlan(null);
+      setUserPlanSettings({ plan: null, addonCount: 0 });
+      return;
+    }
+    (async () => {
+      const settings = await loadUserPlanSettings();
+      if (!currentEventId && !settings?.plan) {
+        setSelectedPlan(null);
+      }
+    })();
+  }, [session, loadUserPlanSettings, currentEventId]);
 
-React.useEffect(() => {
-  if (currentEventId) return;
-  const addonCount = Math.max(
-    userPlanSettings?.addonCount ?? 0,
-    dbAddonCount ?? 0,
-  );
-  setDbAddonCount(addonCount);
-  setAdditionalPackages(Array(addonCount).fill('addon'));
-}, [currentEventId, userPlanSettings, dbAddonCount]);
+  React.useEffect(() => {
+    if (currentEventId) return;
+    const addonCount = Math.max(
+      userPlanSettings?.addonCount ?? 0,
+      dbAddonCount ?? 0,
+    );
+    setDbAddonCount(addonCount);
+    setAdditionalPackages(Array(addonCount).fill('addon'));
+    if (userPlanSettings?.plan) {
+      setSelectedPlan(userPlanSettings.plan);
+    }
+  }, [currentEventId, userPlanSettings, dbAddonCount]);
 
   const totalGuestsCount = guestSummary.adults + guestSummary.children;
   // הודעות שנשלחו: מקור אמת = messages_sent_count (אם קיים) עם fallback למספר אורחים שנוצרו באירוע.
@@ -2469,12 +2487,11 @@ React.useEffect(() => {
     let deletionCompleted = false;
     let deletionErrorAlertShown = false;
     let eventIdToDelete = currentEventId;
-    const addonCountBeforeReset = Math.max(
-      dbAddonCount ?? 0,
-      userPlanSettings?.addonCount ?? 0,
-      Array.isArray(additionalPackages) ? additionalPackages.filter((p) => p === 'addon').length : 0
-    );
-    const planToCarryForward = selectedPlan || userPlanSettings?.plan || null;
+  const addonCountBeforeReset = Math.max(
+    dbAddonCount ?? 0,
+    Array.isArray(additionalPackages) ? additionalPackages.filter((p) => p === 'addon').length : 0
+  );
+  const planToCarryForward = currentEventId ? (selectedPlan || userPlanSettings?.plan || null) : null;
 
     if (!eventIdToDelete) {
       try {
