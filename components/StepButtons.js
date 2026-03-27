@@ -2467,16 +2467,14 @@ React.useEffect(() => {
     setShowExistingEventWarning(false);
     setShowArchiveConfirm(false);
     let eventWasDeleted = false;
-    // "Deletion completed" means: we deleted the event successfully OR there was no DB event to delete.
-    // This better matches the user expectation when they confirm deletion and the UI resets cleanly.
     let deletionCompleted = false;
     let deletionErrorAlertShown = false;
     let eventIdToDelete = currentEventId;
-  const addonCountBeforeReset = Math.max(
-    dbAddonCount ?? 0,
-    Array.isArray(additionalPackages) ? additionalPackages.filter((p) => p === 'addon').length : 0
-  );
-  const planToCarryForward = currentEventId ? (selectedPlan || userPlanSettings?.plan || null) : null;
+    const addonCountBeforeReset = Math.max(
+      dbAddonCount ?? 0,
+      Array.isArray(additionalPackages) ? additionalPackages.filter((p) => p === 'addon').length : 0
+    );
+    const planToCarryForward = currentEventId ? (selectedPlan || userPlanSettings?.plan || null) : null;
 
     if (!eventIdToDelete) {
       try {
@@ -2517,7 +2515,6 @@ React.useEffect(() => {
           .eq('id', eventIdToDelete)
           .maybeSingle();
         if (!fetchError && eventData && eventData.status !== 'archived') {
-          // ארכוב במקום מחיקה – האירוע נשמר בארכיון עם כל הנתונים
           const { error: archiveErr } = await supabase
             .from('events')
             .update({ status: 'archived' })
