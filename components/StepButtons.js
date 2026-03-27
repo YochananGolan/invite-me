@@ -2520,7 +2520,7 @@ React.useEffect(() => {
         if (!fetchError && eventData && eventData.status !== 'archived') {
           const { error: archiveErr } = await supabase
             .from('events')
-            .update({ status: 'archived', selected_plan: null, additional_packages: 0 })
+            .update({ status: 'archived' })
             .eq('id', eventIdToDelete);
           if (archiveErr) {
             console.error('Failed to archive event:', archiveErr);
@@ -2587,10 +2587,10 @@ React.useEffect(() => {
     setShowGuestListModal(false);
     setShowReportModal(false);
     setSelectedEventForReport(null);
-    setSelectedPlan(null);
-    setAdditionalPackages([]);
-    setDbAddonCount(0);
-    try { localStorage.removeItem('additionalPackages_global'); } catch (_) {}
+    setSelectedPlan(planToCarryForward);
+    setAdditionalPackages(Array(addonCountBeforeReset).fill('addon'));
+    setDbAddonCount(addonCountBeforeReset);
+    try { localStorage.setItem('additionalPackages_global', String(addonCountBeforeReset)); } catch (_) {}
     
     try{ localStorage.removeItem('selectedDesign'); }catch{}
     try{ localStorage.removeItem('finishedSteps'); }catch{}
@@ -2605,7 +2605,7 @@ React.useEffect(() => {
       setShowPricingPlan(true);
       setPlanAddOnMode(false); // Ensure we're in plan selection mode, not addon mode
     }
-    await persistUserPlanSettings(null, 0);
+    await persistUserPlanSettings(planToCarryForward, addonCountBeforeReset);
 
     if (showDeletionMessage && (eventWasDeleted || deletionCompleted)) {
       // סימון ש"ניקינו" את האירוע הקודם – כדי לא לבקש מחיקה שוב בכל לחיצה על "צור אירוע חדש"
