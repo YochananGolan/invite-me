@@ -505,7 +505,6 @@ const loadUserPlanSettings = React.useCallback(async () => {
     if (!data) {
       await persistUserPlanSettings(null, 0);
       selectionSourceRef.current = 'manual';
-      setSelectedPlan(null);
       setUserPlanSettings({ plan: null, addonCount: 0 });
       return { plan: null, addonCount: 0 };
     }
@@ -516,10 +515,7 @@ const loadUserPlanSettings = React.useCallback(async () => {
     setUserPlanSettings(settings);
     try { localStorage.setItem('user_plan_code', plan || ''); } catch (e) {}
     try { localStorage.setItem('additionalPackages_global', String(addonCount)); } catch (e) {}
-    if (plan) {
-      setSelectedPlan(plan);
-      selectionSourceRef.current = 'persistent';
-    }
+    selectionSourceRef.current = plan ? 'persistent' : 'manual';
     return settings;
   } catch (err) {
     console.error('loadUserPlanSettings threw', err);
@@ -546,26 +542,15 @@ const [eventRefreshKey, setEventRefreshKey] = useState(0);
       setUserPlanSettings({ plan: null, addonCount: 0 });
       return;
     }
-    (async () => {
-      const settings = await loadUserPlanSettings();
-      if (!currentEventId && !settings?.plan) {
-        setSelectedPlan(null);
-      }
-    })();
-  }, [session, loadUserPlanSettings, currentEventId]);
+    loadUserPlanSettings();
+  }, [session, loadUserPlanSettings]);
 
   React.useEffect(() => {
     if (currentEventId) return;
-    const addonCount = Math.max(
-      userPlanSettings?.addonCount ?? 0,
-      dbAddonCount ?? 0,
-    );
-    setDbAddonCount(addonCount);
-    setAdditionalPackages(Array(addonCount).fill('addon'));
-    if (userPlanSettings?.plan) {
-      setSelectedPlan(userPlanSettings.plan);
-    }
-  }, [currentEventId, userPlanSettings, dbAddonCount]);
+    setSelectedPlan(null);
+    setDbAddonCount(0);
+    setAdditionalPackages([]);
+  }, [currentEventId]);
 
   const totalGuestsCount = guestSummary.adults + guestSummary.children;
   // הודעות שנשלחו: מקור אמת = messages_sent_count (אם קיים) עם fallback למספר אורחים שנוצרו באירוע.
