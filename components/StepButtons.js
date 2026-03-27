@@ -393,7 +393,8 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick, trig
     }
   },[]);
 
-  const [selectedPlan, setSelectedPlan] = useState(null);
+const [selectedPlan, setSelectedPlan] = useState(null);
+const selectionSourceRef = useRef('manual');
 
 const getPlanLabel = React.useCallback((plan) => {
     switch(plan){
@@ -498,6 +499,7 @@ const loadUserPlanSettings = React.useCallback(async () => {
     }
     if (!data) {
       await persistUserPlanSettings(null, 0);
+      selectionSourceRef.current = 'manual';
       return { plan: null, addonCount: 0 };
     }
     const plan = data.plan_code || null;
@@ -507,6 +509,10 @@ const loadUserPlanSettings = React.useCallback(async () => {
     setUserPlanSettings(settings);
     try { localStorage.setItem('user_plan_code', plan || ''); } catch (e) {}
     try { localStorage.setItem('additionalPackages_global', String(addonCount)); } catch (e) {}
+    if (plan) {
+      setSelectedPlan(plan);
+      selectionSourceRef.current = 'persistent';
+    }
     return settings;
   } catch (err) {
     console.error('loadUserPlanSettings threw', err);
@@ -3097,6 +3103,7 @@ React.useEffect(() => {
         const planToUse = derivePlanFromRecord(ev);
         if (planToUse) {
           setSelectedPlan(planToUse);
+          selectionSourceRef.current = 'event';
           try { localStorage.setItem('selectedPlan', planToUse); } catch(e){}
         }
         await persistUserPlanSettings(planToUse, addonCount);
@@ -4549,7 +4556,7 @@ React.useEffect(() => {
                 </p>
               </div>
             )}
-            {session && selectedPlan && (
+            {session && selectedPlan && (currentEventId || newEventStarted) && (
               <div className="bg-yellow-50 p-3 sm:p-4 text-center shadow-lg w-full" style={{
                 border: '3px solid #D4AF37',
                 outline: '2px solid #B8860B',
