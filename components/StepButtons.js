@@ -3251,7 +3251,11 @@ React.useEffect(() => {
     if (typeof window === 'undefined' || !session || !router?.isReady) return;
     if (processedPaymentRedirectRef.current) return;
     const q = router?.query?.payment_success || new URLSearchParams(window.location.search).get('payment_success');
-    const txJson = typeof sessionStorage !== 'undefined' && sessionStorage.getItem('payment_success_transaction');
+    const rawTx =
+      typeof sessionStorage !== 'undefined'
+        ? sessionStorage.getItem('payment_success_transaction')
+        : null;
+    const txJson = rawTx && rawTx.trim().toLowerCase() !== 'undefined' ? rawTx : null;
     if (q !== '1' || !txJson) return;
     processedPaymentRedirectRef.current = true;
     try {
@@ -3265,6 +3269,11 @@ React.useEffect(() => {
       handlePaymentSuccess(transactionData, { plan: plan || null, addonCount, eventId });
     } catch (e) {
       console.error('Payment success from redirect failed:', e);
+      try { sessionStorage.removeItem('payment_success_transaction'); } catch (_) {}
+      ['payment_pending_plan', 'payment_pending_amount', 'payment_pending_planName', 'payment_pending_addonCount', 'payment_pending_eventId'].forEach(k => {
+        try { localStorage.removeItem(k); } catch (_) {}
+      });
+      router.replace('/', undefined, { shallow: true });
       processedPaymentRedirectRef.current = false;
     }
   }, [session, router?.query?.payment_success, router?.isReady]);
