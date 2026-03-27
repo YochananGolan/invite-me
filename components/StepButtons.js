@@ -393,8 +393,8 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick, trig
     }
   },[]);
 
-const [selectedPlan, setSelectedPlan] = useState(null);
-const selectionSourceRef = useRef('manual');
+  const [selectedPlan, setSelectedPlan] = useState(null);
+  const selectionSourceRef = useRef('manual');
 
 const getPlanLabel = React.useCallback((plan) => {
     switch(plan){
