@@ -2495,7 +2495,10 @@ React.useEffect(() => {
               .order('created_at', { ascending: false })
               .limit(1)
               .maybeSingle();
-            if (evFallback) eventIdToDelete = evFallback.id;
+            if (evFallback) {
+              eventIdToDelete = evFallback.id;
+              if (evFallback.status === 'archived') eventIdToDelete = null;
+            }
           } else if (ev && ev.status !== 'archived') {
             eventIdToDelete = ev.id;
           }
@@ -3804,9 +3807,11 @@ React.useEffect(() => {
             markStepDone(2);
           }
           if(Object.values(formData).every(v=>!v) && details){
+          if(currentEventId) {
             setFormData(prev=>({ ...prev, ...details }));
-            setEventDetailsCompleted(true);
-            markStepDone(1);
+              setEventDetailsCompleted(true);
+              markStepDone(1);
+          }
           }
         }
         isInitialLoadRef.current = false;
