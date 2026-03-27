@@ -2587,9 +2587,10 @@ React.useEffect(() => {
     setShowGuestListModal(false);
     setShowReportModal(false);
     setSelectedEventForReport(null);
-    setAdditionalPackages(Array(addonCountBeforeReset).fill('addon'));
-    setDbAddonCount(addonCountBeforeReset);
-    try { localStorage.setItem('additionalPackages_global', String(addonCountBeforeReset)); } catch (_) {}
+    setSelectedPlan(null);
+    setAdditionalPackages([]);
+    setDbAddonCount(0);
+    try { localStorage.removeItem('additionalPackages_global'); } catch (_) {}
     
     try{ localStorage.removeItem('selectedDesign'); }catch{}
     try{ localStorage.removeItem('finishedSteps'); }catch{}
@@ -2604,10 +2605,7 @@ React.useEffect(() => {
       setShowPricingPlan(true);
       setPlanAddOnMode(false); // Ensure we're in plan selection mode, not addon mode
     }
-    if (planToCarryForward) {
-      setSelectedPlan(planToCarryForward);
-    }
-    await persistUserPlanSettings(planToCarryForward, addonCountBeforeReset);
+    await persistUserPlanSettings(planToCarryForward, 0);
 
     if (showDeletionMessage && (eventWasDeleted || deletionCompleted)) {
       // סימון ש"ניקינו" את האירוע הקודם – כדי לא לבקש מחיקה שוב בכל לחיצה על "צור אירוע חדש"
