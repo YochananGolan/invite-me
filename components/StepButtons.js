@@ -575,6 +575,12 @@ const [eventRefreshKey, setEventRefreshKey] = useState(0);
     }
   }, [showPricingPlan, planWarningSuppressed, effectiveMessagesSentCount, selectedPlan, additionalPackages, getPlanBaseLimit, eventDataLoaded]);
 
+  React.useEffect(() => {
+    if (showEventTypes) {
+      setHasClearedExistingEvent(false);
+    }
+  }, [showEventTypes]);
+
 const basePlanLimit = getPlanBaseLimit(selectedPlan);
 const additionalCapacity = additionalPackages.reduce((sum, planId) => sum + getPlanBaseLimit(planId), 0);
 const totalPlanCapacity = (basePlanLimit || 0) + additionalCapacity;
