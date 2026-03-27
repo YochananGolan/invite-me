@@ -3879,10 +3879,6 @@ React.useEffect(() => {
               statusSummary.pending += 1;
             }
           });
-          // Don't show "טרם הגיבו" when no invitations were effectively sent: if no one has responded yet (0 approved, 0 rejected), treat as "no RSVP data yet" and show 0 pending so we don't show misleading counts
-          if (statusSummary.approved === 0 && statusSummary.rejected === 0) {
-            statusSummary.pending = 0;
-          }
           // "הודעות שנשלחו" comes from eventMessagesSentCount (DB), not from guest count
           // Calculate totals
           specialMeals.veg.total = specialMeals.veg.adults + specialMeals.veg.children;
