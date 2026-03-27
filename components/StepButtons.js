@@ -2517,7 +2517,7 @@ React.useEffect(() => {
         if (!fetchError && eventData && eventData.status !== 'archived') {
           const { error: archiveErr } = await supabase
             .from('events')
-            .update({ status: 'archived' })
+            .update({ status: 'archived', selected_plan: null, additional_packages: 0 })
             .eq('id', eventIdToDelete);
           if (archiveErr) {
             console.error('Failed to archive event:', archiveErr);
@@ -2602,7 +2602,7 @@ React.useEffect(() => {
       setShowPricingPlan(true);
       setPlanAddOnMode(false); // Ensure we're in plan selection mode, not addon mode
     }
-    await persistUserPlanSettings(planToCarryForward, 0);
+    await persistUserPlanSettings(null, 0);
 
     if (showDeletionMessage && (eventWasDeleted || deletionCompleted)) {
       // סימון ש"ניקינו" את האירוע הקודם – כדי לא לבקש מחיקה שוב בכל לחיצה על "צור אירוע חדש"
