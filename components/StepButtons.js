@@ -2474,7 +2474,7 @@ React.useEffect(() => {
       dbAddonCount ?? 0,
       Array.isArray(additionalPackages) ? additionalPackages.filter((p) => p === 'addon').length : 0
     );
-    const planToCarryForward = currentEventId ? (selectedPlan || userPlanSettings?.plan || null) : null;
+    const planToCarryForward = selectedPlan || userPlanSettings?.plan || null;
 
     if (!eventIdToDelete) {
       try {
@@ -2588,9 +2588,9 @@ React.useEffect(() => {
     setShowReportModal(false);
     setSelectedEventForReport(null);
     setSelectedPlan(planToCarryForward);
-    setAdditionalPackages([]);
-    setDbAddonCount(0);
-    try { localStorage.removeItem('additionalPackages_global'); } catch (_) {}
+    setAdditionalPackages(Array(addonCountBeforeReset).fill('addon'));
+    setDbAddonCount(addonCountBeforeReset);
+    try { localStorage.setItem('additionalPackages_global', String(addonCountBeforeReset)); } catch (_) {}
     
     try{ localStorage.removeItem('selectedDesign'); }catch{}
     try{ localStorage.removeItem('finishedSteps'); }catch{}
@@ -2605,7 +2605,7 @@ React.useEffect(() => {
       setShowPricingPlan(true);
       setPlanAddOnMode(false); // Ensure we're in plan selection mode, not addon mode
     }
-    await persistUserPlanSettings(planToCarryForward, 0);
+    await persistUserPlanSettings(planToCarryForward, addonCountBeforeReset);
 
     if (showDeletionMessage && (eventWasDeleted || deletionCompleted)) {
       // סימון ש"ניקינו" את האירוע הקודם – כדי לא לבקש מחיקה שוב בכל לחיצה על "צור אירוע חדש"
