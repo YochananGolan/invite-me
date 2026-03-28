@@ -50,6 +50,10 @@ export default function AuthModal({ initialMode = 'sign_in', open = false, onClo
   const [view, setView] = useState(initialMode);
   const [formKey, setFormKey] = useState(0);
   const [successMsg, setSuccessMsg] = useState('');
+  const [emailVerificationNotice, setEmailVerificationNotice] = useState({
+    show: false,
+    email: '',
+  });
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [phone, setPhone] = useState('');
@@ -132,7 +136,11 @@ export default function AuthModal({ initialMode = 'sign_in', open = false, onClo
       
       if (error) throw error;
       
-      setSuccessMsg('נרשמת בהצלחה! בדוק את האימייל שלך לאימות');
+      setEmailVerificationNotice({
+        show: true,
+        email: emailInput,
+      });
+      setSuccessMsg('');
       setFirstName('');
       setLastName('');
       setPhone('');
@@ -323,6 +331,7 @@ export default function AuthModal({ initialMode = 'sign_in', open = false, onClo
       setView(initialMode);
       setFormKey((k) => k + 1);
       setSuccessMsg('');
+      setEmailVerificationNotice({ show: false, email: '' });
       setFirstName('');
       setLastName('');
       setPhone('');
@@ -376,6 +385,82 @@ export default function AuthModal({ initialMode = 'sign_in', open = false, onClo
               className="w-full border-2 border-purple-600 bg-purple-600 text-white hover:bg-purple-700 font-semibold py-2 rounded-full transition-colors"
             >
               כניסה למערכת
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (open && successMsg) {
+    return (
+      <div className="fixed inset-0 flex items-center justify-center bg-black/70 z-[200] px-6">
+        <div className="bg-white border-4 border-green-400 rounded-3xl shadow-2xl w-full max-w-sm text-center px-6 py-10 space-y-6" dir="rtl">
+          <div className="text-3xl font-extrabold text-green-600">ההרשמה בוצעה בהצלחה!</div>
+          <div className="text-base font-semibold leading-relaxed text-green-700">
+            {successMsg}
+          </div>
+          <div className="flex flex-col gap-3">
+            <button
+              type="button"
+              onClick={() => {
+                setSuccessMsg('');
+                onClose();
+                if (typeof window !== 'undefined') {
+                  localStorage.setItem('pendingCreateEvent', 'true');
+                }
+              }}
+              className="w-full border-2 border-green-500 text-green-600 hover:bg-green-500 hover:text-white font-semibold py-2 rounded-full transition-colors"
+            >
+              התחלת יצירת אירוע
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setSuccessMsg('');
+                onClose();
+              }}
+              className="w-full border-2 border-gray-300 text-gray-700 hover:bg-gray-200 font-semibold py-2 rounded-full transition-colors"
+            >
+              חזרה למסך הראשי
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (open && emailVerificationNotice.show) {
+    return (
+      <div className="fixed inset-0 flex items-center justify-center bg-black/70 z-[200] px-6">
+        <div className="bg-white border-4 border-green-400 rounded-3xl shadow-2xl w-full max-w-sm text-center px-6 py-10 space-y-6" dir="rtl">
+          <div className="text-3xl font-extrabold text-green-600">
+            עוד צעד קטן!
+          </div>
+          <div className="text-base font-semibold leading-relaxed text-green-700">
+            שלחנו קישור אימות לכתובת <strong>{emailVerificationNotice.email}</strong>.
+            אשר את הקישור במייל כדי להשלים את ההרשמה ואז חזור לכאן.
+          </div>
+          <div className="flex flex-col gap-3">
+            <button
+              type="button"
+              onClick={() => {
+                setEmailVerificationNotice({ show: false, email: '' });
+                onClose();
+              }}
+              className="w-full border-2 border-green-600 bg-green-600 text-white hover:bg-green-700 font-semibold py-2 rounded-full transition-colors"
+            >
+              הבנתי – אאשר את המייל
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setEmailVerificationNotice({ show: false, email: '' });
+                setView('sign_in');
+              }}
+              className="w-full border-2 border-gray-300 text-gray-700 hover:bg-gray-200 font-semibold py-2 rounded-full transition-colors"
+            >
+              חזרה למסך הכניסה
             </button>
           </div>
         </div>
