@@ -3697,6 +3697,9 @@ React.useEffect(() => {
               if (planToUse) {
                 setSelectedPlan(planToUse);
                 try { localStorage.setItem('selectedPlan', planToUse); } catch(e){}
+                try { localStorage.setItem('finishedSteps', JSON.stringify([1, 2])); } catch (e) {}
+                setFinishedSteps([1, 2]);
+                setShowEventTypes(true);
               }
               await persistUserPlanSettings(planToUse, restoreAddonCount);
               setFormData(prev => ({ ...prev, ...details }));
@@ -3707,11 +3710,26 @@ React.useEffect(() => {
                 markStepDone(2);
               }
             } else {
-              console.log('Event found but has ended, not restoring');
-              if (!newEventStarted) {
-                setShowGuestListModal(false);
-                setShowReportsOptions(false);
-              }
+              console.log('Event found but has ended, not restoring – ensuring clean slate');
+              setCurrentEventId(null);
+              setSelectedPlan(null);
+              setDbAddonCount(0);
+              setAdditionalPackages([]);
+              setFormData(initialFormState);
+              setSelectedEventType('');
+              setSelectedDesign(null);
+              setFinishedSteps([]);
+              setEventDetailsCompleted(false);
+              setNewEventStarted(false);
+              try { localStorage.removeItem('newEventStarted'); } catch(e){}
+              try { localStorage.removeItem('selectedPlan'); } catch(e){}
+              try { localStorage.removeItem('additionalPackages_global'); } catch(e){}
+              try { localStorage.removeItem('selectedEventType'); } catch(e){}
+              try { localStorage.removeItem('savedEventDetails'); } catch(e){}
+              try { localStorage.removeItem('selectedDesign'); } catch(e){}
+              try { localStorage.removeItem('finishedSteps'); } catch(e){}
+              setShowGuestListModal(false);
+              setShowReportsOptions(false);
             }
           }
         } else {
