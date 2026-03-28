@@ -3521,6 +3521,15 @@ React.useEffect(() => {
 
   // ---- Auto-archive when event ends (after date has passed) ----
   React.useEffect(() => {
+    if (currentEventId) return;
+    const plan = userPlanSettings?.plan || null;
+    const addon = userPlanSettings?.addonCount ?? 0;
+    setSelectedPlan(plan);
+    setDbAddonCount(addon);
+    setAdditionalPackages(Array(addon).fill('addon'));
+  }, [currentEventId, userPlanSettings?.plan, userPlanSettings?.addonCount]);
+
+  React.useEffect(() => {
     if (!currentEventId) return;
 
     const archiveIfPast = async () => {
@@ -3546,7 +3555,7 @@ React.useEffect(() => {
 
         if (eventDate >= today) return;
 
-      (async () => {
+        (async () => {
           try {
             const { error: archiveErr } = await supabase
               .from('events')
