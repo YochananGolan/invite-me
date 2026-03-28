@@ -547,10 +547,22 @@ const [eventRefreshKey, setEventRefreshKey] = useState(0);
 
   React.useEffect(() => {
     if (currentEventId) return;
+    const persistedPlan = userPlanSettings?.plan ?? null;
+    const persistedAddonCount = Number.isFinite(userPlanSettings?.addonCount)
+      ? Math.max(0, Math.floor(userPlanSettings.addonCount))
+      : 0;
+
+    if (persistedPlan) {
+      setSelectedPlan(persistedPlan);
+      setDbAddonCount(persistedAddonCount);
+      setAdditionalPackages(Array(persistedAddonCount).fill('addon'));
+      return;
+    }
+
     setSelectedPlan(null);
     setDbAddonCount(0);
     setAdditionalPackages([]);
-  }, [currentEventId]);
+  }, [currentEventId, userPlanSettings]);
 
   const totalGuestsCount = guestSummary.adults + guestSummary.children;
   // הודעות שנשלחו: מקור אמת = messages_sent_count (אם קיים) עם fallback למספר אורחים שנוצרו באירוע.
