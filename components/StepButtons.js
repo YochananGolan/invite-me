@@ -2909,6 +2909,28 @@ React.useEffect(() => {
           setSelectedDesign(null);
           setEventDetailsCompleted(false);
           try { localStorage.removeItem('selectedEventType'); } catch (e) {}
+          setGuestSummary({ approved: 0, adults: 0, children: 0 });
+          resetCapacityWarningGuests();
+          setGuestStatusSummary({ approved: 0, rejected: 0, pending: 0 });
+          setSpecialMealsSummary({
+            veg: { adults: 0, children: 0, total: 0 },
+            vegan: { adults: 0, children: 0, total: 0 },
+            glatt: { adults: 0, children: 0, total: 0 },
+            allergy: { adults: 0, children: 0, total: 0 },
+          });
+          setDbGuests([]);
+          setSentGuests([]);
+          setReportGuests([]);
+          setApprovedGuests([]);
+          setRejectedGuests([]);
+          setPendingGuests([]);
+          setShowGuestListModal(false);
+          setShowReportsOptions(false);
+          setShowReportModal(false);
+          setSelectedEventForReport(null);
+          setInvitedGuestsCount(0);
+          setEventMessagesSentCount(0);
+          setGuestSummaryRefreshKey((prev) => prev + 1);
         } catch (error) {
           console.error('Error handling plan purchase:', error);
           setPaymentResultType('error');
