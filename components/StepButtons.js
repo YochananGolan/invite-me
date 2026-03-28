@@ -3559,6 +3559,7 @@ React.useEffect(() => {
           }
 
           await persistUserPlanSettings(null, 0);
+          setUserPlanSettings({ plan: null, addonCount: 0 });
           setSelectedPlan(null);
           setAdditionalPackages([]);
           setDbAddonCount(0);
