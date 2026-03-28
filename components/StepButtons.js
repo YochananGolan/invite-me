@@ -478,7 +478,12 @@ const persistUserPlanSettings = React.useCallback(async (planCode, addonCount) =
       console.error('persistUserPlanSettings failed', error);
       return;
     }
-    setUserPlanSettings({ plan: safePlan, addonCount: safeAddon });
+    setUserPlanSettings((prev) => {
+      if (prev && prev.plan === safePlan && prev.addonCount === safeAddon) {
+        return prev;
+      }
+      return { plan: safePlan, addonCount: safeAddon };
+    });
     try { localStorage.setItem('user_plan_code', safePlan || ''); } catch (e) {}
     try { localStorage.setItem('additionalPackages_global', String(safeAddon)); } catch (e) {}
   } catch (err) {
@@ -489,7 +494,12 @@ const loadUserPlanSettings = React.useCallback(async () => {
   try {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
-      setUserPlanSettings({ plan: null, addonCount: 0 });
+      setUserPlanSettings((prev) => {
+        if (prev && prev.plan === null && (prev.addonCount ?? 0) === 0) {
+          return prev;
+        }
+        return { plan: null, addonCount: 0 };
+      });
       setSelectedPlan(null);
       return { plan: null, addonCount: 0 };
     }
@@ -505,14 +515,24 @@ const loadUserPlanSettings = React.useCallback(async () => {
     if (!data) {
       await persistUserPlanSettings(null, 0);
       selectionSourceRef.current = 'manual';
-      setUserPlanSettings({ plan: null, addonCount: 0 });
+      setUserPlanSettings((prev) => {
+        if (prev && prev.plan === null && (prev.addonCount ?? 0) === 0) {
+          return prev;
+        }
+        return { plan: null, addonCount: 0 };
+      });
       return { plan: null, addonCount: 0 };
     }
     const plan = data.plan_code || null;
     const parsedAddon = Number(data.addon_balance);
     const addonCount = Number.isFinite(parsedAddon) ? Math.max(0, Math.floor(parsedAddon)) : 0;
     const settings = { plan, addonCount };
-    setUserPlanSettings(settings);
+    setUserPlanSettings((prev) => {
+      if (prev && prev.plan === settings.plan && (prev.addonCount ?? 0) === settings.addonCount) {
+        return prev;
+      }
+      return settings;
+    });
     try { localStorage.setItem('user_plan_code', plan || ''); } catch (e) {}
     try { localStorage.setItem('additionalPackages_global', String(addonCount)); } catch (e) {}
     selectionSourceRef.current = plan ? 'persistent' : 'manual';
@@ -534,12 +554,36 @@ const [invitedGuestsCount, setInvitedGuestsCount] = useState(0);
 const [currentEventId,setCurrentEventId]=useState(null);
 const [eventRefreshKey, setEventRefreshKey] = useState(0);
 
+const progressStepSupportedRef = useRef(true);
+const selectedPlanRef = useRef(selectedPlan);
+useEffect(() => {
+  selectedPlanRef.current = selectedPlan;
+}, [selectedPlan]);
+
+const userPlanSettingsRef = useRef(userPlanSettings);
+useEffect(() => {
+  userPlanSettingsRef.current = userPlanSettings;
+}, [userPlanSettings]);
+
+const additionalPackagesRef = useRef(additionalPackages);
+useEffect(() => {
+  additionalPackagesRef.current = additionalPackages;
+}, [additionalPackages]);
+
+const lastRestoredEventIdRef = useRef(null);
+const noEventLoggedRef = useRef(false);
+
   // Persist additionalPackages after currentEventId is known (see effect below).
 
   React.useEffect(() => {
     if (!session) {
       setSelectedPlan(null);
-      setUserPlanSettings({ plan: null, addonCount: 0 });
+      setUserPlanSettings((prev) => {
+        if (prev && prev.plan === null && (prev.addonCount ?? 0) === 0) {
+          return prev;
+        }
+        return { plan: null, addonCount: 0 };
+      });
       return;
     }
     loadUserPlanSettings();
@@ -552,16 +596,27 @@ const [eventRefreshKey, setEventRefreshKey] = useState(0);
       ? Math.max(0, Math.floor(userPlanSettings.addonCount))
       : 0;
 
-    if (persistedPlan) {
-      setSelectedPlan(persistedPlan);
-      setDbAddonCount(persistedAddonCount);
-      setAdditionalPackages(Array(persistedAddonCount).fill('addon'));
-      return;
-    }
+  if (persistedPlan) {
+    setSelectedPlan(persistedPlan);
+    setDbAddonCount(persistedAddonCount);
+    setAdditionalPackages((prev) => {
+      const prevCount = Array.isArray(prev) ? prev.length : 0;
+      if (prevCount === persistedAddonCount) {
+        return prev;
+      }
+      return Array(persistedAddonCount).fill('addon');
+    });
+    return;
+  }
 
-    setSelectedPlan(null);
-    setDbAddonCount(0);
-    setAdditionalPackages([]);
+  setSelectedPlan(null);
+  setDbAddonCount(0);
+  setAdditionalPackages((prev) => {
+    if (Array.isArray(prev) && prev.length === 0) {
+      return prev;
+    }
+    return [];
+  });
   }, [currentEventId, userPlanSettings]);
 
   const totalGuestsCount = guestSummary.adults + guestSummary.children;
@@ -617,6 +672,7 @@ const additionalPackageCounts = React.useMemo(() => {
     return acc;
   }, {});
 }, [additionalPackages]);
+const canRenderCharts = Boolean(currentEventId && eventDataLoaded);
 
 const addonUnitSize = getPlanBaseLimit('addon') || 0;
 const displayTotalPlanCapacityValue = Math.max(0, Math.round(totalPlanCapacity));
@@ -1645,11 +1701,8 @@ const handleOpenAddonModal = React.useCallback(() => {
           event_type: selectedEventType || null,
         };
 
-        // Try to update progress_step, but don't fail if column doesn't exist
-        try {
+        if (progressStepSupportedRef.current) {
           updateData.progress_step = progress;
-        } catch (e) {
-          // Ignore - column might not exist
         }
         
         const { data: updated, error: updateErr } = await supabase
@@ -1663,6 +1716,7 @@ const handleOpenAddonModal = React.useCallback(() => {
           // If error is about progress_step, try again without it
           if (updateErr.code === 'PGRST204' && updateErr.message?.includes('progress_step')) {
             console.warn('[StepButtons] progress_step column not found, retrying without it');
+            progressStepSupportedRef.current = false;
             const { data: retryData, error: retryErr } = await supabase
               .from('events')
               .update({
@@ -1846,12 +1900,13 @@ const handleOpenAddonModal = React.useCallback(() => {
       setShowDesignChooser(false);
       setShowGuestForm(true);
       // Note: progress_step column may not exist in all schemas, so we skip it if it fails
-      if(currentEventId){ 
+  if (currentEventId && progressStepSupportedRef.current) { 
         try {
           await supabase.from('events').update({progress_step:3}).eq('id',currentEventId);
         } catch (progressErr) {
           // Ignore progress_step errors if column doesn't exist
-          console.warn('Could not update progress_step (column may not exist):', progressErr);
+      progressStepSupportedRef.current = false;
+      console.warn('Could not update progress_step (column may not exist):', progressErr);
         }
       }
       try{ localStorage.setItem('selectedDesign', src);}catch{}
@@ -2578,6 +2633,8 @@ React.useEffect(() => {
     setErrorMsg('');
     setFinishedSteps([]); // Reset finished steps for new event
     setCurrentEventId(null);
+    lastRestoredEventIdRef.current = null;
+    noEventLoggedRef.current = false;
     setEventDataLoaded(false);
     
     // If event was actually deleted (not just archived), reset everything פרט לחבילה:
@@ -2609,7 +2666,13 @@ React.useEffect(() => {
     setShowReportModal(false);
     setSelectedEventForReport(null);
     setSelectedPlan(planToCarryForward);
-    setAdditionalPackages(Array(addonCountBeforeReset).fill('addon'));
+    setAdditionalPackages((prev) => {
+      const prevCount = Array.isArray(prev) ? prev.length : 0;
+      if (prevCount === addonCountBeforeReset) {
+        return prev;
+      }
+      return Array(addonCountBeforeReset).fill('addon');
+    });
     setDbAddonCount(addonCountBeforeReset);
     try { localStorage.setItem('additionalPackages_global', String(addonCountBeforeReset)); } catch (_) {}
     
@@ -3124,7 +3187,7 @@ React.useEffect(() => {
           .or('status.neq.archived,status.is.null')
           .order('created_at',{ascending:false})
           .limit(1)
-          .single();
+          .maybeSingle();
         if (evError && (evError.message || '').toLowerCase().includes('column')) {
           const { data: evF } = await supabase
             .from('events')
@@ -3132,7 +3195,7 @@ React.useEffect(() => {
             .eq('user_id',user.id)
             .order('created_at',{ascending:false})
             .limit(1)
-            .single();
+            .maybeSingle();
           ev = evF;
         } else {
           ev = evData;
@@ -3149,7 +3212,13 @@ React.useEffect(() => {
             const safeAddon = Math.max(prev ?? 0, fallbackAddon);
             return safeAddon;
           });
-          setAdditionalPackages(Array(fallbackAddon).fill('addon'));
+          setAdditionalPackages((prev) => {
+            const prevCount = Array.isArray(prev) ? prev.length : 0;
+            if (prevCount === fallbackAddon) {
+              return prev;
+            }
+            return Array(fallbackAddon).fill('addon');
+          });
           return;
         }
         setEventMessagesSentCount(messagesSent);
@@ -3581,7 +3650,13 @@ React.useEffect(() => {
     const addon = userPlanSettings?.addonCount ?? 0;
     setSelectedPlan(plan);
     setDbAddonCount(addon);
-    setAdditionalPackages(Array(addon).fill('addon'));
+    setAdditionalPackages((prev) => {
+      const prevCount = Array.isArray(prev) ? prev.length : 0;
+      if (prevCount === addon) {
+        return prev;
+      }
+      return Array(addon).fill('addon');
+    });
   }, [currentEventId, userPlanSettings?.plan, userPlanSettings?.addonCount]);
 
   React.useEffect(() => {
@@ -3626,9 +3701,19 @@ React.useEffect(() => {
           }
 
           await persistUserPlanSettings(null, 0);
-          setUserPlanSettings({ plan: null, addonCount: 0 });
+          setUserPlanSettings((prev) => {
+            if (prev && prev.plan === null && (prev.addonCount ?? 0) === 0) {
+              return prev;
+            }
+            return { plan: null, addonCount: 0 };
+          });
           setSelectedPlan(null);
-          setAdditionalPackages([]);
+          setAdditionalPackages((prev) => {
+            if (Array.isArray(prev) && prev.length === 0) {
+              return prev;
+            }
+            return [];
+          });
           setDbAddonCount(0);
           try { localStorage.removeItem('selectedPlan'); } catch (e) {}
           try { localStorage.removeItem('additionalPackages_global'); } catch (e) {}
@@ -3685,6 +3770,7 @@ React.useEffect(() => {
           .maybeSingle();
 
         if (ev) {
+          noEventLoggedRef.current = false;
           const details = typeof ev.event_details === 'string'
             ? JSON.parse(ev.event_details)
             : ev.event_details;
@@ -3696,7 +3782,10 @@ React.useEffect(() => {
             today.setHours(0, 0, 0, 0);
 
             if (eventDate >= today) {
-              console.log('Found future event in database, restoring...', ev.id);
+              if (lastRestoredEventIdRef.current !== ev.id) {
+                console.log('Found future event in database, restoring...', ev.id);
+                lastRestoredEventIdRef.current = ev.id;
+              }
               setCurrentEventId(ev.id);
               if (newEventStarted) {
                 setNewEventStarted(false);
@@ -3732,11 +3821,19 @@ React.useEffect(() => {
                 markStepDone(2);
               }
             } else {
-              console.log('Event found but has ended, not restoring – ensuring clean slate');
+              if (lastRestoredEventIdRef.current !== 'ended') {
+                console.log('Event found but has ended, not restoring – ensuring clean slate');
+                lastRestoredEventIdRef.current = 'ended';
+              }
               setCurrentEventId(null);
               setSelectedPlan(null);
               setDbAddonCount(0);
-              setAdditionalPackages([]);
+              setAdditionalPackages((prev) => {
+                if (Array.isArray(prev) && prev.length === 0) {
+                  return prev;
+                }
+                return [];
+              });
               setFormData(initialFormState);
               setSelectedEventType('');
               setSelectedDesign(null);
@@ -3755,24 +3852,32 @@ React.useEffect(() => {
             }
           }
         } else {
-          console.log('No event found in database');
+          if (!noEventLoggedRef.current) {
+            console.log('No event found in database');
+            noEventLoggedRef.current = true;
+          }
+          lastRestoredEventIdRef.current = null;
           if (!newEventStarted) {
             setShowGuestListModal(false);
             setShowReportsOptions(false);
           }
 
+          const currentSelectedPlan = selectedPlanRef.current;
+          const currentUserSettings = userPlanSettingsRef.current;
+          const currentAdditionalPackages = additionalPackagesRef.current;
+
           const carriedPlan = newEventStarted
-            ? (selectedPlan || userPlanSettings?.plan || null)
+            ? (currentSelectedPlan || currentUserSettings?.plan || null)
             : null;
           const carriedAddon = newEventStarted
             ? (() => {
-                if (Array.isArray(additionalPackages)) return additionalPackages.length;
-                const addonFromSettings = Number(userPlanSettings?.addonCount ?? 0);
+                if (Array.isArray(currentAdditionalPackages)) return currentAdditionalPackages.length;
+                const addonFromSettings = Number(currentUserSettings?.addonCount ?? 0);
                 return Number.isFinite(addonFromSettings) ? Math.max(0, addonFromSettings) : 0;
               })()
             : 0;
 
-          const hasPersistedPlan = Boolean(userPlanSettings?.plan || selectedPlan);
+          const hasPersistedPlan = Boolean(currentUserSettings?.plan || currentSelectedPlan);
           let shouldClearPersistedPlan = false;
           try {
             const { data: lastEvent } = await supabase
@@ -3810,94 +3915,123 @@ React.useEffect(() => {
             await persistUserPlanSettings(null, 0);
             setSelectedPlan(null);
             setDbAddonCount(0);
-            setAdditionalPackages([]);
+            setAdditionalPackages((prev) => {
+              if (Array.isArray(prev) && prev.length === 0) {
+                return prev;
+              }
+              return [];
+            });
             try { localStorage.removeItem('user_plan_code'); } catch(e){}
             try { localStorage.removeItem('selectedPlan'); } catch(e){}
             try { localStorage.removeItem('additionalPackages_global'); } catch(e){}
             return;
           } else if (shouldClearPersistedPlan) {
             // There is a persisted plan (likely a fresh purchase) – keep it instead of clearing.
-            const planToKeep = userPlanSettings?.plan || selectedPlan || null;
-            const addonToKeep = Number.isFinite(userPlanSettings?.addonCount)
-              ? Math.max(0, userPlanSettings.addonCount)
-              : Array.isArray(additionalPackages) ? additionalPackages.length : 0;
+            const planToKeep = currentUserSettings?.plan || currentSelectedPlan || null;
+            const addonToKeep = Number.isFinite(currentUserSettings?.addonCount)
+              ? Math.max(0, currentUserSettings.addonCount)
+              : Array.isArray(currentAdditionalPackages) ? currentAdditionalPackages.length : 0;
             setSelectedPlan(planToKeep);
             setDbAddonCount(addonToKeep);
-            setAdditionalPackages(Array(addonToKeep).fill('addon'));
+            setAdditionalPackages((prev) => {
+              const prevCount = Array.isArray(prev) ? prev.length : 0;
+              if (prevCount === addonToKeep) {
+                return prev;
+              }
+              return Array(addonToKeep).fill('addon');
+            });
           }
 
           if (newEventStarted) {
             if (carriedPlan) {
               setSelectedPlan(carriedPlan);
               setDbAddonCount(carriedAddon);
-              setAdditionalPackages(Array(carriedAddon).fill('addon'));
+              setAdditionalPackages((prev) => {
+                const prevCount = Array.isArray(prev) ? prev.length : 0;
+                if (prevCount === carriedAddon) {
+                  return prev;
+                }
+                return Array(carriedAddon).fill('addon');
+              });
             } else {
               setSelectedPlan(null);
               setDbAddonCount(0);
-              setAdditionalPackages([]);
+              setAdditionalPackages((prev) => {
+                if (Array.isArray(prev) && prev.length === 0) {
+                  return prev;
+                }
+                return [];
+              });
             }
             return;
           }
 
-        const settings = await loadUserPlanSettings();
-        if (settings) {
-          if (settings.plan) {
-            setSelectedPlan(settings.plan);
-            setShowEventTypes(true);
-            setNewEventStarted(true);
-            try { localStorage.setItem('selectedPlan', settings.plan); } catch(e){}
-            try { localStorage.setItem('newEventStarted', '1'); } catch(e){}
-            setFinishedSteps((prev) => {
-              const merged = Array.from(new Set([1, 2, ...(prev || [])])).sort((a, b) => a - b);
-              try { localStorage.setItem('finishedSteps', JSON.stringify(merged)); } catch (e) {}
-              return merged;
+          const settings = await loadUserPlanSettings();
+          if (settings) {
+            if (settings.plan) {
+              setSelectedPlan(settings.plan);
+              setShowEventTypes(true);
+              setNewEventStarted(true);
+              try { localStorage.setItem('selectedPlan', settings.plan); } catch(e){}
+              try { localStorage.setItem('newEventStarted', '1'); } catch(e){}
+              setFinishedSteps((prev) => {
+                const merged = Array.from(new Set([1, 2, ...(prev || [])])).sort((a, b) => a - b);
+                try { localStorage.setItem('finishedSteps', JSON.stringify(merged)); } catch (e) {}
+                return merged;
+              });
+            } else {
+              setSelectedPlan(null);
+              try { localStorage.removeItem('user_plan_code'); } catch(e){}
+              try { localStorage.removeItem('selectedPlan'); } catch(e){}
+            }
+            setDbAddonCount((prev) => Math.max(prev ?? 0, settings.addonCount ?? 0));
+            setAdditionalPackages((prev) => {
+              const addonToApply = settings.addonCount ?? 0;
+              const prevCount = Array.isArray(prev) ? prev.length : 0;
+              if (prevCount === addonToApply) {
+                return prev;
+              }
+              return Array(addonToApply).fill('addon');
             });
-          } else {
-            setSelectedPlan(null);
-            try { localStorage.removeItem('user_plan_code'); } catch(e){}
-            try { localStorage.removeItem('selectedPlan'); } catch(e){}
           }
-          setDbAddonCount((prev) => Math.max(prev ?? 0, settings.addonCount ?? 0));
-          setAdditionalPackages(Array(settings.addonCount ?? 0).fill('addon'));
-        }
 
-        setGuestSummary((prev) => {
-          if ((prev.approved || prev.adults || prev.children)) {
-            return { approved: 0, adults: 0, children: 0 };
-          }
-          return prev;
-        });
-        resetCapacityWarningGuests();
-        setGuestStatusSummary((prev) => {
-          if (prev.approved || prev.rejected || prev.pending) {
-            return { approved: 0, rejected: 0, pending: 0 };
-          }
-          return prev;
-        });
-        setSpecialMealsSummary((prev) => {
-          const emptyMeals = {
-            veg: { adults: 0, children: 0, total: 0 },
-            vegan: { adults: 0, children: 0, total: 0 },
-            glatt: { adults: 0, children: 0, total: 0 },
-            allergy: { adults: 0, children: 0, total: 0 },
-          };
-          const hasMeals =
-            prev.veg.total || prev.vegan.total || prev.glatt.total || prev.allergy.total;
-          return hasMeals ? emptyMeals : prev;
-        });
-        setDbGuests((prev) => (prev.length ? [] : prev));
-        setSentGuests((prev) => (prev.length ? [] : prev));
-        setReportGuests((prev) => (prev.length ? [] : prev));
-        setApprovedGuests((prev) => (prev.length ? [] : prev));
-        setRejectedGuests((prev) => (prev.length ? [] : prev));
-        setPendingGuests((prev) => (prev.length ? [] : prev));
-        setShowGuestListModal(false);
-        setShowReportsOptions(false);
-        setShowReportModal(false);
-        setSelectedEventForReport(null);
-        setInvitedGuestsCount((prev) => (prev ? 0 : prev));
-        setEventMessagesSentCount((prev) => (prev ? 0 : prev));
-        setGuestSummaryRefreshKey((prev) => prev + 1);
+          setGuestSummary((prev) => {
+            if ((prev.approved || prev.adults || prev.children)) {
+              return { approved: 0, adults: 0, children: 0 };
+            }
+            return prev;
+          });
+          resetCapacityWarningGuests();
+          setGuestStatusSummary((prev) => {
+            if (prev.approved || prev.rejected || prev.pending) {
+              return { approved: 0, rejected: 0, pending: 0 };
+            }
+            return prev;
+          });
+          setSpecialMealsSummary((prev) => {
+            const emptyMeals = {
+              veg: { adults: 0, children: 0, total: 0 },
+              vegan: { adults: 0, children: 0, total: 0 },
+              glatt: { adults: 0, children: 0, total: 0 },
+              allergy: { adults: 0, children: 0, total: 0 },
+            };
+            const hasMeals =
+              prev.veg.total || prev.vegan.total || prev.glatt.total || prev.allergy.total;
+            return hasMeals ? emptyMeals : prev;
+          });
+          setDbGuests((prev) => (prev.length ? [] : prev));
+          setSentGuests((prev) => (prev.length ? [] : prev));
+          setReportGuests((prev) => (prev.length ? [] : prev));
+          setApprovedGuests((prev) => (prev.length ? [] : prev));
+          setRejectedGuests((prev) => (prev.length ? [] : prev));
+          setPendingGuests((prev) => (prev.length ? [] : prev));
+          setShowGuestListModal(false);
+          setShowReportsOptions(false);
+          setShowReportModal(false);
+          setSelectedEventForReport(null);
+          setInvitedGuestsCount((prev) => (prev ? 0 : prev));
+          setEventMessagesSentCount((prev) => (prev ? 0 : prev));
+          setGuestSummaryRefreshKey((prev) => prev + 1);
         }
         isInitialLoadRef.current = false;
       } catch (e) {
@@ -3905,7 +4039,7 @@ React.useEffect(() => {
         isInitialLoadRef.current = false;
       }
     })();
-  }, [currentEventId, newEventStarted, eventRefreshKey, derivePlanFromRecord, persistUserPlanSettings, loadUserPlanSettings, selectedPlan, userPlanSettings, additionalPackages]);
+  }, [currentEventId, newEventStarted, eventRefreshKey, derivePlanFromRecord, persistUserPlanSettings, loadUserPlanSettings]);
 
   // ---- Close modals when no active event ----
   React.useEffect(() => {
@@ -4909,7 +5043,9 @@ React.useEffect(()=>{
                 </div>
                 <div className="mt-1">
                   <div className="bg-white p-3 rounded-lg border border-blue-100">
-                    {hasGuestSummaryData ? (
+                    {!canRenderCharts ? (
+                      <div className="py-10 text-sm text-gray-500 text-center">טוען נתונים...</div>
+                    ) : hasGuestSummaryData ? (
                       (() => {
                         const isSmallView = typeof window !== 'undefined' && window.innerWidth < 640;
                         const axisTickFill = isSmallView ? '#FDE68A' : '#1f2937';
@@ -5037,7 +5173,9 @@ React.useEffect(()=>{
                   <h3 className="text-base font-bold text-purple-800">סטטוס אישורי הגעה</h3>
                 </div>
                 <div className="bg-white rounded-lg text-right p-2 mt-3">
-                    {hasStatusData ? (
+                    {!canRenderCharts ? (
+                    <div className="py-10 text-sm text-gray-500 text-center">טוען נתונים...</div>
+                  ) : hasStatusData ? (
                     <div className="h-56 min-h-[200px] sm:h-56">
                       <ResponsiveContainer width="100%" height="100%">
                         <PieChart>
@@ -5151,7 +5289,9 @@ React.useEffect(()=>{
                     </div>
 
                     <div className="bg-white p-3 rounded-lg border border-yellow-200">
-                      {hasCapacityChartData ? (
+                      {!canRenderCharts ? (
+                        <div className="py-10 text-sm text-gray-500 text-center">טוען נתונים...</div>
+                      ) : hasCapacityChartData ? (
                         <div className="h-56 min-h-[200px] sm:h-56">
                           <ResponsiveContainer width="100%" height="100%">
                             <BarChart
