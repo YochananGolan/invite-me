@@ -3518,71 +3518,66 @@ React.useEffect(() => {
 
   // ---- Auto-archive when event ends (after date has passed) ----
   React.useEffect(() => {
-    if (!formData.date || !currentEventId) return;
+    if (!currentEventId) return;
 
-    const eventDate = new Date(formData.date);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    eventDate.setHours(0, 0, 0, 0);
-    const diffTime = eventDate.getTime() - today.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    const archiveIfPast = async () => {
+      try {
+        const { data: dbEvent, error } = await supabase
+          .from('events')
+          .select('event_details, selected_plan, additional_packages')
+          .eq('id', currentEventId)
+          .maybeSingle();
 
-    if (diffDays < 0) {
+        if (error || !dbEvent) return;
+
+        const details = typeof dbEvent.event_details === 'string'
+          ? JSON.parse(dbEvent.event_details)
+          : dbEvent.event_details || {};
+        const dbDate = details.date || details.start_datetime;
+        if (!dbDate) return;
+
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const eventDate = new Date(dbDate);
+        eventDate.setHours(0, 0, 0, 0);
+
+        if (eventDate >= today) return;
+
       (async () => {
-        // Verify the date from the DB to avoid archiving due to stale formData
-        try {
-          const { data: dbEvent } = await supabase
-            .from('events')
-            .select('event_details')
-            .eq('id', currentEventId)
-            .maybeSingle();
-          if (dbEvent) {
-            const details = typeof dbEvent.event_details === 'string'
-              ? JSON.parse(dbEvent.event_details)
-              : dbEvent.event_details || {};
-            const dbDate = details.date || details.start_datetime;
-            if (dbDate) {
-              const dbEventDate = new Date(dbDate);
-              dbEventDate.setHours(0, 0, 0, 0);
-              if (dbEventDate >= today) {
-                // DB has a future date — formData is stale, skip archiving
-                return;
-              }
-            } else {
-              // No date in DB yet (event still being set up) — don't archive
+          try {
+            const { error: archiveErr } = await supabase
+              .from('events')
+              .update({ status: 'archived', selected_plan: null, additional_packages: 0 })
+              .eq('id', currentEventId);
+            if (archiveErr && !(archiveErr.message || '').toLowerCase().includes('column')) {
+              console.error('Failed to archive past event:', archiveErr);
               return;
             }
+          } catch (e) {
+            console.error('Failed to archive past event:', e);
+            return;
           }
-        } catch (e) {
-          console.error('Failed to verify event date from DB:', e);
-          return;
-        }
 
-        try {
-          const { error } = await supabase
-            .from('events')
-            .update({ status: 'archived' })
-            .eq('id', currentEventId);
-          if (error && !(error.message || '').toLowerCase().includes('column')) {
-            console.error('Failed to archive past event:', error);
-          }
-        } catch (e) {
-          console.error('Failed to archive past event:', e);
-        }
+          await persistUserPlanSettings(null, 0);
+          setSelectedPlan(null);
+          setAdditionalPackages([]);
+          setDbAddonCount(0);
+          try { localStorage.removeItem('selectedPlan'); } catch (e) {}
+          try { localStorage.removeItem('additionalPackages_global'); } catch (e) {}
+          setNewEventStarted(false);
+          try { localStorage.removeItem('newEventStarted'); } catch(e){}
+          setCurrentEventId(null);
+          setEventMessagesSentCount(0);
 
-        setNewEventStarted(false);
-        try { localStorage.removeItem('newEventStarted'); } catch(e){}
-        setCurrentEventId(null);
-        setSelectedPlan(null);
-        setEventMessagesSentCount(0);
-        try { localStorage.removeItem('selectedPlan'); } catch(e){}
-
-        if (diffDays >= -1) {
           setShowEventEndedNotice(true);
-        }
-      })();
-    }
-  }, [formData.date, currentEventId]);
+        })();
+      } catch (err) {
+        console.error('auto-archive fetch failed', err);
+      }
+    };
+
+    archiveIfPast();
+  }, [currentEventId]);
 
   // Fetch Tranzila terminal info
   React.useEffect(() => {
