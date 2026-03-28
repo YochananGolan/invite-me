@@ -4036,16 +4036,20 @@ React.useEffect(() => {
   },[]);
 
   // Load selectedDesign from localStorage if not already set from database
-  React.useEffect(()=>{
-    if(typeof window==='undefined') return;
-    if(selectedDesign) return; // Don't override if already set from database
-    try{
-      const saved = localStorage.getItem('selectedDesign');
-      if(saved) setSelectedDesign(saved);
-      // Mark initial load as complete after localStorage check
-      isInitialLoadRef.current = false;
-    }catch{}
-  },[]);
+React.useEffect(()=>{
+  if(typeof window==='undefined') return;
+  if(selectedDesign) return; // Don't override if already set from database
+  if(!currentEventId){
+    try { localStorage.removeItem('selectedDesign'); } catch {}
+    return;
+  }
+  try{
+    const saved = localStorage.getItem('selectedDesign');
+    if(saved) setSelectedDesign(saved);
+    // Mark initial load as complete after localStorage check
+    isInitialLoadRef.current = false;
+  }catch{}
+},[currentEventId, selectedDesign]);
 
   // Load guest summary stats - only if there's an active event
   React.useEffect(()=>{
