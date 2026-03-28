@@ -102,6 +102,31 @@ export default function TranzilaPayment({
   useEffect(() => {
     if (!isOpen) return;
 
+    if (failureTimeoutRef.current) {
+      clearTimeout(failureTimeoutRef.current);
+      failureTimeoutRef.current = null;
+    }
+
+    failureTimeoutRef.current = setTimeout(() => {
+      console.warn('Tranzila payment timeout reached – triggering failure handler');
+      onFailure?.({
+        error: true,
+        reason: 'timeout',
+        message: 'לא התקבל אישור תשלום בזמן. אנא נסה שוב או בחר אמצעי תשלום אחר.',
+      });
+    }, 120000);
+
+    return () => {
+      if (failureTimeoutRef.current) {
+        clearTimeout(failureTimeoutRef.current);
+        failureTimeoutRef.current = null;
+      }
+    };
+  }, [isOpen, handshakeAttempt, onFailure]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
     // Listen for messages from Tranzila iframe
     const handleMessage = (event) => {
       try {
@@ -114,15 +139,34 @@ export default function TranzilaPayment({
 
         const data = event.data;
 
-        // Origin validation - success/failure ONLY from our callback pages (Tranzila redirects iframe to our URLs).
-        // Ignore messages from Tranzila during Google Pay flow - they send intermediate status that we wrongly treated as failure.
+        // Origin validation – allow our own domain and trusted Tranzila domains (for Google Pay callbacks).
+        // Tranzila may emit intermediate statuses; we react only when the payload clearly indicates success or failure.
         const isOwnOrigin = typeof window !== 'undefined' && event.origin === window.location.origin;
+        const isTrustedTranzilaOrigin =
+          typeof event.origin === 'string' && /(?:^https?:\/\/)?([^/]+\.)?tranzila\.com$/i.test(event.origin);
+        const isTrustedOrigin = isOwnOrigin || isTrustedTranzilaOrigin;
 
         // Handle string messages (from API callbacks) - only from our success/failure pages
         if (typeof data === 'string') {
           try {
             const parsed = JSON.parse(data);
-            if (isOwnOrigin && (parsed.success || parsed.Response === '000')) {
+            const responseCode =
+              parsed?.Response ??
+              parsed?.transactionData?.Response ??
+              parsed?.response_code ??
+              null;
+            const normalizedResponse =
+              responseCode !== null && responseCode !== undefined ? String(responseCode) : null;
+            const parsedSuccess =
+              parsed?.success === true ||
+              normalizedResponse === '000' ||
+              normalizedResponse === '0';
+            const parsedFailure =
+              parsed?.error ||
+              parsed?.reason ||
+              (normalizedResponse && normalizedResponse !== '000' && normalizedResponse !== '0');
+
+            if (isTrustedOrigin && parsedSuccess) {
               if (failureTimeoutRef.current) {
                 clearTimeout(failureTimeoutRef.current);
                 failureTimeoutRef.current = null;
@@ -131,7 +175,7 @@ export default function TranzilaPayment({
               onClose();
               return;
             }
-            if (isOwnOrigin && (parsed.error || parsed.Response)) {
+            if (isTrustedOrigin && !parsedSuccess && parsedFailure) {
               if (failureTimeoutRef.current) clearTimeout(failureTimeoutRef.current);
               failureTimeoutRef.current = null;
               onFailure && onFailure(parsed);
@@ -182,7 +226,7 @@ export default function TranzilaPayment({
                          data.Response === '0' ||
                          (data.transactionData && (data.transactionData.Response === '000' || data.transactionData.Response === 0));
 
-        if (isSuccess && isOwnOrigin) {
+        if (isSuccess && isTrustedOrigin) {
           if (failureTimeoutRef.current) {
             clearTimeout(failureTimeoutRef.current);
             failureTimeoutRef.current = null;
@@ -196,7 +240,17 @@ export default function TranzilaPayment({
 
         // Handle failed payment - from our failure page (Tranzila redirects iframe to our URL).
         // Show popup immediately with failure reason and button to return to payment.
-        if (isOwnOrigin && (data.error || data.Response || (data.transactionData && data.transactionData.Response))) {
+        const responseCode =
+          data?.Response ??
+          data?.transactionData?.Response ??
+          null;
+        const normalizedResponse =
+          responseCode !== null && responseCode !== undefined ? String(responseCode) : null;
+        const isFailureResponse =
+          normalizedResponse && normalizedResponse !== '000' && normalizedResponse !== '0';
+        const hasFailureSignal = Boolean(data?.error || data?.reason || isFailureResponse);
+
+        if (isTrustedOrigin && !isSuccess && hasFailureSignal) {
           if (failureTimeoutRef.current) clearTimeout(failureTimeoutRef.current);
           failureTimeoutRef.current = null;
           console.log('Payment failed, calling onFailure with:', data);
