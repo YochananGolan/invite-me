@@ -1538,9 +1538,9 @@ const handleOpenAddonModal = React.useCallback(() => {
   // ניתן לאפס newEventStarted רק כאשר האירוע נסגר לארכיון, לכן לא מנקים אוטומטית עם selectedEventType ריק.
 
   // Helper function to check if there's an active event
-const hasActiveEvent = () => {
-  return Boolean(currentEventId);
-};
+  const hasActiveEvent = () => {
+    return Boolean(currentEventId);
+  };
 
   // Expose imperative methods to parent components
   useImperativeHandle(ref, () => ({
@@ -2896,11 +2896,11 @@ React.useEffect(() => {
           setPaymentWasPlanPurchase(true);
           setShowPaymentModal(false);
           setShowPaymentResultModal(true);
-          // Prepare wizard steps so the user can continue immediately
-          setFinishedSteps([1, 2]);
+          // Prepare wizard for brand new event creation
+          setFinishedSteps([]);
           setShowEventTypes(true);
           setStepErrorMsg('');
-          try { localStorage.setItem('finishedSteps', JSON.stringify([1, 2])); } catch (e) {}
+          try { localStorage.removeItem('finishedSteps'); } catch (e) {}
           try { localStorage.removeItem('savedEventDetails'); } catch (e) {}
           try { localStorage.removeItem('selectedDesign'); } catch (e) {}
           try { localStorage.removeItem('draftEvent'); } catch (e) {}
@@ -4519,7 +4519,7 @@ React.useEffect(() => {
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    const mustStartFirst = !hasActiveEvent() || !selectedPlan;
+                    const mustStartFirst = !selectedPlan;
                     if (mustStartFirst) {
                       setStepErrorMsg('\u05D9\u05E9 \u05EA\u05D7\u05D9\u05DC\u05D4 \u05DC\u05D9\u05E6\u05D5\u05E8 \u05D0\u05D9\u05E8\u05D5\u05E2 \u05D5\u05DC\u05D1\u05D7\u05D5\u05E8 \u05DE\u05E1\u05DC\u05D5\u05DC \u05EA\u05E9\u05DC\u05D5\u05DD.');
                       setShowStepError(true);
@@ -4556,7 +4556,7 @@ React.useEffect(() => {
                     e.preventDefault();
                     e.stopPropagation();
                     if (realIdx === 4) {
-                      const mustStartFirst = !hasActiveEvent() || !selectedPlan;
+                      const mustStartFirst = !selectedPlan;
                       if (mustStartFirst) {
                         setStepErrorMsg('\u05D9\u05E9 \u05EA\u05D7\u05D9\u05DC\u05D4 \u05DC\u05D9\u05E6\u05D5\u05E8 \u05D0\u05D9\u05E8\u05D5\u05E2 \u05D5\u05DC\u05D1\u05D7\u05D5\u05E8 \u05DE\u05E1\u05DC\u05D5\u05DC \u05EA\u05E9\u05DC\u05D5\u05DD.');
                         setShowStepError(true);
@@ -4592,7 +4592,7 @@ React.useEffect(() => {
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
-                  const mustStartFirst = !hasActiveEvent() || !selectedPlan;
+                  const mustStartFirst = !selectedPlan;
                   const stepRequiresFlow = realIdx >= 1 && realIdx <= 4;
                   if (stepRequiresFlow && mustStartFirst) {
                     setStepErrorMsg('\u05D9\u05E9 \u05EA\u05D7\u05D9\u05DC\u05D4 \u05DC\u05D9\u05E6\u05D5\u05E8 \u05D0\u05D9\u05E8\u05D5\u05E2 \u05D5\u05DC\u05D1\u05D7\u05D5\u05E8 \u05DE\u05E1\u05DC\u05D5\u05DC \u05EA\u05E9\u05DC\u05D5\u05DD.');
@@ -4698,11 +4698,33 @@ React.useEffect(() => {
               }}>
                 <div className="flex items-center justify-center gap-2 mb-2">
                   <span className="text-2xl">🚀</span>
-                  <h3 className="text-lg font-bold text-blue-800">תהליך יצירת אירוע חדש החל</h3>
+                  <h3 className="text-lg font-bold text-blue-800">מסלול פעיל – הזמן להתחיל אירוע חדש</h3>
                 </div>
-                <p className="text-blue-700">
-                  אתה נמצא בתהליך יצירת אירוע חדש. המשך עם השלבים הבאים.
+                <p className="text-blue-700 mb-2">
+                  רכשת {getPlanDisplayName(selectedPlan) || 'מסלול'} בהצלחה. האירוע הקודם נסגר והמערכת מוכנה לאירוע חדש.
                 </p>
+                <p className="text-blue-700">
+                  התחל בשלב 1 כדי לבחור סוג אירוע ולהזין את הפרטים.
+                </p>
+                <div className="flex justify-center gap-3 mt-4">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowEventTypes(true);
+                      setStepErrorMsg('');
+                    }}
+                    className="bg-primary text-white font-bold py-2 px-4 rounded-full hover:bg-primary/90 transition-all shadow"
+                  >
+                    עבור לשלב 1 – סוג אירוע
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowPricingPlan(true)}
+                    className="bg-white text-primary font-semibold border border-primary py-2 px-4 rounded-full hover:bg-primary/10 transition-all"
+                  >
+                    בחר מסלול אחר
+                  </button>
+                </div>
               </div>
             ) : (
               <div className="bg-gray-50 p-4 text-center shadow-lg flex-1" style={{
