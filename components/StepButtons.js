@@ -2880,6 +2880,14 @@ React.useEffect(() => {
               if (error) console.error('Failed to persist selected_plan to DB', error);
             });
           }
+          if (!eventIdForPlan) {
+            // Mark that a new event flow should begin so the dashboard shows the plan section
+            setNewEventStarted(true);
+            try { localStorage.setItem('newEventStarted', '1'); } catch (e) {}
+            setShowGuestListModal(false);
+            setShowReportsOptions(false);
+            setShowReportModal(false);
+          }
 
           const planDisplayName = getPlanDisplayName(effectivePlan);
           // Show success modal instead of toast
@@ -2888,6 +2896,19 @@ React.useEffect(() => {
           setPaymentWasPlanPurchase(true);
           setShowPaymentModal(false);
           setShowPaymentResultModal(true);
+          // Prepare wizard steps so the user can continue immediately
+          setFinishedSteps([1, 2]);
+          setShowEventTypes(true);
+          setStepErrorMsg('');
+          try { localStorage.setItem('finishedSteps', JSON.stringify([1, 2])); } catch (e) {}
+          try { localStorage.removeItem('savedEventDetails'); } catch (e) {}
+          try { localStorage.removeItem('selectedDesign'); } catch (e) {}
+          try { localStorage.removeItem('draftEvent'); } catch (e) {}
+          setFormData(initialFormState);
+          setSelectedEventType('');
+          setSelectedDesign(null);
+          setEventDetailsCompleted(false);
+          try { localStorage.removeItem('selectedEventType'); } catch (e) {}
         } catch (error) {
           console.error('Error handling plan purchase:', error);
           setPaymentResultType('error');
@@ -3711,6 +3732,7 @@ React.useEffect(() => {
               })()
             : 0;
 
+          const hasPersistedPlan = Boolean(userPlanSettings?.plan || selectedPlan);
           let shouldClearPersistedPlan = false;
           try {
             const { data: lastEvent } = await supabase
@@ -3744,7 +3766,7 @@ React.useEffect(() => {
             console.error('Failed to inspect last event for plan reset', inspectErr);
           }
 
-          if (shouldClearPersistedPlan) {
+          if (shouldClearPersistedPlan && !hasPersistedPlan) {
             await persistUserPlanSettings(null, 0);
             setSelectedPlan(null);
             setDbAddonCount(0);
@@ -3753,6 +3775,15 @@ React.useEffect(() => {
             try { localStorage.removeItem('selectedPlan'); } catch(e){}
             try { localStorage.removeItem('additionalPackages_global'); } catch(e){}
             return;
+          } else if (shouldClearPersistedPlan) {
+            // There is a persisted plan (likely a fresh purchase) – keep it instead of clearing.
+            const planToKeep = userPlanSettings?.plan || selectedPlan || null;
+            const addonToKeep = Number.isFinite(userPlanSettings?.addonCount)
+              ? Math.max(0, userPlanSettings.addonCount)
+              : Array.isArray(additionalPackages) ? additionalPackages.length : 0;
+            setSelectedPlan(planToKeep);
+            setDbAddonCount(addonToKeep);
+            setAdditionalPackages(Array(addonToKeep).fill('addon'));
           }
 
           if (newEventStarted) {
