@@ -3699,14 +3699,73 @@ React.useEffect(() => {
             setShowGuestListModal(false);
             setShowReportsOptions(false);
           }
-          const settings = await loadUserPlanSettings();
-          if (settings) {
-            if (settings.plan) {
-              setSelectedPlan(settings.plan);
-              try { localStorage.setItem('selectedPlan', settings.plan); } catch(e){}
+
+          if (newEventStarted) {
+            const carriedPlan = selectedPlan || userPlanSettings?.plan || null;
+            const carriedAddon = Array.isArray(additionalPackages) ? additionalPackages.length : userPlanSettings?.addonCount || 0;
+            if (carriedPlan) {
+              setSelectedPlan(carriedPlan);
+              setDbAddonCount(carriedAddon);
+              setAdditionalPackages(Array(carriedAddon).fill('addon'));
             }
-            setDbAddonCount((prev) => Math.max(prev ?? 0, settings.addonCount ?? 0));
-            setAdditionalPackages(Array(settings.addonCount ?? 0).fill('addon'));
+            return;
+          }
+
+          let shouldClearPersistedPlan = false;
+          try {
+            const { data: lastEvent } = await supabase
+              .from('events')
+              .select('event_details, status, created_at')
+              .eq('user_id', user.id)
+              .order('created_at', { ascending: false })
+              .limit(1)
+              .maybeSingle();
+
+            if (lastEvent) {
+              const details = typeof lastEvent.event_details === 'string'
+                ? JSON.parse(lastEvent.event_details)
+                : lastEvent.event_details || {};
+              const rawDate = details.date || details.start_datetime || lastEvent.created_at;
+              if (rawDate) {
+                const eventDate = new Date(rawDate);
+                eventDate.setHours(0, 0, 0, 0);
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+
+                if ((lastEvent.status === 'archived' || !lastEvent.status) && eventDate < today) {
+                  shouldClearPersistedPlan = true;
+                }
+              } else if (lastEvent.status === 'archived') {
+                // No date to compare, default to clearing when archived
+                shouldClearPersistedPlan = true;
+              }
+            }
+          } catch (inspectErr) {
+            console.error('Failed to inspect last event for plan reset', inspectErr);
+          }
+
+          if (shouldClearPersistedPlan) {
+            await persistUserPlanSettings(null, 0);
+            setSelectedPlan(null);
+            setDbAddonCount(0);
+            setAdditionalPackages([]);
+            try { localStorage.removeItem('user_plan_code'); } catch(e){}
+            try { localStorage.removeItem('selectedPlan'); } catch(e){}
+            try { localStorage.removeItem('additionalPackages_global'); } catch(e){}
+          } else {
+            const settings = await loadUserPlanSettings();
+            if (settings) {
+              if (settings.plan) {
+                setSelectedPlan(settings.plan);
+                try { localStorage.setItem('selectedPlan', settings.plan); } catch(e){}
+              } else {
+                setSelectedPlan(null);
+                try { localStorage.removeItem('user_plan_code'); } catch(e){}
+                try { localStorage.removeItem('selectedPlan'); } catch(e){}
+              }
+              setDbAddonCount((prev) => Math.max(prev ?? 0, settings.addonCount ?? 0));
+              setAdditionalPackages(Array(settings.addonCount ?? 0).fill('addon'));
+            }
           }
         }
         isInitialLoadRef.current = false;
@@ -3715,7 +3774,7 @@ React.useEffect(() => {
         isInitialLoadRef.current = false;
       }
     })();
-  }, [currentEventId, newEventStarted, eventRefreshKey, derivePlanFromRecord, persistUserPlanSettings, loadUserPlanSettings]);
+  }, [currentEventId, newEventStarted, eventRefreshKey, derivePlanFromRecord, persistUserPlanSettings, loadUserPlanSettings, selectedPlan, userPlanSettings, additionalPackages]);
 
   // ---- Close modals when no active event ----
   React.useEffect(() => {
