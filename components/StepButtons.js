@@ -3799,19 +3799,27 @@ React.useEffect(() => {
             return;
           }
 
-          const settings = await loadUserPlanSettings();
-          if (settings) {
-            if (settings.plan) {
-              setSelectedPlan(settings.plan);
-              try { localStorage.setItem('selectedPlan', settings.plan); } catch(e){}
-            } else {
-              setSelectedPlan(null);
-              try { localStorage.removeItem('user_plan_code'); } catch(e){}
-              try { localStorage.removeItem('selectedPlan'); } catch(e){}
-            }
-            setDbAddonCount((prev) => Math.max(prev ?? 0, settings.addonCount ?? 0));
-            setAdditionalPackages(Array(settings.addonCount ?? 0).fill('addon'));
+        const settings = await loadUserPlanSettings();
+        if (settings) {
+          if (settings.plan) {
+            setSelectedPlan(settings.plan);
+            setShowEventTypes(true);
+            setNewEventStarted(true);
+            try { localStorage.setItem('selectedPlan', settings.plan); } catch(e){}
+            try { localStorage.setItem('newEventStarted', '1'); } catch(e){}
+            setFinishedSteps((prev) => {
+              const merged = Array.from(new Set([1, 2, ...(prev || [])])).sort((a, b) => a - b);
+              try { localStorage.setItem('finishedSteps', JSON.stringify(merged)); } catch (e) {}
+              return merged;
+            });
+          } else {
+            setSelectedPlan(null);
+            try { localStorage.removeItem('user_plan_code'); } catch(e){}
+            try { localStorage.removeItem('selectedPlan'); } catch(e){}
           }
+          setDbAddonCount((prev) => Math.max(prev ?? 0, settings.addonCount ?? 0));
+          setAdditionalPackages(Array(settings.addonCount ?? 0).fill('addon'));
+        }
         }
         isInitialLoadRef.current = false;
       } catch (e) {
