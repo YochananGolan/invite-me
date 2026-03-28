@@ -3860,6 +3860,44 @@ React.useEffect(() => {
           setDbAddonCount((prev) => Math.max(prev ?? 0, settings.addonCount ?? 0));
           setAdditionalPackages(Array(settings.addonCount ?? 0).fill('addon'));
         }
+
+        setGuestSummary((prev) => {
+          if ((prev.approved || prev.adults || prev.children)) {
+            return { approved: 0, adults: 0, children: 0 };
+          }
+          return prev;
+        });
+        resetCapacityWarningGuests();
+        setGuestStatusSummary((prev) => {
+          if (prev.approved || prev.rejected || prev.pending) {
+            return { approved: 0, rejected: 0, pending: 0 };
+          }
+          return prev;
+        });
+        setSpecialMealsSummary((prev) => {
+          const emptyMeals = {
+            veg: { adults: 0, children: 0, total: 0 },
+            vegan: { adults: 0, children: 0, total: 0 },
+            glatt: { adults: 0, children: 0, total: 0 },
+            allergy: { adults: 0, children: 0, total: 0 },
+          };
+          const hasMeals =
+            prev.veg.total || prev.vegan.total || prev.glatt.total || prev.allergy.total;
+          return hasMeals ? emptyMeals : prev;
+        });
+        setDbGuests((prev) => (prev.length ? [] : prev));
+        setSentGuests((prev) => (prev.length ? [] : prev));
+        setReportGuests((prev) => (prev.length ? [] : prev));
+        setApprovedGuests((prev) => (prev.length ? [] : prev));
+        setRejectedGuests((prev) => (prev.length ? [] : prev));
+        setPendingGuests((prev) => (prev.length ? [] : prev));
+        setShowGuestListModal(false);
+        setShowReportsOptions(false);
+        setShowReportModal(false);
+        setSelectedEventForReport(null);
+        setInvitedGuestsCount((prev) => (prev ? 0 : prev));
+        setEventMessagesSentCount((prev) => (prev ? 0 : prev));
+        setGuestSummaryRefreshKey((prev) => prev + 1);
         }
         isInitialLoadRef.current = false;
       } catch (e) {
