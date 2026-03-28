@@ -3700,16 +3700,16 @@ React.useEffect(() => {
             setShowReportsOptions(false);
           }
 
-          if (newEventStarted) {
-            const carriedPlan = selectedPlan || userPlanSettings?.plan || null;
-            const carriedAddon = Array.isArray(additionalPackages) ? additionalPackages.length : userPlanSettings?.addonCount || 0;
-            if (carriedPlan) {
-              setSelectedPlan(carriedPlan);
-              setDbAddonCount(carriedAddon);
-              setAdditionalPackages(Array(carriedAddon).fill('addon'));
-            }
-            return;
-          }
+          const carriedPlan = newEventStarted
+            ? (selectedPlan || userPlanSettings?.plan || null)
+            : null;
+          const carriedAddon = newEventStarted
+            ? (() => {
+                if (Array.isArray(additionalPackages)) return additionalPackages.length;
+                const addonFromSettings = Number(userPlanSettings?.addonCount ?? 0);
+                return Number.isFinite(addonFromSettings) ? Math.max(0, addonFromSettings) : 0;
+              })()
+            : 0;
 
           let shouldClearPersistedPlan = false;
           try {
@@ -3752,20 +3752,34 @@ React.useEffect(() => {
             try { localStorage.removeItem('user_plan_code'); } catch(e){}
             try { localStorage.removeItem('selectedPlan'); } catch(e){}
             try { localStorage.removeItem('additionalPackages_global'); } catch(e){}
-          } else {
-            const settings = await loadUserPlanSettings();
-            if (settings) {
-              if (settings.plan) {
-                setSelectedPlan(settings.plan);
-                try { localStorage.setItem('selectedPlan', settings.plan); } catch(e){}
-              } else {
-                setSelectedPlan(null);
-                try { localStorage.removeItem('user_plan_code'); } catch(e){}
-                try { localStorage.removeItem('selectedPlan'); } catch(e){}
-              }
-              setDbAddonCount((prev) => Math.max(prev ?? 0, settings.addonCount ?? 0));
-              setAdditionalPackages(Array(settings.addonCount ?? 0).fill('addon'));
+            return;
+          }
+
+          if (newEventStarted) {
+            if (carriedPlan) {
+              setSelectedPlan(carriedPlan);
+              setDbAddonCount(carriedAddon);
+              setAdditionalPackages(Array(carriedAddon).fill('addon'));
+            } else {
+              setSelectedPlan(null);
+              setDbAddonCount(0);
+              setAdditionalPackages([]);
             }
+            return;
+          }
+
+          const settings = await loadUserPlanSettings();
+          if (settings) {
+            if (settings.plan) {
+              setSelectedPlan(settings.plan);
+              try { localStorage.setItem('selectedPlan', settings.plan); } catch(e){}
+            } else {
+              setSelectedPlan(null);
+              try { localStorage.removeItem('user_plan_code'); } catch(e){}
+              try { localStorage.removeItem('selectedPlan'); } catch(e){}
+            }
+            setDbAddonCount((prev) => Math.max(prev ?? 0, settings.addonCount ?? 0));
+            setAdditionalPackages(Array(settings.addonCount ?? 0).fill('addon'));
           }
         }
         isInitialLoadRef.current = false;
