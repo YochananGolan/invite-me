@@ -58,6 +58,21 @@ export default function TranzilaPayment({
   const iframeRef = useRef(null);
   const formRef = useRef(null);
   const failureTimeoutRef = useRef(null);
+  const onSuccessRef = useRef(onSuccess);
+  const onFailureRef = useRef(onFailure);
+  const onCloseRef = useRef(onClose);
+
+  useEffect(() => {
+    onSuccessRef.current = onSuccess;
+  }, [onSuccess]);
+
+  useEffect(() => {
+    onFailureRef.current = onFailure;
+  }, [onFailure]);
+
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -109,7 +124,7 @@ export default function TranzilaPayment({
 
     failureTimeoutRef.current = setTimeout(() => {
       console.warn('Tranzila payment timeout reached – triggering failure handler');
-      onFailure?.({
+      onFailureRef.current?.({
         error: true,
         reason: 'timeout',
         message: 'לא התקבל אישור תשלום בזמן. אנא נסה שוב או בחר אמצעי תשלום אחר.',
@@ -122,7 +137,7 @@ export default function TranzilaPayment({
         failureTimeoutRef.current = null;
       }
     };
-  }, [isOpen, handshakeAttempt, onFailure]);
+  }, [isOpen, handshakeAttempt]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -171,14 +186,14 @@ export default function TranzilaPayment({
                 clearTimeout(failureTimeoutRef.current);
                 failureTimeoutRef.current = null;
               }
-              onSuccess && onSuccess(parsed);
-              onClose();
+              onSuccessRef.current && onSuccessRef.current(parsed);
+              onCloseRef.current && onCloseRef.current();
               return;
             }
             if (isTrustedOrigin && !parsedSuccess && parsedFailure) {
               if (failureTimeoutRef.current) clearTimeout(failureTimeoutRef.current);
               failureTimeoutRef.current = null;
-              onFailure && onFailure(parsed);
+              onFailureRef.current && onFailureRef.current(parsed);
               return;
             }
           } catch (e) {
@@ -198,7 +213,7 @@ export default function TranzilaPayment({
         // Handle close payment request - only from our success page
         if (data.closePayment) {
           if (!isOwnOrigin) return;
-          onClose();
+          onCloseRef.current && onCloseRef.current();
           return;
         }
 
@@ -233,8 +248,8 @@ export default function TranzilaPayment({
           }
           console.log('Payment successful, calling onSuccess with:', data);
           const transactionData = data.transactionData || data;
-          onSuccess && onSuccess(transactionData);
-          onClose();
+          onSuccessRef.current && onSuccessRef.current(transactionData);
+          onCloseRef.current && onCloseRef.current();
           return;
         }
 
@@ -255,7 +270,7 @@ export default function TranzilaPayment({
           failureTimeoutRef.current = null;
           console.log('Payment failed, calling onFailure with:', data);
           const errorData = data.transactionData || data;
-          onFailure && onFailure(errorData);
+          onFailureRef.current && onFailureRef.current(errorData);
           return;
         }
 
@@ -272,7 +287,7 @@ export default function TranzilaPayment({
     return () => {
       window.removeEventListener('message', handleMessage);
     };
-  }, [isOpen, onSuccess, onFailure, onClose]);
+  }, [isOpen]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -296,11 +311,11 @@ export default function TranzilaPayment({
         const message = 'סכום העסקה אינו תקין עבור תשלום ב-Tranzila.';
         console.error(message, { amount });
         setHandshakeError(message);
-        onFailure &&
-          onFailure({
+        onFailureRef.current &&
+          onFailureRef.current({
             error: true,
             reason: 'invalid_amount',
-            message
+            message,
           });
         return;
       }
@@ -346,11 +361,11 @@ export default function TranzilaPayment({
 
           if (!isCancelled) {
             setHandshakeError(message);
-            onFailure &&
-              onFailure({
+            onFailureRef.current &&
+              onFailureRef.current({
                 error: true,
                 reason: 'handshake_failed',
-                message
+                message,
               });
           }
 
@@ -409,11 +424,11 @@ export default function TranzilaPayment({
 
         setHandshakeError(message);
 
-        onFailure &&
-          onFailure({
+        onFailureRef.current &&
+          onFailureRef.current({
             error: true,
             reason: 'handshake_failed',
-            message
+            message,
           });
       } finally {
         if (!isCancelled) {
@@ -429,7 +444,7 @@ export default function TranzilaPayment({
       isCancelled = true;
       handshakeInProgressRef.current = false;
     };
-  }, [isOpen, amount, planName, onFailure, handshakeAttempt]);
+  }, [isOpen, amount, planName, handshakeAttempt]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -464,10 +479,19 @@ export default function TranzilaPayment({
 
   // Get terminal name from env or use a default
   const terminalName = process.env.NEXT_PUBLIC_TRANZILA_TERMINAL || 'jira';
+  const isTestTerminal = /(?:^test|test$|demo|jira)/i.test(terminalName);
+  const googlePayEnabled =
+    !isTestTerminal &&
+    process.env.NEXT_PUBLIC_DISABLE_GOOGLE_PAY !== '1' &&
+    process.env.NEXT_PUBLIC_DISABLE_GOOGLE_PAY !== 'true';
+  const applePayEnabled =
+    !isTestTerminal &&
+    process.env.NEXT_PUBLIC_DISABLE_APPLE_PAY !== '1' &&
+    process.env.NEXT_PUBLIC_DISABLE_APPLE_PAY !== 'true';
 
   // Warn if using test terminal
-  if (terminalName === 'jira') {
-    console.warn('⚠️ Using Tranzila test terminal. Set NEXT_PUBLIC_TRANZILA_TERMINAL in .env.local for production.');
+  if (isTestTerminal) {
+    console.warn('⚠️ Using Tranzila test/demo terminal. Configure production credentials to enable real payments and digital wallets.');
   }
 
   // Build the Tranzila iframe URL
@@ -504,7 +528,7 @@ export default function TranzilaPayment({
             {planName} - {amount} ₪
           </p>
           <button
-            onClick={onClose}
+            onClick={() => onCloseRef.current && onCloseRef.current()}
             className="text-white hover:bg-white/20 rounded-full w-7 h-7 sm:w-10 sm:h-10 flex items-center justify-center text-xl sm:text-3xl transition-colors flex-shrink-0"
             aria-label="סגור"
           >
@@ -526,14 +550,20 @@ export default function TranzilaPayment({
             </div>
           </div>
 
-          {handshakeMode === 'legacy' && (
+          {(handshakeMode === 'legacy' || isTestTerminal) && (
             <div className="mb-4 bg-amber-50 border border-amber-200 rounded-lg p-4 text-right">
-              <p className="font-semibold text-amber-900 mb-1">מצב תשלום להרצה</p>
-              <p className="text-sm text-amber-800">
-                התשלום פועל במצב בדיקות עם מסוף Tranzila לדוגמה. כדי לאפשר סליקה אמיתית, הגדר ערכי TRANZILA_TERMINAL ו-TRANZILA_TERMINAL_PASSWORD בקובץ ‎.env.local ולאחר מכן הפעל מחדש את השרת.
+              <p className="font-semibold text-amber-900 mb-1">
+                {isTestTerminal ? 'מסוף תשלומים במצב בדיקות' : 'מצב תשלום להרצה'}
               </p>
-              {handshakeDetails?.message && (
-                <p className="text-xs text-amber-700 mt-2">{handshakeDetails.message}</p>
+              <p className="text-sm text-amber-800">
+                {isTestTerminal
+                  ? 'המסוף מחובר במצב בדיקות של Tranzila. השתמש במספרי כרטיס בדיקה של Tranzila בלבד – העסקה לא תחייב בפועל, וארנקים דיגיטליים (Google Pay / Apple Pay) מושבתים כדי למנוע תקלות.'
+                  : 'התשלום פועל במצב בדיקות עם מסוף Tranzila לדוגמה. כדי לאפשר סליקה אמיתית, הגדר ערכי TRANZILA_TERMINAL ו-TRANZILA_TERMINAL_PASSWORD בקובץ ‎.env.local ולאחר מכן הפעל מחדש את השרת.'}
+              </p>
+              {(handshakeDetails?.message || handshakeError) && (
+                <p className="text-xs text-amber-700 mt-2">
+                  {handshakeDetails?.message || handshakeError}
+                </p>
               )}
             </div>
           )}
@@ -584,16 +614,10 @@ export default function TranzilaPayment({
             <input type="hidden" name="trButtonColor" value="D4AF37" />
             <input type="hidden" name="nologo" value="1" />
             <input type="hidden" name="bit_pay" value="1" />
-            {/* Google Pay - can conflict with credit card form; disable via NEXT_PUBLIC_DISABLE_GOOGLE_PAY=1 */}
-            {process.env.NEXT_PUBLIC_DISABLE_GOOGLE_PAY !== '1' &&
-             process.env.NEXT_PUBLIC_DISABLE_GOOGLE_PAY !== 'true' && (
-              <input type="hidden" name="google_pay" value="1" />
-            )}
-            {/* Apple Pay - Requires Tranzila Apple Pay enablement and supported Apple devices/browsers */}
-            {process.env.NEXT_PUBLIC_DISABLE_APPLE_PAY !== '1' &&
-             process.env.NEXT_PUBLIC_DISABLE_APPLE_PAY !== 'true' && (
-              <input type="hidden" name="apple_pay" value="1" />
-            )}
+            {/* Google Pay - enabled only when terminal supports it */}
+            {googlePayEnabled && <input type="hidden" name="google_pay" value="1" />}
+            {/* Apple Pay - enabled only when terminal supports it */}
+            {applePayEnabled && <input type="hidden" name="apple_pay" value="1" />}
             {handshakeDetails?.response?.index && (
               <input
                 type="hidden"
@@ -671,8 +695,7 @@ export default function TranzilaPayment({
                 <span className="text-2xl">📱</span>
                 <span className="text-sm text-gray-700">Bit</span>
               </div>
-              {process.env.NEXT_PUBLIC_DISABLE_GOOGLE_PAY !== '1' &&
-               process.env.NEXT_PUBLIC_DISABLE_GOOGLE_PAY !== 'true' && (
+              {googlePayEnabled && (
               <div className="flex items-center gap-2">
                 <span className="text-2xl">🟢</span>
                 <span className="text-sm text-gray-700">Google Pay</span>
@@ -681,16 +704,14 @@ export default function TranzilaPayment({
                 )}
               </div>
               )}
-              {process.env.NEXT_PUBLIC_DISABLE_APPLE_PAY !== '1' &&
-               process.env.NEXT_PUBLIC_DISABLE_APPLE_PAY !== 'true' && (
+              {applePayEnabled && (
               <div className="flex items-center gap-2">
                 <span className="text-2xl">&#63743;</span>
                 <span className="text-sm text-gray-700">Apple Pay</span>
               </div>
               )}
             </div>
-            {process.env.NEXT_PUBLIC_DISABLE_GOOGLE_PAY !== '1' &&
-             process.env.NEXT_PUBLIC_DISABLE_GOOGLE_PAY !== 'true' &&
+            {googlePayEnabled &&
              typeof window !== 'undefined' && window.location.protocol === 'http:' && (
               <p className="text-center text-xs text-amber-600 mt-2">
                 ⚠️ Google Pay זמין רק באתרים מאובטחים (HTTPS). באתר ייצור Google Pay יופיע אוטומטית.
