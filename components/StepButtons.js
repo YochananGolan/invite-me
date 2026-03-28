@@ -1538,9 +1538,9 @@ const handleOpenAddonModal = React.useCallback(() => {
   // ניתן לאפס newEventStarted רק כאשר האירוע נסגר לארכיון, לכן לא מנקים אוטומטית עם selectedEventType ריק.
 
   // Helper function to check if there's an active event
-  const hasActiveEvent = () => {
-    return currentEventId || newEventStarted;
-  };
+const hasActiveEvent = () => {
+  return Boolean(currentEventId);
+};
 
   // Expose imperative methods to parent components
   useImperativeHandle(ref, () => ({
