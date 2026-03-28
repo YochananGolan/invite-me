@@ -1492,16 +1492,19 @@ const handleOpenAddonModal = React.useCallback(() => {
         .from('events')
         .select('event_type, event_details, invitation_path')
         .eq('user_id', user.id)
+        .or('status.neq.archived,status.is.null')
         .order('created_at', { ascending: false })
         .limit(1)
-        .single();
+        .maybeSingle();
       if (error || !data) return;
       const details = data.event_details || {};
-      setSelectedEventType(data.event_type);
-      setFormData((prev)=>({ ...prev, ...details }));
-      setEventDetailsCompleted(true);
-      markStepDone(1);
-      try { localStorage.setItem('savedEventDetails', JSON.stringify(formData)); } catch(e){}
+      setSelectedEventType(data.event_type || '');
+      setFormData((prev)=>({ ...prev, ...(details || {}) }));
+      if (details && Object.keys(details).length) {
+        setEventDetailsCompleted(true);
+        markStepDone(1);
+      }
+      try { localStorage.setItem('savedEventDetails', JSON.stringify(details || {})); } catch(e){}
     })();
   }, []);
 
