@@ -673,6 +673,24 @@ const additionalPackageCounts = React.useMemo(() => {
   }, {});
 }, [additionalPackages]);
 const canRenderCharts = Boolean(currentEventId && eventDataLoaded);
+const [chartsReady, setChartsReady] = useState(false);
+useEffect(() => {
+  if (!canRenderCharts) {
+    setChartsReady(false);
+    return;
+  }
+  let cancelled = false;
+  const raf = requestAnimationFrame(() => {
+    if (!cancelled) {
+      setChartsReady(true);
+    }
+  });
+  return () => {
+    cancelled = true;
+    cancelAnimationFrame(raf);
+  };
+}, [canRenderCharts, currentEventId, eventRefreshKey]);
+const shouldShowCharts = canRenderCharts && chartsReady;
 
 const addonUnitSize = getPlanBaseLimit('addon') || 0;
 const displayTotalPlanCapacityValue = Math.max(0, Math.round(totalPlanCapacity));
@@ -5043,7 +5061,7 @@ React.useEffect(()=>{
                 </div>
                 <div className="mt-1">
                   <div className="bg-white p-3 rounded-lg border border-blue-100">
-                    {!canRenderCharts ? (
+                    {!shouldShowCharts ? (
                       <div className="py-10 text-sm text-gray-500 text-center">טוען נתונים...</div>
                     ) : hasGuestSummaryData ? (
                       (() => {
@@ -5173,7 +5191,7 @@ React.useEffect(()=>{
                   <h3 className="text-base font-bold text-purple-800">סטטוס אישורי הגעה</h3>
                 </div>
                 <div className="bg-white rounded-lg text-right p-2 mt-3">
-                    {!canRenderCharts ? (
+                    {!shouldShowCharts ? (
                     <div className="py-10 text-sm text-gray-500 text-center">טוען נתונים...</div>
                   ) : hasStatusData ? (
                     <div className="h-56 min-h-[200px] sm:h-56">
@@ -5289,7 +5307,7 @@ React.useEffect(()=>{
                     </div>
 
                     <div className="bg-white p-3 rounded-lg border border-yellow-200">
-                      {!canRenderCharts ? (
+                      {!shouldShowCharts ? (
                         <div className="py-10 text-sm text-gray-500 text-center">טוען נתונים...</div>
                       ) : hasCapacityChartData ? (
                         <div className="h-56 min-h-[200px] sm:h-56">
