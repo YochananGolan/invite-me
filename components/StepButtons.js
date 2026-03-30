@@ -1658,6 +1658,52 @@ const handleOpenAddonModal = React.useCallback(() => {
     },
   }));
 
+  const triggerWhatsAppInvites = useCallback(async (eventId) => {
+    if (!eventId) return;
+
+    const registry = whatsappTriggeredEventsRef.current;
+    if (registry.has(eventId)) {
+      return;
+    }
+    registry.add(eventId);
+
+    try {
+      const response = await fetch('/api/whatsapp/send-event-invite', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ eventId }),
+      });
+
+      let payload = {};
+      try {
+        payload = await response.json();
+      } catch (err) {
+        // Ignore JSON parse issues (empty body)
+      }
+
+      if (response.ok) {
+        if (payload.sent > 0) {
+          addToast?.(`נשלחו ${payload.sent} הודעות וואטסאפ לאורחים`, 'success');
+        } else {
+          registry.delete(eventId);
+          addToast?.(
+            payload.message || 'לא נמצאו אורחים עם מספרי וואטסאפ לשיגור אוטומטי',
+            'info'
+          );
+        }
+      } else {
+        registry.delete(eventId);
+        addToast?.(payload.error || 'שליחת הודעת וואטסאפ נכשלה', 'error');
+      }
+    } catch (err) {
+      registry.delete(eventId);
+      console.error('Failed to trigger WhatsApp invites', err);
+      addToast?.('שליחת הודעת וואטסאפ נכשלה', 'error');
+    }
+  }, [addToast]);
+
   // designFile is the stored image file name in storage (or null). templateSrc is the relative path of template image chosen
   const saveEventToSupabase = async (designFile, templateSrc) => {
     try {
@@ -1820,6 +1866,7 @@ const handleOpenAddonModal = React.useCallback(() => {
           console.debug('[StepButtons] Insert success', inserted);
           setCurrentEventId(inserted.id);
           setEventMessagesSentCount(0);
+          triggerWhatsAppInvites(inserted.id);
         }
         if(insertErr){
           console.error('[StepButtons] Insert error', insertErr);
@@ -4085,6 +4132,7 @@ React.useEffect(() => {
   const formSaveTimer = useRef(null);
   const isInitialLoadRef = useRef(true); // Track if we're in initial load phase
   const eventDetailsOpenedRef = useRef(false); // Prevent reset when reopening event details
+const whatsappTriggeredEventsRef = useRef(new Set());
 
   // Reset form when opening event details for NEW event (first open only, not on reopen)
   React.useEffect(() => {
