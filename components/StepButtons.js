@@ -619,12 +619,12 @@ const noEventLoggedRef = useRef(false);
   });
   }, [currentEventId, userPlanSettings]);
 
-  const totalGuestsCount = guestSummary.adults + guestSummary.children;
-  // הודעות שנשלחו: מקור אמת = messages_sent_count (אם קיים) עם fallback למספר אורחים שנוצרו באירוע.
-  const invitedCountFromStatus =
-    (guestStatusSummary?.approved ?? 0) + (guestStatusSummary?.rejected ?? 0) + (guestStatusSummary?.pending ?? 0);
-  const invitedCount = Math.max(invitedGuestsCount || 0, invitedCountFromStatus || 0);
-  const effectiveMessagesSentCount = Math.max(eventMessagesSentCount || 0, invitedCount || 0);
+const totalGuestsCount = guestSummary.adults + guestSummary.children;
+// הודעות שנשלחו: מבוסס על ספירת הצלחות בפועל בלבד.
+const invitedCountFromStatus =
+  (guestStatusSummary?.approved ?? 0) + (guestStatusSummary?.rejected ?? 0) + (guestStatusSummary?.pending ?? 0);
+const invitedCount = Math.max(invitedGuestsCount || 0, invitedCountFromStatus || 0);
+const effectiveMessagesSentCount = Number.isFinite(eventMessagesSentCount) ? eventMessagesSentCount : 0;
 
   React.useEffect(() => {
     if (!showPricingPlan) {
@@ -1111,6 +1111,20 @@ const handleOpenAddonModal = React.useCallback(() => {
         setIsSendingInvitation(false);
 
         if (apiResult.ok) {
+          const success = (apiResult.payload?.results || []).some((r) => r.ok);
+          if (success) {
+            setSentGuests((prev) => [
+              ...prev,
+              {
+                guestId: newGuest.id,
+                guestFirstName: guestData.guestFirstName,
+                guestLastName: guestData.guestLastName,
+                guestPhone: guestData.guestPhone,
+                guestTable: guestData.guestTable,
+                channel: 'whatsapp',
+              },
+            ]);
+          }
           setInvitationSent(true);
           setInvitationResult({
             type: 'success',
@@ -2431,6 +2445,7 @@ React.useEffect(() => {
         const smsGuests = insertedGuests.map(g => {
           const inviteLink = `${baseUrl}/${bulkEventId}/${g.id}`;
           return {
+            id: g.id,
             phone: g.phone,
             firstName: g.first_name,
             lastName: g.last_name,
@@ -2447,7 +2462,6 @@ React.useEffect(() => {
           setExcelPreviewData([]);
           setExcelErrors([]);
           setIsSavingExcelGuests(false);
-          setSentGuests((prev) => [...prev, ...validGuests]);
           setInvitationResult({ 
             type: 'error', 
             message: `נשמרו ${validGuests.length} אורחים. אין מספיק הודעות במכסה לשליחת SMS (נשלחו ${effectiveMessagesSentCount}, מכסה ${totalLimitBulk}). נא לרכוש חבילת הרחבה.` 
@@ -2489,14 +2503,37 @@ React.useEffect(() => {
           setExcelErrors([]);
           setIsSavingExcelGuests(false);
 
-          // Add to local state
-          setSentGuests((prev) => [...prev, ...validGuests]);
-
           if (smsResult.sent > 0) {
             if (typeof smsResult.updatedMessagesSentCount === 'number') {
               setEventMessagesSentCount(smsResult.updatedMessagesSentCount);
             } else {
               setEventMessagesSentCount((prev) => (prev || 0) + smsResult.sent);
+            }
+
+            const successIds = new Set(
+              (smsResult.results || [])
+                .map((r) => r.guest?.id)
+                .filter(Boolean)
+            );
+            if (successIds.size > 0) {
+              const guestsById = insertedGuests.reduce((acc, inserted, idx) => {
+                acc[inserted.id] = { inserted, original: validGuests[idx] };
+                return acc;
+              }, {});
+              const successfulGuests = Array.from(successIds)
+                .map((id) => guestsById[id])
+                .filter(Boolean)
+                .map(({ inserted, original }) => ({
+                  guestId: inserted.id,
+                  guestFirstName: original?.guestFirstName || inserted.first_name || '',
+                  guestLastName: original?.guestLastName || inserted.last_name || '',
+                  guestPhone: inserted.phone || original?.guestPhone || '',
+                  guestTable: original?.guestTable || inserted.table_number || '',
+                  channel: 'sms',
+                }));
+              if (successfulGuests.length > 0) {
+                setSentGuests((prev) => [...prev, ...successfulGuests]);
+              }
             }
           }
           if (smsResult.success && smsResult.sent === validGuests.length) {
@@ -2533,7 +2570,6 @@ React.useEffect(() => {
           setExcelPreviewData([]);
           setExcelErrors([]);
           setIsSavingExcelGuests(false);
-          setSentGuests((prev) => [...prev, ...validGuests]);
           const errMsg = smsError?.message || '';
           setInvitationResult({ 
             type: 'error', 
@@ -2550,7 +2586,6 @@ React.useEffect(() => {
         setExcelPreviewData([]);
         setExcelErrors([]);
         setIsSavingExcelGuests(false);
-        setSentGuests((prev) => [...prev, ...validGuests]);
         if (bulkEventId) {
           const guestIds = insertedGuests.map((g) => g.id).filter(Boolean);
           const apiResult = await sendWhatsAppInviteViaApi({
@@ -2559,6 +2594,32 @@ React.useEffect(() => {
           });
           if (apiResult.ok) {
             const sent = apiResult.payload?.sent || 0;
+            const successIds = new Set(
+              (apiResult.payload?.results || [])
+                .filter((r) => r.ok)
+                .map((r) => r.guestId)
+                .filter(Boolean)
+            );
+            if (successIds.size > 0) {
+              const guestsById = insertedGuests.reduce((acc, inserted, idx) => {
+                acc[inserted.id] = { inserted, original: validGuests[idx] };
+                return acc;
+              }, {});
+              const successfulGuests = Array.from(successIds)
+                .map((id) => guestsById[id])
+                .filter(Boolean)
+                .map(({ inserted, original }) => ({
+                  guestId: inserted.id,
+                  guestFirstName: original?.guestFirstName || inserted.first_name || '',
+                  guestLastName: original?.guestLastName || inserted.last_name || '',
+                  guestPhone: inserted.phone || original?.guestPhone || '',
+                  guestTable: original?.guestTable || inserted.table_number || '',
+                  channel: 'whatsapp',
+                }));
+              if (successfulGuests.length > 0) {
+                setSentGuests((prev) => [...prev, ...successfulGuests]);
+              }
+            }
             const msg =
               sent === guestIds.length
                 ? `נשמרו ${validGuests.length} אורחים ונשלחו ${sent} הודעות וואטסאפ בהצלחה!`
