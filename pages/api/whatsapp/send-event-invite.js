@@ -73,7 +73,7 @@ export default async function handler(req, res) {
     return;
   }
 
-  const { eventId } = req.body || {};
+  const { eventId, guestId, guestIds } = req.body || {};
 
   if (!eventId) {
     return res.status(400).json({ error: 'eventId is required' });
@@ -92,10 +92,18 @@ export default async function handler(req, res) {
     return res.status(404).json({ error: 'Event not found' });
   }
 
-  const { data: guests, error: guestsError } = await supabase
+  let guestQuery = supabase
     .from('invited_guests')
     .select('id, phone, first_name, last_name')
     .eq('event_id', eventId);
+
+  if (Array.isArray(guestIds) && guestIds.length > 0) {
+    guestQuery = guestQuery.in('id', guestIds);
+  } else if (guestId) {
+    guestQuery = guestQuery.eq('id', guestId);
+  }
+
+  const { data: guests, error: guestsError } = await guestQuery;
 
   if (guestsError) {
     console.error('[whatsapp] Failed to fetch guests', guestsError);
@@ -131,9 +139,24 @@ export default async function handler(req, res) {
   const sentCount = results.filter((r) => r.ok).length;
   const failed = results.filter((r) => !r.ok);
 
+  if (sentCount > 0) {
+    try {
+      const { error: rpcError } = await supabase.rpc('increment_event_messages_sent', {
+        p_event_id: eventId,
+        p_delta: sentCount,
+      });
+      if (rpcError) {
+        console.warn('[whatsapp] increment_event_messages_sent RPC failed', rpcError);
+      }
+    } catch (err) {
+      console.warn('[whatsapp] Failed to increment messages_sent_count', err);
+    }
+  }
+
   return res.status(200).json({
     sent: sentCount,
     failed,
     total: results.length,
+    results,
   });
 }

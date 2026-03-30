@@ -1072,6 +1072,7 @@ const handleOpenAddonModal = React.useCallback(() => {
         if (inviteUrl) {
           const shared = await shareInviteImage(inviteUrl, guestData.guestFirstName, inviteLink, shareText);
           if (shared) {
+            setIsSendingInvitation(false);
             if (eventIdForInvite) {
               try {
                 const { data: newCount, error: rpcErr } = await supabase.rpc('increment_event_messages_sent', {
@@ -1099,52 +1100,34 @@ const handleOpenAddonModal = React.useCallback(() => {
           }
         }
 
-        const waNumber = digitsOnly;
-        const waText = encodeURIComponent(
-          `${invitationText}\n\n` +
-          `לאישור הגעה:\n${inviteLink}`
-        );
-        const waWin = window.open(`https://wa.me/972${waNumber.slice(1)}?text=${waText}`, '_blank','noopener,noreferrer');
-        if (waWin) {
-          waWin.opener = null; // prevent redirect effect
-          // Count this message toward quota – atomic DB increment so WhatsApp + SMS in quick succession both count
-          if (eventIdForInvite) {
-            try {
-              const { data: newCount, error: rpcErr } = await supabase.rpc('increment_event_messages_sent', {
-                p_event_id: eventIdForInvite,
-                p_delta: 1
-              });
-              if (!rpcErr && typeof newCount === 'number') {
-                setEventMessagesSentCount(newCount);
-              } else {
-                const fallback = (eventMessagesSentCount || 0) + 1;
-                setEventMessagesSentCount(fallback);
-                await supabase.from('events').update({ messages_sent_count: fallback }).eq('id', eventIdForInvite);
-              }
-            } catch (e) {
-              const fallback = (eventMessagesSentCount || 0) + 1;
-              setEventMessagesSentCount(fallback);
-              try { await supabase.from('events').update({ messages_sent_count: fallback }).eq('id', eventIdForInvite); } catch (_) {}
-            }
-          } else {
-            setEventMessagesSentCount((prev) => (prev || 0) + 1);
-          }
-          setInvitationResult({ 
-            type: 'success', 
-            message: 'ההזמנה נשלחה בהצלחה בוואטסאפ!' 
+        const apiResult = await sendWhatsAppInviteViaApi({
+          eventId: eventIdForInvite,
+          guestIds: [newGuest.id],
+        });
+
+        setIsSendingInvitation(false);
+
+        if (apiResult.ok) {
+          setInvitationSent(true);
+          setInvitationResult({
+            type: 'success',
+            message: 'ההזמנה נשלחה בהצלחה בוואטסאפ!',
           });
-          setShowInvitationResultModal(true);
         } else {
-          console.warn('WhatsApp popup possibly blocked');
-          // Show error modal
-          setInvitationResult({ 
-            type: 'error', 
-            message: 'אירעה שגיאה בשליחת ההזמנה. ייתכן שחלון הוואטסאפ נחסם.' 
+          const errMsg =
+            apiResult.payload?.error ||
+            apiResult.payload?.message ||
+            apiResult.error?.message ||
+            'אירעה שגיאה בשליחת ההזמנה בוואטסאפ.';
+          setInvitationResult({
+            type: 'error',
+            message: errMsg,
           });
-          setShowInvitationResultModal(true);
         }
+        setShowInvitationResultModal(true);
       } catch (err) {
         console.error('Failed to send invitation:', err);
+        setIsSendingInvitation(false);
         setInvitationResult({ 
           type: 'error', 
           message: 'אירעה שגיאה בשליחת ההזמנה.' 
@@ -1686,6 +1669,7 @@ const handleOpenAddonModal = React.useCallback(() => {
       if (response.ok) {
         if (payload.sent > 0) {
           addToast?.(`נשלחו ${payload.sent} הודעות וואטסאפ לאורחים`, 'success');
+          setEventMessagesSentCount((prev) => (prev || 0) + (payload.sent || 0));
         } else {
           registry.delete(eventId);
           addToast?.(
@@ -1701,6 +1685,47 @@ const handleOpenAddonModal = React.useCallback(() => {
       registry.delete(eventId);
       console.error('Failed to trigger WhatsApp invites', err);
       addToast?.('שליחת הודעת וואטסאפ נכשלה', 'error');
+    }
+  }, [addToast]);
+
+  const sendWhatsAppInviteViaApi = useCallback(async ({ eventId, guestIds }) => {
+    if (!eventId) {
+      addToast?.('לא ניתן לשלוח הודעת וואטסאפ לפני שמירת האירוע', 'error');
+      return { ok: false, reason: 'missing_event' };
+    }
+
+    try {
+      const response = await fetch('/api/whatsapp/send-event-invite', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ eventId, guestIds }),
+      });
+
+      let payload = {};
+      try {
+        payload = await response.json();
+      } catch (err) {
+        // ignore
+      }
+
+      if (response.ok) {
+        if (payload.sent > 0) {
+          setEventMessagesSentCount((prev) => (prev || 0) + (payload.sent || 0));
+          return { ok: true, payload };
+        }
+
+        addToast?.(payload.message || 'לא נמצאו מספרי וואטסאפ תקינים לשליחה', 'info');
+        return { ok: false, payload };
+      }
+
+      addToast?.(payload.error || 'שליחת הודעת וואטסאפ נכשלה', 'error');
+      return { ok: false, payload };
+    } catch (err) {
+      console.error('Failed to send WhatsApp invite via API', err);
+      addToast?.('שליחת הודעת וואטסאפ נכשלה', 'error');
+      return { ok: false, error: err };
     }
   }, [addToast]);
 
@@ -2507,26 +2532,45 @@ React.useEffect(() => {
           setShowInvitationResultModal(true);
         }
       } else if (sendWhatsApp && insertedGuests && insertedGuests.length > 0) {
-        // Save + open WhatsApp for first guest
-        const baseUrl = getInviteBaseUrl();
-        const first = insertedGuests[0];
-        const inviteLink = `${baseUrl}/${bulkEventId}/${first.id}`;
-        const digitsOnly = (first.phone || '').replace(/\D/g, '');
-        const waText = encodeURIComponent(
-          `${invitationText}\n\nלאישור הגעה:\n${inviteLink}`
-        );
+        // Save + send WhatsApp via Meta API for inserted guests
         setShowExcelPreview(false);
         setExcelPreviewData([]);
         setExcelErrors([]);
         setIsSavingExcelGuests(false);
         setSentGuests((prev) => [...prev, ...validGuests]);
-        if (digitsOnly.length >= 9) {
-          window.open(`https://wa.me/972${digitsOnly.startsWith('0') ? digitsOnly.slice(1) : digitsOnly}?text=${waText}`, '_blank', 'noopener,noreferrer');
+        if (bulkEventId) {
+          const guestIds = insertedGuests.map((g) => g.id).filter(Boolean);
+          const apiResult = await sendWhatsAppInviteViaApi({
+            eventId: bulkEventId,
+            guestIds,
+          });
+          if (apiResult.ok) {
+            const sent = apiResult.payload?.sent || 0;
+            const msg =
+              sent === guestIds.length
+                ? `נשמרו ${validGuests.length} אורחים ונשלחו ${sent} הודעות וואטסאפ בהצלחה!`
+                : `נשמרו ${validGuests.length} אורחים. נשלחו ${sent} הודעות וואטסאפ, בדוק את רשימת הכשלים.`;
+            setInvitationResult({
+              type: sent === guestIds.length ? 'success' : 'warning',
+              message: msg,
+            });
+          } else {
+            const errMsg =
+              apiResult.payload?.error ||
+              apiResult.payload?.message ||
+              apiResult.error?.message ||
+              'אירעה שגיאה בשליחת הודעות הוואטסאפ.';
+            setInvitationResult({
+              type: 'error',
+              message: `נשמרו ${validGuests.length} אורחים, אך שליחת הודעות וואטסאפ נכשלה. ${errMsg}`,
+            });
+          }
+        } else {
+          setInvitationResult({
+            type: 'warning',
+            message: `נשמרו ${validGuests.length} אורחים. שמור את האירוע לפני שליחת הודעות וואטסאפ.`,
+          });
         }
-        setInvitationResult({ 
-          type: 'success', 
-          message: `נשמרו ${validGuests.length} אורחים. נפתח חלון וואטסאפ לאורח הראשון – שלח וחפש "שלח הזמנה" ברשימה לשאר.` 
-        });
         setShowInvitationResultModal(true);
       } else {
         // Close preview modal - save only
