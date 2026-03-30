@@ -2,11 +2,70 @@ import { createClient } from '@supabase/supabase-js';
 import { getInviteBaseUrl } from '../../../lib/inviteUrl';
 import { sendWhatsAppTextMessage, normalizePhoneNumber } from '../../../lib/whatsappClient';
 
+const DEBUG_ENDPOINT = 'http://127.0.0.1:7780/ingest/b5f4ac25-b263-42d9-8749-29626868bbeb';
+const DEBUG_SESSION_ID = 'dcd254';
+
+function sendDebugLog({ runId = 'initial', hypothesisId, location, message, data }) {
+  try {
+    const payload = {
+      sessionId: DEBUG_SESSION_ID,
+      runId,
+      hypothesisId,
+      location,
+      message,
+      data,
+      timestamp: Date.now(),
+    };
+
+    if (typeof fetch === 'function') {
+      fetch(DEBUG_ENDPOINT, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Debug-Session-Id': DEBUG_SESSION_ID,
+        },
+        body: JSON.stringify(payload),
+      }).catch(() => {});
+    } else {
+      const http = require('http');
+      const url = new URL(DEBUG_ENDPOINT);
+      const req = http.request(
+        {
+          method: 'POST',
+          hostname: url.hostname,
+          port: url.port,
+          path: url.pathname,
+          headers: {
+            'Content-Type': 'application/json',
+            'Content-Length': Buffer.byteLength(JSON.stringify(payload)),
+            'X-Debug-Session-Id': DEBUG_SESSION_ID,
+          },
+        },
+        () => {}
+      );
+      req.on('error', () => {});
+      req.write(JSON.stringify(payload));
+      req.end();
+    }
+  } catch {
+    // Swallow instrumentation errors
+  }
+}
+
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 function ensureSupabaseConfigured(res) {
   if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
+    sendDebugLog({
+      hypothesisId: 'H4',
+      location: 'pages/api/whatsapp/send-event-invite.js:55',
+      message: 'Supabase configuration missing',
+      data: {
+        hasUrl: Boolean(SUPABASE_URL),
+        hasServiceKey: Boolean(SUPABASE_SERVICE_KEY),
+      },
+    });
     res.status(500).json({
       error: 'Supabase service configuration is missing (check SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY).',
     });
@@ -75,6 +134,18 @@ export default async function handler(req, res) {
 
   const { eventId, guestId, guestIds } = req.body || {};
 
+  sendDebugLog({
+    hypothesisId: 'H4',
+    location: 'pages/api/whatsapp/send-event-invite.js:43',
+    message: 'Webhook request received',
+    data: {
+      eventId,
+      guestId,
+      guestIdsCount: Array.isArray(guestIds) ? guestIds.length : null,
+      method: req.method,
+    },
+  });
+
   if (!eventId) {
     return res.status(400).json({ error: 'eventId is required' });
   }
@@ -89,6 +160,12 @@ export default async function handler(req, res) {
 
   if (eventError || !event) {
     console.error('[whatsapp] Failed to fetch event', eventError);
+    sendDebugLog({
+      hypothesisId: 'H4',
+      location: 'pages/api/whatsapp/send-event-invite.js:69',
+      message: 'Event fetch failed',
+      data: { eventError },
+    });
     return res.status(404).json({ error: 'Event not found' });
   }
 
@@ -107,10 +184,23 @@ export default async function handler(req, res) {
 
   if (guestsError) {
     console.error('[whatsapp] Failed to fetch guests', guestsError);
+    sendDebugLog({
+      hypothesisId: 'H5',
+      location: 'pages/api/whatsapp/send-event-invite.js:95',
+      message: 'Guests fetch failed',
+      data: { guestsError },
+    });
     return res.status(500).json({ error: 'Failed to fetch guests' });
   }
 
   const guestsWithPhone = (guests || []).filter((guest) => normalizePhoneNumber(guest.phone));
+
+  sendDebugLog({
+    hypothesisId: 'H5',
+    location: 'pages/api/whatsapp/send-event-invite.js:103',
+    message: 'Guests fetched',
+    data: { totalGuests: guests?.length || 0, withPhone: guestsWithPhone.length },
+  });
 
   if (guestsWithPhone.length === 0) {
     return res.status(200).json({
@@ -138,6 +228,13 @@ export default async function handler(req, res) {
 
   const sentCount = results.filter((r) => r.ok).length;
   const failed = results.filter((r) => !r.ok);
+
+  sendDebugLog({
+    hypothesisId: 'H2',
+    location: 'pages/api/whatsapp/send-event-invite.js:135',
+    message: 'WhatsApp send summary',
+    data: { sentCount, failedCount: failed.length },
+  });
 
   if (sentCount > 0) {
     try {

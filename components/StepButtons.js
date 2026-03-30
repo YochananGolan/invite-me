@@ -1100,6 +1100,9 @@ const handleOpenAddonModal = React.useCallback(() => {
           }
         }
 
+        // #region agent log
+        fetch('http://127.0.0.1:7780/ingest/b5f4ac25-b263-42d9-8749-29626868bbeb',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'dcd254'},body:JSON.stringify({sessionId:'dcd254',runId:'initial',hypothesisId:'H3',location:'components/StepButtons.js:1103',message:'Single guest WhatsApp send invoked',data:{eventIdForInvite,guestId:newGuest.id},timestamp:Date.now()})}).catch(()=>{});
+        // #endregion
         const apiResult = await sendWhatsAppInviteViaApi({
           eventId: eventIdForInvite,
           guestIds: [newGuest.id],
@@ -1689,6 +1692,9 @@ const handleOpenAddonModal = React.useCallback(() => {
   }, [addToast]);
 
   const sendWhatsAppInviteViaApi = useCallback(async ({ eventId, guestIds }) => {
+    // #region agent log
+    fetch('http://127.0.0.1:7780/ingest/b5f4ac25-b263-42d9-8749-29626868bbeb',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'dcd254'},body:JSON.stringify({sessionId:'dcd254',runId:'initial',hypothesisId:'H2',location:'components/StepButtons.js:1686',message:'sendWhatsAppInviteViaApi entry',data:{eventId,guestIdsLength:Array.isArray(guestIds)?guestIds.length:null},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
     if (!eventId) {
       addToast?.('לא ניתן לשלוח הודעת וואטסאפ לפני שמירת האירוע', 'error');
       return { ok: false, reason: 'missing_event' };
@@ -1709,6 +1715,10 @@ const handleOpenAddonModal = React.useCallback(() => {
       } catch (err) {
         // ignore
       }
+
+      // #region agent log
+      fetch('http://127.0.0.1:7780/ingest/b5f4ac25-b263-42d9-8749-29626868bbeb',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'dcd254'},body:JSON.stringify({sessionId:'dcd254',runId:'initial',hypothesisId:'H2',location:'components/StepButtons.js:1706',message:'sendWhatsAppInviteViaApi response',data:{status:response.status,ok:response.ok,sent:payload?.sent||0,failedCount:Array.isArray(payload?.failed)?payload.failed.length:null},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
 
       if (response.ok) {
         if (payload.sent > 0) {
@@ -2533,6 +2543,9 @@ React.useEffect(() => {
         }
       } else if (sendWhatsApp && insertedGuests && insertedGuests.length > 0) {
         // Save + send WhatsApp via Meta API for inserted guests
+        // #region agent log
+        fetch('http://127.0.0.1:7780/ingest/b5f4ac25-b263-42d9-8749-29626868bbeb',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'dcd254'},body:JSON.stringify({sessionId:'dcd254',runId:'initial',hypothesisId:'H1',location:'components/StepButtons.js:2512',message:'Bulk WhatsApp branch triggered',data:{bulkEventId,insertedGuestsCount:insertedGuests.length},timestamp:Date.now()})}).catch(()=>{});
+        // #endregion
         setShowExcelPreview(false);
         setExcelPreviewData([]);
         setExcelErrors([]);
