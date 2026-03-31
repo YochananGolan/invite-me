@@ -33,18 +33,41 @@ export default async function handler(req, res) {
         },
       });
 
-      const { data, error } = await supabaseAdmin.auth.admin.getUserByEmail(
-        normalizedEmail
-      );
+      if (
+        supabaseAdmin.auth?.admin &&
+        typeof supabaseAdmin.auth.admin.getUserByEmail === 'function'
+      ) {
+        const { data, error } =
+          await supabaseAdmin.auth.admin.getUserByEmail(normalizedEmail);
 
-      if (error && error.message && !/user not found/i.test(error.message)) {
-        console.error('check-email admin error:', error);
+        if (error && error.message && !/user not found/i.test(error.message)) {
+          console.error('check-email admin error:', error);
+          return res
+            .status(200)
+            .json({ exists: false, skipped: true, error: error.message });
+        }
+
+        return res.status(200).json({ exists: !!data });
+      }
+
+      console.warn(
+        'check-email: admin.getUserByEmail unavailable – querying auth.users directly'
+      );
+      const { data: userRow, error } = await supabaseAdmin
+        .from('auth.users')
+        .select('id')
+        .eq('email', normalizedEmail)
+        .limit(1)
+        .maybeSingle();
+
+      if (error && error.message && !/row not found/i.test(error.message)) {
+        console.error('check-email auth.users query error:', error);
         return res
           .status(200)
           .json({ exists: false, skipped: true, error: error.message });
       }
 
-      return res.status(200).json({ exists: !!data });
+      return res.status(200).json({ exists: !!userRow });
     }
 
     if (!SUPABASE_ANON_KEY) {
