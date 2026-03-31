@@ -333,13 +333,13 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick, trig
   const [archiveLoading,setArchiveLoading]=useState(false);
 
   // Excel import preview modal
-  const [showExcelPreview, setShowExcelPreview] = useState(false);
-  const [showExcelInstructions, setShowExcelInstructions] = useState(false);
-  const [excelPreviewData, setExcelPreviewData] = useState([]);
-  const [excelErrors, setExcelErrors] = useState([]);
-  const [isSavingExcelGuests, setIsSavingExcelGuests] = useState(false);
+const [showExcelPreview, setShowExcelPreview] = useState(false);
+const [showExcelInstructions, setShowExcelInstructions] = useState(false);
+const [excelPreviewData, setExcelPreviewData] = useState([]);
+const [excelErrors, setExcelErrors] = useState([]);
+const [isSavingExcelGuests, setIsSavingExcelGuests] = useState(false);
 
-  // Process flow diagram modal
+// Process flow diagram modal
   const [showFlowDiagram, setShowFlowDiagram] = useState(false);
   const [selectedFlowStep, setSelectedFlowStep] = useState(null);
 
@@ -920,7 +920,25 @@ const handleOpenAddonModal = React.useCallback(() => {
       return `${d}.${m}.${yy}`;
     };
 
-    /**
+  const resolveShareFetchUrl = (rawUrl) => {
+    if (!rawUrl) return null;
+    try {
+      const target = new URL(rawUrl, typeof window !== 'undefined' ? window.location.origin : undefined);
+      if (typeof window !== 'undefined' && target.origin === window.location.origin) {
+        return target.toString();
+      }
+      const allowedHosts = ['meet-m.co.il', 'www.meet-m.co.il', 'app.meet-m.co.il', 'static.meet-m.co.il'];
+      if (!allowedHosts.includes(target.hostname)) {
+        return target.toString();
+      }
+      return `/api/image-proxy?url=${encodeURIComponent(target.toString())}`;
+    } catch (err) {
+      console.warn('resolveShareFetchUrl failed to parse URL', rawUrl, err);
+      return rawUrl;
+    }
+  };
+
+  /**
      * Try to share an invitation image using the Web Share API (level 2 – files).
      * Falls back to returning false if not supported or on error.
      * @param {string} url Public URL of the invitation image (jpg)
@@ -929,7 +947,12 @@ const handleOpenAddonModal = React.useCallback(() => {
      */
     const shareInviteImage = async (url, guestFirstName, inviteLink, customText) => {
       try {
-        const res = await fetch(url);
+      const fetchUrl = resolveShareFetchUrl(url) || url;
+      const res = await fetch(fetchUrl);
+      if (!res.ok) {
+        console.warn('shareInviteImage fetch failed', fetchUrl, res.status);
+        return false;
+      }
         const blob = await res.blob();
         const file = new File([blob], 'invite.jpg', { type: blob.type || 'image/jpeg' });
 
@@ -971,6 +994,7 @@ const handleOpenAddonModal = React.useCallback(() => {
 
 
     // Attempt to save guest to Supabase (optional – will work only if table exists)
+    let newGuestRecord = null;
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
@@ -1017,12 +1041,13 @@ const handleOpenAddonModal = React.useCallback(() => {
         .select()
         .single();
       if (error) throw error;
+      newGuestRecord = newGuest;
       if (eventIdForInvite) {
         setInvitedGuestsCount((prev) => prev + 1);
       }
 
       const baseUrl = getInviteBaseUrl();
-      const inviteLink = `${baseUrl}/${eventIdForInvite}/${newGuest.id}`;
+      const inviteLink = `${baseUrl}/${eventIdForInvite}/${newGuestRecord.id}`;
 
       // Dev helper: log the RSVP link so it can be copied from the browser console
       if (process.env.NODE_ENV !== 'production') {
@@ -1101,22 +1126,23 @@ const handleOpenAddonModal = React.useCallback(() => {
         }
 
         // #region agent log
-        fetch('http://127.0.0.1:7780/ingest/b5f4ac25-b263-42d9-8749-29626868bbeb',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'dcd254'},body:JSON.stringify({sessionId:'dcd254',runId:'initial',hypothesisId:'H3',location:'components/StepButtons.js:1103',message:'Single guest WhatsApp send invoked',data:{eventIdForInvite,guestId:newGuest.id},timestamp:Date.now()})}).catch(()=>{});
+        fetch('http://127.0.0.1:7780/ingest/b5f4ac25-b263-42d9-8749-29626868bbeb',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'dcd254'},body:JSON.stringify({sessionId:'dcd254',runId:'initial',hypothesisId:'H3',location:'components/StepButtons.js:1103',message:'Single guest WhatsApp send invoked',data:{eventIdForInvite,guestId:newGuestRecord.id},timestamp:Date.now()})}).catch(()=>{});
         // #endregion
         const apiResult = await sendWhatsAppInviteViaApi({
           eventId: eventIdForInvite,
-          guestIds: [newGuest.id],
+          guestIds: newGuestRecord?.id ? [newGuestRecord.id] : [],
         });
 
         setIsSendingInvitation(false);
 
         if (apiResult.ok) {
-          const success = (apiResult.payload?.results || []).some((r) => r.ok);
+          const results = apiResult.payload?.results || [];
+          const success = results.some((r) => r.ok);
           if (success) {
             setSentGuests((prev) => [
               ...prev,
               {
-                guestId: newGuest.id,
+                guestId: newGuestRecord.id,
                 guestFirstName: guestData.guestFirstName,
                 guestLastName: guestData.guestLastName,
                 guestPhone: guestData.guestPhone,
@@ -1139,6 +1165,9 @@ const handleOpenAddonModal = React.useCallback(() => {
             (typeof failureEntry?.error === 'string' ? failureEntry.error : null) ||
             apiResult.error?.message ||
             'אירעה שגיאה בשליחת ההזמנה בוואטסאפ.';
+          if (newGuestRecord?.id) {
+            await cleanupGuestsAfterFailedSend([newGuestRecord.id]);
+          }
           setInvitationSent(false);
           setInvitationResult({
             type: 'error',
@@ -1149,6 +1178,9 @@ const handleOpenAddonModal = React.useCallback(() => {
       } catch (err) {
         console.error('Failed to send invitation:', err);
         setIsSendingInvitation(false);
+        if (newGuestRecord?.id) {
+          await cleanupGuestsAfterFailedSend([newGuestRecord.id]);
+        }
         setInvitationSent(false);
         setInvitationResult({ 
           type: 'error', 
@@ -1158,6 +1190,9 @@ const handleOpenAddonModal = React.useCallback(() => {
       }
     } catch (err) {
       console.error('Failed to send invitation:', err);
+      if (newGuestRecord?.id) {
+        await cleanupGuestsAfterFailedSend([newGuestRecord.id]);
+      }
       setInvitationSent(false);
       setInvitationResult({ 
         type: 'error', 
@@ -2072,6 +2107,53 @@ const handleOpenAddonModal = React.useCallback(() => {
   const [reportGuests, setReportGuests] = useState([]);
   const [reportTitle, setReportTitle] = useState('');
   
+  const cleanupGuestsAfterFailedSend = useCallback(async (guestIds = []) => {
+    const ids = (guestIds || []).filter(Boolean);
+    if (!ids.length) return;
+
+    try {
+      await supabase.from('invited_guests').delete().in('id', ids);
+    } catch (err) {
+      console.error('Failed to roll back guests after failed WhatsApp send', err);
+    }
+
+    const refreshInvitedCount = async () => {
+      if (!currentEventId) return;
+      try {
+        const { count, error } = await supabase
+          .from('invited_guests')
+          .select('id', { count: 'exact', head: true })
+          .eq('event_id', currentEventId);
+        if (!error) {
+          setInvitedGuestsCount(count || 0);
+          return;
+        }
+        console.warn('Failed to refresh invited guests count after cleanup', error);
+      } catch (countErr) {
+        console.error('Error refreshing invited guests count after cleanup', countErr);
+      }
+    };
+    await refreshInvitedCount();
+
+    const filterByIds = (list, idKey = 'id') =>
+      Array.isArray(list) ? list.filter((item) => !ids.includes(item?.[idKey])) : list;
+
+    setDbGuests((prev) => filterByIds(prev));
+    setReportGuests((prev) => filterByIds(prev));
+    setApprovedGuests((prev) => filterByIds(prev));
+    setRejectedGuests((prev) => filterByIds(prev));
+    setPendingGuests((prev) => filterByIds(prev));
+    setSentGuests((prev) =>
+      Array.isArray(prev)
+        ? prev.filter((item) => {
+            const candidateId = item?.guestId ?? item?.id;
+            return candidateId ? !ids.includes(candidateId) : true;
+          })
+        : prev
+    );
+    setGuestSummaryRefreshKey((key) => key + 1);
+  }, [supabase, currentEventId]);
+
   // --- Table summary state ---
   const [tableSummary, setTableSummary] = useState([]);
   
@@ -2628,13 +2710,21 @@ React.useEffect(() => {
             guestIds,
           });
           if (apiResult.ok) {
+            const results = apiResult.payload?.results || [];
             const sent = apiResult.payload?.sent || 0;
             const successIds = new Set(
-              (apiResult.payload?.results || [])
+              results
                 .filter((r) => r.ok)
                 .map((r) => r.guestId)
                 .filter(Boolean)
             );
+            const failedIds = results
+              .filter((r) => !r.ok && r.guestId)
+              .map((r) => r.guestId)
+              .filter(Boolean);
+            if (failedIds.length > 0) {
+              await cleanupGuestsAfterFailedSend(failedIds);
+            }
             if (successIds.size > 0) {
               const guestsById = insertedGuests.reduce((acc, inserted, idx) => {
                 acc[inserted.id] = { inserted, original: validGuests[idx] };
@@ -2664,6 +2754,9 @@ React.useEffect(() => {
               message: msg,
             });
           } else {
+            if (guestIds.length > 0) {
+              await cleanupGuestsAfterFailedSend(guestIds);
+            }
             const errMsg =
               apiResult.payload?.error ||
               apiResult.payload?.message ||
