@@ -1131,11 +1131,15 @@ const handleOpenAddonModal = React.useCallback(() => {
             message: 'ההזמנה נשלחה בהצלחה בוואטסאפ!',
           });
         } else {
+          const failureEntry = Array.isArray(apiResult.payload?.failed) && apiResult.payload.failed.length > 0 ? apiResult.payload.failed[0] : null;
           const errMsg =
             apiResult.payload?.error ||
             apiResult.payload?.message ||
+            failureEntry?.error?.message ||
+            (typeof failureEntry?.error === 'string' ? failureEntry.error : null) ||
             apiResult.error?.message ||
             'אירעה שגיאה בשליחת ההזמנה בוואטסאפ.';
+          setInvitationSent(false);
           setInvitationResult({
             type: 'error',
             message: errMsg,
@@ -1145,6 +1149,7 @@ const handleOpenAddonModal = React.useCallback(() => {
       } catch (err) {
         console.error('Failed to send invitation:', err);
         setIsSendingInvitation(false);
+        setInvitationSent(false);
         setInvitationResult({ 
           type: 'error', 
           message: 'אירעה שגיאה בשליחת ההזמנה.' 
@@ -1153,6 +1158,7 @@ const handleOpenAddonModal = React.useCallback(() => {
       }
     } catch (err) {
       console.error('Failed to send invitation:', err);
+      setInvitationSent(false);
       setInvitationResult({ 
         type: 'error', 
         message: 'אירעה שגיאה בשליחת ההזמנה.' 
@@ -1683,12 +1689,23 @@ const handleOpenAddonModal = React.useCallback(() => {
         // Ignore JSON parse issues (empty body)
       }
 
+      const updatedCount = typeof payload?.updatedMessagesSentCount === 'number'
+        ? payload.updatedMessagesSentCount
+        : null;
+
       if (response.ok) {
         if (payload.sent > 0) {
           addToast?.(`נשלחו ${payload.sent} הודעות וואטסאפ לאורחים`, 'success');
-          setEventMessagesSentCount((prev) => (prev || 0) + (payload.sent || 0));
+          if (updatedCount !== null) {
+            setEventMessagesSentCount(updatedCount);
+          } else {
+            setEventMessagesSentCount((prev) => (prev || 0) + (payload.sent || 0));
+          }
         } else {
           registry.delete(eventId);
+          if (updatedCount !== null) {
+            setEventMessagesSentCount(updatedCount);
+          }
           addToast?.(
             payload.message || 'לא נמצאו אורחים עם מספרי וואטסאפ לשיגור אוטומטי',
             'info'
@@ -1696,6 +1713,9 @@ const handleOpenAddonModal = React.useCallback(() => {
         }
       } else {
         registry.delete(eventId);
+        if (updatedCount !== null) {
+          setEventMessagesSentCount(updatedCount);
+        }
         addToast?.(payload.error || 'שליחת הודעת וואטסאפ נכשלה', 'error');
       }
     } catch (err) {
@@ -1734,13 +1754,28 @@ const handleOpenAddonModal = React.useCallback(() => {
       fetch('http://127.0.0.1:7780/ingest/b5f4ac25-b263-42d9-8749-29626868bbeb',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'dcd254'},body:JSON.stringify({sessionId:'dcd254',runId:'initial',hypothesisId:'H2',location:'components/StepButtons.js:1706',message:'sendWhatsAppInviteViaApi response',data:{status:response.status,ok:response.ok,sent:payload?.sent||0,failedCount:Array.isArray(payload?.failed)?payload.failed.length:null},timestamp:Date.now()})}).catch(()=>{});
       // #endregion
 
+      const updatedCount = typeof payload?.updatedMessagesSentCount === 'number'
+        ? payload.updatedMessagesSentCount
+        : null;
+      if (updatedCount !== null) {
+        setEventMessagesSentCount(updatedCount);
+      }
+
       if (response.ok) {
         if (payload.sent > 0) {
-          setEventMessagesSentCount((prev) => (prev || 0) + (payload.sent || 0));
+          if (updatedCount === null) {
+            setEventMessagesSentCount((prev) => (prev || 0) + (payload.sent || 0));
+          }
           return { ok: true, payload };
         }
 
-        addToast?.(payload.message || 'לא נמצאו מספרי וואטסאפ תקינים לשליחה', 'info');
+        const failureDetails = Array.isArray(payload.failed) && payload.failed.length > 0 ? payload.failed[0] : null;
+        const failureMessage =
+          payload.message ||
+          failureDetails?.error?.message ||
+          (typeof failureDetails?.error === 'string' ? failureDetails.error : null) ||
+          'לא נמצאו מספרי וואטסאפ תקינים לשליחה';
+        addToast?.(failureMessage, 'info');
         return { ok: false, payload };
       }
 

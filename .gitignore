@@ -11,3 +11,4 @@ NUL
 
 # IDE and editor files
 .claude/
+.cursor/

@@ -154,7 +154,7 @@ export default async function handler(req, res) {
 
   const { data: event, error: eventError } = await supabase
     .from('events')
-    .select('id, event_details')
+    .select('id, event_details, messages_sent_count')
     .eq('id', eventId)
     .maybeSingle();
 
@@ -212,18 +212,44 @@ export default async function handler(req, res) {
   }
 
   const eventDetails = parseEventDetails(event.event_details);
+  let updatedMessagesSentCount = Number.isFinite(event.messages_sent_count)
+    ? event.messages_sent_count
+    : 0;
   const results = [];
 
   for (const guest of guestsWithPhone) {
     const body = buildGuestMessage({ guest, eventDetails, eventId });
-    const sendResult = await sendWhatsAppTextMessage({ to: guest.phone, body });
-    results.push({
+    const phone = normalizePhoneNumber(guest.phone);
+    if (!phone) {
+      results.push({
+        guestId: guest.id,
+        phone: guest.phone,
+        ok: false,
+        error: 'Invalid phone number',
+        status: 'invalid',
+      });
+      continue;
+    }
+    const sendResult = await sendWhatsAppTextMessage({ to: phone, body });
+    const resultEntry = {
       guestId: guest.id,
-      phone: guest.phone,
+      phoneOriginal: guest.phone,
+      phoneNormalized: phone,
       ok: sendResult.ok,
       error: sendResult.ok ? null : sendResult.error,
       status: sendResult.status,
-    });
+    };
+
+    if (!sendResult.ok) {
+      sendDebugLog({
+        hypothesisId: 'H6',
+        location: 'pages/api/whatsapp/send-event-invite.js:126',
+        message: 'WhatsApp send failed',
+        data: resultEntry,
+      });
+    }
+
+    results.push(resultEntry);
   }
 
   const sentCount = results.filter((r) => r.ok).length;
@@ -233,17 +259,19 @@ export default async function handler(req, res) {
     hypothesisId: 'H2',
     location: 'pages/api/whatsapp/send-event-invite.js:135',
     message: 'WhatsApp send summary',
-    data: { sentCount, failedCount: failed.length },
+    data: { sentCount, failedCount: failed.length, updatedMessagesSentCount },
   });
 
   if (sentCount > 0) {
     try {
-      const { error: rpcError } = await supabase.rpc('increment_event_messages_sent', {
+      const { data: rpcData, error: rpcError } = await supabase.rpc('increment_event_messages_sent', {
         p_event_id: eventId,
         p_delta: sentCount,
       });
       if (rpcError) {
         console.warn('[whatsapp] increment_event_messages_sent RPC failed', rpcError);
+      } else if (typeof rpcData === 'number') {
+        updatedMessagesSentCount = rpcData;
       }
     } catch (err) {
       console.warn('[whatsapp] Failed to increment messages_sent_count', err);
@@ -255,5 +283,6 @@ export default async function handler(req, res) {
     failed,
     total: results.length,
     results,
+    updatedMessagesSentCount,
   });
 }
