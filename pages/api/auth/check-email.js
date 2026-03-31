@@ -51,23 +51,20 @@ export default async function handler(req, res) {
       }
 
       console.warn(
-        'check-email: admin.getUserByEmail unavailable – querying auth.users directly'
+        'check-email: admin.getUserByEmail unavailable – falling back to RPC email_exists'
       );
-      const { data: userRow, error } = await supabaseAdmin
-        .from('auth.users')
-        .select('id')
-        .eq('email', normalizedEmail)
-        .limit(1)
-        .maybeSingle();
+      const { data: rpcData, error } = await supabaseAdmin.rpc('email_exists', {
+        p_email: normalizedEmail,
+      });
 
-      if (error && error.message && !/row not found/i.test(error.message)) {
-        console.error('check-email auth.users query error:', error);
+      if (error) {
+        console.error('check-email service RPC error:', error);
         return res
           .status(200)
           .json({ exists: false, skipped: true, error: error.message });
       }
 
-      return res.status(200).json({ exists: !!userRow });
+      return res.status(200).json({ exists: !!rpcData });
     }
 
     if (!SUPABASE_ANON_KEY) {
