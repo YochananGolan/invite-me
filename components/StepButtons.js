@@ -2,6 +2,7 @@ import React, { useState, forwardRef, useImperativeHandle, useRef, useCallback, 
 import { useRouter } from 'next/router';
 import { supabase } from '../lib/supabaseClient';
 import { getInviteBaseUrl } from '../lib/inviteUrl';
+import { normalizePhoneNumber } from '../lib/whatsappClient';
 import DatePicker, { registerLocale } from 'react-datepicker';
 import he from 'date-fns/locale/he';
 import 'react-datepicker/dist/react-datepicker.css';
@@ -992,6 +993,13 @@ const handleOpenAddonModal = React.useCallback(() => {
       return;
     }
 
+    const normalizedPhone = normalizePhoneNumber(guestData.guestPhone);
+    if (!normalizedPhone) {
+      setGuestErrors({ guestPhone: true });
+      setGuestErrorMsg('מספר טלפון לא תקין – לא ניתן לקבוע קידומת 972.');
+      return;
+    }
+
 
     // Attempt to save guest to Supabase (optional – will work only if table exists)
     let newGuestRecord = null;
@@ -1031,7 +1039,7 @@ const handleOpenAddonModal = React.useCallback(() => {
             event_id: eventIdForInvite,
             first_name: guestData.guestFirstName,
             last_name: guestData.guestLastName,
-            phone: guestData.guestPhone,
+            phone: normalizedPhone,
             email: null,
             total_guests: 1,
             adults: 1,
@@ -1145,7 +1153,8 @@ const handleOpenAddonModal = React.useCallback(() => {
                 guestId: newGuestRecord.id,
                 guestFirstName: guestData.guestFirstName,
                 guestLastName: guestData.guestLastName,
-                guestPhone: guestData.guestPhone,
+                guestPhone: normalizedPhone,
+                guestPhoneOriginal: guestData.guestPhone,
                 guestTable: guestData.guestTable,
                 channel: 'whatsapp',
               },
@@ -2534,19 +2543,22 @@ React.useEffect(() => {
       const newGuestsToAdd = validGuests.length; // Each guest in Excel = 1 person
       // Quota is by messages sent only - saving guests is allowed; we check message limit when sending SMS below
       // Prepare guests for bulk insert
-      const guestsToInsert = validGuests.map(g => ({
-        user_id: user.id,
-        event_id: bulkEventId,
-        first_name: g.guestFirstName.trim(),
-        last_name: g.guestLastName.trim(),
-        phone: g.guestPhone.toString().trim(),
-        email: null,
-        total_guests: 1,
-        adults: 1,
-        children: 0,
-        table_number: g.guestTable.toString().trim() || null,
-        status: 'pending',
-      }));
+      const guestsToInsert = validGuests.map(g => {
+        const normalizedBulkPhone = normalizePhoneNumber(g.guestPhone);
+        return {
+          user_id: user.id,
+          event_id: bulkEventId,
+          first_name: g.guestFirstName.trim(),
+          last_name: g.guestLastName.trim(),
+          phone: normalizedBulkPhone || g.guestPhone.toString().trim(),
+          email: null,
+          total_guests: 1,
+          adults: 1,
+          children: 0,
+          table_number: g.guestTable.toString().trim() || null,
+          status: 'pending',
+        };
+      });
 
       // Bulk insert
       const { data: insertedGuests, error } = await supabase
