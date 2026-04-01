@@ -7934,13 +7934,13 @@ React.useEffect(()=>{
               <h2 className="text-2xl font-bold text-red-800 mb-4">אישור סופי נדרש</h2>
               <div className="bg-orange-50 border-2 border-orange-200 rounded-lg p-4 mb-4 text-right">
                 <p className="text-base font-bold text-gray-800 mb-3">
-                  האם אתה בטוח שברצונך להעביר את האירוע הקיים לארכיון וליצור אירוע חדש?
+                  האם אתה בטוח שברצונך למחוק אירוע קיים?
                 </p>
                 <div className="space-y-3 text-base text-gray-700">
                   <div className="flex items-start gap-2">
                     <span className="text-orange-600 font-bold text-lg">📁</span>
                     <p className="text-right flex-1 text-base font-semibold">
-                      האירוע הקיים יימחק (הנתונים נשמרים בארכיון) ותוכל לעיין בהם מאוחר יותר.
+                      האירוע הקיים יימחק.
                     </p>
                   </div>
                   <div className="flex items-start gap-2">
@@ -7964,9 +7964,9 @@ React.useEffect(()=>{
                   setShowArchiveConfirm(false);
                   handleNewEvent(true);
                 }}
-                className="flex-1 bg-primary text-white border border-primary rounded-full px-6 py-3 font-bold hover:bg-primary/90 transition-all"
+                className="flex-1 bg-red-700 text-white border border-red-900 rounded-full px-6 py-3 font-bold hover:bg-red-800 transition-all"
               >
-                העבר לארכיון וצור אירוע חדש
+                מחק אירוע קיים
               </button>
             </div>
           </div>
