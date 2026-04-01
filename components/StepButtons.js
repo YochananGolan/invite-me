@@ -1,3 +1,35 @@
+  const resetWizardStateForNoEvent = () => {
+    setSelectedEventType('');
+    setFormData(initialFormState);
+    setEventDetailsCompleted(false);
+    setSelectedDesign(null);
+    setInvitationSent(false);
+    setRsvpConfirmed(false);
+    setShowGuestForm(false);
+    setShowReportsOptions(false);
+    setStepErrorMsg('');
+    setErrorMsg('');
+    setFinishedSteps([]);
+    setCurrentEventId(null);
+    lastRestoredEventIdRef.current = null;
+    noEventLoggedRef.current = false;
+    setEventDataLoaded(false);
+    setGuestSummary({ approved: 0, adults: 0, children: 0 });
+    resetCapacityWarningGuests();
+    setGuestStatusSummary({ approved: 0, rejected: 0, pending: 0 });
+    setSpecialMealsSummary({
+      veg: { adults: 0, children: 0, total: 0 },
+      vegan: { adults: 0, children: 0, total: 0 },
+      glatt: { adults: 0, children: 0, total: 0 },
+      allergy: { adults: 0, children: 0, total: 0 },
+    });
+    setDbGuests([]);
+    setSentGuests([]);
+    setReportGuests([]);
+    setShowGuestListModal(false);
+    setShowReportModal(false);
+    setSelectedEventForReport(null);
+  };
 import React, { useState, forwardRef, useImperativeHandle, useRef, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { supabase } from '../lib/supabaseClient';
@@ -2865,6 +2897,10 @@ React.useEffect(() => {
   const handleNewEvent = async (showDeletionMessage = false) => {
     setShowExistingEventWarning(false);
     setShowArchiveConfirm(false);
+    if (!sessionRef.current) {
+      resetWizardStateForNoEvent();
+      return;
+    }
     let eventWasDeleted = false;
     let deletionCompleted = false;
     let deletionErrorAlertShown = false;
@@ -2982,6 +3018,13 @@ React.useEffect(() => {
     setSelectedPlan(planToCarryForward);
     if (!planToCarryForward) {
       try { localStorage.removeItem('selectedPlan'); } catch (_) {}
+      resetWizardStateForNoEvent();
+      setNewEventStarted(false);
+      setShowEventTypes(false);
+      setShowPricingPlan(false);
+      setShowPlanLimitWarning(false);
+      setPlanAddOnMode(false);
+      return;
     }
     setAdditionalPackages([]);
     setDbAddonCount(addonCountBeforeReset);
