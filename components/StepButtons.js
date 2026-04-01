@@ -2862,6 +2862,26 @@ React.useEffect(() => {
     customEventDescription: 'תיאור האירוע', hostName: '',
   };
 
+  const isClearingPlanRef = useRef(false);
+
+  const clearPlanState = useCallback(async () => {
+    if (isClearingPlanRef.current) return;
+    isClearingPlanRef.current = true;
+    try {
+      setSelectedPlan(null);
+      setAdditionalPackages([]);
+      setDbAddonCount(0);
+      setUserPlanSettings({ plan: null, addonCount: 0 });
+      setNewEventStarted(false);
+      try { localStorage.removeItem('selectedPlan'); } catch (_) {}
+      try { localStorage.removeItem('additionalPackages_global'); } catch (_) {}
+      try { localStorage.removeItem('newEventStarted'); } catch (_) {}
+      await persistUserPlanSettings(null, 0);
+    } finally {
+      isClearingPlanRef.current = false;
+    }
+  }, [persistUserPlanSettings]);
+
   const resetWizardStateForNoEvent = async () => {
     setSelectedEventType('');
     setFormData(initialFormState);
@@ -2893,13 +2913,9 @@ React.useEffect(() => {
     setShowGuestListModal(false);
     setShowReportModal(false);
     setSelectedEventForReport(null);
-    setSelectedPlan(null);
-    setAdditionalPackages([]);
-    setDbAddonCount(0);
-    setUserPlanSettings({ plan: null, addonCount: 0 });
-    try { localStorage.removeItem('selectedPlan'); } catch (_) {}
-    try { localStorage.removeItem('additionalPackages_global'); } catch (_) {}
-    await persistUserPlanSettings(null, 0);
+    setInvitedGuestsCount(0);
+    setEventMessagesSentCount(0);
+    await clearPlanState();
   };
 
   const handleNewEvent = async (showDeletionMessage = false) => {
@@ -3532,18 +3548,30 @@ React.useEffect(() => {
   });
 
   React.useEffect(() => {
-    if (!currentEventId && !newEventStarted && selectedPlan) {
-      (async () => {
-        setSelectedPlan(null);
-        setAdditionalPackages([]);
-        setDbAddonCount(0);
-        setUserPlanSettings({ plan: null, addonCount: 0 });
-        try { localStorage.removeItem('selectedPlan'); } catch (_) {}
-        try { localStorage.removeItem('additionalPackages_global'); } catch (_) {}
-        await persistUserPlanSettings(null, 0);
-      })();
-    }
-  }, [currentEventId, newEventStarted, selectedPlan, persistUserPlanSettings]);
+  if (!sessionRef.current) return;
+  const hasEvent =
+    Boolean(currentEventId) ||
+    Boolean(newEventStarted) ||
+    finishedSteps.length > 0 ||
+    Boolean(selectedEventType) ||
+    Object.values(formData || {}).some(Boolean);
+  if (hasEvent) return;
+  const hasPlanData =
+    Boolean(selectedPlan) ||
+    Boolean(userPlanSettings?.plan) ||
+    (Array.isArray(additionalPackages) && additionalPackages.length > 0) ||
+    (dbAddonCount ?? 0) > 0;
+  if (!hasPlanData) return;
+  clearPlanState();
+}, [
+  currentEventId,
+  newEventStarted,
+  selectedPlan,
+  userPlanSettings?.plan,
+  additionalPackages,
+  dbAddonCount,
+  clearPlanState,
+]);
 
   // State for Tranzila terminal info
   const [tranzilaTerminalInfo, setTranzilaTerminalInfo] = useState(null);
