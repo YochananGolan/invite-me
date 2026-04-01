@@ -2869,11 +2869,8 @@ React.useEffect(() => {
     let deletionCompleted = false;
     let deletionErrorAlertShown = false;
     let eventIdToDelete = currentEventId;
-    const addonCountBeforeReset = Math.max(
-      dbAddonCount ?? 0,
-      Array.isArray(additionalPackages) ? additionalPackages.filter((p) => p === 'addon').length : 0
-    );
-    const planToCarryForward = selectedPlan || userPlanSettings?.plan || null;
+    const addonCountBeforeReset = 0;
+    const planToCarryForward = null;
 
     if (!eventIdToDelete) {
       try {
@@ -2962,15 +2959,9 @@ React.useEffect(() => {
     
     // If event was actually deleted (not just archived), reset everything פרט לחבילה:
     // המשתמש כבר רכש/בחר מסלול, אין סיבה לבקש ממנו לבחור שוב.
-    if (eventWasDeleted) {
-      setNewEventStarted(false); // Clear "event in progress" message
-      setEventMessagesSentCount(0);
-      try { localStorage.removeItem('newEventStarted'); } catch(e){}
-    } else {
-      // Event was archived or doesn't exist - start new event process
-      setNewEventStarted(true);
-      try { localStorage.setItem('newEventStarted','1'); } catch(e){}
-    }
+    setNewEventStarted(false);
+    setEventMessagesSentCount(0);
+    try { localStorage.removeItem('newEventStarted'); } catch(e){}
     
     // Reset guest data and reports (these are UI state only, data is preserved in DB)
     setGuestSummary({ approved: 0, adults: 0, children: 0 });
@@ -2989,15 +2980,12 @@ React.useEffect(() => {
     setShowReportModal(false);
     setSelectedEventForReport(null);
     setSelectedPlan(planToCarryForward);
-    setAdditionalPackages((prev) => {
-      const prevCount = Array.isArray(prev) ? prev.length : 0;
-      if (prevCount === addonCountBeforeReset) {
-        return prev;
-      }
-      return Array(addonCountBeforeReset).fill('addon');
-    });
+    if (!planToCarryForward) {
+      try { localStorage.removeItem('selectedPlan'); } catch (_) {}
+    }
+    setAdditionalPackages([]);
     setDbAddonCount(addonCountBeforeReset);
-    try { localStorage.setItem('additionalPackages_global', String(addonCountBeforeReset)); } catch (_) {}
+    try { localStorage.removeItem('additionalPackages_global'); } catch (_) {}
     
     try{ localStorage.removeItem('selectedDesign'); }catch{}
     try{ localStorage.removeItem('finishedSteps'); }catch{}
