@@ -3531,6 +3531,20 @@ React.useEffect(() => {
     } catch(e) { return false; }
   });
 
+  React.useEffect(() => {
+    if (!currentEventId && !newEventStarted && selectedPlan) {
+      (async () => {
+        setSelectedPlan(null);
+        setAdditionalPackages([]);
+        setDbAddonCount(0);
+        setUserPlanSettings({ plan: null, addonCount: 0 });
+        try { localStorage.removeItem('selectedPlan'); } catch (_) {}
+        try { localStorage.removeItem('additionalPackages_global'); } catch (_) {}
+        await persistUserPlanSettings(null, 0);
+      })();
+    }
+  }, [currentEventId, newEventStarted, selectedPlan, persistUserPlanSettings]);
+
   // State for Tranzila terminal info
   const [tranzilaTerminalInfo, setTranzilaTerminalInfo] = useState(null);
 
