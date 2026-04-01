@@ -2930,7 +2930,8 @@ React.useEffect(() => {
     let deletionErrorAlertShown = false;
     let eventIdToDelete = currentEventId;
     const addonCountBeforeReset = 0;
-    const planToCarryForward = null;
+  const planToCarryForward =
+    currentEventId || newEventStarted ? selectedPlan || userPlanSettings?.plan || null : null;
 
     if (!eventIdToDelete) {
       try {
@@ -7891,7 +7892,7 @@ React.useEffect(()=>{
                     • במערכת זו לא ניתן לנהל שני אירועים במקביל. בכל פעם ניתן לנהל אירוע אחד בלבד.
                   </p>
                   <p className="text-base font-bold text-red-800">
-                    • האירוע הקיים יעבור לארכיון (יישמר עם כל הנתונים) ותוכל לפתוח אירוע חדש.
+                    • האירוע הקיים יימחק, ותוכל לפתוח אירוע חדש.
                   </p>
                 </div>
               </div>
@@ -7939,7 +7940,7 @@ React.useEffect(()=>{
                   <div className="flex items-start gap-2">
                     <span className="text-orange-600 font-bold text-lg">📁</span>
                     <p className="text-right flex-1 text-base font-semibold">
-                      האירוע הקיים יעבור לארכיון (יישמר עם כל הנתונים) ותוכל לגשת אליו מאוחר יותר.
+                      האירוע הקיים יימחק (הנתונים נשמרים בארכיון) ותוכל לעיין בהם מאוחר יותר.
                     </p>
                   </div>
                   <div className="flex items-start gap-2">
