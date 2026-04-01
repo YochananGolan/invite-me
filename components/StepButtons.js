@@ -7909,9 +7909,9 @@ React.useEffect(()=>{
       setShowExistingEventWarning(false);
       setShowArchiveConfirm(true);
                 }}
-                className="w-full bg-red-600 text-white border border-red-700 rounded-full px-6 py-3 font-bold hover:bg-red-700 transition-all"
+                className="w-full bg-red-700 text-white border border-red-900 rounded-full px-6 py-3 font-bold hover:bg-red-800 transition-all"
               >
-                העבר לארכיון וצור אירוע חדש
+                מחק אירוע קיים
               </button>
             </div>
           </div>
