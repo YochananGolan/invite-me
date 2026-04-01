@@ -3548,30 +3548,53 @@ React.useEffect(() => {
   });
 
   React.useEffect(() => {
-  if (!sessionRef.current) return;
-  const hasEvent =
-    Boolean(currentEventId) ||
-    Boolean(newEventStarted) ||
-    finishedSteps.length > 0 ||
-    Boolean(selectedEventType) ||
-    Object.values(formData || {}).some(Boolean);
-  if (hasEvent) return;
-  const hasPlanData =
-    Boolean(selectedPlan) ||
-    Boolean(userPlanSettings?.plan) ||
-    (Array.isArray(additionalPackages) && additionalPackages.length > 0) ||
-    (dbAddonCount ?? 0) > 0;
-  if (!hasPlanData) return;
-  clearPlanState();
-}, [
-  currentEventId,
-  newEventStarted,
-  selectedPlan,
-  userPlanSettings?.plan,
-  additionalPackages,
-  dbAddonCount,
-  clearPlanState,
-]);
+    if (!sessionRef.current) return;
+    const hasEvent =
+      Boolean(currentEventId) ||
+      Boolean(newEventStarted) ||
+      finishedSteps.length > 0 ||
+      Boolean(selectedEventType) ||
+      Object.values(formData || {}).some(Boolean);
+    if (hasEvent) return;
+    const hasPlanData =
+      Boolean(selectedPlan) ||
+      Boolean(userPlanSettings?.plan) ||
+      (Array.isArray(additionalPackages) && additionalPackages.length > 0) ||
+      (dbAddonCount ?? 0) > 0;
+    if (!hasPlanData) return;
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    let eventInFuture = false;
+    const potentialDate =
+      formData?.date ||
+      formData?.event_date ||
+      formData?.start_datetime ||
+      formData?.end_datetime ||
+      null;
+    if (potentialDate) {
+      const parsed = new Date(potentialDate);
+      if (!Number.isNaN(parsed.getTime())) {
+        parsed.setHours(0, 0, 0, 0);
+        eventInFuture = parsed >= today;
+      }
+    }
+
+    if (eventInFuture) return;
+
+    clearPlanState();
+  }, [
+    currentEventId,
+    newEventStarted,
+    selectedPlan,
+    userPlanSettings?.plan,
+    additionalPackages,
+    dbAddonCount,
+    clearPlanState,
+    finishedSteps,
+    selectedEventType,
+    formData,
+  ]);
 
   // State for Tranzila terminal info
   const [tranzilaTerminalInfo, setTranzilaTerminalInfo] = useState(null);
