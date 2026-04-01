@@ -2862,7 +2862,7 @@ React.useEffect(() => {
     customEventDescription: 'תיאור האירוע', hostName: '',
   };
 
-  const resetWizardStateForNoEvent = () => {
+  const resetWizardStateForNoEvent = async () => {
     setSelectedEventType('');
     setFormData(initialFormState);
     setEventDetailsCompleted(false);
@@ -2893,14 +2893,20 @@ React.useEffect(() => {
     setShowGuestListModal(false);
     setShowReportModal(false);
     setSelectedEventForReport(null);
+    setSelectedPlan(null);
+    setAdditionalPackages([]);
+    setDbAddonCount(0);
     setUserPlanSettings({ plan: null, addonCount: 0 });
+    try { localStorage.removeItem('selectedPlan'); } catch (_) {}
+    try { localStorage.removeItem('additionalPackages_global'); } catch (_) {}
+    await persistUserPlanSettings(null, 0);
   };
 
   const handleNewEvent = async (showDeletionMessage = false) => {
     setShowExistingEventWarning(false);
     setShowArchiveConfirm(false);
     if (!sessionRef.current) {
-      resetWizardStateForNoEvent();
+      await resetWizardStateForNoEvent();
       return;
     }
     let eventWasDeleted = false;
@@ -3020,7 +3026,7 @@ React.useEffect(() => {
     setSelectedPlan(planToCarryForward);
     if (!planToCarryForward) {
       try { localStorage.removeItem('selectedPlan'); } catch (_) {}
-      resetWizardStateForNoEvent();
+      await resetWizardStateForNoEvent();
       setNewEventStarted(false);
       setShowEventTypes(false);
       setShowPricingPlan(false);
