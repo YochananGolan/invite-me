@@ -461,8 +461,50 @@ const computePlanFromCapacity = React.useCallback((allowedGuestsValue, addonCoun
 }, [getPlanBaseLimit]);
 const derivePlanFromRecord = React.useCallback((record) => {
   if (!record) return null;
+
+  let detailsPlan = null;
+  let detailsStatus = null;
+  if (record.event_details) {
+    try {
+      const parsed =
+        typeof record.event_details === 'string'
+          ? JSON.parse(record.event_details)
+          : record.event_details;
+      if (parsed && typeof parsed === 'object') {
+        if (parsed.pricing_plan && typeof parsed.pricing_plan === 'string') {
+          detailsPlan = parsed.pricing_plan;
+        }
+        if (parsed.status && typeof parsed.status === 'string') {
+          detailsStatus = parsed.status.toLowerCase();
+        }
+      }
+    } catch (err) {
+      console.warn('Failed to parse event_details while deriving plan', err);
+    }
+  }
+
   const dbPlan = record.selected_plan || null;
-  if (dbPlan) return dbPlan;
+  if (dbPlan) {
+    if (detailsPlan && typeof detailsPlan === 'string') {
+      return detailsPlan;
+    }
+    const rawStatusForDbPlan = typeof record.status === 'string' ? record.status : detailsStatus;
+    const normalizedStatusForDbPlan =
+      typeof rawStatusForDbPlan === 'string' ? rawStatusForDbPlan.toLowerCase() : null;
+    if (normalizedStatusForDbPlan && (normalizedStatusForDbPlan === 'draft' || normalizedStatusForDbPlan === 'pending' || normalizedStatusForDbPlan === 'pending_payment')) {
+      return null;
+    }
+    return dbPlan;
+  }
+
+  if (detailsPlan) return detailsPlan;
+
+  const rawStatus = typeof record.status === 'string' ? record.status : detailsStatus;
+  const normalizedStatus = typeof rawStatus === 'string' ? rawStatus.toLowerCase() : null;
+  if (normalizedStatus === 'draft' || normalizedStatus === 'pending' || normalizedStatus === 'pending_payment') {
+    return null;
+  }
+
   const addonCount = typeof record.additional_packages === 'number' ? record.additional_packages : 0;
   const derivedPlan = computePlanFromCapacity(record.allowed_guests, addonCount);
   if (derivedPlan && record.id && !planPersistenceRef.current.has(record.id)) {
@@ -1902,8 +1944,8 @@ const handleOpenAddonModal = React.useCallback(() => {
           hasDesignFile: !!designFile
         });
 
-        // Calculate allowed guests based on plan and addons
-        const basePlanLimit = getPlanBaseLimit(selectedPlan) || 50;
+        // Calculate allowed guests based on plan and addons – if no plan purchased yet, capacity is 0
+        const basePlanLimit = selectedPlan ? getPlanBaseLimit(selectedPlan) || 0 : 0;
         const extraCapacity = additionalPackages.reduce(
           (sum, planId) => sum + getPlanBaseLimit(planId),
           0
@@ -1996,7 +2038,7 @@ const handleOpenAddonModal = React.useCallback(() => {
         // allowed_guests is persisted in DB; UI quota uses selectedPlan/addons from state.
       } else {
         // Calculate allowed guests based on plan and addons
-        const basePlanLimit = getPlanBaseLimit(selectedPlan) || 50;
+        const basePlanLimit = selectedPlan ? getPlanBaseLimit(selectedPlan) || 0 : 0;
         const extraCapacity = additionalPackages.reduce(
           (sum, planId) => sum + getPlanBaseLimit(planId),
           0
@@ -3701,6 +3743,10 @@ React.useEffect(() => {
           setSelectedPlan(planToUse);
           selectionSourceRef.current = 'event';
           try { localStorage.setItem('selectedPlan', planToUse); } catch(e){}
+        } else {
+          setSelectedPlan(null);
+          selectionSourceRef.current = 'manual';
+          try { localStorage.removeItem('selectedPlan'); } catch(_) {}
         }
         await persistUserPlanSettings(planToUse, addonCount);
         const details=typeof ev.event_details==='string'?JSON.parse(ev.event_details):ev.event_details||{};
@@ -3744,6 +3790,10 @@ React.useEffect(() => {
           if (planFromEvent) {
             setSelectedPlan(planFromEvent);
             try { localStorage.setItem('selectedPlan', planFromEvent); } catch (_) {}
+          } else {
+            setSelectedPlan(null);
+            selectionSourceRef.current = 'manual';
+            try { localStorage.removeItem('selectedPlan'); } catch (_) {}
           }
           persistUserPlanSettings(planFromEvent, ev.additional_packages ?? 0);
           setEventRefreshKey((k) => k + 1);
