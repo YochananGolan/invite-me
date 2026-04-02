@@ -62,6 +62,29 @@ const fieldLabels = {
   hostName: 'שם המארחת',
 };
 
+const DEFAULT_EVENT_TIME = '19:30';
+const DEFAULT_CHUPPAH_TIME = '21:00';
+const DEFAULT_CUSTOM_DESCRIPTION = 'תיאור האירוע';
+
+const hasMeaningfulFormValue = (key, value) => {
+  if (value === null || value === undefined) return false;
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) return false;
+    if (key === 'time' && trimmed === DEFAULT_EVENT_TIME) return false;
+    if (key === 'chuppahTime' && trimmed === DEFAULT_CHUPPAH_TIME) return false;
+    if (key === 'customEventDescription' && trimmed === DEFAULT_CUSTOM_DESCRIPTION) return false;
+    return true;
+  }
+  if (Array.isArray(value)) {
+    return value.some((item) => hasMeaningfulFormValue(key, item));
+  }
+  if (typeof value === 'object') {
+    return Object.values(value).some((nested) => hasMeaningfulFormValue(key, nested));
+  }
+  return Boolean(value);
+};
+
 const StepButtons = forwardRef(function StepButtons({ session, onAuthClick, triggerCreateEvent, onConsumedCreateTrigger }, ref) {
   const router = useRouter();
   const { addToast } = useToast();
@@ -154,13 +177,17 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick, trig
     businessName: '',
     businessContact: '',
     date: '',
-    time: '19:30',
-    chuppahTime: '21:00',
+    time: DEFAULT_EVENT_TIME,
+    chuppahTime: DEFAULT_CHUPPAH_TIME,
     hallName: '',
     hallAddress: '',
-    customEventDescription: 'תיאור האירוע',
+    customEventDescription: DEFAULT_CUSTOM_DESCRIPTION,
     hostName: '',
   });
+  const formDataHasMeaningfulValues = React.useMemo(() => {
+    return Object.entries(formData || {}).some(([key, value]) => hasMeaningfulFormValue(key, value));
+  }, [formData]);
+  const formDataIsMeaningfullyEmpty = !formDataHasMeaningfulValues;
   const [formErrors, setFormErrors] = useState({});
   const [eventDetailsCompleted, setEventDetailsCompleted] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -1647,7 +1674,7 @@ const handleOpenAddonModal = React.useCallback(() => {
   // restore details
   React.useEffect(()=>{
     if(!finishedSteps.includes(1)) return;
-    if(Object.values(formData).some(v=>v)) return;
+    if(formDataHasMeaningfulValues) return;
     try{
       const raw = localStorage.getItem('savedEventDetails');
       const saved = (raw && typeof raw === 'string' && raw.trim().startsWith('{')) ? JSON.parse(raw) : {};
@@ -2858,8 +2885,8 @@ React.useEffect(() => {
     brideName: '', groomName: '', brideParents: '', groomParents: '',
     boyName: '', boyParents: '', girlName: '', girlParents: '', babyParents: '',
     birthdayName: '', birthdayAge: '', businessName: '', businessContact: '',
-    date: '', time: '19:30', chuppahTime: '21:00', hallName: '', hallAddress: '',
-    customEventDescription: 'תיאור האירוע', hostName: '',
+    date: '', time: DEFAULT_EVENT_TIME, chuppahTime: DEFAULT_CHUPPAH_TIME, hallName: '', hallAddress: '',
+    customEventDescription: DEFAULT_CUSTOM_DESCRIPTION, hostName: '',
   };
 
   const isClearingPlanRef = useRef(false);
@@ -3533,7 +3560,13 @@ React.useEffect(() => {
 
   // Check if there's an existing event in progress
   const hasExistingEvent = () => {
-    return Boolean(currentEventId || newEventStarted || finishedSteps.length > 0 || selectedEventType || Object.values(formData || {}).some(Boolean));
+    return Boolean(
+      currentEventId ||
+      newEventStarted ||
+      finishedSteps.length > 0 ||
+      selectedEventType ||
+      formDataHasMeaningfulValues
+    );
   };
 
   // Confirmation for creating a new event
@@ -3555,7 +3588,7 @@ React.useEffect(() => {
       Boolean(newEventStarted) ||
       finishedSteps.length > 0 ||
       Boolean(selectedEventType) ||
-      Object.values(formData || {}).some(Boolean);
+      formDataHasMeaningfulValues;
     if (hasEvent) return;
     const hasPlanData =
       Boolean(selectedPlan) ||
@@ -3595,6 +3628,7 @@ React.useEffect(() => {
     finishedSteps,
     selectedEventType,
     formData,
+    formDataHasMeaningfulValues,
   ]);
 
   // State for Tranzila terminal info
@@ -4585,7 +4619,7 @@ const whatsappTriggeredEventsRef = useRef(new Set());
             setSelectedDesign(tpl);
             markStepDone(2);
           }
-          if(Object.values(formData).every(v=>!v) && details){
+          if(formDataIsMeaningfullyEmpty && details){
           if(currentEventId) {
             setFormData(prev=>({ ...prev, ...details }));
               setEventDetailsCompleted(true);
