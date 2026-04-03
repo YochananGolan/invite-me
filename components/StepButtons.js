@@ -66,6 +66,29 @@ const DEFAULT_EVENT_TIME = '19:30';
 const DEFAULT_CHUPPAH_TIME = '21:00';
 const DEFAULT_CUSTOM_DESCRIPTION = 'תיאור האירוע';
 
+const parseEventDate = (str) => {
+  if (!str) return null;
+  const dateOnly = String(str).split(/[T ]/)[0];
+  const native = new Date(dateOnly);
+  if (!Number.isNaN(native.getTime())) return native;
+  const match = dateOnly.match(/^(\d{1,2})[.\/-](\d{1,2})[.\/-](\d{4})$/);
+  if (match) {
+    const [, day, month, year] = match;
+    return new Date(Number(year), Number(month) - 1, Number(day));
+  }
+  return null;
+};
+
+const computePlanRetentionDate = (rawDate) => {
+  const parsed = parseEventDate(rawDate);
+  if (!parsed) return null;
+  parsed.setHours(0, 0, 0, 0);
+  const retention = new Date(parsed);
+  retention.setDate(retention.getDate() + 1);
+  retention.setHours(0, 0, 0, 0);
+  return retention;
+};
+
 const hasMeaningfulFormValue = (key, value) => {
   if (value === null || value === undefined) return false;
   if (typeof value === 'string') {
@@ -224,6 +247,10 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick, trig
     { key: 'pending', name: 'טרם הגיבו', value: guestStatusSummary.pending, color: '#facc15' },
     { key: 'rejected', name: 'לא אישרו', value: guestStatusSummary.rejected, color: '#dc2626' }
   ]), [guestStatusSummary]);
+  const statusTotal = React.useMemo(
+    () => statusChartData.reduce((sum, item) => sum + (Number(item.value) || 0), 0),
+    [statusChartData]
+  );
   const hasStatusData = statusChartData.some(item => item.value > 0);
   const guestSummaryChartData = React.useMemo(() => ([
     { key: 'adults', name: 'מבוגרים', value: guestSummary.adults, color: '#16a34a' },
@@ -260,29 +287,26 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick, trig
       </text>
     );
   }, [guestSummaryChartData]);
-  const renderStatusLabel = React.useCallback(({
-    cx,
-    cy,
-    midAngle,
-    innerRadius,
-    outerRadius,
-    index,
-    value
-  }) => {
-    if (!value) return null;
-    const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
-    const x = cx + radius * Math.cos(-midAngle * RADIAN);
-    const y = cy + radius * Math.sin(-midAngle * RADIAN);
-    const slice = statusChartData[index];
-    const color = slice?.key === 'approved' || slice?.key === 'rejected' ? '#FFFFFF' : '#1f2937';
+  const renderStatusSliceLabel = React.useCallback((props) => {
+    const { value, cx, cy, midAngle, innerRadius, outerRadius, index } = props;
+    if (value === undefined || value === null || Number(value) === 0) return null;
+    const slice = statusChartData?.[index];
+    if (!slice) return null;
+    const labelRadius = innerRadius + (outerRadius - innerRadius) * 0.6;
+    const x = cx + labelRadius * Math.cos(-midAngle * RADIAN);
+    const y = cy + labelRadius * Math.sin(-midAngle * RADIAN);
     return (
       <text
         x={x}
         y={y}
-        fill={color}
-        textAnchor={x >= cx ? 'start' : 'end'}
+        fill="#111827"
+        textAnchor="middle"
         dominantBaseline="central"
-        style={{ fontWeight: 700, fontSize: '14px' }}
+        fontWeight="700"
+        fontSize="18"
+        stroke="#FFFFFF"
+        strokeWidth="4"
+        paintOrder="stroke"
       >
         {value}
       </text>
@@ -421,8 +445,17 @@ const [isSavingExcelGuests, setIsSavingExcelGuests] = useState(false);
     }
   },[]);
 
-  const [selectedPlan, setSelectedPlan] = useState(null);
+  const [selectedPlan, setSelectedPlan] = useState(() => {
+    if (typeof window === 'undefined') return null;
+    try {
+      const saved = localStorage.getItem('selectedPlan');
+      return saved || null;
+    } catch (e) {
+      return null;
+    }
+  });
   const selectionSourceRef = useRef('manual');
+  const planRetentionUntilRef = useRef(null);
   const isMobileView = typeof window !== 'undefined' && window.innerWidth < 640;
 
 const getPlanLabel = React.useCallback((plan) => {
@@ -1691,27 +1724,101 @@ const handleOpenAddonModal = React.useCallback(() => {
 
   React.useEffect(()=>{
     (async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-      const { data, error } = await supabase
-        .from('events')
-        .select('event_type, event_details, invitation_path')
-        .eq('user_id', user.id)
-        .or('status.neq.archived,status.is.null')
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      if (error || !data) return;
-      const details = data.event_details || {};
-      setSelectedEventType(data.event_type || '');
-      setFormData((prev)=>({ ...prev, ...(details || {}) }));
-      if (details && Object.keys(details).length) {
-        setEventDetailsCompleted(true);
-        markStepDone(1);
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+        const { data, error } = await supabase
+          .from('events')
+          .select('id, event_type, event_details, invitation_path, status')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        const clearEventDetails = () => {
+          setSelectedEventType('');
+          setFormData(() => ({ ...initialFormState }));
+          setEventDetailsCompleted(false);
+          setSelectedDesign(null);
+          setInvitationSent(false);
+          setRsvpConfirmed(false);
+          setShowGuestForm(false);
+          setShowReportsOptions(false);
+          setStepErrorMsg('');
+          setErrorMsg('');
+          setFinishedSteps([]);
+          setCurrentEventId(null);
+          lastRestoredEventIdRef.current = null;
+          noEventLoggedRef.current = false;
+          setEventDataLoaded(false);
+          setGuestSummary({ approved: 0, adults: 0, children: 0 });
+          resetCapacityWarningGuests();
+          setGuestStatusSummary({ approved: 0, rejected: 0, pending: 0 });
+          setSpecialMealsSummary({
+            veg: { adults: 0, children: 0, total: 0 },
+            vegan: { adults: 0, children: 0, total: 0 },
+            glatt: { adults: 0, children: 0, total: 0 },
+            allergy: { adults: 0, children: 0, total: 0 },
+          });
+          setDbGuests([]);
+          setSentGuests([]);
+          setReportGuests([]);
+          setApprovedGuests([]);
+          setRejectedGuests([]);
+          setPendingGuests([]);
+          setShowGuestListModal(false);
+          setShowReportModal(false);
+          setSelectedEventForReport(null);
+          setInvitedGuestsCount(0);
+          setEventMessagesSentCount(0);
+          setNewEventStarted(false);
+          try {
+            localStorage.removeItem('savedEventDetails');
+            localStorage.removeItem('selectedEventType');
+            localStorage.removeItem('selectedDesign');
+            localStorage.removeItem('draftEvent');
+            localStorage.removeItem('finishedSteps');
+            localStorage.removeItem('newEventStarted');
+          } catch (_) {}
+        };
+
+        if (error || !data) {
+          clearEventDetails();
+          return;
+        }
+
+        const details = data.event_details || {};
+        const rawDate =
+          details?.date ||
+          details?.event_date ||
+          details?.start_datetime ||
+          details?.end_datetime ||
+          null;
+        const retentionDate = computePlanRetentionDate(rawDate);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const isArchived = data.status === 'archived';
+        const isPastEvent =
+          retentionDate ? today >= retentionDate : false;
+
+        if (isArchived || isPastEvent) {
+          clearEventDetails();
+          return;
+        }
+
+        setCurrentEventId(data.id);
+        setSelectedEventType(data.event_type || '');
+        setFormData((prev)=>({ ...prev, ...(details || {}) }));
+        if (details && Object.keys(details).length) {
+          setEventDetailsCompleted(true);
+          markStepDone(1);
+        }
+        try { localStorage.setItem('savedEventDetails', JSON.stringify(details || {})); } catch(e){}
+      } catch (err) {
+        console.error('Failed to restore latest event details', err);
       }
-      try { localStorage.setItem('savedEventDetails', JSON.stringify(details || {})); } catch(e){}
     })();
-  }, []);
+  }, [eventRefreshKey, resetCapacityWarningGuests]);
 
   // restore details
   React.useEffect(()=>{
@@ -2942,6 +3049,7 @@ React.useEffect(() => {
       setDbAddonCount(0);
       setUserPlanSettings({ plan: null, addonCount: 0 });
       setNewEventStarted(false);
+    planRetentionUntilRef.current = null;
       try { localStorage.removeItem('selectedPlan'); } catch (_) {}
       try { localStorage.removeItem('additionalPackages_global'); } catch (_) {}
       try { localStorage.removeItem('newEventStarted'); } catch (_) {}
@@ -2984,7 +3092,6 @@ React.useEffect(() => {
     setSelectedEventForReport(null);
     setInvitedGuestsCount(0);
     setEventMessagesSentCount(0);
-    await clearPlanState();
   };
 
   const handleNewEvent = async (showDeletionMessage = false) => {
@@ -2999,8 +3106,9 @@ React.useEffect(() => {
     let deletionErrorAlertShown = false;
     let eventIdToDelete = currentEventId;
     const addonCountBeforeReset = 0;
-  const planToCarryForward =
-    currentEventId || newEventStarted ? selectedPlan || userPlanSettings?.plan || null : null;
+    const planToCarryForward =
+      currentEventId || newEventStarted ? selectedPlan || userPlanSettings?.plan || null : null;
+    let eventDateForRetention = null;
 
     if (!eventIdToDelete) {
       try {
@@ -3040,22 +3148,69 @@ React.useEffect(() => {
       try {
         const { data: eventData, error: fetchError } = await supabase
           .from('events')
-          .select('id, status')
+          .select('id, status, event_details')
           .eq('id', eventIdToDelete)
           .maybeSingle();
-        if (!fetchError && eventData && eventData.status !== 'archived') {
-          const { error: archiveErr } = await supabase
-            .from('events')
-            .update({ status: 'archived' })
-            .eq('id', eventIdToDelete);
-          if (archiveErr) {
-            console.error('Failed to archive event:', archiveErr);
-            alert('שגיאה בארכוב האירוע הקיים.');
-            deletionErrorAlertShown = true;
-            deletionCompleted = false;
+        if (!fetchError && eventData) {
+          try {
+            const details = typeof eventData.event_details === 'string'
+              ? JSON.parse(eventData.event_details)
+              : eventData.event_details || {};
+            const retentionDateRaw =
+              details?.date ||
+              details?.event_date ||
+              details?.start_datetime ||
+              details?.end_datetime ||
+              null;
+            if (retentionDateRaw) {
+              eventDateForRetention = retentionDateRaw;
+            }
+          } catch (parseErr) {
+            console.warn('Failed to parse event_details for retention window', parseErr);
+          }
+
+          // Always remove invited guests belonging to the event that is being cleared.
+          try {
+            await supabase.from('invited_guests').delete().eq('event_id', eventIdToDelete);
+          } catch (guestDeleteErr) {
+            console.warn('Failed to delete invited guests for event:', guestDeleteErr);
+          }
+
+          const retentionDate = computePlanRetentionDate(eventDateForRetention);
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          const shouldArchive =
+            Boolean(retentionDate && today >= retentionDate) &&
+            eventData.status !== 'archived';
+
+          if (shouldArchive) {
+            const { error: archiveErr } = await supabase
+              .from('events')
+              .update({ status: 'archived' })
+              .eq('id', eventIdToDelete);
+            if (archiveErr) {
+              console.error('Failed to archive event:', archiveErr);
+              alert('שגיאה בארכוב האירוע הקיים.');
+              deletionErrorAlertShown = true;
+              deletionCompleted = false;
+            } else {
+              eventWasDeleted = true;
+              deletionCompleted = true;
+            }
           } else {
-            eventWasDeleted = true;
-            deletionCompleted = true;
+            const { error: deleteErr } = await supabase
+              .from('events')
+              .delete()
+              .eq('id', eventIdToDelete);
+            if (deleteErr) {
+              console.error('Failed to delete event:', deleteErr);
+              alert('שגיאה במחיקת האירוע הקיים.');
+              deletionErrorAlertShown = true;
+              deletionCompleted = false;
+            } else {
+              eventWasDeleted = true;
+              deletionCompleted = true;
+            }
           }
         } else {
           deletionCompleted = true;
@@ -3086,6 +3241,24 @@ React.useEffect(() => {
     lastRestoredEventIdRef.current = null;
     noEventLoggedRef.current = false;
     setEventDataLoaded(false);
+
+    if (!eventDateForRetention) {
+      const rawDateFromForm =
+        formData?.date ||
+        formData?.event_date ||
+        formData?.start_datetime ||
+        formData?.end_datetime ||
+        null;
+      if (rawDateFromForm) {
+        eventDateForRetention = rawDateFromForm;
+      }
+    }
+    if (eventDateForRetention) {
+      const retentionDate = computePlanRetentionDate(eventDateForRetention);
+      if (retentionDate) {
+        planRetentionUntilRef.current = retentionDate;
+      }
+    }
     
     // If event was actually deleted (not just archived), reset everything פרט לחבילה:
     // המשתמש כבר רכש/בחר מסלול, אין סיבה לבקש ממנו לבחור שוב.
@@ -3138,6 +3311,7 @@ React.useEffect(() => {
       setPlanAddOnMode(false); // Ensure we're in plan selection mode, not addon mode
     }
     await persistUserPlanSettings(planToCarryForward, addonCountBeforeReset);
+    setEventRefreshKey((key) => key + 1);
 
     if (showDeletionMessage && (eventWasDeleted || deletionCompleted)) {
       // סימון ש"ניקינו" את האירוע הקודם – כדי לא לבקש מחיקה שוב בכל לחיצה על "צור אירוע חדש"
@@ -3622,6 +3796,17 @@ React.useEffect(() => {
       return localStorage.getItem('newEventStarted') === '1';
     } catch(e) { return false; }
   });
+React.useEffect(() => {
+  if (typeof window === 'undefined') return;
+  try {
+    const stored = localStorage.getItem('newEventStarted');
+    if (stored === '1') {
+      setNewEventStarted(true);
+    }
+  } catch (err) {
+    console.warn('Failed to restore newEventStarted from localStorage', err);
+  }
+}, []);
 
   React.useEffect(() => {
     if (!sessionRef.current) return;
@@ -3641,22 +3826,9 @@ React.useEffect(() => {
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    let eventInFuture = false;
-    const potentialDate =
-      formData?.date ||
-      formData?.event_date ||
-      formData?.start_datetime ||
-      formData?.end_datetime ||
-      null;
-    if (potentialDate) {
-      const parsed = new Date(potentialDate);
-      if (!Number.isNaN(parsed.getTime())) {
-        parsed.setHours(0, 0, 0, 0);
-        eventInFuture = parsed >= today;
-      }
-    }
-
-    if (eventInFuture) return;
+    const retentionUntil = planRetentionUntilRef.current;
+    if (!retentionUntil) return;
+    if (today < retentionUntil) return;
 
     clearPlanState();
   }, [
@@ -3669,7 +3841,6 @@ React.useEffect(() => {
     clearPlanState,
     finishedSteps,
     selectedEventType,
-    formData,
     formDataHasMeaningfulValues,
   ]);
 
@@ -3688,7 +3859,6 @@ React.useEffect(() => {
           .from('events')
           .select('id,event_details,allowed_guests,messages_sent_count,additional_packages,selected_plan,status')
           .eq('user_id',user.id)
-          .or('status.neq.archived,status.is.null')
           .order('created_at',{ascending:false})
           .limit(1)
           .maybeSingle();
@@ -3705,7 +3875,7 @@ React.useEffect(() => {
           ev = evData;
           messagesSent = ev?.messages_sent_count ?? 0;
         }
-        if(!ev) {
+        if (!ev || (ev.status === 'archived')) {
           const settings = await loadUserPlanSettings();
           const fallbackAddon = settings?.addonCount ?? 0;
           if ((settings?.plan || null) !== null) {
@@ -3743,14 +3913,14 @@ React.useEffect(() => {
           setSelectedPlan(planToUse);
           selectionSourceRef.current = 'event';
           try { localStorage.setItem('selectedPlan', planToUse); } catch(e){}
-        } else {
-          setSelectedPlan(null);
-          selectionSourceRef.current = 'manual';
-          try { localStorage.removeItem('selectedPlan'); } catch(_) {}
+          await persistUserPlanSettings(planToUse, addonCount);
         }
-        await persistUserPlanSettings(planToUse, addonCount);
         const details=typeof ev.event_details==='string'?JSON.parse(ev.event_details):ev.event_details||{};
         const dateStr=details.date||details.start_datetime;
+        const retentionDate = computePlanRetentionDate(dateStr);
+        if (retentionDate) {
+          planRetentionUntilRef.current = retentionDate;
+        }
         const parsedDate = parseEventDate(dateStr);
         if(parsedDate) {
           const today = new Date();
@@ -3790,12 +3960,8 @@ React.useEffect(() => {
           if (planFromEvent) {
             setSelectedPlan(planFromEvent);
             try { localStorage.setItem('selectedPlan', planFromEvent); } catch (_) {}
-          } else {
-            setSelectedPlan(null);
-            selectionSourceRef.current = 'manual';
-            try { localStorage.removeItem('selectedPlan'); } catch (_) {}
+            persistUserPlanSettings(planFromEvent, ev.additional_packages ?? 0);
           }
-          persistUserPlanSettings(planFromEvent, ev.additional_packages ?? 0);
           setEventRefreshKey((k) => k + 1);
         }
       )
@@ -4405,6 +4571,10 @@ React.useEffect(() => {
                 ? JSON.parse(lastEvent.event_details)
                 : lastEvent.event_details || {};
               const rawDate = details.date || details.start_datetime || lastEvent.created_at;
+              const retentionDate = computePlanRetentionDate(rawDate);
+              if (retentionDate) {
+                planRetentionUntilRef.current = retentionDate;
+              }
               if (rawDate) {
                 const eventDate = new Date(rawDate);
                 eventDate.setHours(0, 0, 0, 0);
@@ -4969,20 +5139,6 @@ React.useEffect(()=>{
   };
 
   // Robust date parsing for event date strings that may use DD-MM-YYYY, DD.MM.YYYY or DD/MM/YYYY formats.
-  const parseEventDate = (str)=>{
-    if(!str) return null;
-    // If string contains time, take only the date portion
-    const dateOnly = str.split(/[T ]/)[0];
-    const native = new Date(dateOnly);
-    if(!isNaN(native)) return native;
-    const m = dateOnly.match(/^(\d{1,2})[.\/-](\d{1,2})[.\/-](\d{4})$/);
-    if(m){
-      const [, d,mn,y] = m;
-      return new Date(Number(y), Number(mn)-1, Number(d));
-    }
-    return null;
-  };
-
   // Reset form and steps when no active event exists AND no new event started
   React.useEffect(()=>{
     if(currentEventId || newEventStarted) return; // Don't reset if new event is in progress
@@ -5689,7 +5845,7 @@ React.useEffect(()=>{
                     {!shouldShowCharts ? (
                     <div className="py-10 text-sm text-gray-500 text-center">טוען נתונים...</div>
                   ) : hasStatusData ? (
-                    <div className="h-56 min-h-[200px] sm:h-56">
+                    <div className="relative h-56 min-h-[200px] sm:h-56">
                       <ResponsiveContainer width="100%" height="100%">
                         <PieChart>
                           <Pie
@@ -5699,8 +5855,8 @@ React.useEffect(()=>{
                             innerRadius={55}
                             outerRadius={95}
                             paddingAngle={3}
-                            labelLine={false}
-                            label={renderStatusLabel}
+              labelLine={false}
+              label={renderStatusSliceLabel}
                           >
                             {statusChartData.map((item) => (
                               <Cell key={item.key} fill={item.color} />
@@ -8070,9 +8226,9 @@ React.useEffect(()=>{
             </button>
             <div className="mb-6">
               <div className="text-5xl mb-4 text-green-600">✅</div>
-              <h2 className="text-2xl font-bold text-green-700 mb-3">האירוע הועבר לארכיון</h2>
+              <h2 className="text-2xl font-bold text-green-700 mb-3">מחיקת האירוע בוצעה בהצלחה</h2>
               <p className="text-base text-gray-700 leading-relaxed">
-                האירוע הקודם נשמר בארכיון עם כל הנתונים. כעת ניתן ליצור אירוע חדש.
+                האירוע הקודם נמחק בהצלחה, כעת ניתן ליצור אירוע חדש.
               </p>
             </div>
             <button
