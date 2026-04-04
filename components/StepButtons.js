@@ -3111,8 +3111,7 @@ React.useEffect(() => {
     let deletionErrorAlertShown = false;
     let eventIdToDelete = currentEventId;
     const addonCountBeforeReset = 0;
-    const planToCarryForward =
-      currentEventId || newEventStarted ? selectedPlan || userPlanSettings?.plan || null : null;
+    const planToCarryForward = selectedPlan || userPlanSettings?.plan || null;
     let eventDateForRetention = null;
 
     if (!eventIdToDelete) {
@@ -5616,7 +5615,7 @@ React.useEffect(()=>{
                 </p>
               </div>
             )}
-            {session && selectedPlan && (currentEventId || newEventStarted) && (
+            {session && selectedPlan && (
               <div className="bg-yellow-50 p-3 sm:p-4 text-center shadow-lg w-full" style={{
                 border: '3px solid #D4AF37',
                 outline: '2px solid #B8860B',
