@@ -289,12 +289,17 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick, trig
   }, [guestSummaryChartData]);
   const renderStatusSliceLabel = React.useCallback((props) => {
     const { value, cx, cy, midAngle, innerRadius, outerRadius, index } = props;
-    if (value === undefined || value === null || Number(value) === 0) return null;
+    const numericValue = Number(value);
+    if (!Number.isFinite(numericValue) || numericValue <= 0) return null;
     const slice = statusChartData?.[index];
     if (!slice) return null;
-    const labelRadius = innerRadius + (outerRadius - innerRadius) * 0.6;
-    const x = cx + labelRadius * Math.cos(-midAngle * RADIAN);
-    const y = cy + labelRadius * Math.sin(-midAngle * RADIAN);
+    const total = statusTotal;
+    const isOnlySlice = total > 0 && numericValue === total;
+    const radius = isOnlySlice
+      ? innerRadius + (outerRadius - innerRadius) / 2
+      : innerRadius + (outerRadius - innerRadius) * 0.65;
+    const x = isOnlySlice ? cx : cx + radius * Math.cos(-midAngle * RADIAN);
+    const y = isOnlySlice ? cy : cy + radius * Math.sin(-midAngle * RADIAN);
     return (
       <text
         x={x}
@@ -303,15 +308,15 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick, trig
         textAnchor="middle"
         dominantBaseline="central"
         fontWeight="700"
-        fontSize="18"
+        fontSize={isOnlySlice ? 22 : 18}
         stroke="#FFFFFF"
-        strokeWidth="4"
-        paintOrder="stroke"
+        strokeWidth={isOnlySlice ? 5 : 3}
+        style={{ paintOrder: 'stroke' }}
       >
-        {value}
+        {numericValue}
       </text>
     );
-  }, [statusChartData]);
+  }, [statusChartData, statusTotal]);
 
   const markStepDone=(idx)=>{
     console.log('markStepDone called with idx:', idx);
@@ -3317,7 +3322,8 @@ React.useEffect(() => {
       // סימון ש"ניקינו" את האירוע הקודם – כדי לא לבקש מחיקה שוב בכל לחיצה על "צור אירוע חדש"
       setHasClearedExistingEvent(true);
       setShowDeletionSuccess(true);
-      setShowEventTypes(true);
+      setSelectedFlowStep(null);
+      setShowEventTypes(false);
     }
   };
 
@@ -3550,6 +3556,7 @@ React.useEffect(() => {
       // Handle plan purchase (ב, ג, ד)
       if (effectivePlan && effectivePlan !== 'addon') {
         try {
+          planRetentionUntilRef.current = null;
           setSelectedPlan(effectivePlan);
           try { localStorage.setItem('selectedPlan', effectivePlan); } catch(e){
             console.warn('Failed to save plan to localStorage:', e);
@@ -5855,8 +5862,8 @@ React.useEffect(()=>{
                             innerRadius={55}
                             outerRadius={95}
                             paddingAngle={3}
-              labelLine={false}
-              label={renderStatusSliceLabel}
+                            label={renderStatusSliceLabel}
+                            labelLine={false}
                           >
                             {statusChartData.map((item) => (
                               <Cell key={item.key} fill={item.color} />
@@ -8218,7 +8225,11 @@ React.useEffect(()=>{
         <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-[60]">
           <div className="relative bg-white rounded-lg p-6 w-full max-w-md text-center shadow-2xl border-4 border-green-500">
             <button
-              onClick={() => { setShowDeletionSuccess(false); setShowEventTypes(true); }}
+              onClick={() => {
+                setShowDeletionSuccess(false);
+                setSelectedFlowStep(null);
+                setShowEventTypes(false);
+              }}
               className="absolute top-2 left-2 text-2xl text-gray-500 hover:text-gray-700"
               aria-label="סגור"
             >
@@ -8232,7 +8243,11 @@ React.useEffect(()=>{
               </p>
             </div>
             <button
-              onClick={() => { setShowDeletionSuccess(false); setShowEventTypes(true); }}
+              onClick={() => {
+                setShowDeletionSuccess(false);
+                setSelectedFlowStep(null);
+                setShowEventTypes(true);
+              }}
               className="bg-green-600 text-white border border-green-700 rounded-full px-8 py-3 font-bold text-lg hover:bg-green-700 transition-all"
             >
               בחר סוג אירוע חדש
