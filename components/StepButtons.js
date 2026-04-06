@@ -3110,7 +3110,19 @@ React.useEffect(() => {
     let deletionCompleted = false;
     let deletionErrorAlertShown = false;
     let eventIdToDelete = currentEventId;
-    const addonCountBeforeReset = 0;
+    const addonCountFromPackages = Array.isArray(additionalPackages)
+      ? additionalPackages.filter((pkg) => pkg === 'addon').length
+      : 0;
+    const addonCountFromDb = Number.isFinite(dbAddonCount) ? Math.max(0, dbAddonCount) : 0;
+    const addonCountFromSettings = Number.isFinite(userPlanSettings?.addonCount)
+      ? Math.max(0, userPlanSettings.addonCount)
+      : 0;
+    const addonCountBeforeReset = Math.max(
+      0,
+      addonCountFromPackages,
+      addonCountFromDb,
+      addonCountFromSettings,
+    );
     const planToCarryForward = selectedPlan || userPlanSettings?.plan || null;
     let eventDateForRetention = null;
 
@@ -3288,7 +3300,11 @@ React.useEffect(() => {
     setSelectedEventForReport(null);
     setSelectedPlan(planToCarryForward);
     if (!planToCarryForward) {
+      setAdditionalPackages([]);
+      setDbAddonCount(0);
+      selectionSourceRef.current = 'manual';
       try { localStorage.removeItem('selectedPlan'); } catch (_) {}
+      try { localStorage.removeItem('additionalPackages_global'); } catch (_) {}
       await resetWizardStateForNoEvent();
       setNewEventStarted(false);
       setShowEventTypes(false);
@@ -3297,9 +3313,14 @@ React.useEffect(() => {
       setPlanAddOnMode(false);
       return;
     }
-    setAdditionalPackages([]);
+
+    selectionSourceRef.current = 'persistent';
+    try { localStorage.setItem('selectedPlan', planToCarryForward); } catch (_) {}
+    const addonsArray =
+      addonCountBeforeReset > 0 ? Array(addonCountBeforeReset).fill('addon') : [];
+    setAdditionalPackages(addonsArray);
     setDbAddonCount(addonCountBeforeReset);
-    try { localStorage.removeItem('additionalPackages_global'); } catch (_) {}
+    try { localStorage.setItem('additionalPackages_global', String(addonCountBeforeReset)); } catch (_) {}
     
     try{ localStorage.removeItem('selectedDesign'); }catch{}
     try{ localStorage.removeItem('finishedSteps'); }catch{}
