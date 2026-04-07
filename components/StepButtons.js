@@ -3123,7 +3123,7 @@ React.useEffect(() => {
       addonCountFromDb,
       addonCountFromSettings,
     );
-    let planToCarryForward = selectedPlan || userPlanSettings?.plan || null;
+    let planToCarryForward = selectedPlanRef.current || userPlanSettings?.plan || null;
     if (!planToCarryForward && typeof window !== 'undefined') {
       try {
         const storedPlan =
