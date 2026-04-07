@@ -3117,13 +3117,47 @@ React.useEffect(() => {
     const addonCountFromSettings = Number.isFinite(userPlanSettings?.addonCount)
       ? Math.max(0, userPlanSettings.addonCount)
       : 0;
-    const addonCountBeforeReset = Math.max(
+    let addonCountBeforeReset = Math.max(
       0,
       addonCountFromPackages,
       addonCountFromDb,
       addonCountFromSettings,
     );
-    const planToCarryForward = selectedPlan || userPlanSettings?.plan || null;
+    let planToCarryForward = selectedPlan || userPlanSettings?.plan || null;
+    if (!planToCarryForward && typeof window !== 'undefined') {
+      try {
+        const storedPlan =
+          localStorage.getItem('selectedPlan') ||
+          localStorage.getItem('user_plan_code') ||
+          null;
+        if (storedPlan) {
+          planToCarryForward = storedPlan;
+        }
+        if (!addonCountBeforeReset) {
+          const storedAddon = localStorage.getItem('additionalPackages_global');
+          const parsedAddon = Number(storedAddon);
+          if (Number.isFinite(parsedAddon) && parsedAddon > 0) {
+            addonCountBeforeReset = Math.max(addonCountBeforeReset, parsedAddon);
+          }
+        }
+      } catch (storageErr) {
+        console.warn('Failed to recover plan from storage during deletion', storageErr);
+      }
+    }
+    if (!planToCarryForward) {
+      try {
+        const settingsSnapshot = await loadUserPlanSettings();
+        if (settingsSnapshot?.plan) {
+          planToCarryForward = settingsSnapshot.plan;
+          const addonFromSettingsSnapshot = Number(settingsSnapshot.addonCount);
+          if (Number.isFinite(addonFromSettingsSnapshot) && addonFromSettingsSnapshot > 0) {
+            addonCountBeforeReset = Math.max(addonCountBeforeReset, addonFromSettingsSnapshot);
+          }
+        }
+      } catch (settingsErr) {
+        console.warn('Failed to recover plan from Supabase during deletion', settingsErr);
+      }
+    }
     let eventDateForRetention = null;
 
     if (!eventIdToDelete) {
