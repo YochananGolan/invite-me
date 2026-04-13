@@ -87,32 +87,96 @@ function parseEventDetails(eventDetails) {
   return eventDetails;
 }
 
-function buildGuestMessage({ guest, eventDetails, eventId }) {
+function formatHebrewDate(eventDateRaw) {
+  if (!eventDateRaw) return '';
+  try {
+    const parsed = new Date(eventDateRaw);
+    if (!Number.isNaN(parsed.getTime())) {
+      return parsed.toLocaleDateString('he-IL', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      });
+    }
+  } catch (err) {
+    // Fall through to raw value
+  }
+  return eventDateRaw;
+}
+
+function buildEventTemplateText({ eventType, eventDetails, formattedDate }) {
+  const normalizeType = (type) => (type === 'ברית/ה' ? 'ברית' : type);
+  const t = normalizeType(eventType);
+  const d = eventDetails || {};
+
+  const templates = {
+    'חתונה': `${d.brideName || ''} ו${d.groomName || ''} מתחתנים
+שמחים להזמינכם לחגוג עמנו את יום הנישואין
+${formattedDate ? `ביום ${formattedDate}` : ''}
+${d.time ? `בשעה ${d.time}` : ''}
+${d.hallName || d.hallAddress ? `באולם ${d.hallName || ''}${d.hallAddress ? `, ${d.hallAddress}` : ''}` : ''}
+${d.chuppahTime ? `החופה תתקיים בשעה ${d.chuppahTime}` : ''}`.trim(),
+    'חינה': `${d.brideName || ''} ו${d.groomName || ''} מזמינים אתכם לחגוג עמנו בחינה
+${formattedDate ? `ביום ${formattedDate}` : ''}
+${d.time ? `בשעה ${d.time}` : ''}
+${d.hallName || d.hallAddress ? `באולם ${d.hallName || ''}${d.hallAddress ? `, ${d.hallAddress}` : ''}` : ''}`.trim(),
+    'מסיבת אירוסין': `${d.brideName || ''} ו${d.groomName || ''} שמחים להזמינכם למסיבת האירוסין שלנו
+${formattedDate ? `ביום ${formattedDate}` : ''}
+${d.time ? `בשעה ${d.time}` : ''}
+${d.hallName || d.hallAddress ? `באולם ${d.hallName || ''}${d.hallAddress ? `, ${d.hallAddress}` : ''}` : ''}`.trim(),
+    'בר מצווה': `מזמינים אתכם לחגוג עמנו את בר המצווה של ${d.boyName || 'בננו'}
+${formattedDate ? `ביום ${formattedDate}` : ''}
+${d.time ? `בשעה ${d.time}` : ''}
+${d.hallName || d.hallAddress ? `באולם ${d.hallName || ''}${d.hallAddress ? `, ${d.hallAddress}` : ''}` : ''}`.trim(),
+    'בת מצווה': `מזמינים אתכם לחגוג עמנו את בת המצווה של ${d.girlName || 'בתנו'}
+${formattedDate ? `ביום ${formattedDate}` : ''}
+${d.time ? `בשעה ${d.time}` : ''}
+${d.hallName || d.hallAddress ? `באולם ${d.hallName || ''}${d.hallAddress ? `, ${d.hallAddress}` : ''}` : ''}`.trim(),
+    'ברית': `שמחים להזמינכם לברית
+${formattedDate ? `ביום ${formattedDate}` : ''}
+${d.time ? `בשעה ${d.time}` : ''}
+${d.hallName || d.hallAddress ? `באולם ${d.hallName || ''}${d.hallAddress ? `, ${d.hallAddress}` : ''}` : ''}`.trim(),
+    'בריתה': `שמחים להזמינכם לבריתה
+${formattedDate ? `ביום ${formattedDate}` : ''}
+${d.time ? `בשעה ${d.time}` : ''}
+${d.hallName || d.hallAddress ? `באולם ${d.hallName || ''}${d.hallAddress ? `, ${d.hallAddress}` : ''}` : ''}`.trim(),
+    'יום הולדת': `את/ה מוזמנ/ת לחגוג יום הולדת ל${d.birthdayName || ''}
+${formattedDate ? `ביום ${formattedDate}` : ''}
+${d.time ? `בשעה ${d.time}` : ''}
+${d.hallName || d.hallAddress ? `ב${d.hallName || ''}${d.hallAddress ? `, ${d.hallAddress}` : ''}` : ''}`.trim(),
+    'אירוע עסקי': `חברת ${d.businessName || ''}${d.businessContact ? ` (${d.businessContact})` : ''}
+מתכבדת להזמינך לאירוע העסקי שלנו
+${formattedDate ? `ביום ${formattedDate}` : ''}
+${d.time ? `בשעה ${d.time}` : ''}
+${d.hallName || d.hallAddress ? `ב${d.hallName || ''}${d.hallAddress ? `, ${d.hallAddress}` : ''}` : ''}`.trim(),
+    'הפרשת חלה': `${d.hostName || ''} מזמינה אתכן לטקס הפרשת חלה
+${formattedDate ? `ביום ${formattedDate}` : ''}
+${d.time ? `בשעה ${d.time}` : ''}
+${d.hallName || d.hallAddress ? `ב${d.hallName || ''}${d.hallAddress ? `, ${d.hallAddress}` : ''}` : ''}`.trim(),
+  };
+
+  return templates[t] || '';
+}
+
+function buildGuestMessage({ guest, eventType, eventDetails, eventId }) {
   const inviteBase = getInviteBaseUrl();
   const inviteLink = `${inviteBase}/${eventId}/${guest.id}`;
 
-  const customText = eventDetails?.custom_invitation_text || eventDetails?.customEventDescription || '';
   const eventDateRaw = eventDetails?.date || eventDetails?.event_date;
-  let formattedDate = eventDateRaw || '';
-  if (eventDateRaw) {
-    try {
-      const parsed = new Date(eventDateRaw);
-      if (!Number.isNaN(parsed.getTime())) {
-        formattedDate = parsed.toLocaleDateString('he-IL', {
-          weekday: 'long',
-          year: 'numeric',
-          month: 'long',
-          day: 'numeric',
-        });
-      }
-    } catch (err) {
-      formattedDate = eventDateRaw;
-    }
-  }
+  const formattedDate = formatHebrewDate(eventDateRaw);
+
+  const invitationLines = Array.isArray(eventDetails?.invitation_text_lines)
+    ? eventDetails.invitation_text_lines.filter((line) => typeof line === 'string' && line.trim())
+    : [];
+  const customText = invitationLines.length
+    ? invitationLines.join('\n')
+    : (eventDetails?.custom_invitation_text || eventDetails?.customEventDescription || '').trim();
+  const templateText = customText || buildEventTemplateText({ eventType, eventDetails, formattedDate });
 
   const parts = [
     guest.first_name ? `היי ${guest.first_name}!` : 'שלום!',
-    customText || undefined,
+    templateText || undefined,
     formattedDate ? `תאריך האירוע: ${formattedDate}` : undefined,
     eventDetails?.time ? `שעה: ${eventDetails.time}` : undefined,
     eventDetails?.hallName ? `מקום האירוע: ${eventDetails.hallName}` : undefined,
@@ -154,7 +218,7 @@ export default async function handler(req, res) {
 
   const { data: event, error: eventError } = await supabase
     .from('events')
-    .select('id, event_details, messages_sent_count')
+    .select('id, event_type, event_details, messages_sent_count')
     .eq('id', eventId)
     .maybeSingle();
 
@@ -218,7 +282,7 @@ export default async function handler(req, res) {
   const results = [];
 
   for (const guest of guestsWithPhone) {
-    const body = buildGuestMessage({ guest, eventDetails, eventId });
+    const body = buildGuestMessage({ guest, eventType: event.event_type, eventDetails, eventId });
     const phone = normalizePhoneNumber(guest.phone);
     if (!phone) {
       results.push({
