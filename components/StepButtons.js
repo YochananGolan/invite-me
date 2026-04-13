@@ -2147,6 +2147,10 @@ const handleOpenAddonModal = React.useCallback(() => {
           }
         }
 
+        // In most real flows we update an existing active event (not insert a new row),
+        // so we should still trigger WhatsApp sends for guests tied to this event.
+        triggerWhatsAppInvites(currentEventId);
+
         // allowed_guests is persisted in DB; UI quota uses selectedPlan/addons from state.
       } else {
         // Calculate allowed guests based on plan and addons
