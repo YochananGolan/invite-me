@@ -197,6 +197,12 @@ export default async function handler(req, res) {
   }
 
   const { eventId, guestId, guestIds } = req.body || {};
+  console.log('[greenapi-send-invite] Request received', {
+    method: req.method,
+    eventId,
+    guestId: guestId || null,
+    guestIdsCount: Array.isArray(guestIds) ? guestIds.length : 0,
+  });
 
   sendDebugLog({
     hypothesisId: 'H4',
@@ -232,6 +238,11 @@ export default async function handler(req, res) {
     });
     return res.status(404).json({ error: 'Event not found' });
   }
+  console.log('[greenapi-send-invite] Event loaded', {
+    eventId: event?.id || eventId,
+    eventType: event?.event_type || null,
+    hasEventDetails: Boolean(event?.event_details),
+  });
 
   let guestQuery = supabase
     .from('invited_guests')
@@ -256,8 +267,11 @@ export default async function handler(req, res) {
     });
     return res.status(500).json({ error: 'Failed to fetch guests' });
   }
-
   const guestsWithPhone = (guests || []).filter((guest) => normalizePhoneNumber(guest.phone));
+  console.log('[greenapi-send-invite] Guests loaded', {
+    totalGuests: guests?.length || 0,
+    guestsWithPhone: guestsWithPhone.length,
+  });
 
   sendDebugLog({
     hypothesisId: 'H5',
@@ -267,6 +281,7 @@ export default async function handler(req, res) {
   });
 
   if (guestsWithPhone.length === 0) {
+    console.log('[greenapi-send-invite] No guests with valid phone numbers');
     return res.status(200).json({
       sent: 0,
       failed: [],
@@ -305,6 +320,12 @@ export default async function handler(req, res) {
     };
 
     if (!sendResult.ok) {
+      console.error('[greenapi-send-invite] Failed sending to guest', {
+        guestId: guest.id,
+        phone,
+        status: sendResult.status,
+        error: sendResult.error,
+      });
       sendDebugLog({
         hypothesisId: 'H6',
         location: 'pages/api/greenapi/send-event-invite.js:126',
@@ -318,6 +339,11 @@ export default async function handler(req, res) {
 
   const sentCount = results.filter((r) => r.ok).length;
   const failed = results.filter((r) => !r.ok);
+  console.log('[greenapi-send-invite] Send summary', {
+    eventId,
+    sentCount,
+    failedCount: failed.length,
+  });
 
   sendDebugLog({
     hypothesisId: 'H2',
