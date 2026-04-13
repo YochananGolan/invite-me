@@ -59,7 +59,7 @@ function ensureSupabaseConfigured(res) {
   if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
     sendDebugLog({
       hypothesisId: 'H4',
-      location: 'pages/api/whatsapp/send-event-invite.js:55',
+      location: 'pages/api/greenapi/send-event-invite.js:55',
       message: 'Supabase configuration missing',
       data: {
         hasUrl: Boolean(SUPABASE_URL),
@@ -200,8 +200,8 @@ export default async function handler(req, res) {
 
   sendDebugLog({
     hypothesisId: 'H4',
-    location: 'pages/api/whatsapp/send-event-invite.js:43',
-    message: 'Webhook request received',
+    location: 'pages/api/greenapi/send-event-invite.js:43',
+    message: 'Invite send request received',
     data: {
       eventId,
       guestId,
@@ -226,7 +226,7 @@ export default async function handler(req, res) {
     console.error('[whatsapp] Failed to fetch event', eventError);
     sendDebugLog({
       hypothesisId: 'H4',
-      location: 'pages/api/whatsapp/send-event-invite.js:69',
+      location: 'pages/api/greenapi/send-event-invite.js:69',
       message: 'Event fetch failed',
       data: { eventError },
     });
@@ -250,7 +250,7 @@ export default async function handler(req, res) {
     console.error('[whatsapp] Failed to fetch guests', guestsError);
     sendDebugLog({
       hypothesisId: 'H5',
-      location: 'pages/api/whatsapp/send-event-invite.js:95',
+      location: 'pages/api/greenapi/send-event-invite.js:95',
       message: 'Guests fetch failed',
       data: { guestsError },
     });
@@ -261,7 +261,7 @@ export default async function handler(req, res) {
 
   sendDebugLog({
     hypothesisId: 'H5',
-    location: 'pages/api/whatsapp/send-event-invite.js:103',
+    location: 'pages/api/greenapi/send-event-invite.js:103',
     message: 'Guests fetched',
     data: { totalGuests: guests?.length || 0, withPhone: guestsWithPhone.length },
   });
@@ -307,7 +307,7 @@ export default async function handler(req, res) {
     if (!sendResult.ok) {
       sendDebugLog({
         hypothesisId: 'H6',
-        location: 'pages/api/whatsapp/send-event-invite.js:126',
+        location: 'pages/api/greenapi/send-event-invite.js:126',
         message: 'WhatsApp send failed',
         data: resultEntry,
       });
@@ -321,7 +321,7 @@ export default async function handler(req, res) {
 
   sendDebugLog({
     hypothesisId: 'H2',
-    location: 'pages/api/whatsapp/send-event-invite.js:135',
+    location: 'pages/api/greenapi/send-event-invite.js:135',
     message: 'WhatsApp send summary',
     data: { sentCount, failedCount: failed.length, updatedMessagesSentCount },
   });

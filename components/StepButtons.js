@@ -1899,7 +1899,7 @@ const handleOpenAddonModal = React.useCallback(() => {
     registry.add(eventId);
 
     try {
-      const response = await fetch('/api/whatsapp/send-event-invite', {
+      const response = await fetch('/api/greenapi/send-event-invite', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1960,7 +1960,7 @@ const handleOpenAddonModal = React.useCallback(() => {
     }
 
     try {
-      const response = await fetch('/api/whatsapp/send-event-invite', {
+      const response = await fetch('/api/greenapi/send-event-invite', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
