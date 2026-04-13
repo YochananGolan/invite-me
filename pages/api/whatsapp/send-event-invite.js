@@ -54,6 +54,7 @@ function sendDebugLog({ runId = 'initial', hypothesisId, location, message, data
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const SEND_CONCURRENCY = Math.max(1, Number(process.env.WHATSAPP_SEND_CONCURRENCY || 5));
 
 function ensureSupabaseConfigured(res) {
   if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
@@ -186,6 +187,27 @@ function buildGuestMessage({ guest, eventType, eventDetails, eventId }) {
   return parts.join('\n');
 }
 
+async function mapWithConcurrency(items, concurrency, mapper) {
+  const results = new Array(items.length);
+  let currentIndex = 0;
+
+  async function worker() {
+    while (true) {
+      const index = currentIndex;
+      currentIndex += 1;
+      if (index >= items.length) return;
+      results[index] = await mapper(items[index], index);
+    }
+  }
+
+  const workers = Array.from(
+    { length: Math.min(concurrency, items.length) },
+    () => worker()
+  );
+  await Promise.all(workers);
+  return results;
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     res.setHeader('Allow', ['POST']);
@@ -296,18 +318,17 @@ export default async function handler(req, res) {
     : 0;
   const results = [];
 
-  for (const guest of guestsWithPhone) {
+  const sendResults = await mapWithConcurrency(guestsWithPhone, SEND_CONCURRENCY, async (guest) => {
     const body = buildGuestMessage({ guest, eventType: event.event_type, eventDetails, eventId });
     const phone = normalizePhoneNumber(guest.phone);
     if (!phone) {
-      results.push({
+      return {
         guestId: guest.id,
         phone: guest.phone,
         ok: false,
         error: 'Invalid phone number',
         status: 'invalid',
-      });
-      continue;
+      };
     }
     const sendResult = await sendWhatsAppTextMessage({ to: phone, body });
     const resultEntry = {
@@ -334,8 +355,9 @@ export default async function handler(req, res) {
       });
     }
 
-    results.push(resultEntry);
-  }
+    return resultEntry;
+  });
+  results.push(...sendResults);
 
   const sentCount = results.filter((r) => r.ok).length;
   const failed = results.filter((r) => !r.ok);
@@ -343,6 +365,7 @@ export default async function handler(req, res) {
     eventId,
     sentCount,
     failedCount: failed.length,
+    concurrency: SEND_CONCURRENCY,
   });
 
   sendDebugLog({
