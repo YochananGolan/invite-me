@@ -4553,7 +4553,6 @@ React.useEffect(() => {
                 try { localStorage.setItem('selectedPlan', planToUse); } catch(e){}
                 try { localStorage.setItem('finishedSteps', JSON.stringify([1, 2])); } catch (e) {}
                 setFinishedSteps([1, 2]);
-                setShowEventTypes(true);
               }
               await persistUserPlanSettings(planToUse, restoreAddonCount);
               setFormData(prev => ({ ...prev, ...details }));
@@ -4717,15 +4716,9 @@ React.useEffect(() => {
           if (settings) {
             if (settings.plan) {
               setSelectedPlan(settings.plan);
-              setShowEventTypes(true);
-              setNewEventStarted(true);
+              // Keep the purchased/retained plan ready, but do NOT start the wizard automatically.
+              // The user should explicitly click "צור אירוע חדש" before seeing step modals.
               try { localStorage.setItem('selectedPlan', settings.plan); } catch(e){}
-              try { localStorage.setItem('newEventStarted', '1'); } catch(e){}
-              setFinishedSteps((prev) => {
-                const merged = Array.from(new Set([1, 2, ...(prev || [])])).sort((a, b) => a - b);
-                try { localStorage.setItem('finishedSteps', JSON.stringify(merged)); } catch (e) {}
-                return merged;
-              });
             } else {
               setSelectedPlan(null);
               try { localStorage.removeItem('user_plan_code'); } catch(e){}
