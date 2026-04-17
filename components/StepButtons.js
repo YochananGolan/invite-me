@@ -3167,6 +3167,8 @@ React.useEffect(() => {
       }
     }
     let eventDateForRetention = null;
+    let archivedByRetention = false;
+    let fetchedEventRow = null;
 
     if (!eventIdToDelete) {
       try {
@@ -3206,10 +3208,11 @@ React.useEffect(() => {
       try {
         const { data: eventData, error: fetchError } = await supabase
           .from('events')
-          .select('id, status, event_details')
+          .select('id, status, event_details, selected_plan, additional_packages, allowed_guests')
           .eq('id', eventIdToDelete)
           .maybeSingle();
         if (!fetchError && eventData) {
+          fetchedEventRow = eventData;
           try {
             const details = typeof eventData.event_details === 'string'
               ? JSON.parse(eventData.event_details)
@@ -3242,16 +3245,28 @@ React.useEffect(() => {
             eventData.status !== 'archived';
 
           if (shouldArchive) {
-            const { error: archiveErr } = await supabase
+            // סיום אירוע (אחרי תקופת השמירה): כמו ארכוב אוטומטי – גם המסלול מתאפס ברשומה
+            let archiveErr = null;
+            ({ error: archiveErr } = await supabase
               .from('events')
-              .update({ status: 'archived' })
-              .eq('id', eventIdToDelete);
+              .update({ status: 'archived', selected_plan: null, additional_packages: 0 })
+              .eq('id', eventIdToDelete));
+            if (
+              archiveErr &&
+              (archiveErr.message || '').toLowerCase().includes('column')
+            ) {
+              ({ error: archiveErr } = await supabase
+                .from('events')
+                .update({ status: 'archived' })
+                .eq('id', eventIdToDelete));
+            }
             if (archiveErr) {
               console.error('Failed to archive event:', archiveErr);
               alert('שגיאה בארכוב האירוע הקיים.');
               deletionErrorAlertShown = true;
               deletionCompleted = false;
             } else {
+              archivedByRetention = true;
               eventWasDeleted = true;
               deletionCompleted = true;
             }
@@ -3279,6 +3294,22 @@ React.useEffect(() => {
           alert('שגיאה בארכוב האירוע הקיים.');
         }
         deletionCompleted = false;
+      }
+    }
+
+    // מחיקה ידנית: לשחזר מסלול מרשומת האירוע ב-DB אם חסר ב-state. ארכוב אחרי סיום: לא לשמור מסלול.
+    if (archivedByRetention) {
+      planToCarryForward = null;
+      addonCountBeforeReset = 0;
+    } else if (fetchedEventRow) {
+      if (!planToCarryForward) {
+        const fromDb = derivePlanFromRecord(fetchedEventRow);
+        if (fromDb) planToCarryForward = fromDb;
+      }
+      const apFromRow =
+        typeof fetchedEventRow.additional_packages === 'number' ? fetchedEventRow.additional_packages : 0;
+      if (apFromRow > 0) {
+        addonCountBeforeReset = Math.max(addonCountBeforeReset, apFromRow);
       }
     }
 
@@ -3347,6 +3378,17 @@ React.useEffect(() => {
       selectionSourceRef.current = 'manual';
       try { localStorage.removeItem('selectedPlan'); } catch (_) {}
       try { localStorage.removeItem('additionalPackages_global'); } catch (_) {}
+      if (archivedByRetention) {
+        try {
+          await persistUserPlanSettings(null, 0);
+        } catch (_) {}
+        setUserPlanSettings((prev) => {
+          if (prev && prev.plan === null && (prev.addonCount ?? 0) === 0) {
+            return prev;
+          }
+          return { plan: null, addonCount: 0 };
+        });
+      }
       await resetWizardStateForNoEvent();
       setNewEventStarted(false);
       setShowEventTypes(false);
