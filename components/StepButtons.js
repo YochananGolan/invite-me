@@ -4483,13 +4483,34 @@ React.useEffect(() => {
 
     const archiveIfPast = async () => {
       try {
-        const { data: dbEvent, error } = await supabase
+        let dbEvent = null;
+        let error = null;
+        const res1 = await supabase
           .from('events')
-          .select('event_details, selected_plan, additional_packages')
+          .select('event_details, selected_plan, additional_packages, status')
           .eq('id', currentEventId)
           .maybeSingle();
+        if (res1.error && (res1.error.message || '').toLowerCase().includes('column')) {
+          const res2 = await supabase
+            .from('events')
+            .select('event_details, selected_plan, additional_packages')
+            .eq('id', currentEventId)
+            .maybeSingle();
+          dbEvent = res2.data;
+          error = res2.error;
+        } else {
+          dbEvent = res1.data;
+          error = res1.error;
+        }
 
         if (error || !dbEvent) return;
+
+        const rowStatus = typeof dbEvent.status === 'string' ? dbEvent.status.toLowerCase() : '';
+        if (rowStatus === 'archived') {
+          // אירוע כבר בארכיון (למשל רשומה ישנה אחרי מחיקה/רענון) — לא לאפס מסלול ולא להציג "האירוע הסתיים"
+          setCurrentEventId(null);
+          return;
+        }
 
         const details = typeof dbEvent.event_details === 'string'
           ? JSON.parse(dbEvent.event_details)
@@ -4500,6 +4521,7 @@ React.useEffect(() => {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         const eventDate = new Date(dbDate);
+        if (!Number.isFinite(eventDate.getTime())) return;
         eventDate.setHours(0, 0, 0, 0);
 
         if (eventDate >= today) return;
@@ -4892,7 +4914,7 @@ const whatsappTriggeredEventsRef = useRef(new Set());
         let messagesSent = 0;
         const { data: evData, error: evError } = await supabase
           .from('events')
-          .select('id,event_details,allowed_guests,messages_sent_count,additional_packages,selected_plan')
+          .select('id,status,event_details,allowed_guests,messages_sent_count,additional_packages,selected_plan')
           .eq('user_id', user.id)
           .order('created_at',{ascending:false})
           .limit(1)
@@ -4910,6 +4932,28 @@ const whatsappTriggeredEventsRef = useRef(new Set());
         } else {
           ev = evData;
           messagesSent = ev?.messages_sent_count ?? 0;
+        }
+        const evIsArchived =
+          ev &&
+          typeof ev.status === 'string' &&
+          ev.status.toLowerCase() === 'archived';
+        if (evIsArchived) {
+          const settings = await loadUserPlanSettings();
+          if (settings?.plan) {
+            setSelectedPlan(settings.plan);
+            try { localStorage.setItem('selectedPlan', settings.plan); } catch (e) {}
+            try { localStorage.setItem('user_plan_code', settings.plan); } catch (e) {}
+          }
+          const ac = settings?.addonCount ?? 0;
+          setDbAddonCount(ac);
+          setAdditionalPackages((prev) => {
+            const prevCount = Array.isArray(prev) ? prev.length : 0;
+            if (prevCount === ac) return prev;
+            return Array(ac).fill('addon');
+          });
+          try { localStorage.setItem('additionalPackages_global', String(ac)); } catch (e) {}
+          isInitialLoadRef.current = false;
+          return;
         }
         if(ev){
           setCurrentEventId(ev.id);
@@ -4952,7 +4996,7 @@ const whatsappTriggeredEventsRef = useRef(new Set());
         isInitialLoadRef.current = false;
       }catch(e){ console.error('restore event failed', e);}  
     })();
-  },[]);
+  },[loadUserPlanSettings]);
 
   // Load selectedDesign from localStorage if not already set from database
 React.useEffect(()=>{
