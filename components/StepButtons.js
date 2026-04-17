@@ -5635,7 +5635,7 @@ React.useEffect(()=>{
                 </p>
               </div>
             )}
-            {session && (planForDisplay || currentEventId) && (
+            {(planForDisplay || currentEventId) && (
               <div className="bg-yellow-50 p-3 sm:p-4 text-center shadow-lg w-full" style={{
                 border: '3px solid #D4AF37',
                 outline: '2px solid #B8860B',
@@ -5930,7 +5930,7 @@ React.useEffect(()=>{
                   <p className="text-xs text-gray-500 mt-2 text-center">נתוני אישור הגעה יופיעו לאחר שליחת הזמנות ותגובות אורחים</p>
                 )}
               </div>
-              {session && (planForDisplay || currentEventId) && (() => {
+              {(planForDisplay || currentEventId) && (() => {
                 // התאמה לסטטוס אישורי הגעה: אותו מספר הודעות שנשלחו בכל הדוחות
                 const messagesSent = effectiveMessagesSentCount;
                 const basePlanLimitForDisplay = getPlanBaseLimit(planForDisplay);
