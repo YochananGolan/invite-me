@@ -124,11 +124,10 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick, trig
   }, [session]);
 
   useEffect(() => {
-    if (!session) {
-      setSelectedPlan(null);
-    } else {
+    if (session) {
       setEventRefreshKey((k) => k + 1);
     }
+    // לא לאפס selectedPlan כאן ב־!session — גורם לריצה לפני שהסשן מוכן ומוחק מסלול מ־localStorage; איפוס רק באפקט session למטה
   }, [session]);
 
   // כשהדף מעלה triggerCreateEvent – מריצים זרימת יצירת אירוע (בלי תלות ב-ref)
@@ -603,7 +602,21 @@ const persistUserPlanSettings = React.useCallback(async (planCode, addonCount) =
   }
 }, []);
 const loadUserPlanSettings = React.useCallback(async () => {
-  userPlanSettingsHydratedRef.current = false;
+  const applyPlanToWizardUi = (planCode, addonBal) => {
+    if (!planCode) return;
+    const ac = Number.isFinite(addonBal) ? Math.max(0, Math.floor(addonBal)) : 0;
+    setSelectedPlan(planCode);
+    setDbAddonCount(ac);
+    setAdditionalPackages((prev) => {
+      const prevCount = Array.isArray(prev) ? prev.length : 0;
+      if (prevCount === ac) return prev;
+      return Array(ac).fill('addon');
+    });
+    try { localStorage.setItem('selectedPlan', planCode); } catch (e) {}
+    try { localStorage.setItem('user_plan_code', planCode); } catch (e) {}
+    try { localStorage.setItem('additionalPackages_global', String(ac)); } catch (e) {}
+    selectionSourceRef.current = 'persistent';
+  };
   try {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
@@ -632,6 +645,7 @@ const loadUserPlanSettings = React.useCallback(async () => {
             const n = rawAddon != null ? parseInt(rawAddon, 10) : NaN;
             const lsAddon = Number.isFinite(n) ? Math.max(0, Math.floor(n)) : 0;
             await persistUserPlanSettings(raw, lsAddon);
+            applyPlanToWizardUi(raw, lsAddon);
             return { plan: raw, addonCount: lsAddon };
           }
         }
@@ -653,6 +667,7 @@ const loadUserPlanSettings = React.useCallback(async () => {
       } catch (_) {}
       if (lsPlan) {
         await persistUserPlanSettings(lsPlan, lsAddon);
+        applyPlanToWizardUi(lsPlan, lsAddon);
         return { plan: lsPlan, addonCount: lsAddon };
       }
       selectionSourceRef.current = 'manual';
@@ -678,6 +693,7 @@ const loadUserPlanSettings = React.useCallback(async () => {
           const lsAddon = Number.isFinite(n) ? Math.max(0, Math.floor(n)) : 0;
           const mergedAddon = Math.max(addonCount, lsAddon);
           await persistUserPlanSettings(raw, mergedAddon);
+          applyPlanToWizardUi(raw, mergedAddon);
           return { plan: raw, addonCount: mergedAddon };
         }
       } catch (_) {}
@@ -689,12 +705,28 @@ const loadUserPlanSettings = React.useCallback(async () => {
       }
       return settings;
     });
+    if (plan) {
+      applyPlanToWizardUi(plan, addonCount);
+    }
     try { localStorage.setItem('user_plan_code', plan || ''); } catch (e) {}
     try { localStorage.setItem('additionalPackages_global', String(addonCount)); } catch (e) {}
     selectionSourceRef.current = plan ? 'persistent' : 'manual';
     return settings;
   } catch (err) {
     console.error('loadUserPlanSettings threw', err);
+    try {
+      if (typeof window !== 'undefined') {
+        const raw =
+          (localStorage.getItem('user_plan_code') || localStorage.getItem('selectedPlan') || '').trim();
+        if (raw) {
+          const rawAddon = localStorage.getItem('additionalPackages_global');
+          const n = rawAddon != null ? parseInt(rawAddon, 10) : NaN;
+          const lsAddon = Number.isFinite(n) ? Math.max(0, Math.floor(n)) : 0;
+          applyPlanToWizardUi(raw, lsAddon);
+          return { plan: raw, addonCount: lsAddon };
+        }
+      }
+    } catch (_) {}
     return null;
   } finally {
     userPlanSettingsHydratedRef.current = true;
