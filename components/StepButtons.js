@@ -146,11 +146,6 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick, trig
         setPlanAddOnMode(false);
         return;
       }
-      if (!selectedPlan) {
-        setShowPricingPlan(true);
-        setPlanAddOnMode(false);
-        return;
-      }
       setSelectedFlowStep(null);
       setStepErrorMsg('');
       // אם כבר בוצעה מחיקה מוצלחת של האירוע הקיים בסשן הזה – אין צורך לבקש מחיקה שוב.
@@ -158,14 +153,21 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick, trig
         await handleNewEvent();
         // אחרי שמתחילים אירוע חדש אחרי מחיקה – לפתוח מיד את שלב 1 (בחירת סוג אירוע)
         setShowEventTypes(true);
-      } else {
-        const hasActive = await checkActiveEventExists();
-        if (hasActive) {
-          setShowExistingEventWarning(true);
-        } else {
-          handleNewEvent();
-        }
+        return;
       }
+      // קודם: אם יש אירוע פעיל – להציג אזהרה/ארכיון, לא מסך מסלולים (גם כש־selectedPlan ריק ברגע)
+      const hasActive = await checkActiveEventExists();
+      if (hasActive) {
+        setShowExistingEventWarning(true);
+        return;
+      }
+      const planReady = selectedPlanRef.current || userPlanSettingsRef.current?.plan;
+      if (!planReady) {
+        setShowPricingPlan(true);
+        setPlanAddOnMode(false);
+        return;
+      }
+      await handleNewEvent();
     };
     run().catch((err) => {
       console.error('createNewEvent error', err);
@@ -1870,18 +1872,19 @@ const handleOpenAddonModal = React.useCallback(() => {
           setPlanAddOnMode(false);
           return;
         }
-        if (!selectedPlan) {
-          setShowPricingPlan(true);
-          setPlanAddOnMode(false);
-          return;
-        }
         setStepErrorMsg('');
         const hasActive = await checkActiveEventExists();
         if (hasActive) {
           setShowExistingEventWarning(true);
-        } else {
-          handleNewEvent();
+          return;
         }
+        const planReady = selectedPlanRef.current || userPlanSettingsRef.current?.plan;
+        if (!planReady) {
+          setShowPricingPlan(true);
+          setPlanAddOnMode(false);
+          return;
+        }
+        await handleNewEvent();
       } catch (err) {
         console.error('createNewEvent error', err);
         setShowPricingPlan(true);
@@ -8538,7 +8541,7 @@ React.useEffect(()=>{
                       const { data: { user } } = await supabase.auth.getUser();
                       hasSession = !!user;
                     }
-                    if (!hasSession || !selectedPlan) {
+                    if (!hasSession) {
                       setShowPricingPlan(true);
                       setPlanAddOnMode(false);
                       return;
@@ -8547,9 +8550,15 @@ React.useEffect(()=>{
                     const hasActive = await checkActiveEventExists();
                     if (hasActive) {
                       setShowExistingEventWarning(true);
-                    } else {
-                      handleNewEvent();
+                      return;
                     }
+                    const planReady = selectedPlanRef.current || userPlanSettingsRef.current?.plan;
+                    if (!planReady) {
+                      setShowPricingPlan(true);
+                      setPlanAddOnMode(false);
+                      return;
+                    }
+                    await handleNewEvent();
                   } catch (err) {
                     console.error('createNewEvent error', err);
                     setShowPricingPlan(true);
