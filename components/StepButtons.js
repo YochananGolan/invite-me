@@ -623,7 +623,22 @@ const loadUserPlanSettings = React.useCallback(async () => {
       return null;
     }
     if (!data) {
-      await persistUserPlanSettings(null, 0);
+      let lsPlan = null;
+      let lsAddon = 0;
+      try {
+        if (typeof window !== 'undefined') {
+          const raw =
+            (localStorage.getItem('user_plan_code') || localStorage.getItem('selectedPlan') || '').trim();
+          lsPlan = raw || null;
+          const rawAddon = localStorage.getItem('additionalPackages_global');
+          const n = rawAddon != null ? parseInt(rawAddon, 10) : NaN;
+          lsAddon = Number.isFinite(n) ? Math.max(0, Math.floor(n)) : 0;
+        }
+      } catch (_) {}
+      if (lsPlan) {
+        await persistUserPlanSettings(lsPlan, lsAddon);
+        return { plan: lsPlan, addonCount: lsAddon };
+      }
       selectionSourceRef.current = 'manual';
       setUserPlanSettings((prev) => {
         if (prev && prev.plan === null && (prev.addonCount ?? 0) === 0) {
@@ -3304,7 +3319,14 @@ React.useEffect(() => {
     } else if (fetchedEventRow) {
       if (!planToCarryForward) {
         const fromDb = derivePlanFromRecord(fetchedEventRow);
-        if (fromDb) planToCarryForward = fromDb;
+        const rawSelected =
+          typeof fetchedEventRow.selected_plan === 'string'
+            ? fetchedEventRow.selected_plan.trim()
+            : fetchedEventRow.selected_plan
+              ? String(fetchedEventRow.selected_plan).trim()
+              : '';
+        // derivePlanFromRecord מחזיר null במצב draft/pending גם כש-selected_plan מלא (לפני "פרסום") — במחיקה נשמרים מה ששולם
+        planToCarryForward = fromDb || (rawSelected ? rawSelected : null);
       }
       const apFromRow =
         typeof fetchedEventRow.additional_packages === 'number' ? fetchedEventRow.additional_packages : 0;
@@ -4623,14 +4645,6 @@ React.useEffect(() => {
                 lastRestoredEventIdRef.current = 'ended';
               }
               setCurrentEventId(null);
-              setSelectedPlan(null);
-              setDbAddonCount(0);
-              setAdditionalPackages((prev) => {
-                if (Array.isArray(prev) && prev.length === 0) {
-                  return prev;
-                }
-                return [];
-              });
               setFormData(initialFormState);
               setSelectedEventType('');
               setSelectedDesign(null);
@@ -4638,14 +4652,31 @@ React.useEffect(() => {
               setEventDetailsCompleted(false);
               setNewEventStarted(false);
               try { localStorage.removeItem('newEventStarted'); } catch(e){}
-              try { localStorage.removeItem('selectedPlan'); } catch(e){}
-              try { localStorage.removeItem('additionalPackages_global'); } catch(e){}
               try { localStorage.removeItem('selectedEventType'); } catch(e){}
               try { localStorage.removeItem('savedEventDetails'); } catch(e){}
               try { localStorage.removeItem('selectedDesign'); } catch(e){}
               try { localStorage.removeItem('finishedSteps'); } catch(e){}
               setShowGuestListModal(false);
               setShowReportsOptions(false);
+              const settingsPast = await loadUserPlanSettings();
+              if (settingsPast?.plan) {
+                setSelectedPlan(settingsPast.plan);
+                try { localStorage.setItem('selectedPlan', settingsPast.plan); } catch(e){}
+                try { localStorage.setItem('user_plan_code', settingsPast.plan); } catch(e){}
+              } else {
+                setSelectedPlan(null);
+                try { localStorage.removeItem('selectedPlan'); } catch(e){}
+              }
+              const addonPast = settingsPast?.addonCount ?? 0;
+              setDbAddonCount(addonPast);
+              setAdditionalPackages((prev) => {
+                const prevCount = Array.isArray(prev) ? prev.length : 0;
+                if (prevCount === addonPast) {
+                  return prev;
+                }
+                return Array(addonPast).fill('addon');
+              });
+              try { localStorage.setItem('additionalPackages_global', String(addonPast)); } catch(e){}
             }
           }
         } else {
