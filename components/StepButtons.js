@@ -3973,7 +3973,8 @@ React.useEffect(() => {
         });
         try { localStorage.setItem('additionalPackages_' + ev.id, String(addonCount)); } catch (_) {}
         setEventDataLoaded(true);
-        const planToUse = derivePlanFromRecord(ev);
+        const fallbackPlan = userPlanSettingsRef.current?.plan || selectedPlanRef.current || null;
+        const planToUse = derivePlanFromRecord(ev) || fallbackPlan;
         if (planToUse) {
           setSelectedPlan(planToUse);
           selectionSourceRef.current = 'event';
@@ -4547,14 +4548,15 @@ React.useEffect(() => {
               });
               try { localStorage.setItem('additionalPackages_' + ev.id, String(restoreAddonCount)); } catch (_) {}
               setEventDataLoaded(true);
-              const planToUse = derivePlanFromRecord(ev);
+              const fallbackPlan = userPlanSettingsRef.current?.plan || selectedPlanRef.current || null;
+              const planToUse = derivePlanFromRecord(ev) || fallbackPlan;
               if (planToUse) {
                 setSelectedPlan(planToUse);
                 try { localStorage.setItem('selectedPlan', planToUse); } catch(e){}
                 try { localStorage.setItem('finishedSteps', JSON.stringify([1, 2])); } catch (e) {}
                 setFinishedSteps([1, 2]);
+                await persistUserPlanSettings(planToUse, restoreAddonCount);
               }
-              await persistUserPlanSettings(planToUse, restoreAddonCount);
               setFormData(prev => ({ ...prev, ...details }));
 
               const tpl = details?.template_src || null;
@@ -4840,12 +4842,13 @@ const whatsappTriggeredEventsRef = useRef(new Set());
           });
           try { localStorage.setItem('additionalPackages_' + ev.id, String(addonCount)); } catch (_) {}
           setEventDataLoaded(true);
-          const planToUse = derivePlanFromRecord(ev);
+          const fallbackPlan = userPlanSettingsRef.current?.plan || selectedPlanRef.current || null;
+          const planToUse = derivePlanFromRecord(ev) || fallbackPlan;
           if (planToUse) {
             setSelectedPlan(planToUse);
             try { localStorage.setItem('selectedPlan', planToUse); } catch(e){}
+            await persistUserPlanSettings(planToUse, addonCount);
           }
-          await persistUserPlanSettings(planToUse, addonCount);
           const details = typeof ev.event_details === 'string' 
             ? JSON.parse(ev.event_details) 
             : ev.event_details;
