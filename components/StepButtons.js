@@ -4619,8 +4619,6 @@ React.useEffect(() => {
               })()
             : 0;
 
-          const hasPersistedPlan = Boolean(currentUserSettings?.plan || currentSelectedPlan);
-          let shouldClearPersistedPlan = false;
           try {
             const { data: lastEvent } = await supabase
               .from('events')
@@ -4640,52 +4638,11 @@ React.useEffect(() => {
                 planRetentionUntilRef.current = retentionDate;
               }
               if (rawDate) {
-                const eventDate = new Date(rawDate);
-                eventDate.setHours(0, 0, 0, 0);
-                const today = new Date();
-                today.setHours(0, 0, 0, 0);
-
-                if ((lastEvent.status === 'archived' || !lastEvent.status) && eventDate < today) {
-                  shouldClearPersistedPlan = true;
-                }
-              } else if (lastEvent.status === 'archived') {
-                // No date to compare, default to clearing when archived
-                shouldClearPersistedPlan = true;
+                // Keep retention metadata for UX; do not auto-clear paid plans on event end.
               }
             }
           } catch (inspectErr) {
             console.error('Failed to inspect last event for plan reset', inspectErr);
-          }
-
-          if (shouldClearPersistedPlan && !hasPersistedPlan) {
-            await persistUserPlanSettings(null, 0);
-            setSelectedPlan(null);
-            setDbAddonCount(0);
-            setAdditionalPackages((prev) => {
-              if (Array.isArray(prev) && prev.length === 0) {
-                return prev;
-              }
-              return [];
-            });
-            try { localStorage.removeItem('user_plan_code'); } catch(e){}
-            try { localStorage.removeItem('selectedPlan'); } catch(e){}
-            try { localStorage.removeItem('additionalPackages_global'); } catch(e){}
-            return;
-          } else if (shouldClearPersistedPlan) {
-            // There is a persisted plan (likely a fresh purchase) – keep it instead of clearing.
-            const planToKeep = currentUserSettings?.plan || currentSelectedPlan || null;
-            const addonToKeep = Number.isFinite(currentUserSettings?.addonCount)
-              ? Math.max(0, currentUserSettings.addonCount)
-              : Array.isArray(currentAdditionalPackages) ? currentAdditionalPackages.length : 0;
-            setSelectedPlan(planToKeep);
-            setDbAddonCount(addonToKeep);
-            setAdditionalPackages((prev) => {
-              const prevCount = Array.isArray(prev) ? prev.length : 0;
-              if (prevCount === addonToKeep) {
-                return prev;
-              }
-              return Array(addonToKeep).fill('addon');
-            });
           }
 
           if (newEventStarted) {
