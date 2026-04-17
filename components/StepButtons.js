@@ -623,6 +623,19 @@ const loadUserPlanSettings = React.useCallback(async () => {
       .maybeSingle();
     if (error) {
       console.error('loadUserPlanSettings failed', error);
+      try {
+        if (typeof window !== 'undefined') {
+          const raw =
+            (localStorage.getItem('user_plan_code') || localStorage.getItem('selectedPlan') || '').trim();
+          if (raw) {
+            const rawAddon = localStorage.getItem('additionalPackages_global');
+            const n = rawAddon != null ? parseInt(rawAddon, 10) : NaN;
+            const lsAddon = Number.isFinite(n) ? Math.max(0, Math.floor(n)) : 0;
+            await persistUserPlanSettings(raw, lsAddon);
+            return { plan: raw, addonCount: lsAddon };
+          }
+        }
+      } catch (_) {}
       return null;
     }
     if (!data) {
@@ -651,9 +664,24 @@ const loadUserPlanSettings = React.useCallback(async () => {
       });
       return { plan: null, addonCount: 0 };
     }
-    const plan = data.plan_code || null;
+    let plan = data.plan_code || null;
     const parsedAddon = Number(data.addon_balance);
-    const addonCount = Number.isFinite(parsedAddon) ? Math.max(0, Math.floor(parsedAddon)) : 0;
+    let addonCount = Number.isFinite(parsedAddon) ? Math.max(0, Math.floor(parsedAddon)) : 0;
+    // שורה ב-user_settings עם plan_code ריק אבל המסלול נשמר בדפדפן בלבד (לפני סנכרון)
+    if (!plan && typeof window !== 'undefined') {
+      try {
+        const raw =
+          (localStorage.getItem('user_plan_code') || localStorage.getItem('selectedPlan') || '').trim();
+        if (raw) {
+          const rawAddon = localStorage.getItem('additionalPackages_global');
+          const n = rawAddon != null ? parseInt(rawAddon, 10) : NaN;
+          const lsAddon = Number.isFinite(n) ? Math.max(0, Math.floor(n)) : 0;
+          const mergedAddon = Math.max(addonCount, lsAddon);
+          await persistUserPlanSettings(raw, mergedAddon);
+          return { plan: raw, addonCount: mergedAddon };
+        }
+      } catch (_) {}
+    }
     const settings = { plan, addonCount };
     setUserPlanSettings((prev) => {
       if (prev && prev.plan === settings.plan && (prev.addonCount ?? 0) === settings.addonCount) {
@@ -724,10 +752,26 @@ const noEventLoggedRef = useRef(false);
   React.useEffect(() => {
     if (currentEventId) return;
     if (!userPlanSettingsHydratedRef.current) return;
-    const persistedPlan = userPlanSettings?.plan ?? null;
-    const persistedAddonCount = Number.isFinite(userPlanSettings?.addonCount)
+    let persistedPlan = userPlanSettings?.plan ?? null;
+    let persistedAddonCount = Number.isFinite(userPlanSettings?.addonCount)
       ? Math.max(0, Math.floor(userPlanSettings.addonCount))
       : 0;
+
+    if (!persistedPlan && typeof window !== 'undefined') {
+      try {
+        const raw =
+          (localStorage.getItem('user_plan_code') || localStorage.getItem('selectedPlan') || '').trim();
+        if (raw) {
+          persistedPlan = raw;
+          const rawAddon = localStorage.getItem('additionalPackages_global');
+          const n = rawAddon != null ? parseInt(rawAddon, 10) : NaN;
+          if (Number.isFinite(n)) {
+            persistedAddonCount = Math.max(0, Math.floor(n));
+          }
+          void persistUserPlanSettings(persistedPlan, persistedAddonCount);
+        }
+      } catch (_) {}
+    }
 
   if (persistedPlan) {
     setSelectedPlan(persistedPlan);
@@ -750,7 +794,7 @@ const noEventLoggedRef = useRef(false);
     }
     return [];
   });
-  }, [currentEventId, userPlanSettings]);
+  }, [currentEventId, userPlanSettings, persistUserPlanSettings]);
 
 const totalGuestsCount = guestSummary.adults + guestSummary.children;
 // הודעות שנשלחו: מבוסס על ספירת הצלחות בפועל בלבד.
@@ -4470,20 +4514,7 @@ React.useEffect(() => {
   }, [showGuestListModal, currentEventId, guestSummaryRefreshKey]);
 
   // ---- Auto-archive when event ends (after date has passed) ----
-  React.useEffect(() => {
-    if (currentEventId) return;
-    const plan = userPlanSettings?.plan || null;
-    const addon = userPlanSettings?.addonCount ?? 0;
-    setSelectedPlan(plan);
-    setDbAddonCount(addon);
-    setAdditionalPackages((prev) => {
-      const prevCount = Array.isArray(prev) ? prev.length : 0;
-      if (prevCount === addon) {
-        return prev;
-      }
-      return Array(addon).fill('addon');
-    });
-  }, [currentEventId, userPlanSettings?.plan, userPlanSettings?.addonCount]);
+  // סנכרון מסלול כשאין אירוע פעיל: רק באפקט עם userPlanSettingsHydratedRef (למטה), לא כאן — אפקט כפול היה מאפס selectedPlan לפני טעינת user_settings
 
   React.useEffect(() => {
     if (!currentEventId) return;
