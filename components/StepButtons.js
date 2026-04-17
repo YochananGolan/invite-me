@@ -672,6 +672,7 @@ const userPlanSettingsRef = useRef(userPlanSettings);
 useEffect(() => {
   userPlanSettingsRef.current = userPlanSettings;
 }, [userPlanSettings]);
+const planForDisplay = selectedPlan || userPlanSettings?.plan || null;
 
 const additionalPackagesRef = useRef(additionalPackages);
 useEffect(() => {
@@ -5634,7 +5635,7 @@ React.useEffect(()=>{
                 </p>
               </div>
             )}
-            {session && selectedPlan && (
+            {session && (planForDisplay || currentEventId) && (
               <div className="bg-yellow-50 p-3 sm:p-4 text-center shadow-lg w-full" style={{
                 border: '3px solid #D4AF37',
                 outline: '2px solid #B8860B',
@@ -5659,20 +5660,20 @@ React.useEffect(()=>{
                   <div className="bg-white p-3 rounded-lg border border-yellow-200 mb-3 space-y-3">
                     <div>
                       <div className="text-lg font-bold text-yellow-700 mb-1">
-                        {selectedPlan === 'basic' || selectedPlan === 'free' ? 'מסלול א' : 
-                         selectedPlan === 'standard' ? 'מסלול ב' : 
-                         selectedPlan === 'premium' ? 'מסלול ג' : 
-                         selectedPlan === 'luxury' ? 'מסלול ד' : 
-                         selectedPlan === 'elite' ? 'מסלול ה' : 
-                         selectedPlan === 'supreme' ? 'מסלול ו' : 'לא נבחר מסלול'}
+                        {planForDisplay === 'basic' || planForDisplay === 'free' ? 'מסלול א' : 
+                         planForDisplay === 'standard' ? 'מסלול ב' : 
+                         planForDisplay === 'premium' ? 'מסלול ג' : 
+                         planForDisplay === 'luxury' ? 'מסלול ד' : 
+                         planForDisplay === 'elite' ? 'מסלול ה' : 
+                         planForDisplay === 'supreme' ? 'מסלול ו' : 'לא זוהה מסלול'}
                       </div>
                       <div className="text-base text-gray-700 font-semibold">
-                        {selectedPlan === 'basic' || selectedPlan === 'free' ? '₪5 - עד 5 הודעות' :
-                         selectedPlan === 'standard' ? '149₪ - מ 51 עד 200 הודעות' :
-                         selectedPlan === 'premium' ? '199₪ - מ 201 עד 350 הודעות' :
-                         selectedPlan === 'luxury' ? '259₪ - מ 351 עד 500 הודעות' :
-                         selectedPlan === 'elite' ? '349₪ - מ 501 עד 650 הודעות' :
-                         selectedPlan === 'supreme' ? '499₪ - מ 651 עד 1000 הודעות' : ''}
+                        {planForDisplay === 'basic' || planForDisplay === 'free' ? '₪5 - עד 5 הודעות' :
+                         planForDisplay === 'standard' ? '149₪ - מ 51 עד 200 הודעות' :
+                         planForDisplay === 'premium' ? '199₪ - מ 201 עד 350 הודעות' :
+                         planForDisplay === 'luxury' ? '259₪ - מ 351 עד 500 הודעות' :
+                         planForDisplay === 'elite' ? '349₪ - מ 501 עד 650 הודעות' :
+                         planForDisplay === 'supreme' ? '499₪ - מ 651 עד 1000 הודעות' : 'המסלול ישוחזר אוטומטית כעת'}
                       </div>
                     </div>
                     <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
@@ -5929,10 +5930,11 @@ React.useEffect(()=>{
                   <p className="text-xs text-gray-500 mt-2 text-center">נתוני אישור הגעה יופיעו לאחר שליחת הזמנות ותגובות אורחים</p>
                 )}
               </div>
-              {session && selectedPlan && (() => {
+              {session && (planForDisplay || currentEventId) && (() => {
                 // התאמה לסטטוס אישורי הגעה: אותו מספר הודעות שנשלחו בכל הדוחות
                 const messagesSent = effectiveMessagesSentCount;
-                const messageLimit = totalPlanCapacity;
+                const basePlanLimitForDisplay = getPlanBaseLimit(planForDisplay);
+                const messageLimit = (basePlanLimitForDisplay || 0) + additionalCapacity;
                 const remainingMessagesRaw = messageLimit - messagesSent;
                 const remainingMessages = Math.max(0, remainingMessagesRaw);
                 const overMessages = remainingMessagesRaw < 0 ? Math.abs(remainingMessagesRaw) : 0;
