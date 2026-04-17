@@ -1894,10 +1894,11 @@ const handleOpenAddonModal = React.useCallback(() => {
     if (!eventId) return;
 
     const registry = whatsappTriggeredEventsRef.current;
-    if (registry.has(eventId)) {
+    const eventKey = String(eventId);
+    if (registry.has(eventKey)) {
       return;
     }
-    registry.add(eventId);
+    registry.add(eventKey);
 
     try {
       const response = await fetch('/api/greenapi/send-event-invite', {
@@ -1928,7 +1929,7 @@ const handleOpenAddonModal = React.useCallback(() => {
             setEventMessagesSentCount((prev) => (prev || 0) + (payload.sent || 0));
           }
         } else {
-          registry.delete(eventId);
+          registry.delete(eventKey);
           if (updatedCount !== null) {
             setEventMessagesSentCount(updatedCount);
           }
@@ -1938,14 +1939,14 @@ const handleOpenAddonModal = React.useCallback(() => {
           );
         }
       } else {
-        registry.delete(eventId);
+        registry.delete(eventKey);
         if (updatedCount !== null) {
           setEventMessagesSentCount(updatedCount);
         }
         addToast?.(payload.error || 'שליחת הודעת וואטסאפ נכשלה', 'error');
       }
     } catch (err) {
-      registry.delete(eventId);
+      registry.delete(eventKey);
       console.error('Failed to trigger WhatsApp invites', err);
       addToast?.('שליחת הודעת וואטסאפ נכשלה', 'error');
     }
@@ -2148,9 +2149,8 @@ const handleOpenAddonModal = React.useCallback(() => {
           }
         }
 
-        // In most real flows we update an existing active event (not insert a new row),
-        // so we should still trigger WhatsApp sends for guests tied to this event.
-        triggerWhatsAppInvites(currentEventId);
+        // Do not auto-send on every event update to avoid duplicate WhatsApp sends.
+        // WhatsApp sending is handled explicitly on guest send actions and first event creation.
 
         // allowed_guests is persisted in DB; UI quota uses selectedPlan/addons from state.
       } else {

@@ -289,7 +289,14 @@ export default async function handler(req, res) {
     });
     return res.status(500).json({ error: 'Failed to fetch guests' });
   }
-  const guestsWithPhone = (guests || []).filter((guest) => normalizePhoneNumber(guest.phone));
+  const uniqueGuests = [];
+  const seenGuestIds = new Set();
+  for (const guest of guests || []) {
+    if (!guest?.id || seenGuestIds.has(guest.id)) continue;
+    seenGuestIds.add(guest.id);
+    uniqueGuests.push(guest);
+  }
+  const guestsWithPhone = uniqueGuests.filter((guest) => normalizePhoneNumber(guest.phone));
   console.log('[greenapi-send-invite] Guests loaded', {
     totalGuests: guests?.length || 0,
     guestsWithPhone: guestsWithPhone.length,
