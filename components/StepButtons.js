@@ -4196,6 +4196,13 @@ React.useEffect(() => {
     };
   }, [currentEventId]);
 
+  // Hide "event ended" notice once user starts/has an event again.
+  React.useEffect(() => {
+    if ((currentEventId || newEventStarted) && showEventEndedNotice) {
+      setShowEventEndedNotice(false);
+    }
+  }, [currentEventId, newEventStarted, showEventEndedNotice]);
+
   // Auto-save invitation text and styles to database when they change (with debounce)
   useEffect(() => {
     if (!currentEventId || !selectedDesign) return;
@@ -5355,7 +5362,7 @@ React.useEffect(()=>{
       )}
 
       {/* הודעה כשהאירוע הסתיים (עבר התאריך) – מאפשר למשתמש להבין שאפשר לפתוח אירוע חדש */}
-      {showEventEndedNotice && (
+      {showEventEndedNotice && !currentEventId && !newEventStarted && (
         <div className="fixed left-4 right-4 bottom-32 z-40 max-w-2xl mx-auto bg-green-50 border-2 border-green-500 rounded-xl shadow-lg p-4 flex flex-col gap-3">
           <p className="text-green-900 font-semibold text-center text-lg">
             האירוע הסתיים. כעת ניתן לפתוח אירוע חדש.
