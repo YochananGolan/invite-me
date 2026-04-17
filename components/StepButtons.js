@@ -567,6 +567,8 @@ const derivePlanFromRecord = React.useCallback((record) => {
   return derivedPlan;
 }, [computePlanFromCapacity]);
 const [userPlanSettings, setUserPlanSettings] = useState({ plan: null, addonCount: 0 });
+/** נכון אחרי ש־loadUserPlanSettings סיים (כולל שגיאה) — לא לאפס מסלול מ-localStorage לפני כן */
+const userPlanSettingsHydratedRef = useRef(false);
 const persistUserPlanSettings = React.useCallback(async (planCode, addonCount) => {
   try {
     const { data: { user } } = await supabase.auth.getUser();
@@ -601,6 +603,7 @@ const persistUserPlanSettings = React.useCallback(async (planCode, addonCount) =
   }
 }, []);
 const loadUserPlanSettings = React.useCallback(async () => {
+  userPlanSettingsHydratedRef.current = false;
   try {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
@@ -665,6 +668,8 @@ const loadUserPlanSettings = React.useCallback(async () => {
   } catch (err) {
     console.error('loadUserPlanSettings threw', err);
     return null;
+  } finally {
+    userPlanSettingsHydratedRef.current = true;
   }
 }, [persistUserPlanSettings]);
 const [additionalPackages, setAdditionalPackages] = useState([]);
@@ -703,6 +708,7 @@ const noEventLoggedRef = useRef(false);
 
   React.useEffect(() => {
     if (!session) {
+      userPlanSettingsHydratedRef.current = false;
       setSelectedPlan(null);
       setUserPlanSettings((prev) => {
         if (prev && prev.plan === null && (prev.addonCount ?? 0) === 0) {
@@ -717,6 +723,7 @@ const noEventLoggedRef = useRef(false);
 
   React.useEffect(() => {
     if (currentEventId) return;
+    if (!userPlanSettingsHydratedRef.current) return;
     const persistedPlan = userPlanSettings?.plan ?? null;
     const persistedAddonCount = Number.isFinite(userPlanSettings?.addonCount)
       ? Math.max(0, Math.floor(userPlanSettings.addonCount))
