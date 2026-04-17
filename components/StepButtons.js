@@ -1,4 +1,4 @@
-import React, { useState, forwardRef, useImperativeHandle, useRef, useCallback, useEffect } from 'react';
+import React, { useState, forwardRef, useImperativeHandle, useRef, useCallback, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/router';
 import { supabase } from '../lib/supabaseClient';
 import { getInviteBaseUrl } from '../lib/inviteUrl';
@@ -619,7 +619,13 @@ const loadUserPlanSettings = React.useCallback(async () => {
   };
   try {
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
+    const { data: { session: authSession } } = await supabase.auth.getSession();
+    const userId =
+      user?.id ??
+      authSession?.user?.id ??
+      sessionRef.current?.user?.id ??
+      null;
+    if (!userId) {
       setUserPlanSettings((prev) => {
         if (prev && prev.plan === null && (prev.addonCount ?? 0) === 0) {
           return prev;
@@ -632,7 +638,7 @@ const loadUserPlanSettings = React.useCallback(async () => {
     const { data, error } = await supabase
       .from('user_settings')
       .select('plan_code, addon_balance')
-      .eq('user_id', user.id)
+      .eq('user_id', userId)
       .maybeSingle();
     if (error) {
       console.error('loadUserPlanSettings failed', error);
@@ -679,7 +685,10 @@ const loadUserPlanSettings = React.useCallback(async () => {
       });
       return { plan: null, addonCount: 0 };
     }
-    let plan = data.plan_code || null;
+    let plan =
+      typeof data.plan_code === 'string'
+        ? data.plan_code.trim() || null
+        : data.plan_code || null;
     const parsedAddon = Number(data.addon_balance);
     let addonCount = Number.isFinite(parsedAddon) ? Math.max(0, Math.floor(parsedAddon)) : 0;
     // שורה ב-user_settings עם plan_code ריק אבל המסלול נשמר בדפדפן בלבד (לפני סנכרון)
@@ -754,7 +763,19 @@ const userPlanSettingsRef = useRef(userPlanSettings);
 useEffect(() => {
   userPlanSettingsRef.current = userPlanSettings;
 }, [userPlanSettings]);
-const planForDisplay = selectedPlan || userPlanSettings?.plan || null;
+const planForDisplay = useMemo(() => {
+    const fromState = selectedPlan || userPlanSettings?.plan || null;
+    if (fromState) return fromState;
+    if (!session) return null;
+    if (typeof window === 'undefined') return null;
+    try {
+      const raw =
+        (localStorage.getItem('user_plan_code') || localStorage.getItem('selectedPlan') || '').trim();
+      return raw || null;
+    } catch (_) {
+      return null;
+    }
+  }, [session, selectedPlan, userPlanSettings?.plan]);
 
 const additionalPackagesRef = useRef(additionalPackages);
 useEffect(() => {
@@ -818,14 +839,8 @@ const noEventLoggedRef = useRef(false);
     return;
   }
 
-  setSelectedPlan(null);
-  setDbAddonCount(0);
-  setAdditionalPackages((prev) => {
-    if (Array.isArray(prev) && prev.length === 0) {
-      return prev;
-    }
-    return [];
-  });
+  // לא לאפס selectedPlan כאן: גרם למחיקת מסלול תקף מ-localStorage לפני/במקביל לטעינת user_settings.
+  // איפוס מסלול — רק בהתנתקות, clearPlanState, או loadUserPlanSettings כשאין userId.
   }, [currentEventId, userPlanSettings, persistUserPlanSettings]);
 
 const totalGuestsCount = guestSummary.adults + guestSummary.children;
