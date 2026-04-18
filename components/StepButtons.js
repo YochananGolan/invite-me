@@ -5601,7 +5601,8 @@ React.useEffect(()=>{
         </div>
       )}
 
-      {(currentEventId || newEventStarted) && (
+      {/* סרגל שלבים: למשתמש מחובר תמיד (לא רק כשיש אירוע פעיל) — אחרת נעלם אחרי מחיקת אירוע / רענון */}
+      {session && (
       <div className="fixed left-0 right-0 bottom-0 z-20 w-full bg-white/95 backdrop-blur-sm border-t border-gray-200 shadow-[0_-4px_12px_rgba(0,0,0,0.08)] py-2 px-2 sm:pt-3 sm:px-2" style={{ paddingBottom: 'max(0.4rem, env(safe-area-inset-bottom, 0.4rem))' }}>
         <div className="flex flex-col gap-1.5 sm:hidden px-1">
           <div className="grid grid-cols-3 gap-1.5">
