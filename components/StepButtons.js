@@ -89,6 +89,37 @@ const computePlanRetentionDate = (rawDate) => {
   return retention;
 };
 
+/** מחיקה ידנית של אירוע לפני סיום — לא לאפס מסלול ב-bootstrap אחרי רענון */
+const INVITEME_CARRY_PLAN_AFTER_DELETE_KEY = 'inviteMe_carryPlanAfterManualDelete';
+const INVITEME_CARRY_PLAN_MAX_AGE_MS = 90 * 24 * 60 * 60 * 1000;
+
+function markCarryPlanAfterManualDelete() {
+  try {
+    if (typeof window === 'undefined') return;
+    localStorage.setItem(INVITEME_CARRY_PLAN_AFTER_DELETE_KEY, String(Date.now()));
+  } catch (_) {}
+}
+
+function clearCarryPlanAfterManualDelete() {
+  try {
+    if (typeof window === 'undefined') return;
+    localStorage.removeItem(INVITEME_CARRY_PLAN_AFTER_DELETE_KEY);
+  } catch (_) {}
+}
+
+function shouldRespectCarryPlanAfterManualDelete() {
+  try {
+    if (typeof window === 'undefined') return false;
+    const v = localStorage.getItem(INVITEME_CARRY_PLAN_AFTER_DELETE_KEY);
+    if (!v) return false;
+    const ts = parseInt(v, 10);
+    if (!Number.isFinite(ts)) return false;
+    return Date.now() - ts <= INVITEME_CARRY_PLAN_MAX_AGE_MS;
+  } catch (_) {
+    return false;
+  }
+}
+
 const hasMeaningfulFormValue = (key, value) => {
   if (value === null || value === undefined) return false;
   if (typeof value === 'string') {
@@ -595,6 +626,9 @@ const persistUserPlanSettings = React.useCallback(async (planCode, addonCount) =
       }
       return { plan: safePlan, addonCount: safeAddon };
     });
+    if (safePlan) {
+      clearCarryPlanAfterManualDelete();
+    }
     try { localStorage.setItem('user_plan_code', safePlan || ''); } catch (e) {}
     try { localStorage.setItem('additionalPackages_global', String(safeAddon)); } catch (e) {}
   } catch (err) {
@@ -3177,6 +3211,7 @@ React.useEffect(() => {
       setNewEventStarted(false);
     planRetentionUntilRef.current = null;
       try { localStorage.removeItem('selectedPlan'); } catch (_) {}
+      try { localStorage.removeItem('user_plan_code'); } catch (_) {}
       try { localStorage.removeItem('additionalPackages_global'); } catch (_) {}
       try { localStorage.removeItem('newEventStarted'); } catch (_) {}
       await persistUserPlanSettings(null, 0);
@@ -3184,6 +3219,67 @@ React.useEffect(() => {
       isClearingPlanRef.current = false;
     }
   }, [persistUserPlanSettings]);
+
+  // אחרי גמר אירוע (אין אירוע פעיל, האחרון בארכיון ועבר תאריך שמירה): איפוס מסלול. לא רץ אם הייתה מחיקה ידנית (דגל carry).
+  React.useEffect(() => {
+    if (!session) return;
+    if (currentEventId) return;
+    let cancelled = false;
+    (async () => {
+      if (!userPlanSettingsHydratedRef.current) return;
+      if (shouldRespectCarryPlanAfterManualDelete()) return;
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        const { data: { session: authSession } } = await supabase.auth.getSession();
+        const userId = user?.id ?? authSession?.user?.id ?? sessionRef.current?.user?.id ?? null;
+        if (!userId || cancelled) return;
+
+        const { data: activeEv } = await supabase
+          .from('events')
+          .select('id')
+          .eq('user_id', userId)
+          .or('status.neq.archived,status.is.null')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (activeEv?.id || cancelled) return;
+
+        const { data: latest } = await supabase
+          .from('events')
+          .select('id, status, event_details')
+          .eq('user_id', userId)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (!latest || cancelled) return;
+        const st = typeof latest.status === 'string' ? latest.status.toLowerCase() : '';
+        if (st !== 'archived' || cancelled) return;
+
+        let details = {};
+        try {
+          details =
+            typeof latest.event_details === 'string'
+              ? JSON.parse(latest.event_details)
+              : latest.event_details || {};
+        } catch (_) {
+          details = {};
+        }
+        const raw = details.date || details.start_datetime || details.end_datetime || null;
+        const retentionDate = computePlanRetentionDate(raw);
+        if (!retentionDate || cancelled) return;
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        if (today < retentionDate || cancelled) return;
+
+        await clearPlanState();
+      } catch (e) {
+        console.warn('clear plan after ended event (bootstrap) failed', e);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [session, currentEventId, userPlanSettings?.plan, eventRefreshKey, clearPlanState]);
 
   const resetWizardStateForNoEvent = async () => {
     setSelectedEventType('');
@@ -3382,6 +3478,7 @@ React.useEffect(() => {
               archivedByRetention = true;
               eventWasDeleted = true;
               deletionCompleted = true;
+              clearCarryPlanAfterManualDelete();
             }
           } else {
             const { error: deleteErr } = await supabase
@@ -3396,6 +3493,7 @@ React.useEffect(() => {
             } else {
               eventWasDeleted = true;
               deletionCompleted = true;
+              markCarryPlanAfterManualDelete();
             }
           }
         } else {
@@ -4642,11 +4740,13 @@ React.useEffect(() => {
           });
           setDbAddonCount(0);
           try { localStorage.removeItem('selectedPlan'); } catch (e) {}
+          try { localStorage.removeItem('user_plan_code'); } catch (e) {}
           try { localStorage.removeItem('additionalPackages_global'); } catch (e) {}
           setNewEventStarted(false);
           try { localStorage.removeItem('newEventStarted'); } catch(e){}
           setCurrentEventId(null);
           setEventMessagesSentCount(0);
+          clearCarryPlanAfterManualDelete();
 
           setShowEventEndedNotice(true);
         })();
