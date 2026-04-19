@@ -1,6 +1,16 @@
 const path = require('path');
 
 module.exports = {
+  /** Short alias → same handler as dev-whatsapp-template (POST body preserved with 307). */
+  async redirects() {
+    return [
+      {
+        source: '/api/greenapi/dev-send-event-invite',
+        destination: '/api/greenapi/dev-whatsapp-template',
+        permanent: false,
+      },
+    ];
+  },
   async rewrites() {
     return {
       // beforeFiles = רץ לפני קבצים סטטיים. ברירת מחדל (מערך) = afterFiles = רץ אחרי,

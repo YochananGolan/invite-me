@@ -8,7 +8,6 @@ import AuthModal from '../components/AuthModal';
 import Footer from '../components/Footer';
 import PricingTableModal from '../components/PricingTableModal';
 
-
 export default function Home({ session }) {
   const router = useRouter();
   const [showAuth, setShowAuth] = useState(false);

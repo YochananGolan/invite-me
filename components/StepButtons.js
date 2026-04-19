@@ -2043,12 +2043,12 @@ const handleOpenAddonModal = React.useCallback(() => {
   const triggerWhatsAppInvites = useCallback(async (eventId) => {
     if (!eventId) return;
 
-    const registry = whatsappTriggeredEventsRef.current;
     const eventKey = String(eventId);
-    if (registry.has(eventKey)) {
+    // רק מניעת כפילות בזמן שבקשה כבר רצה — לא נעילה קבועה אחרי שליחה מוצלחת (היה חוסם טריגרים עתידיים לאותו eventId)
+    if (whatsappInviteTriggerInFlightRef.current.has(eventKey)) {
       return;
     }
-    registry.add(eventKey);
+    whatsappInviteTriggerInFlightRef.current.add(eventKey);
 
     try {
       const response = await fetch('/api/greenapi/send-event-invite', {
@@ -2079,7 +2079,6 @@ const handleOpenAddonModal = React.useCallback(() => {
             setEventMessagesSentCount((prev) => (prev || 0) + (payload.sent || 0));
           }
         } else {
-          registry.delete(eventKey);
           if (updatedCount !== null) {
             setEventMessagesSentCount(updatedCount);
           }
@@ -2089,16 +2088,16 @@ const handleOpenAddonModal = React.useCallback(() => {
           );
         }
       } else {
-        registry.delete(eventKey);
         if (updatedCount !== null) {
           setEventMessagesSentCount(updatedCount);
         }
         addToast?.(payload.error || 'שליחת הודעת וואטסאפ נכשלה', 'error');
       }
     } catch (err) {
-      registry.delete(eventKey);
       console.error('Failed to trigger WhatsApp invites', err);
       addToast?.('שליחת הודעת וואטסאפ נכשלה', 'error');
+    } finally {
+      whatsappInviteTriggerInFlightRef.current.delete(eventKey);
     }
   }, [addToast]);
 
@@ -5057,7 +5056,8 @@ React.useEffect(() => {
   const formSaveTimer = useRef(null);
   const isInitialLoadRef = useRef(true); // Track if we're in initial load phase
   const eventDetailsOpenedRef = useRef(false); // Prevent reset when reopening event details
-const whatsappTriggeredEventsRef = useRef(new Set());
+/** מונע קריאות מקבילות כפולות ל-/api/greenapi/send-event-invite לאותו eventId בלבד */
+const whatsappInviteTriggerInFlightRef = useRef(new Set());
 
   // Reset form when opening event details for NEW event (first open only, not on reopen)
   React.useEffect(() => {
