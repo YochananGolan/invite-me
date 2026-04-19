@@ -14,6 +14,24 @@ import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, Legend, BarChart, Ba
 
 const RADIAN = Math.PI / 180;
 
+const CANONICAL_PLAN_CODES = new Set([
+  'free',
+  'basic',
+  'standard',
+  'premium',
+  'luxury',
+  'elite',
+  'supreme',
+]);
+
+function parseNonNegativeInt(value) {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return Math.max(0, Math.floor(value));
+  }
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? Math.max(0, Math.floor(parsed)) : 0;
+}
+
 // Register Hebrew locale for datepicker
 registerLocale('he', he);
 
@@ -575,8 +593,9 @@ const derivePlanFromRecord = React.useCallback((record) => {
     return null;
   }
 
-  const addonCount = typeof record.additional_packages === 'number' ? record.additional_packages : 0;
-  const derivedPlan = computePlanFromCapacity(record.allowed_guests, addonCount);
+  const addonCount = parseNonNegativeInt(record.additional_packages);
+  const allowedGuestsCoerced = parseNonNegativeInt(record.allowed_guests);
+  const derivedPlan = computePlanFromCapacity(allowedGuestsCoerced, addonCount);
   if (derivedPlan && record.id && !planPersistenceRef.current.has(record.id)) {
     planPersistenceRef.current.add(record.id);
     supabase
@@ -786,6 +805,8 @@ const [eventMessagesSentCount, setEventMessagesSentCount] = useState(0);
 const [invitedGuestsCount, setInvitedGuestsCount] = useState(0);
 const [currentEventId,setCurrentEventId]=useState(null);
 const [eventRefreshKey, setEventRefreshKey] = useState(0);
+/** מכסת הודעות כפי שנשמרה ב־DB (allowed_guests) — לזיהוי מסלול תצוגה כש־selected_plan חסר */
+const [eventAllowedGuests, setEventAllowedGuests] = useState(null);
 
 const progressStepSupportedRef = useRef(true);
 const selectedPlanRef = useRef(selectedPlan);
@@ -798,18 +819,53 @@ useEffect(() => {
   userPlanSettingsRef.current = userPlanSettings;
 }, [userPlanSettings]);
 const planForDisplay = useMemo(() => {
-    const fromState = selectedPlan || userPlanSettings?.plan || null;
+    let fromState = selectedPlan || userPlanSettings?.plan || null;
+    if (typeof fromState === 'string') {
+      fromState = fromState.trim() || null;
+    }
+    if (fromState && CANONICAL_PLAN_CODES.has(fromState)) {
+      return fromState;
+    }
+
+    let fromLs = null;
+    if (session && typeof window !== 'undefined') {
+      try {
+        const raw =
+          (localStorage.getItem('user_plan_code') || localStorage.getItem('selectedPlan') || '').trim();
+        fromLs = raw || null;
+      } catch (_) {
+        fromLs = null;
+      }
+    }
+    if (fromLs && CANONICAL_PLAN_CODES.has(fromLs)) {
+      return fromLs;
+    }
+
+    const addonCount = Math.max(
+      typeof dbAddonCount === 'number' && Number.isFinite(dbAddonCount)
+        ? Math.max(0, Math.floor(dbAddonCount))
+        : 0,
+      Array.isArray(additionalPackages) ? additionalPackages.length : 0,
+    );
+    if (typeof eventAllowedGuests === 'number' && eventAllowedGuests > 0) {
+      const derived = computePlanFromCapacity(eventAllowedGuests, addonCount);
+      if (derived) {
+        return derived;
+      }
+    }
+
     if (fromState) return fromState;
     if (!session) return null;
-    if (typeof window === 'undefined') return null;
-    try {
-      const raw =
-        (localStorage.getItem('user_plan_code') || localStorage.getItem('selectedPlan') || '').trim();
-      return raw || null;
-    } catch (_) {
-      return null;
-    }
-  }, [session, selectedPlan, userPlanSettings?.plan]);
+    return fromLs;
+  }, [
+    session,
+    selectedPlan,
+    userPlanSettings?.plan,
+    eventAllowedGuests,
+    dbAddonCount,
+    additionalPackages,
+    computePlanFromCapacity,
+  ]);
 
 const additionalPackagesRef = useRef(additionalPackages);
 useEffect(() => {
@@ -825,6 +881,7 @@ const noEventLoggedRef = useRef(false);
     if (!session) {
       userPlanSettingsHydratedRef.current = false;
       setSelectedPlan(null);
+      setEventAllowedGuests(null);
       setUserPlanSettings((prev) => {
         if (prev && prev.plan === null && (prev.addonCount ?? 0) === 0) {
           return prev;
@@ -911,17 +968,17 @@ const additionalCapacity = additionalPackages.reduce((sum, planId) => sum + getP
 const totalPlanCapacity = (basePlanLimit || 0) + additionalCapacity;
 const basePlanOverCapacity = basePlanLimit ? effectiveMessagesSentCount > basePlanLimit : false;
 const activePlanDescription =
-  selectedPlan === 'basic' || selectedPlan === 'free'
+  planForDisplay === 'basic' || planForDisplay === 'free'
     ? 'מסלול א - ₪5 לאירועים קטנים עם כל הפיצ\'רים הבסיסיים'
-    : selectedPlan === 'standard'
+    : planForDisplay === 'standard'
       ? 'מסלול ב - מקצועי עם תמיכה מלאה ועיצובים מתקדמים'
-      : selectedPlan === 'premium'
+      : planForDisplay === 'premium'
         ? 'מסלול ג - כולל את כל הפיצ\'רים ותמיכה 24/7'
-        : selectedPlan === 'luxury'
+        : planForDisplay === 'luxury'
           ? 'מסלול ד - מתאים לאירועים גדולים מאוד עם יכולות מתקדמות'
-          : selectedPlan === 'elite'
+          : planForDisplay === 'elite'
             ? 'מסלול ה - מעטפת מלאה לאירועים ענקיים'
-            : selectedPlan === 'supreme'
+            : planForDisplay === 'supreme'
               ? ''
               : '';
 const additionalPackageCounts = React.useMemo(() => {
@@ -1950,7 +2007,7 @@ const handleOpenAddonModal = React.useCallback(() => {
         if (!user) return;
         const { data, error } = await supabase
           .from('events')
-          .select('id, event_type, event_details, invitation_path, status')
+          .select('id, event_type, event_details, invitation_path, status, allowed_guests')
           .eq('user_id', user.id)
           .order('created_at', { ascending: false })
           .limit(1)
@@ -1972,6 +2029,7 @@ const handleOpenAddonModal = React.useCallback(() => {
           lastRestoredEventIdRef.current = null;
           noEventLoggedRef.current = false;
           setEventDataLoaded(false);
+          setEventAllowedGuests(null);
           setGuestSummary({ approved: 0, adults: 0, children: 0 });
           resetCapacityWarningGuests();
           setGuestStatusSummary({ approved: 0, rejected: 0, pending: 0 });
@@ -2028,6 +2086,8 @@ const handleOpenAddonModal = React.useCallback(() => {
         }
 
         setCurrentEventId(data.id);
+        const capFromRow = parseNonNegativeInt(data?.allowed_guests);
+        setEventAllowedGuests(capFromRow > 0 ? capFromRow : null);
         setSelectedEventType(data.event_type || '');
         setFormData((prev)=>({ ...prev, ...(details || {}) }));
         if (details && Object.keys(details).length) {
@@ -3270,6 +3330,7 @@ React.useEffect(() => {
     isClearingPlanRef.current = true;
     try {
       setSelectedPlan(null);
+      setEventAllowedGuests(null);
       setAdditionalPackages([]);
       setDbAddonCount(0);
       setUserPlanSettings({ plan: null, addonCount: 0 });
@@ -3362,6 +3423,7 @@ React.useEffect(() => {
     lastRestoredEventIdRef.current = null;
     noEventLoggedRef.current = false;
     setEventDataLoaded(false);
+    setEventAllowedGuests(null);
     setGuestSummary({ approved: 0, adults: 0, children: 0 });
     resetCapacityWarningGuests();
     setGuestStatusSummary({ approved: 0, rejected: 0, pending: 0 });
@@ -3613,6 +3675,7 @@ React.useEffect(() => {
     lastRestoredEventIdRef.current = null;
     noEventLoggedRef.current = false;
     setEventDataLoaded(false);
+    setEventAllowedGuests(null);
 
     if (!eventDateForRetention) {
       const rawDateFromForm =
@@ -4037,11 +4100,13 @@ React.useEffect(() => {
               const { data: { user } } = await supabase.auth.getUser();
               if (user) {
                 const { data: latestEv } = await supabase.from('events')
-                  .select('id').eq('user_id', user.id)
+                  .select('id, allowed_guests').eq('user_id', user.id)
                   .order('created_at', { ascending: false }).limit(1).single();
                 if (latestEv) {
                   eventIdForSave = latestEv.id;
                   setCurrentEventId(latestEv.id);
+                  const capPay = parseNonNegativeInt(latestEv.allowed_guests);
+                  setEventAllowedGuests(capPay > 0 ? capPay : null);
                 }
               }
             } catch (_) {}
@@ -4270,6 +4335,7 @@ React.useEffect(() => {
           messagesSent = ev?.messages_sent_count ?? 0;
         }
         if (!ev || (ev.status === 'archived')) {
+          setEventAllowedGuests(null);
           const settings = await loadUserPlanSettings();
           const fallbackAddon = settings?.addonCount ?? 0;
           if ((settings?.plan || null) !== null) {
@@ -4290,10 +4356,7 @@ React.useEffect(() => {
           return;
         }
         setEventMessagesSentCount(messagesSent);
-        let addonCount = 0;
-        if (typeof ev.additional_packages === 'number') {
-          addonCount = ev.additional_packages;
-        }
+        const addonCount = parseNonNegativeInt(ev.additional_packages);
         setDbAddonCount((prev) => Math.max(prev ?? 0, addonCount));
         setAdditionalPackages((prev) => {
           const prevCount = prev ? prev.length : 0;
@@ -4302,6 +4365,8 @@ React.useEffect(() => {
         });
         try { localStorage.setItem('additionalPackages_' + ev.id, String(addonCount)); } catch (_) {}
         setEventDataLoaded(true);
+        const capSync = parseNonNegativeInt(ev.allowed_guests);
+        setEventAllowedGuests(capSync > 0 ? capSync : null);
         const fallbackPlan = userPlanSettingsRef.current?.plan || selectedPlanRef.current || null;
         const planToUse = derivePlanFromRecord(ev) || fallbackPlan;
         if (planToUse) {
@@ -4343,13 +4408,18 @@ React.useEffect(() => {
           if (typeof ev.messages_sent_count === 'number') {
             setEventMessagesSentCount(ev.messages_sent_count);
           }
-          if (typeof ev.additional_packages === 'number') {
-            setDbAddonCount((prev) => Math.max(prev ?? 0, ev.additional_packages));
+          if (ev.additional_packages != null && ev.additional_packages !== '') {
+            const ap = parseNonNegativeInt(ev.additional_packages);
+            setDbAddonCount((prev) => Math.max(prev ?? 0, ap));
             setAdditionalPackages((prev) => {
               const prevCount = prev ? prev.length : 0;
-              if (ev.additional_packages > prevCount) return Array(ev.additional_packages).fill('addon');
+              if (ap > prevCount) return Array(ap).fill('addon');
               return prev;
             });
+          }
+          if (ev.allowed_guests != null && ev.allowed_guests !== '') {
+            const capRt = parseNonNegativeInt(ev.allowed_guests);
+            setEventAllowedGuests(capRt > 0 ? capRt : null);
           }
           const planFromEvent = derivePlanFromRecord(ev);
           if (planFromEvent) {
@@ -4757,6 +4827,7 @@ React.useEffect(() => {
         if (rowStatus === 'archived') {
           // אירוע כבר בארכיון (למשל רשומה ישנה אחרי מחיקה/רענון) — לא לאפס מסלול ולא להציג "האירוע הסתיים"
           setCurrentEventId(null);
+          setEventAllowedGuests(null);
           return;
         }
 
@@ -4810,6 +4881,7 @@ React.useEffect(() => {
           setNewEventStarted(false);
           try { localStorage.removeItem('newEventStarted'); } catch(e){}
           setCurrentEventId(null);
+          setEventAllowedGuests(null);
           setEventMessagesSentCount(0);
           clearCarryPlanAfterManualDelete();
 
@@ -4883,10 +4955,7 @@ React.useEffect(() => {
                 try { localStorage.removeItem('newEventStarted'); } catch(e){}
               }
               setEventMessagesSentCount(ev.messages_sent_count ?? 0);
-              let restoreAddonCount = 0;
-              if (typeof ev.additional_packages === 'number') {
-                restoreAddonCount = ev.additional_packages;
-              }
+              const restoreAddonCount = parseNonNegativeInt(ev.additional_packages);
               setDbAddonCount((prev) => Math.max(prev ?? 0, restoreAddonCount));
               setAdditionalPackages((prev) => {
                 const prevCount = prev ? prev.length : 0;
@@ -4895,6 +4964,8 @@ React.useEffect(() => {
               });
               try { localStorage.setItem('additionalPackages_' + ev.id, String(restoreAddonCount)); } catch (_) {}
               setEventDataLoaded(true);
+              const capRestore = parseNonNegativeInt(ev.allowed_guests);
+              setEventAllowedGuests(capRestore > 0 ? capRestore : null);
               const fallbackPlan = userPlanSettingsRef.current?.plan || selectedPlanRef.current || null;
               const planToUse = derivePlanFromRecord(ev) || fallbackPlan;
               if (planToUse) {
@@ -4917,6 +4988,7 @@ React.useEffect(() => {
                 lastRestoredEventIdRef.current = 'ended';
               }
               setCurrentEventId(null);
+              setEventAllowedGuests(null);
               setFormData(initialFormState);
               setSelectedEventType('');
               setSelectedDesign(null);
@@ -5189,6 +5261,7 @@ const whatsappInviteTriggerInFlightRef = useRef(new Set());
           typeof ev.status === 'string' &&
           ev.status.toLowerCase() === 'archived';
         if (evIsArchived) {
+          setEventAllowedGuests(null);
           const settings = await loadUserPlanSettings();
           if (settings?.plan) {
             setSelectedPlan(settings.plan);
@@ -5209,10 +5282,7 @@ const whatsappInviteTriggerInFlightRef = useRef(new Set());
         if(ev){
           setCurrentEventId(ev.id);
           setEventMessagesSentCount(messagesSent);
-          let addonCount = 0;
-          if (typeof ev.additional_packages === 'number') {
-            addonCount = ev.additional_packages;
-          }
+          const addonCount = parseNonNegativeInt(ev.additional_packages);
           setDbAddonCount((prev) => Math.max(prev ?? 0, addonCount));
           setAdditionalPackages((prev) => {
             const prevCount = prev ? prev.length : 0;
@@ -5221,6 +5291,8 @@ const whatsappInviteTriggerInFlightRef = useRef(new Set());
           });
           try { localStorage.setItem('additionalPackages_' + ev.id, String(addonCount)); } catch (_) {}
           setEventDataLoaded(true);
+          const capBoot = parseNonNegativeInt(ev.allowed_guests);
+          setEventAllowedGuests(capBoot > 0 ? capBoot : null);
           const fallbackPlan = userPlanSettingsRef.current?.plan || selectedPlanRef.current || null;
           const planToUse = derivePlanFromRecord(ev) || fallbackPlan;
           if (planToUse) {
