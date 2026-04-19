@@ -947,8 +947,74 @@ useEffect(() => {
     cancelled = true;
     cancelAnimationFrame(raf);
   };
-}, [canRenderCharts, currentEventId, eventRefreshKey]);
+}, [canRenderCharts, currentEventId]);
 const shouldShowCharts = canRenderCharts && chartsReady;
+
+  /** נתוני גרף יתרת הודעות — useMemo כדי שלא ייווצר מערך חדש בכל רינדור (Recharts + הבהוב) */
+  const messageCapacityChartModel = React.useMemo(() => {
+    if (!planForDisplay && !currentEventId) return null;
+    const messagesSent = effectiveMessagesSentCount;
+    const basePlanLimitForDisplay = getPlanBaseLimit(planForDisplay);
+    const messageLimit = (basePlanLimitForDisplay || 0) + additionalCapacity;
+    const remainingMessagesRaw = messageLimit - messagesSent;
+    const remainingMessages = Math.max(0, remainingMessagesRaw);
+    const overMessages = remainingMessagesRaw < 0 ? Math.abs(remainingMessagesRaw) : 0;
+    const capacityChartData = [
+      { key: 'limit', name: isMobileView ? 'מגבלה' : 'מגבלת הודעות', value: messageLimit, color: '#facc15' },
+      { key: 'sent', name: isMobileView ? 'נשלחו' : 'הודעות שנשלחו', value: messagesSent, color: '#7c3aed' },
+      {
+        key: overMessages > 0 ? 'over' : 'remaining',
+        name: overMessages > 0 ? 'חריגה' : 'יתרה',
+        value: overMessages > 0 ? overMessages : remainingMessages,
+        color: overMessages > 0 ? '#dc2626' : '#22c55e',
+      },
+    ];
+    const hasCapacityChartData = capacityChartData.some(
+      (item) => Number.isFinite(item.value) && item.value > 0,
+    );
+    return {
+      capacityChartData,
+      hasCapacityChartData,
+      messagesSent,
+      messageLimit,
+      remainingMessages,
+      overMessages,
+    };
+  }, [
+    planForDisplay,
+    currentEventId,
+    effectiveMessagesSentCount,
+    additionalCapacity,
+    isMobileView,
+    getPlanBaseLimit,
+  ]);
+
+  const renderCapacityLabel = React.useCallback(
+    ({ x, y, width, height, value, index }) => {
+      if (!messageCapacityChartModel || value === undefined || value === null) return null;
+      const { capacityChartData } = messageCapacityChartModel;
+      const dataItem = capacityChartData[index];
+      const isDarkBar = ['sent', 'over', 'remaining'].includes(dataItem?.key);
+      const insideBar = (height ?? 0) >= 24;
+      const labelX = x + (width ?? 0) / 2;
+      const labelY = insideBar ? y + (height ?? 0) / 2 : (y ?? 0) - 6;
+      const color = insideBar ? (isDarkBar ? '#FFFFFF' : '#111827') : '#111827';
+      return (
+        <text
+          x={labelX}
+          y={labelY}
+          fill={color}
+          textAnchor="middle"
+          dominantBaseline={insideBar ? 'middle' : 'baseline'}
+          fontWeight="700"
+          fontSize="14"
+        >
+          {value}
+        </text>
+      );
+    },
+    [messageCapacityChartModel],
+  );
 
 const addonUnitSize = getPlanBaseLimit('addon') || 0;
 const displayTotalPlanCapacityValue = Math.max(0, Math.round(totalPlanCapacity));
@@ -6047,10 +6113,6 @@ React.useEffect(()=>{
                     {!shouldShowCharts ? (
                       <div className="py-10 text-sm text-gray-500 text-center">טוען נתונים...</div>
                     ) : hasGuestSummaryData ? (
-                      (() => {
-                        const isSmallView = typeof window !== 'undefined' && window.innerWidth < 640;
-                        const axisTickFill = isSmallView ? '#FDE68A' : '#1f2937';
-                        return (
                       <div className="h-56 min-h-[200px] sm:h-56">
                         <ResponsiveContainer width="100%" height="100%">
                           <BarChart
@@ -6061,11 +6123,11 @@ React.useEffect(()=>{
                             <XAxis
                               dataKey="name"
                               stroke="#1f2937"
-                                tick={{
-                                  fontSize: isSmallView ? 12 : 16,
-                                  fontWeight: 600,
-                                  fill: axisTickFill
-                                }}
+                              tick={{
+                                fontSize: isMobileView ? 12 : 16,
+                                fontWeight: 600,
+                                fill: isMobileView ? '#FDE68A' : '#1f2937',
+                              }}
                               interval={0}
                               tickFormatter={(value) => {
                                 if (value === 'adults') return 'מבוגרים';
@@ -6075,11 +6137,16 @@ React.useEffect(()=>{
                               }}
                               tickLine={false}
                               axisLine={false}
-                                tickMargin={isSmallView ? 12 : 16}
+                              tickMargin={isMobileView ? 12 : 16}
                             />
                             <YAxis hide />
                             <Tooltip content={() => null} active={false} cursor={false} />
-                            <Bar dataKey="value" radius={[8, 8, 0, 0]} maxBarSize={60}>
+                            <Bar
+                              dataKey="value"
+                              radius={[8, 8, 0, 0]}
+                              maxBarSize={60}
+                              isAnimationActive={false}
+                            >
                               {guestSummaryChartData.map((item) => (
                                 <Cell key={item.key} fill={item.color} />
                               ))}
@@ -6088,8 +6155,6 @@ React.useEffect(()=>{
                           </BarChart>
                         </ResponsiveContainer>
                       </div>
-                        );
-                      })()
                     ) : (
                       <div className="py-10 text-sm text-gray-500 text-center">אין נתונים להצגה עדיין</div>
                     )}
@@ -6187,6 +6252,7 @@ React.useEffect(()=>{
                             innerRadius={55}
                             outerRadius={95}
                             paddingAngle={3}
+                            isAnimationActive={false}
                             label={renderStatusSliceLabel}
                             labelLine={false}
                           >
@@ -6236,49 +6302,7 @@ React.useEffect(()=>{
                   <p className="text-xs text-gray-500 mt-2 text-center">נתוני אישור הגעה יופיעו לאחר שליחת הזמנות ותגובות אורחים</p>
                 )}
               </div>
-              {(planForDisplay || currentEventId) && (() => {
-                // התאמה לסטטוס אישורי הגעה: אותו מספר הודעות שנשלחו בכל הדוחות
-                const messagesSent = effectiveMessagesSentCount;
-                const basePlanLimitForDisplay = getPlanBaseLimit(planForDisplay);
-                const messageLimit = (basePlanLimitForDisplay || 0) + additionalCapacity;
-                const remainingMessagesRaw = messageLimit - messagesSent;
-                const remainingMessages = Math.max(0, remainingMessagesRaw);
-                const overMessages = remainingMessagesRaw < 0 ? Math.abs(remainingMessagesRaw) : 0;
-                const capacityChartData = [
-                  { key: 'limit', name: isMobileView ? 'מגבלה' : 'מגבלת הודעות', value: messageLimit, color: '#facc15' },
-                  { key: 'sent', name: isMobileView ? 'נשלחו' : 'הודעות שנשלחו', value: messagesSent, color: '#7c3aed' },
-                  {
-                    key: overMessages > 0 ? 'over' : 'remaining',
-                    name: overMessages > 0 ? 'חריגה' : 'יתרה',
-                    value: overMessages > 0 ? overMessages : remainingMessages,
-                    color: overMessages > 0 ? '#dc2626' : '#22c55e'
-                  }
-                ];
-                const hasCapacityChartData = capacityChartData.some(item => Number.isFinite(item.value) && item.value > 0);
-                const renderCapacityLabel = ({ x, y, width, height, value, index }) => {
-                  if (!value) return null;
-                  const dataItem = capacityChartData[index];
-                  const isDarkBar = ['sent', 'over', 'remaining'].includes(dataItem?.key);
-                  const insideBar = (height ?? 0) >= 24;
-                  const labelX = x + (width ?? 0) / 2;
-                  const labelY = insideBar ? y + (height ?? 0) / 2 : (y ?? 0) - 6;
-                  const color = insideBar ? (isDarkBar ? '#FFFFFF' : '#111827') : '#111827';
-                  return (
-                    <text
-                      x={labelX}
-                      y={labelY}
-                      fill={color}
-                      textAnchor="middle"
-                      dominantBaseline={insideBar ? 'middle' : 'baseline'}
-                      fontWeight="700"
-                      fontSize="14"
-                    >
-                      {value}
-                    </text>
-                  );
-                };
-                
-                return (
+              {(planForDisplay || currentEventId) && messageCapacityChartModel && (
                   <div className="bg-yellow-50 p-3 sm:p-4 text-center shadow-lg w-full min-h-[320px]" style={{
                     border: '3px solid #D4AF37',
                     outline: '2px solid #B8860B',
@@ -6293,11 +6317,11 @@ React.useEffect(()=>{
                     <div className="bg-white p-3 rounded-lg border border-yellow-200">
                       {!shouldShowCharts ? (
                         <div className="py-10 text-sm text-gray-500 text-center">טוען נתונים...</div>
-                      ) : hasCapacityChartData ? (
+                      ) : messageCapacityChartModel.hasCapacityChartData ? (
                         <div className="h-56 min-h-[200px] sm:h-56">
                           <ResponsiveContainer width="100%" height="100%">
                             <BarChart
-                              data={capacityChartData}
+                              data={messageCapacityChartModel.capacityChartData}
                               margin={{ top: 16, right: 20, left: -10, bottom: 8 }}
                             >
                               <CartesianGrid strokeDasharray="3 3" vertical={false} />
@@ -6312,8 +6336,13 @@ React.useEffect(()=>{
                               />
                               <YAxis hide />
                               <Tooltip content={() => null} active={false} cursor={false} />
-                              <Bar dataKey="value" radius={[8, 8, 0, 0]} maxBarSize={60}>
-                                {capacityChartData.map((item) => (
+                              <Bar
+                                dataKey="value"
+                                radius={[8, 8, 0, 0]}
+                                maxBarSize={60}
+                                isAnimationActive={false}
+                              >
+                                {messageCapacityChartModel.capacityChartData.map((item) => (
                                   <Cell key={item.key} fill={item.color} />
                                 ))}
                                 <LabelList dataKey="value" content={renderCapacityLabel} />
@@ -6329,24 +6358,23 @@ React.useEffect(()=>{
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-3 text-base">
                       <div className="bg-white p-2 rounded-lg border border-yellow-100 text-right">
                         <div className="text-sm font-semibold text-yellow-600">מגבלת הודעות</div>
-                        <div className="text-2xl font-bold text-yellow-800">{messageLimit}</div>
+                        <div className="text-2xl font-bold text-yellow-800">{messageCapacityChartModel.messageLimit}</div>
                       </div>
                       <div className="bg-white p-2 rounded-lg border border-purple-100 text-right">
                             <div className="text-sm font-semibold text-purple-600">הודעות שנשלחו</div>
-                        <div className="text-2xl font-bold text-purple-700">{messagesSent}</div>
+                        <div className="text-2xl font-bold text-purple-700">{messageCapacityChartModel.messagesSent}</div>
                       </div>
-                      <div className={`bg-white p-2 rounded-lg border ${overMessages > 0 ? 'border-red-200' : 'border-green-200'} text-right`}>
-                        <div className={`text-sm font-semibold ${overMessages > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                          {overMessages > 0 ? 'חריגה' : 'יתרה'}
+                      <div className={`bg-white p-2 rounded-lg border ${messageCapacityChartModel.overMessages > 0 ? 'border-red-200' : 'border-green-200'} text-right`}>
+                        <div className={`text-sm font-semibold ${messageCapacityChartModel.overMessages > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                          {messageCapacityChartModel.overMessages > 0 ? 'חריגה' : 'יתרה'}
                         </div>
-                        <div className={`text-2xl font-bold ${overMessages > 0 ? 'text-red-700' : 'text-green-700'}`}>
-                          {overMessages > 0 ? `-${overMessages}` : remainingMessages}
+                        <div className={`text-2xl font-bold ${messageCapacityChartModel.overMessages > 0 ? 'text-red-700' : 'text-green-700'}`}>
+                          {messageCapacityChartModel.overMessages > 0 ? `-${messageCapacityChartModel.overMessages}` : messageCapacityChartModel.remainingMessages}
                         </div>
                       </div>
                     </div>
                   </div>
-                );
-              })()}
+              )}
             </div>
           )}
 
