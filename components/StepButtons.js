@@ -819,10 +819,12 @@ useEffect(() => {
   userPlanSettingsRef.current = userPlanSettings;
 }, [userPlanSettings]);
 const planForDisplay = useMemo(() => {
-    let fromState = selectedPlan || userPlanSettings?.plan || null;
-    if (typeof fromState === 'string') {
-      fromState = fromState.trim() || null;
-    }
+    const normalizePlanToken = (raw) => {
+      if (raw == null) return null;
+      const s = String(raw).trim().toLowerCase();
+      return s || null;
+    };
+    let fromState = normalizePlanToken(selectedPlan || userPlanSettings?.plan || null);
     if (fromState && CANONICAL_PLAN_CODES.has(fromState)) {
       return fromState;
     }
@@ -832,7 +834,7 @@ const planForDisplay = useMemo(() => {
       try {
         const raw =
           (localStorage.getItem('user_plan_code') || localStorage.getItem('selectedPlan') || '').trim();
-        fromLs = raw || null;
+        fromLs = normalizePlanToken(raw);
       } catch (_) {
         fromLs = null;
       }
@@ -842,11 +844,11 @@ const planForDisplay = useMemo(() => {
     }
 
     const addonCount = Math.max(
-      typeof dbAddonCount === 'number' && Number.isFinite(dbAddonCount)
-        ? Math.max(0, Math.floor(dbAddonCount))
-        : 0,
+      parseNonNegativeInt(dbAddonCount),
       Array.isArray(additionalPackages) ? additionalPackages.length : 0,
     );
+    const addonUnit = getPlanBaseLimit('addon') || 100;
+
     if (typeof eventAllowedGuests === 'number' && eventAllowedGuests > 0) {
       const derived = computePlanFromCapacity(eventAllowedGuests, addonCount);
       if (derived) {
@@ -854,9 +856,18 @@ const planForDisplay = useMemo(() => {
       }
     }
 
-    if (fromState) return fromState;
+    // כיסוי מהמצב המקומי כשאין allowed_guests ב־state (למשל לפני סיום fetch) — כמו totalPlanCapacity
+    if (addonCount > 0) {
+      const baseCap = getPlanBaseLimit(selectedPlan || userPlanSettings?.plan || null);
+      const syntheticTotal = baseCap + addonCount * addonUnit;
+      const inferredLocal = computePlanFromCapacity(syntheticTotal, addonCount);
+      if (inferredLocal) {
+        return inferredLocal;
+      }
+    }
+
     if (!session) return null;
-    return fromLs;
+    return null;
   }, [
     session,
     selectedPlan,
@@ -865,6 +876,7 @@ const planForDisplay = useMemo(() => {
     dbAddonCount,
     additionalPackages,
     computePlanFromCapacity,
+    getPlanBaseLimit,
   ]);
 
 const additionalPackagesRef = useRef(additionalPackages);
