@@ -979,18 +979,26 @@ const basePlanLimit = getPlanBaseLimit(selectedPlan);
 const additionalCapacity = additionalPackages.reduce((sum, planId) => sum + getPlanBaseLimit(planId), 0);
 const totalPlanCapacity = (basePlanLimit || 0) + additionalCapacity;
 const basePlanOverCapacity = basePlanLimit ? effectiveMessagesSentCount > basePlanLimit : false;
+const addonCountForDisplay = Math.max(
+  parseNonNegativeInt(dbAddonCount),
+  Array.isArray(additionalPackages) ? additionalPackages.length : 0,
+);
+const displayPlanCode =
+  planForDisplay ||
+  computePlanFromCapacity(Math.max(0, totalPlanCapacity), addonCountForDisplay) ||
+  null;
 const activePlanDescription =
-  planForDisplay === 'basic' || planForDisplay === 'free'
+  displayPlanCode === 'basic' || displayPlanCode === 'free'
     ? 'מסלול א - ₪5 לאירועים קטנים עם כל הפיצ\'רים הבסיסיים'
-    : planForDisplay === 'standard'
+    : displayPlanCode === 'standard'
       ? 'מסלול ב - מקצועי עם תמיכה מלאה ועיצובים מתקדמים'
-      : planForDisplay === 'premium'
+      : displayPlanCode === 'premium'
         ? 'מסלול ג - כולל את כל הפיצ\'רים ותמיכה 24/7'
-        : planForDisplay === 'luxury'
+        : displayPlanCode === 'luxury'
           ? 'מסלול ד - מתאים לאירועים גדולים מאוד עם יכולות מתקדמות'
-          : planForDisplay === 'elite'
+          : displayPlanCode === 'elite'
             ? 'מסלול ה - מעטפת מלאה לאירועים ענקיים'
-            : planForDisplay === 'supreme'
+            : displayPlanCode === 'supreme'
               ? ''
               : '';
 const additionalPackageCounts = React.useMemo(() => {
@@ -1021,9 +1029,9 @@ const shouldShowCharts = canRenderCharts && chartsReady;
 
   /** נתוני גרף יתרת הודעות — useMemo כדי שלא ייווצר מערך חדש בכל רינדור (Recharts + הבהוב) */
   const messageCapacityChartModel = React.useMemo(() => {
-    if (!planForDisplay && !currentEventId) return null;
+    if (!displayPlanCode && !currentEventId) return null;
     const messagesSent = effectiveMessagesSentCount;
-    const basePlanLimitForDisplay = getPlanBaseLimit(planForDisplay);
+    const basePlanLimitForDisplay = getPlanBaseLimit(displayPlanCode);
     const messageLimit = (basePlanLimitForDisplay || 0) + additionalCapacity;
     const remainingMessagesRaw = messageLimit - messagesSent;
     const remainingMessages = Math.max(0, remainingMessagesRaw);
@@ -1050,7 +1058,7 @@ const shouldShowCharts = canRenderCharts && chartsReady;
       overMessages,
     };
   }, [
-    planForDisplay,
+    displayPlanCode,
     currentEventId,
     effectiveMessagesSentCount,
     additionalCapacity,
@@ -6116,20 +6124,20 @@ React.useEffect(()=>{
                   <div className="bg-white p-3 rounded-lg border border-yellow-200 mb-3 space-y-3">
                     <div>
                       <div className="text-lg font-bold text-yellow-700 mb-1">
-                        {planForDisplay === 'basic' || planForDisplay === 'free' ? 'מסלול א' : 
-                         planForDisplay === 'standard' ? 'מסלול ב' : 
-                         planForDisplay === 'premium' ? 'מסלול ג' : 
-                         planForDisplay === 'luxury' ? 'מסלול ד' : 
-                         planForDisplay === 'elite' ? 'מסלול ה' : 
-                         planForDisplay === 'supreme' ? 'מסלול ו' : 'לא זוהה מסלול'}
+                        {displayPlanCode === 'basic' || displayPlanCode === 'free' ? 'מסלול א' : 
+                         displayPlanCode === 'standard' ? 'מסלול ב' : 
+                         displayPlanCode === 'premium' ? 'מסלול ג' : 
+                         displayPlanCode === 'luxury' ? 'מסלול ד' : 
+                         displayPlanCode === 'elite' ? 'מסלול ה' : 
+                         displayPlanCode === 'supreme' ? 'מסלול ו' : 'מסלול א'}
                       </div>
                       <div className="text-base text-gray-700 font-semibold">
-                        {planForDisplay === 'basic' || planForDisplay === 'free' ? '₪5 - עד 5 הודעות' :
-                         planForDisplay === 'standard' ? '149₪ - מ 51 עד 200 הודעות' :
-                         planForDisplay === 'premium' ? '199₪ - מ 201 עד 350 הודעות' :
-                         planForDisplay === 'luxury' ? '259₪ - מ 351 עד 500 הודעות' :
-                         planForDisplay === 'elite' ? '349₪ - מ 501 עד 650 הודעות' :
-                         planForDisplay === 'supreme' ? '499₪ - מ 651 עד 1000 הודעות' : 'המסלול ישוחזר אוטומטית כעת'}
+                        {displayPlanCode === 'basic' || displayPlanCode === 'free' ? '₪5 - עד 5 הודעות' :
+                         displayPlanCode === 'standard' ? '149₪ - מ 51 עד 200 הודעות' :
+                         displayPlanCode === 'premium' ? '199₪ - מ 201 עד 350 הודעות' :
+                         displayPlanCode === 'luxury' ? '259₪ - מ 351 עד 500 הודעות' :
+                         displayPlanCode === 'elite' ? '349₪ - מ 501 עד 650 הודעות' :
+                         displayPlanCode === 'supreme' ? '499₪ - מ 651 עד 1000 הודעות' : '₪5 - עד 5 הודעות'}
                       </div>
                     </div>
                     <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
