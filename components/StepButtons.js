@@ -2197,10 +2197,17 @@ const handleOpenAddonModal = React.useCallback(() => {
     whatsappInviteTriggerInFlightRef.current.add(eventKey);
 
     try {
+      const { data: { session: authSession } } = await supabase.auth.getSession();
+      const accessToken = authSession?.access_token || null;
+      if (!accessToken) {
+        addToast?.('חיבור המשתמש פג. התחבר מחדש כדי לשלוח וואטסאפ.', 'error');
+        return;
+      }
       const response = await fetch('/api/greenapi/send-event-invite', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          Authorization: `Bearer ${accessToken}`,
         },
         body: JSON.stringify({ eventId }),
       });
@@ -2215,14 +2222,15 @@ const handleOpenAddonModal = React.useCallback(() => {
       const updatedCount = typeof payload?.updatedMessagesSentCount === 'number'
         ? payload.updatedMessagesSentCount
         : null;
+      const queuedCount = Number(payload?.queued ?? payload?.sent ?? 0);
 
       if (response.ok) {
-        if (payload.sent > 0) {
-          addToast?.(`נשלחו ${payload.sent} הודעות וואטסאפ לאורחים`, 'success');
+        if (queuedCount > 0) {
+          addToast?.(`תוּרִגְרו ${queuedCount} הודעות וואטסאפ לשליחה`, 'success');
           if (updatedCount !== null) {
             setEventMessagesSentCount(updatedCount);
           } else {
-            setEventMessagesSentCount((prev) => (prev || 0) + (payload.sent || 0));
+            setEventMessagesSentCount((prev) => (prev || 0) + queuedCount);
           }
         } else {
           if (updatedCount !== null) {
@@ -2257,10 +2265,17 @@ const handleOpenAddonModal = React.useCallback(() => {
     }
 
     try {
+      const { data: { session: authSession } } = await supabase.auth.getSession();
+      const accessToken = authSession?.access_token || null;
+      if (!accessToken) {
+        addToast?.('חיבור המשתמש פג. התחבר מחדש כדי לשלוח וואטסאפ.', 'error');
+        return { ok: false, reason: 'missing_auth' };
+      }
       const response = await fetch('/api/greenapi/send-event-invite', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          Authorization: `Bearer ${accessToken}`,
         },
         body: JSON.stringify({ eventId, guestIds }),
       });
@@ -2283,10 +2298,11 @@ const handleOpenAddonModal = React.useCallback(() => {
         setEventMessagesSentCount(updatedCount);
       }
 
+      const queuedCount = Number(payload?.queued ?? payload?.sent ?? 0);
       if (response.ok) {
-        if (payload.sent > 0) {
+        if (queuedCount > 0) {
           if (updatedCount === null) {
-            setEventMessagesSentCount((prev) => (prev || 0) + (payload.sent || 0));
+            setEventMessagesSentCount((prev) => (prev || 0) + queuedCount);
           }
           return { ok: true, payload };
         }
