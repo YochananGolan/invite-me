@@ -1321,56 +1321,6 @@ const handleOpenAddonModal = React.useCallback(() => {
       return `${d}.${m}.${yy}`;
     };
 
-  const resolveShareFetchUrl = (rawUrl) => {
-    if (!rawUrl) return null;
-    try {
-      const target = new URL(rawUrl, typeof window !== 'undefined' ? window.location.origin : undefined);
-      if (typeof window !== 'undefined' && target.origin === window.location.origin) {
-        return target.toString();
-      }
-      const allowedHosts = ['meet-m.co.il', 'www.meet-m.co.il', 'app.meet-m.co.il', 'static.meet-m.co.il'];
-      if (!allowedHosts.includes(target.hostname)) {
-        return target.toString();
-      }
-      return `/api/image-proxy?url=${encodeURIComponent(target.toString())}`;
-    } catch (err) {
-      console.warn('resolveShareFetchUrl failed to parse URL', rawUrl, err);
-      return rawUrl;
-    }
-  };
-
-  /**
-     * Try to share an invitation image using the Web Share API (level 2 – files).
-     * Falls back to returning false if not supported or on error.
-     * @param {string} url Public URL of the invitation image (jpg)
-     * @param {string} guestFirstName Name of guest for greeting
-     * @returns {Promise<boolean>} true if shared successfully, else false
-     */
-    const shareInviteImage = async (url, guestFirstName, inviteLink, customText) => {
-      try {
-      const fetchUrl = resolveShareFetchUrl(url) || url;
-      const res = await fetch(fetchUrl);
-      if (!res.ok) {
-        console.warn('shareInviteImage fetch failed', fetchUrl, res.status);
-        return false;
-      }
-        const blob = await res.blob();
-        const file = new File([blob], 'invite.jpg', { type: blob.type || 'image/jpeg' });
-
-        if (navigator.canShare && navigator.canShare({ files: [file] })) {
-          await navigator.share({
-            files: [file],
-            title: 'הזמנה',
-            text: customText || `היי ${guestFirstName}, מצורפת ההזמנה שלנו.\nלאישור הגעה והזנת פרטי משתתפים:\n${inviteLink}`,
-          });
-          return true;
-        }
-      } catch (e) {
-        if (e.name !== 'AbortError') console.error('Share invite image failed', e);
-      }
-      return false;
-    };
-
     const handleSendInvitation = async () => {
       // Persist current event details so they survive any reloads after sending
       try{ localStorage.setItem('savedEventDetails', JSON.stringify(formData)); }catch{}
@@ -1462,77 +1412,8 @@ const handleOpenAddonModal = React.useCallback(() => {
         console.log('RSVP link:', inviteLink);
       }
 
-      // Fetch invitation public URL
+      // Send via Green API only. Do not use browser share here because it cannot confirm provider acceptance.
       try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) {
-          console.error('User session lost during invitation send');
-          setInvitationResult({ 
-            type: 'error', 
-            message: 'אירעה שגיאה בשליחת ההזמנה.' 
-          });
-          setShowInvitationResultModal(true);
-          return;
-        }
-
-        const { data: ev } = await supabase
-          .from('events')
-          .select('invitation_path, event_details')
-          .eq('user_id', user.id)
-          .eq('id', eventIdForInvite)
-          .maybeSingle();
-
-        let inviteUrl = '';
-        if (ev && ev.invitation_path) {
-          if (ev.invitation_path.startsWith('http')) {
-            inviteUrl = ev.invitation_path;
-          } else {
-            const { data: urlData } = supabase.storage
-              .from('invites')
-              .getPublicUrl(ev.invitation_path);
-            inviteUrl = urlData.publicUrl;
-          }
-        } else if (ev && ev.event_details) {
-          const details = typeof ev.event_details === 'string' ? JSON.parse(ev.event_details || '{}') : ev.event_details || {};
-          const tpl = details.template_src;
-          if (tpl) {
-            const base = getInviteBaseUrl();
-            inviteUrl = tpl.startsWith('http') ? tpl : (base + (tpl.startsWith('/') ? tpl : '/' + tpl));
-          }
-        }
-
-        const shareText = `${invitationText}\n\nלאישור הגעה:\n${inviteLink}`;
-        if (inviteUrl) {
-          const shared = await shareInviteImage(inviteUrl, guestData.guestFirstName, inviteLink, shareText);
-          if (shared) {
-            setIsSendingInvitation(false);
-            if (eventIdForInvite) {
-              try {
-                const { data: newCount, error: rpcErr } = await supabase.rpc('increment_event_messages_sent', {
-                  p_event_id: eventIdForInvite,
-                  p_delta: 1
-                });
-                if (!rpcErr && typeof newCount === 'number') {
-                  setEventMessagesSentCount(newCount);
-                } else {
-                  const fallback = (eventMessagesSentCount || 0) + 1;
-                  setEventMessagesSentCount(fallback);
-                  await supabase.from('events').update({ messages_sent_count: fallback }).eq('id', eventIdForInvite);
-                }
-              } catch (e) {
-                const fallback = (eventMessagesSentCount || 0) + 1;
-                setEventMessagesSentCount(fallback);
-                try { await supabase.from('events').update({ messages_sent_count: fallback }).eq('id', eventIdForInvite); } catch (_) {}
-              }
-            } else {
-              setEventMessagesSentCount((prev) => prev + 1);
-            }
-            setInvitationResult({ type: 'success', message: 'ההזמנה נשלחה בהצלחה!' });
-            setShowInvitationResultModal(true);
-            return;
-          }
-        }
-
         // #region agent log
         fetch('http://127.0.0.1:7780/ingest/b5f4ac25-b263-42d9-8749-29626868bbeb',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'dcd254'},body:JSON.stringify({sessionId:'dcd254',runId:'initial',hypothesisId:'H3',location:'components/StepButtons.js:1103',message:'Single guest WhatsApp send invoked',data:{eventIdForInvite,guestId:newGuestRecord.id},timestamp:Date.now()})}).catch(()=>{});
         // #endregion
@@ -2186,78 +2067,6 @@ const handleOpenAddonModal = React.useCallback(() => {
     },
   }));
 
-  const triggerWhatsAppInvites = useCallback(async (eventId) => {
-    if (!eventId) return { ok: false, reason: 'missing_event' };
-
-    const eventKey = String(eventId);
-    // רק מניעת כפילות בזמן שבקשה כבר רצה — לא נעילה קבועה אחרי שליחה מוצלחת (היה חוסם טריגרים עתידיים לאותו eventId)
-    if (whatsappInviteTriggerInFlightRef.current.has(eventKey)) {
-      return { ok: false, reason: 'in_flight' };
-    }
-    whatsappInviteTriggerInFlightRef.current.add(eventKey);
-
-    try {
-      const { data: { session: authSession } } = await supabase.auth.getSession();
-      const accessToken = authSession?.access_token || null;
-      if (!accessToken) {
-        addToast?.('חיבור המשתמש פג. התחבר מחדש כדי לשלוח וואטסאפ.', 'error');
-        return { ok: false, reason: 'missing_auth' };
-      }
-      const response = await fetch('/api/greenapi/send-event-invite', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${accessToken}`,
-        },
-        body: JSON.stringify({ eventId }),
-      });
-
-      let payload = {};
-      try {
-        payload = await response.json();
-      } catch (err) {
-        // Ignore JSON parse issues (empty body)
-      }
-
-      const updatedCount = typeof payload?.updatedMessagesSentCount === 'number'
-        ? payload.updatedMessagesSentCount
-        : null;
-      const queuedCount = Number(payload?.queued ?? payload?.sent ?? 0);
-
-      if (response.ok) {
-        if (queuedCount > 0) {
-          addToast?.(`תוּרִגְרו ${queuedCount} הודעות וואטסאפ לשליחה`, 'success');
-          if (updatedCount !== null) {
-            setEventMessagesSentCount(updatedCount);
-          } else {
-            setEventMessagesSentCount((prev) => (prev || 0) + queuedCount);
-          }
-        } else {
-          if (updatedCount !== null) {
-            setEventMessagesSentCount(updatedCount);
-          }
-          addToast?.(
-            payload.message || 'לא נמצאו אורחים עם מספרי וואטסאפ לשיגור אוטומטי',
-            'info'
-          );
-        }
-        return { ok: true, payload };
-      } else {
-        if (updatedCount !== null) {
-          setEventMessagesSentCount(updatedCount);
-        }
-        addToast?.(payload.error || 'שליחת הודעת וואטסאפ נכשלה', 'error');
-        return { ok: false, payload };
-      }
-    } catch (err) {
-      console.error('Failed to trigger WhatsApp invites', err);
-      addToast?.('שליחת הודעת וואטסאפ נכשלה', 'error');
-      return { ok: false, error: err };
-    } finally {
-      whatsappInviteTriggerInFlightRef.current.delete(eventKey);
-    }
-  }, [addToast]);
-
   const sendWhatsAppInviteViaApi = useCallback(async ({ eventId, guestIds }) => {
     // #region agent log
     fetch('http://127.0.0.1:7780/ingest/b5f4ac25-b263-42d9-8749-29626868bbeb',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'dcd254'},body:JSON.stringify({sessionId:'dcd254',runId:'initial',hypothesisId:'H2',location:'components/StepButtons.js:1686',message:'sendWhatsAppInviteViaApi entry',data:{eventId,guestIdsLength:Array.isArray(guestIds)?guestIds.length:null},timestamp:Date.now()})}).catch(()=>{});
@@ -2494,7 +2303,6 @@ const handleOpenAddonModal = React.useCallback(() => {
           console.debug('[StepButtons] Insert success', inserted);
           setCurrentEventId(inserted.id);
           setEventMessagesSentCount(0);
-          await triggerWhatsAppInvites(inserted.id);
         }
         if(insertErr){
           console.error('[StepButtons] Insert error', insertErr);
@@ -5233,8 +5041,6 @@ React.useEffect(() => {
   const formSaveTimer = useRef(null);
   const isInitialLoadRef = useRef(true); // Track if we're in initial load phase
   const eventDetailsOpenedRef = useRef(false); // Prevent reset when reopening event details
-/** מונע קריאות מקבילות כפולות ל-/api/greenapi/send-event-invite לאותו eventId בלבד */
-const whatsappInviteTriggerInFlightRef = useRef(new Set());
 
   // Reset form when opening event details for NEW event (first open only, not on reopen)
   React.useEffect(() => {
