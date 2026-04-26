@@ -959,12 +959,17 @@ const invitedCountFromStatus =
   (guestStatusSummary?.approved ?? 0) + (guestStatusSummary?.rejected ?? 0) + (guestStatusSummary?.pending ?? 0);
 const invitedCount = Math.max(invitedGuestsCount || 0, invitedCountFromStatus || 0);
 const effectiveMessagesSentCount = Number.isFinite(eventMessagesSentCount) ? eventMessagesSentCount : 0;
+const addonCountForDisplay = Math.max(
+  parseNonNegativeInt(dbAddonCount),
+  parseNonNegativeInt(userPlanSettings?.addonCount),
+  Array.isArray(additionalPackages) ? additionalPackages.length : 0,
+);
 
   React.useEffect(() => {
     if (!showPricingPlan) {
       if (planWarningSuppressed && eventDataLoaded) {
-        const baseLimit = getPlanBaseLimit(selectedPlan);
-        const extraCapacity = additionalPackages.reduce((sum, planId) => sum + getPlanBaseLimit(planId), 0);
+        const baseLimit = getPlanBaseLimit(selectedPlan || planForDisplay || userPlanSettings?.plan || null);
+        const extraCapacity = addonCountForDisplay * (getPlanBaseLimit('addon') || 100);
         const totalLimit = (baseLimit || 0) + extraCapacity;
         if (effectiveMessagesSentCount > totalLimit) {
           setPendingAddonCount(1);
@@ -974,7 +979,7 @@ const effectiveMessagesSentCount = Number.isFinite(eventMessagesSentCount) ? eve
       }
       setPlanSelectionError('');
     }
-  }, [showPricingPlan, planWarningSuppressed, effectiveMessagesSentCount, selectedPlan, additionalPackages, getPlanBaseLimit, eventDataLoaded]);
+  }, [showPricingPlan, planWarningSuppressed, effectiveMessagesSentCount, selectedPlan, planForDisplay, userPlanSettings?.plan, addonCountForDisplay, getPlanBaseLimit, eventDataLoaded]);
 
   React.useEffect(() => {
     if (showEventTypes) {
@@ -982,14 +987,10 @@ const effectiveMessagesSentCount = Number.isFinite(eventMessagesSentCount) ? eve
     }
   }, [showEventTypes]);
 
-const basePlanLimit = getPlanBaseLimit(selectedPlan);
-const additionalCapacity = additionalPackages.reduce((sum, planId) => sum + getPlanBaseLimit(planId), 0);
+const basePlanLimit = getPlanBaseLimit(selectedPlan || planForDisplay || userPlanSettings?.plan || null);
+const additionalCapacity = addonCountForDisplay * (getPlanBaseLimit('addon') || 100);
 const totalPlanCapacity = (basePlanLimit || 0) + additionalCapacity;
 const basePlanOverCapacity = basePlanLimit ? effectiveMessagesSentCount > basePlanLimit : false;
-const addonCountForDisplay = Math.max(
-  parseNonNegativeInt(dbAddonCount),
-  Array.isArray(additionalPackages) ? additionalPackages.length : 0,
-);
 const displayPlanCode =
   planForDisplay ||
   computePlanFromCapacity(Math.max(0, totalPlanCapacity), addonCountForDisplay) ||
@@ -1009,11 +1010,15 @@ const activePlanDescription =
               ? ''
               : '';
 const additionalPackageCounts = React.useMemo(() => {
-  return additionalPackages.reduce((acc, planId) => {
+  const counts = additionalPackages.reduce((acc, planId) => {
     acc[planId] = (acc[planId] || 0) + 1;
     return acc;
   }, {});
-}, [additionalPackages]);
+  if (addonCountForDisplay > 0) {
+    counts.addon = Math.max(counts.addon || 0, addonCountForDisplay);
+  }
+  return counts;
+}, [additionalPackages, addonCountForDisplay]);
 const canRenderCharts = Boolean(currentEventId && eventDataLoaded);
 const [chartsReady, setChartsReady] = useState(false);
 useEffect(() => {
@@ -1368,7 +1373,9 @@ const handleOpenAddonModal = React.useCallback(() => {
       }
 
       // Block sending when over message quota (same limit for all plans; effective = sync with status panel)
-      const totalLimitForSend = (getPlanBaseLimit(selectedPlan) || 0) + additionalPackages.reduce((s, id) => s + (getPlanBaseLimit(id) || 0), 0);
+      const totalLimitForSend =
+        (getPlanBaseLimit(selectedPlan || planForDisplay || userPlanSettings?.plan || null) || 0) +
+        addonCountForDisplay * (getPlanBaseLimit('addon') || 100);
       if (totalLimitForSend > 0 && effectiveMessagesSentCount >= totalLimitForSend) {
         setPendingAddonCount(1);
         setShowPlanLimitWarning(true);
@@ -1570,7 +1577,9 @@ const handleOpenAddonModal = React.useCallback(() => {
       const inviteLink = `${baseUrl}/${eventIdForInvite}/${newGuest.id}`;
 
       // Send SMS via API - check message quota first (effective = sync with status panel)
-      const totalLimitSms = (getPlanBaseLimit(selectedPlan) || 0) + additionalPackages.reduce((s, id) => s + (getPlanBaseLimit(id) || 0), 0);
+      const totalLimitSms =
+        (getPlanBaseLimit(selectedPlan || planForDisplay || userPlanSettings?.plan || null) || 0) +
+        addonCountForDisplay * (getPlanBaseLimit('addon') || 100);
       if (totalLimitSms > 0 && effectiveMessagesSentCount >= totalLimitSms) {
         setInvitationResult({ type: 'error', message: 'אין מספיק הודעות במכסה. נא לרכוש חבילת הרחבה.' });
         setShowInvitationResultModal(true);
@@ -2399,11 +2408,10 @@ const handleOpenAddonModal = React.useCallback(() => {
         });
 
         // Calculate allowed guests based on plan and addons – if no plan purchased yet, capacity is 0
-        const basePlanLimit = selectedPlan ? getPlanBaseLimit(selectedPlan) || 0 : 0;
-        const extraCapacity = additionalPackages.reduce(
-          (sum, planId) => sum + getPlanBaseLimit(planId),
-          0
-        );
+        const basePlanLimit = selectedPlan || planForDisplay || userPlanSettings?.plan
+          ? getPlanBaseLimit(selectedPlan || planForDisplay || userPlanSettings?.plan) || 0
+          : 0;
+        const extraCapacity = addonCountForDisplay * (getPlanBaseLimit('addon') || 100);
         const totalAllowedGuests = basePlanLimit + extraCapacity;
         const addonCountForDb = additionalPackageCounts['addon'] || 0;
 
@@ -2495,11 +2503,10 @@ const handleOpenAddonModal = React.useCallback(() => {
         // allowed_guests is persisted in DB; UI quota uses selectedPlan/addons from state.
       } else {
         // Calculate allowed guests based on plan and addons
-        const basePlanLimit = selectedPlan ? getPlanBaseLimit(selectedPlan) || 0 : 0;
-        const extraCapacity = additionalPackages.reduce(
-          (sum, planId) => sum + getPlanBaseLimit(planId),
-          0
-        );
+        const basePlanLimit = selectedPlan || planForDisplay || userPlanSettings?.plan
+          ? getPlanBaseLimit(selectedPlan || planForDisplay || userPlanSettings?.plan) || 0
+          : 0;
+        const extraCapacity = addonCountForDisplay * (getPlanBaseLimit('addon') || 100);
         const totalAllowedGuests = basePlanLimit + extraCapacity;
         const addonCountForDb = additionalPackageCounts['addon'] || 0;
 
@@ -3118,7 +3125,9 @@ React.useEffect(() => {
         // Build SMS message with invitation text and RSVP link
         const smsMessage = `${invitationText}\n\nשלום {firstName},\nלאישור הגעה:\n{inviteLink}`;
 
-        const totalLimitBulk = (getPlanBaseLimit(selectedPlan) || 0) + additionalPackages.reduce((s, id) => s + (getPlanBaseLimit(id) || 0), 0);
+        const totalLimitBulk =
+          (getPlanBaseLimit(selectedPlan || planForDisplay || userPlanSettings?.plan || null) || 0) +
+          addonCountForDisplay * (getPlanBaseLimit('addon') || 100);
         if (totalLimitBulk > 0 && effectiveMessagesSentCount + smsGuests.length > totalLimitBulk) {
           setShowExcelPreview(false);
           setExcelPreviewData([]);
@@ -4156,7 +4165,11 @@ React.useEffect(() => {
       // Handle addon packages (100 guests for 100 shekel each)
       else if (effectivePlan === 'addon') {
         try {
-          let existingAddonCount = additionalPackages.filter((p) => p === 'addon').length;
+          let existingAddonCount = Math.max(
+            parseNonNegativeInt(dbAddonCount),
+            parseNonNegativeInt(userPlanSettings?.addonCount),
+            additionalPackages.filter((p) => p === 'addon').length,
+          );
           if (override && eventIdForPlan) {
             const { data: ev } = await supabase.from('events').select('additional_packages').eq('id', eventIdForPlan).single();
             existingAddonCount = (ev?.additional_packages ?? 0);
@@ -5633,8 +5646,8 @@ React.useEffect(()=>{
       return;
     }
     
-    const baseLimit = getPlanBaseLimit(selectedPlan);
-    const extraCapacity = additionalPackages.reduce((sum, planId) => sum + getPlanBaseLimit(planId), 0);
+    const baseLimit = getPlanBaseLimit(selectedPlan || planForDisplay || userPlanSettings?.plan || null);
+    const extraCapacity = addonCountForDisplay * (getPlanBaseLimit('addon') || 100);
     if (!baseLimit && extraCapacity === 0) {
       setShowPlanLimitWarning(false);
       setPlanAddOnMode(false);
@@ -5785,11 +5798,8 @@ React.useEffect(()=>{
         <div className="fixed inset-0 flex items-center justify-center bg-black/70 z-[100]">
           <div className="bg-white rounded-lg p-4 sm:p-6 w-full max-w-lg mx-3 text-center shadow-2xl">
             {(() => {
-              const baseLimit = getPlanBaseLimit(selectedPlan) || 0;
-              const extraCapacity = additionalPackages.reduce(
-                (sum, planId) => sum + getPlanBaseLimit(planId),
-                0
-              );
+              const baseLimit = getPlanBaseLimit(selectedPlan || planForDisplay || userPlanSettings?.plan || null) || 0;
+              const extraCapacity = addonCountForDisplay * (getPlanBaseLimit('addon') || 100);
               const totalLimit = baseLimit + extraCapacity;
               const messagesOverQuota = Math.max(0, effectiveMessagesSentCount - totalLimit);
               const addonUnit = getPlanBaseLimit('addon') || 100;
