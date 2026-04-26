@@ -4171,8 +4171,15 @@ React.useEffect(() => {
             additionalPackages.filter((p) => p === 'addon').length,
           );
           if (override && eventIdForPlan) {
-            const { data: ev } = await supabase.from('events').select('additional_packages').eq('id', eventIdForPlan).single();
-            existingAddonCount = (ev?.additional_packages ?? 0);
+            const { data: ev } = await supabase
+              .from('events')
+              .select('additional_packages')
+              .eq('id', eventIdForPlan)
+              .single();
+            existingAddonCount = Math.max(
+              existingAddonCount,
+              parseNonNegativeInt(ev?.additional_packages),
+            );
           }
           const newAddonTotal = existingAddonCount + addonCount;
           const newAddons = Array(addonCount).fill('addon');
@@ -4197,21 +4204,41 @@ React.useEffect(() => {
             } catch (_) {}
           }
           if (eventIdForSave) {
+            const basePlanForAddonEvent = selectedPlan || planForDisplay || userPlanSettings?.plan || 'basic';
+            const newAllowedGuests =
+              (getPlanBaseLimit(basePlanForAddonEvent) || 0) +
+              newAddonTotal * (getPlanBaseLimit('addon') || 100);
             const { error: updErr } = await supabase
               .from('events')
-              .update({ additional_packages: newAddonTotal })
+              .update({
+                additional_packages: newAddonTotal,
+                allowed_guests: newAllowedGuests,
+                selected_plan: basePlanForAddonEvent,
+              })
               .eq('id', eventIdForSave);
             if (updErr) {
               console.error('Failed to persist additional_packages in DB', updErr);
             }
+            setEventAllowedGuests(newAllowedGuests > 0 ? newAllowedGuests : null);
             const { data: verify } = await supabase
               .from('events')
-              .select('additional_packages')
+              .select('additional_packages,allowed_guests')
               .eq('id', eventIdForSave)
               .single();
-            if (verify && typeof verify.additional_packages === 'number' && verify.additional_packages !== newAddonTotal) {
-              console.warn('additional_packages mismatch after update, retrying');
-              await supabase.from('events').update({ additional_packages: newAddonTotal }).eq('id', eventIdForSave);
+            if (
+              verify &&
+              (parseNonNegativeInt(verify.additional_packages) !== newAddonTotal ||
+                parseNonNegativeInt(verify.allowed_guests) < newAllowedGuests)
+            ) {
+              console.warn('addon capacity mismatch after update, retrying');
+              await supabase
+                .from('events')
+                .update({
+                  additional_packages: newAddonTotal,
+                  allowed_guests: newAllowedGuests,
+                  selected_plan: basePlanForAddonEvent,
+                })
+                .eq('id', eventIdForSave);
             }
           }
           try { localStorage.setItem('additionalPackages_' + (eventIdForSave || 'global'), JSON.stringify(newAddonTotal)); } catch (_) {}
@@ -4441,7 +4468,12 @@ React.useEffect(() => {
           return;
         }
         setEventMessagesSentCount(messagesSent);
-        const addonCount = parseNonNegativeInt(ev.additional_packages);
+        const eventAddonCount = parseNonNegativeInt(ev.additional_packages);
+        const settingsAddonCount = parseNonNegativeInt(userPlanSettingsRef.current?.addonCount);
+        const localAddonCount = Array.isArray(additionalPackagesRef.current)
+          ? additionalPackagesRef.current.filter((planId) => planId === 'addon').length
+          : 0;
+        const addonCount = Math.max(eventAddonCount, settingsAddonCount, localAddonCount);
         setDbAddonCount((prev) => Math.max(prev ?? 0, addonCount));
         setAdditionalPackages((prev) => {
           const prevCount = prev ? prev.length : 0;
@@ -4459,6 +4491,20 @@ React.useEffect(() => {
           selectionSourceRef.current = 'event';
           try { localStorage.setItem('selectedPlan', planToUse); } catch(e){}
           await persistUserPlanSettings(planToUse, addonCount);
+          if (addonCount > eventAddonCount) {
+            const repairedAllowedGuests =
+              (getPlanBaseLimit(planToUse) || 0) +
+              addonCount * (getPlanBaseLimit('addon') || 100);
+            await supabase
+              .from('events')
+              .update({
+                additional_packages: addonCount,
+                allowed_guests: repairedAllowedGuests,
+                selected_plan: planToUse,
+              })
+              .eq('id', ev.id);
+            setEventAllowedGuests(repairedAllowedGuests > 0 ? repairedAllowedGuests : null);
+          }
         }
         const details=typeof ev.event_details==='string'?JSON.parse(ev.event_details):ev.event_details||{};
         const dateStr=details.date||details.start_datetime;
@@ -4478,7 +4524,7 @@ React.useEffect(() => {
         }
       }catch(e){console.error('archive check failed',e);}  
     })();
-  },[eventRefreshKey, loadUserPlanSettings, derivePlanFromRecord, persistUserPlanSettings]);
+  },[eventRefreshKey, loadUserPlanSettings, derivePlanFromRecord, persistUserPlanSettings, getPlanBaseLimit]);
 
   // Realtime sync: when current event or its guests change in Supabase, refresh state.
   React.useEffect(() => {
