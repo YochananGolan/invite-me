@@ -69,6 +69,27 @@ function isMissingColumnError(error) {
   return error?.code === '42703' || msg.includes('whatsapp_group_');
 }
 
+function parseEventDetails(event) {
+  try {
+    return typeof event?.event_details === 'string'
+      ? JSON.parse(event.event_details || '{}')
+      : event?.event_details || {};
+  } catch {
+    return {};
+  }
+}
+
+function getStoredGroupMetadata(event) {
+  const details = parseEventDetails(event);
+  const fallbackGroup = details?.whatsapp_group || {};
+
+  return {
+    groupId: event?.whatsapp_group_id || fallbackGroup.groupId || null,
+    groupInviteLink: event?.whatsapp_group_invite_link || fallbackGroup.groupInviteLink || null,
+    groupName: event?.whatsapp_group_name || fallbackGroup.groupName || null,
+  };
+}
+
 async function loadOwnedEvent(supabase, eventId, userId) {
   const fullSelect =
     'id, user_id, event_type, event_details, whatsapp_group_id, whatsapp_group_invite_link, whatsapp_group_name';
@@ -94,7 +115,9 @@ async function loadOwnedEvent(supabase, eventId, userId) {
 }
 
 async function persistGroupMetadata(supabase, eventId, metadata, supportsGroupColumns) {
-  if (!supportsGroupColumns) return false;
+  if (!supportsGroupColumns) {
+    return persistGroupMetadataInEventDetails(supabase, eventId, metadata);
+  }
 
   const { error } = await supabase
     .from('events')
@@ -107,6 +130,50 @@ async function persistGroupMetadata(supabase, eventId, metadata, supportsGroupCo
 
   if (error) {
     console.warn('[greenapi-group] Failed to persist group metadata', error);
+    return persistGroupMetadataInEventDetails(supabase, eventId, metadata);
+  }
+
+  return true;
+}
+
+async function persistGroupMetadataInEventDetails(supabase, eventId, metadata) {
+  const { data: event, error: fetchError } = await supabase
+    .from('events')
+    .select('event_details')
+    .eq('id', eventId)
+    .maybeSingle();
+
+  if (fetchError || !event) {
+    console.warn('[greenapi-group] Failed to load event_details for group metadata fallback', fetchError);
+    return false;
+  }
+
+  let details = {};
+  try {
+    details =
+      typeof event.event_details === 'string'
+        ? JSON.parse(event.event_details || '{}')
+        : event.event_details || {};
+  } catch (err) {
+    console.warn('[greenapi-group] Failed to parse event_details for group metadata fallback', err);
+  }
+
+  const { error: updateError } = await supabase
+    .from('events')
+    .update({
+      event_details: {
+        ...details,
+        whatsapp_group: {
+          groupId: metadata.groupId,
+          groupInviteLink: metadata.groupInviteLink || null,
+          groupName: metadata.groupName,
+        },
+      },
+    })
+    .eq('id', eventId);
+
+  if (updateError) {
+    console.warn('[greenapi-group] Failed to persist group metadata in event_details', updateError);
     return false;
   }
 
@@ -214,12 +281,16 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'Failed to fetch guests' });
   }
 
+  const storedGroup = getStoredGroupMetadata(event);
   const { targetGuests, skippedGuests } = classifyGuestsByPhone(guests);
   const duplicateSkipped = skippedGuests.filter((guest) => guest.reason === 'duplicate_phone');
   if (targetGuests.length === 0) {
     return res.status(200).json({
       created: false,
-      reused: Boolean(event.whatsapp_group_id),
+      reused: Boolean(storedGroup.groupId),
+      groupId: storedGroup.groupId,
+      groupName: storedGroup.groupName,
+      groupInviteLink: storedGroup.groupInviteLink,
       added: 0,
       failed: [],
       skipped: skippedGuests.length,
@@ -232,10 +303,11 @@ export default async function handler(req, res) {
     });
   }
 
-  const cleanGroupName = formatEventGroupName(event, groupName);
-  let groupId = event.whatsapp_group_id || null;
-  let groupInviteLink = event.whatsapp_group_invite_link || null;
+  const cleanGroupName = formatEventGroupName(event, groupName || storedGroup.groupName);
+  let groupId = storedGroup.groupId;
+  let groupInviteLink = storedGroup.groupInviteLink;
   let created = false;
+  let metadataPersisted = Boolean(groupId);
   const results = [];
   const failed = [];
 
@@ -267,7 +339,7 @@ export default async function handler(req, res) {
     created = true;
     groupId = createResult.groupId;
     groupInviteLink = createResult.groupInviteLink || null;
-    await persistGroupMetadata(
+    metadataPersisted = await persistGroupMetadata(
       supabase,
       eventId,
       { groupId, groupInviteLink, groupName: cleanGroupName },
@@ -317,6 +389,7 @@ export default async function handler(req, res) {
     skipped: skippedGuests.length,
     duplicateSkipped,
     skippedGuests,
+    metadataPersisted,
     total: results.length,
     results,
     supportsGroupColumns,

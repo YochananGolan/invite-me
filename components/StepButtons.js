@@ -2256,8 +2256,8 @@ const handleOpenAddonModal = React.useCallback(() => {
       const duplicateText = duplicateSkippedCount > 0
         ? ` ${duplicateSkippedCount} אורחים דולגו כי מספר הטלפון שלהם מופיע יותר מפעם אחת.`
         : '';
-      const persistenceText = payload.supportsGroupColumns === false
-        ? '\nשים לב: פרטי הקבוצה לא נשמרו במסד הנתונים כי חסרות עמודות המטא-דאטה.'
+      const persistenceText = payload.metadataPersisted === false
+        ? '\nשים לב: פרטי הקבוצה לא נשמרו במסד הנתונים.'
         : '';
 
       setShowWhatsAppGroupModal(false);
@@ -2306,7 +2306,7 @@ const handleOpenAddonModal = React.useCallback(() => {
       try {
         const { data, error } = await supabase
           .from('events')
-          .select('whatsapp_group_id')
+          .select('whatsapp_group_id, event_details')
           .eq('id', currentEventId)
           .maybeSingle();
 
@@ -2315,17 +2315,37 @@ const handleOpenAddonModal = React.useCallback(() => {
         if (error) {
           const errorText = `${error.message || ''} ${error.details || ''}`.toLowerCase();
           if (error.code === '42703' || errorText.includes('whatsapp_group_id')) {
-            setHasWhatsAppGroup(false);
+            const { data: fallbackData, error: fallbackError } = await supabase
+              .from('events')
+              .select('event_details')
+              .eq('id', currentEventId)
+              .maybeSingle();
+
+            if (!cancelled && !fallbackError) {
+              const fallbackDetails =
+                typeof fallbackData?.event_details === 'string'
+                  ? JSON.parse(fallbackData.event_details || '{}')
+                  : fallbackData?.event_details || {};
+              setHasWhatsAppGroup(Boolean(String(fallbackDetails?.whatsapp_group?.groupId || '').trim()));
+            } else if (!cancelled) {
+              setHasWhatsAppGroup(false);
+            }
             return;
           }
           console.warn('Failed to load WhatsApp group metadata', error);
           return;
         }
 
-        setHasWhatsAppGroup(Boolean(String(data?.whatsapp_group_id || '').trim()));
+        const details =
+          typeof data?.event_details === 'string'
+            ? JSON.parse(data.event_details || '{}')
+            : data?.event_details || {};
+        const groupId = data?.whatsapp_group_id || details?.whatsapp_group?.groupId || '';
+        setHasWhatsAppGroup(Boolean(String(groupId || '').trim()));
       } catch (err) {
         if (!cancelled) {
           console.warn('Failed to load WhatsApp group metadata', err);
+          setHasWhatsAppGroup(false);
         }
       }
     })();
