@@ -2350,7 +2350,27 @@ const handleOpenAddonModal = React.useCallback(() => {
             ? JSON.parse(data.event_details || '{}')
             : data?.event_details || {};
         const groupId = data?.whatsapp_group_id || details?.whatsapp_group?.groupId || '';
-        setHasWhatsAppGroup(Boolean(String(groupId || '').trim()));
+        if (String(groupId || '').trim()) {
+          setHasWhatsAppGroup(true);
+          return;
+        }
+
+        const { data: sessionData } = await supabase.auth.getSession();
+        const token = sessionData?.session?.access_token;
+        if (!token) {
+          setHasWhatsAppGroup(false);
+          return;
+        }
+
+        const response = await fetch(`/api/greenapi/event-group-status?eventId=${encodeURIComponent(currentEventId)}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!cancelled) {
+          setHasWhatsAppGroup(Boolean(response.ok && payload?.hasGroup));
+        }
       } catch (err) {
         if (!cancelled) {
           console.warn('Failed to load WhatsApp group metadata', err);
@@ -2407,6 +2427,27 @@ const handleOpenAddonModal = React.useCallback(() => {
           hasDesignFile: !!designFile
         });
 
+        let eventDetailsForSave = eventDetails;
+        try {
+          const { data: existingEvent } = await supabase
+            .from('events')
+            .select('event_details')
+            .eq('id', currentEventId)
+            .maybeSingle();
+          const existingDetails =
+            typeof existingEvent?.event_details === 'string'
+              ? JSON.parse(existingEvent.event_details || '{}')
+              : existingEvent?.event_details || {};
+          if (existingDetails?.whatsapp_group && !eventDetailsForSave?.whatsapp_group) {
+            eventDetailsForSave = {
+              ...eventDetailsForSave,
+              whatsapp_group: existingDetails.whatsapp_group,
+            };
+          }
+        } catch (preserveGroupError) {
+          console.warn('[StepButtons] Failed to preserve WhatsApp group metadata', preserveGroupError);
+        }
+
         // Calculate allowed guests based on plan and addons – if no plan purchased yet, capacity is 0
         const basePlanLimit = selectedPlan || planForDisplay || userPlanSettings?.plan
           ? getPlanBaseLimit(selectedPlan || planForDisplay || userPlanSettings?.plan) || 0
@@ -2417,7 +2458,7 @@ const handleOpenAddonModal = React.useCallback(() => {
 
         // Build update object - only include progress_step if it exists
         const updateData = {
-          event_details: eventDetails,
+          event_details: eventDetailsForSave,
           invitation_path: designFile,
           allowed_guests: totalAllowedGuests,
           additional_packages: addonCountForDb,
@@ -2443,7 +2484,7 @@ const handleOpenAddonModal = React.useCallback(() => {
             const { data: retryData, error: retryErr } = await supabase
               .from('events')
               .update({
-                event_details: eventDetails,
+                event_details: eventDetailsForSave,
                 invitation_path: designFile,
                 allowed_guests: totalAllowedGuests,
                 additional_packages: addonCountForDb,
