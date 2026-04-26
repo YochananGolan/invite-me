@@ -445,6 +445,12 @@ const [showExcelInstructions, setShowExcelInstructions] = useState(false);
 const [excelPreviewData, setExcelPreviewData] = useState([]);
 const [excelErrors, setExcelErrors] = useState([]);
 const [isSavingExcelGuests, setIsSavingExcelGuests] = useState(false);
+const [showWhatsAppGroupModal, setShowWhatsAppGroupModal] = useState(false);
+const [whatsAppGroupName, setWhatsAppGroupName] = useState('');
+const [whatsAppGroupEventId, setWhatsAppGroupEventId] = useState(null);
+const [whatsAppGroupGuestIds, setWhatsAppGroupGuestIds] = useState(null);
+const [whatsAppGroupGuestCount, setWhatsAppGroupGuestCount] = useState(0);
+const [isWhatsAppGroupSubmitting, setIsWhatsAppGroupSubmitting] = useState(false);
 
 // Process flow diagram modal
   const [showFlowDiagram, setShowFlowDiagram] = useState(false);
@@ -2138,6 +2144,145 @@ const handleOpenAddonModal = React.useCallback(() => {
     }
   }, [addToast]);
 
+  const buildDefaultWhatsAppGroupName = useCallback(() => {
+    const values = [
+      formData?.brideName && formData?.groomName ? `${formData.brideName} ו${formData.groomName}` : '',
+      formData?.birthdayName,
+      formData?.businessName,
+      formData?.hostName,
+      selectedEventType,
+    ]
+      .map((value) => String(value || '').trim())
+      .filter(Boolean);
+
+    return `קבוצת וואטסאפ - ${values[0] || 'אירוע'}`;
+  }, [formData, selectedEventType]);
+
+  const openWhatsAppGroupModal = useCallback(async ({ eventId: explicitEventId = null, guestIds = null } = {}) => {
+    const eventId = explicitEventId || currentEventId;
+    if (!eventId) {
+      setInvitationResult({
+        type: 'error',
+        message: 'לא ניתן ליצור קבוצת וואטסאפ לפני שמירת האירוע.',
+      });
+      setShowInvitationResultModal(true);
+      return;
+    }
+
+    const normalizedGuestIds = Array.isArray(guestIds) && guestIds.length > 0
+      ? guestIds.filter(Boolean)
+      : null;
+
+    let guestCount = normalizedGuestIds?.length || 0;
+    if (!guestCount) {
+      try {
+        const { count, error } = await supabase
+          .from('invited_guests')
+          .select('id', { count: 'exact', head: true })
+          .eq('event_id', eventId);
+        if (!error) {
+          guestCount = count || 0;
+        }
+      } catch (err) {
+        console.warn('Failed to count guests for WhatsApp group', err);
+      }
+    }
+
+    setWhatsAppGroupGuestIds(normalizedGuestIds);
+    setWhatsAppGroupEventId(eventId);
+    setWhatsAppGroupGuestCount(guestCount);
+    setWhatsAppGroupName((prev) => prev || buildDefaultWhatsAppGroupName());
+    setShowWhatsAppGroupModal(true);
+  }, [buildDefaultWhatsAppGroupName, currentEventId]);
+
+  const handleCreateWhatsAppGroup = useCallback(async () => {
+    const eventIdForGroup = whatsAppGroupEventId || currentEventId;
+    if (!eventIdForGroup) {
+      setShowWhatsAppGroupModal(false);
+      setInvitationResult({
+        type: 'error',
+        message: 'לא נמצא אירוע פעיל ליצירת קבוצת וואטסאפ.',
+      });
+      setShowInvitationResultModal(true);
+      return;
+    }
+
+    const cleanGroupName = whatsAppGroupName.trim() || buildDefaultWhatsAppGroupName();
+    if (!cleanGroupName) {
+      addToast?.('יש להזין שם לקבוצת הוואטסאפ.', 'error');
+      return;
+    }
+
+    setIsWhatsAppGroupSubmitting(true);
+    try {
+      const { data: { session: authSession } } = await supabase.auth.getSession();
+      const accessToken = authSession?.access_token || null;
+      if (!accessToken) {
+        throw new Error('חיבור המשתמש פג. התחבר מחדש כדי ליצור קבוצת וואטסאפ.');
+      }
+
+      const response = await fetch('/api/greenapi/create-event-group', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({
+          eventId: eventIdForGroup,
+          groupName: cleanGroupName,
+          guestIds: whatsAppGroupGuestIds || undefined,
+        }),
+      });
+
+      let payload = {};
+      try {
+        payload = await response.json();
+      } catch (err) {
+        // ignore empty response
+      }
+
+      if (!response.ok) {
+        throw new Error(payload.error || `שגיאת שרת ${response.status}`);
+      }
+
+      const failedCount = Array.isArray(payload.failed) ? payload.failed.length : 0;
+      const added = Number(payload.added || 0);
+      const total = Number(payload.total || added + failedCount);
+      const linkText = payload.groupInviteLink ? `\nקישור קבוצה: ${payload.groupInviteLink}` : '';
+      const persistenceText = payload.supportsGroupColumns === false
+        ? '\nשים לב: פרטי הקבוצה לא נשמרו במסד הנתונים כי חסרות עמודות המטא-דאטה.'
+        : '';
+
+      setShowWhatsAppGroupModal(false);
+      setInvitationResult({
+        type: failedCount > 0 ? 'warning' : 'success',
+        message:
+          `${payload.created ? 'קבוצת הוואטסאפ נוצרה' : 'קבוצת הוואטסאפ עודכנה'}: ` +
+          `${added} מתוך ${total} אורחים נוספו/נשלחו להוספה.${failedCount > 0 ? ` ${failedCount} נכשלו.` : ''}` +
+          linkText +
+          persistenceText,
+      });
+      setShowInvitationResultModal(true);
+      setWhatsAppGroupName(cleanGroupName);
+    } catch (err) {
+      console.error('Failed to create WhatsApp group', err);
+      setInvitationResult({
+        type: 'error',
+        message: err?.message || 'אירעה שגיאה ביצירת קבוצת הוואטסאפ.',
+      });
+      setShowInvitationResultModal(true);
+    } finally {
+      setIsWhatsAppGroupSubmitting(false);
+    }
+  }, [
+    addToast,
+    buildDefaultWhatsAppGroupName,
+    currentEventId,
+    whatsAppGroupEventId,
+    whatsAppGroupGuestIds,
+    whatsAppGroupName,
+  ]);
+
   // designFile is the stored image file name in storage (or null). templateSrc is the relative path of template image chosen
   const saveEventToSupabase = async (designFile, templateSrc) => {
     try {
@@ -2791,7 +2936,7 @@ React.useEffect(() => {
     reader.readAsArrayBuffer(file);
   };
 
-  const handleSaveExcelGuests = async (sendSms = false, sendWhatsApp = false) => {
+  const handleSaveExcelGuests = async (sendSms = false, sendWhatsApp = false, sendWhatsAppGroup = false) => {
     // Filter out guests with errors
     const validGuests = excelPreviewData.filter(g => !g.errors || g.errors.length === 0);
 
@@ -2876,8 +3021,16 @@ React.useEffect(() => {
 
       if (error) throw error;
 
+      if (sendWhatsAppGroup && insertedGuests && insertedGuests.length > 0) {
+        setShowExcelPreview(false);
+        setExcelPreviewData([]);
+        setExcelErrors([]);
+        setIsSavingExcelGuests(false);
+        const guestIds = insertedGuests.map((g) => g.id).filter(Boolean);
+        setSentGuests((prev) => [...prev, ...validGuests]);
+        await openWhatsAppGroupModal({ eventId: bulkEventId, guestIds });
       // Send SMS to all guests if requested
-      if (sendSms && insertedGuests && insertedGuests.length > 0) {
+      } else if (sendSms && insertedGuests && insertedGuests.length > 0) {
         const baseUrl = getInviteBaseUrl();
         const smsGuests = insertedGuests.map(g => {
           const inviteLink = `${baseUrl}/${bulkEventId}/${g.id}`;
@@ -6520,10 +6673,10 @@ React.useEffect(()=>{
               </button>
               <button
                 type="button"
-                onClick={() => { addToast?.('שליחה לקבוצת וואטסאפ – בתהליך פיתוח'); }}
+                onClick={() => openWhatsAppGroupModal()}
                 className="w-full text-primary font-medium border-2 border-primary rounded-lg px-4 py-3 hover:bg-primary hover:text-white transition-colors"
               >
-                שלח לקבוצת וואטסאפ
+                צור/עדכן קבוצת וואטסאפ
               </button>
             </div>
 
@@ -6555,6 +6708,63 @@ React.useEffect(()=>{
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {showWhatsAppGroupModal && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50">
+          <div className="relative bg-white rounded-lg p-6 w-full max-w-md event-form text-right">
+            <button
+              onClick={() => setShowWhatsAppGroupModal(false)}
+              className="absolute top-2 left-2 text-3xl leading-none w-8 h-8 flex items-center justify-center text-gray-500 hover:text-gray-700"
+              disabled={isWhatsAppGroupSubmitting}
+            >
+              &times;
+            </button>
+            <h2 className="text-xl font-bold text-primary text-center mb-4">קבוצת וואטסאפ לאירוע</h2>
+            <p className="text-gray-700 mb-4">
+              המערכת תיצור קבוצה אחת לאירוע או תשתמש בקבוצה שכבר נשמרה, ותוסיף אליה את מספרי הטלפון התקינים של האורחים.
+            </p>
+            <label className="block mb-2 font-medium">שם הקבוצה</label>
+            <input
+              type="text"
+              value={whatsAppGroupName}
+              onChange={(e) => setWhatsAppGroupName(e.target.value)}
+              className="w-full border rounded-md p-2 mb-4"
+              maxLength={100}
+              placeholder={buildDefaultWhatsAppGroupName()}
+              disabled={isWhatsAppGroupSubmitting}
+            />
+            <div className="bg-gray-50 border rounded-lg p-3 mb-4 text-gray-700">
+              <div>אורחים להוספה: <strong>{whatsAppGroupGuestCount}</strong></div>
+              <div className="text-sm mt-1">
+                {whatsAppGroupGuestIds
+                  ? 'יתווספו האורחים שנשמרו עכשיו מהקובץ.'
+                  : 'יתווספו כל האורחים השמורים באירוע.'}
+              </div>
+            </div>
+            <p className="text-sm text-gray-600 mb-5">
+              ייתכן שחלק מהמספרים לא יתווספו בגלל הגדרות פרטיות של וואטסאפ או מגבלות Green API.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              <button
+                type="button"
+                onClick={handleCreateWhatsAppGroup}
+                disabled={isWhatsAppGroupSubmitting || whatsAppGroupGuestCount === 0}
+                className="bg-primary text-white border border-primary rounded-full px-6 py-3 font-bold hover:bg-primary/90 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isWhatsAppGroupSubmitting ? 'יוצר קבוצה...' : 'אישור - צור/עדכן קבוצה'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowWhatsAppGroupModal(false)}
+                disabled={isWhatsAppGroupSubmitting}
+                className="bg-white text-gray-700 border border-gray-300 rounded-full px-6 py-3 font-medium hover:bg-gray-50 transition-all disabled:opacity-50"
+              >
+                ביטול
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -6816,6 +7026,13 @@ React.useEffect(()=>{
                 className="bg-primary text-white px-8 py-3 rounded-full font-medium hover:bg-primary/90 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isSavingExcelGuests ? 'שומר...' : `שמור ושלח בוואטסאפ ל-${excelPreviewData.filter(g => !g.errors || g.errors.length === 0).length} אורחים`}
+              </button>
+              <button
+                onClick={() => handleSaveExcelGuests(false, false, true)}
+                disabled={isSavingExcelGuests || excelPreviewData.filter(g => !g.errors || g.errors.length === 0).length === 0}
+                className="bg-emerald-600 text-white px-8 py-3 rounded-full font-medium hover:bg-emerald-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isSavingExcelGuests ? 'שומר...' : `שמור והוסף לקבוצת וואטסאפ ${excelPreviewData.filter(g => !g.errors || g.errors.length === 0).length} אורחים`}
               </button>
               <button
                 onClick={() => {
