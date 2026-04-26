@@ -113,25 +113,45 @@ async function persistGroupMetadata(supabase, eventId, metadata, supportsGroupCo
   return true;
 }
 
-function uniqueGuestsWithPhones(guests = []) {
-  const seenPhones = new Set();
-  const result = [];
+function classifyGuestsByPhone(guests = []) {
+  const phoneCounts = new Map();
+  const normalizedGuests = [];
 
   for (const guest of guests || []) {
     const normalized = normalizePhoneNumber(guest?.phone);
-    if (!normalized || seenPhones.has(normalized)) continue;
-    seenPhones.add(normalized);
-    result.push({
+    const entry = {
       guestId: guest.id,
       firstName: guest.first_name || '',
       lastName: guest.last_name || '',
       tableNumber: guest.table_number || '',
       phoneOriginal: guest.phone,
       phoneNormalized: normalized,
-    });
+    };
+
+    normalizedGuests.push(entry);
+    if (normalized) {
+      phoneCounts.set(normalized, (phoneCounts.get(normalized) || 0) + 1);
+    }
   }
 
-  return result;
+  const targetGuests = [];
+  const skippedGuests = [];
+
+  for (const guest of normalizedGuests) {
+    if (!guest.phoneNormalized) {
+      skippedGuests.push({ ...guest, reason: 'invalid_phone' });
+      continue;
+    }
+
+    if (phoneCounts.get(guest.phoneNormalized) !== 1) {
+      skippedGuests.push({ ...guest, reason: 'duplicate_phone' });
+      continue;
+    }
+
+    targetGuests.push(guest);
+  }
+
+  return { targetGuests, skippedGuests };
 }
 
 export default async function handler(req, res) {
@@ -194,15 +214,20 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'Failed to fetch guests' });
   }
 
-  const targetGuests = uniqueGuestsWithPhones(guests);
+  const { targetGuests, skippedGuests } = classifyGuestsByPhone(guests);
+  const duplicateSkipped = skippedGuests.filter((guest) => guest.reason === 'duplicate_phone');
   if (targetGuests.length === 0) {
     return res.status(200).json({
       created: false,
       reused: Boolean(event.whatsapp_group_id),
       added: 0,
       failed: [],
-      skipped: (guests || []).length,
-      message: 'No guests with valid WhatsApp phone numbers were found.',
+      skipped: skippedGuests.length,
+      duplicateSkipped,
+      skippedGuests,
+      message: duplicateSkipped.length > 0
+        ? 'No guests were added because duplicate phone numbers are not allowed for WhatsApp group updates.'
+        : 'No guests with valid WhatsApp phone numbers were found.',
       supportsGroupColumns,
     });
   }
@@ -232,6 +257,9 @@ export default async function handler(req, res) {
           ok: false,
           error: createResult.error || 'Failed to create WhatsApp group',
         })),
+        skipped: skippedGuests.length,
+        duplicateSkipped,
+        skippedGuests,
         supportsGroupColumns,
       });
     }
@@ -286,6 +314,9 @@ export default async function handler(req, res) {
     groupInviteLink,
     added,
     failed,
+    skipped: skippedGuests.length,
+    duplicateSkipped,
+    skippedGuests,
     total: results.length,
     results,
     supportsGroupColumns,

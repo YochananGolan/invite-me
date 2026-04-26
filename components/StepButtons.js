@@ -451,6 +451,7 @@ const [whatsAppGroupEventId, setWhatsAppGroupEventId] = useState(null);
 const [whatsAppGroupGuestIds, setWhatsAppGroupGuestIds] = useState(null);
 const [whatsAppGroupGuestCount, setWhatsAppGroupGuestCount] = useState(0);
 const [isWhatsAppGroupSubmitting, setIsWhatsAppGroupSubmitting] = useState(false);
+const [hasWhatsAppGroup, setHasWhatsAppGroup] = useState(false);
 
 // Process flow diagram modal
   const [showFlowDiagram, setShowFlowDiagram] = useState(false);
@@ -2248,7 +2249,13 @@ const handleOpenAddonModal = React.useCallback(() => {
       const failedCount = Array.isArray(payload.failed) ? payload.failed.length : 0;
       const added = Number(payload.added || 0);
       const total = Number(payload.total || added + failedCount);
+      const duplicateSkippedCount = Array.isArray(payload.duplicateSkipped)
+        ? payload.duplicateSkipped.length
+        : 0;
       const linkText = payload.groupInviteLink ? `\nקישור קבוצה: ${payload.groupInviteLink}` : '';
+      const duplicateText = duplicateSkippedCount > 0
+        ? ` ${duplicateSkippedCount} אורחים דולגו כי מספר הטלפון שלהם מופיע יותר מפעם אחת.`
+        : '';
       const persistenceText = payload.supportsGroupColumns === false
         ? '\nשים לב: פרטי הקבוצה לא נשמרו במסד הנתונים כי חסרות עמודות המטא-דאטה.'
         : '';
@@ -2259,11 +2266,15 @@ const handleOpenAddonModal = React.useCallback(() => {
         message:
           `${payload.created ? 'קבוצת הוואטסאפ נוצרה' : 'קבוצת הוואטסאפ עודכנה'}: ` +
           `${added} מתוך ${total} אורחים נוספו/נשלחו להוספה.${failedCount > 0 ? ` ${failedCount} נכשלו.` : ''}` +
+          duplicateText +
           linkText +
           persistenceText,
       });
       setShowInvitationResultModal(true);
       setWhatsAppGroupName(cleanGroupName);
+      if (payload.groupId) {
+        setHasWhatsAppGroup(true);
+      }
     } catch (err) {
       console.error('Failed to create WhatsApp group', err);
       setInvitationResult({
@@ -2282,6 +2293,47 @@ const handleOpenAddonModal = React.useCallback(() => {
     whatsAppGroupGuestIds,
     whatsAppGroupName,
   ]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!currentEventId) {
+      setHasWhatsAppGroup(false);
+      return undefined;
+    }
+
+    (async () => {
+      try {
+        const { data, error } = await supabase
+          .from('events')
+          .select('whatsapp_group_id')
+          .eq('id', currentEventId)
+          .maybeSingle();
+
+        if (cancelled) return;
+
+        if (error) {
+          const errorText = `${error.message || ''} ${error.details || ''}`.toLowerCase();
+          if (error.code === '42703' || errorText.includes('whatsapp_group_id')) {
+            setHasWhatsAppGroup(false);
+            return;
+          }
+          console.warn('Failed to load WhatsApp group metadata', error);
+          return;
+        }
+
+        setHasWhatsAppGroup(Boolean(String(data?.whatsapp_group_id || '').trim()));
+      } catch (err) {
+        if (!cancelled) {
+          console.warn('Failed to load WhatsApp group metadata', err);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [currentEventId]);
 
   // designFile is the stored image file name in storage (or null). templateSrc is the relative path of template image chosen
   const saveEventToSupabase = async (designFile, templateSrc) => {
@@ -5878,7 +5930,7 @@ React.useEffect(()=>{
               );
             })}
           </div>
-          <div className="grid grid-cols-2 gap-1.5">
+          <div className={`grid ${currentEventId && hasWhatsAppGroup ? 'grid-cols-3' : 'grid-cols-2'} gap-1.5`}>
             {steps.slice(4).map((step, idx) => {
               const realIdx = idx + 4;
               const isFinished = finishedSteps.includes(realIdx);
@@ -5913,6 +5965,20 @@ React.useEffect(()=>{
                 </button>
               );
             })}
+            {currentEventId && hasWhatsAppGroup && (
+              <button
+                type="button"
+                style={{ cursor: 'pointer', position: 'relative', zIndex: 21, pointerEvents: 'auto' }}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  openWhatsAppGroupModal();
+                }}
+                className="flex items-center justify-center gap-1.5 rounded-xl py-2.5 px-2 text-center transition-all bg-emerald-50 text-emerald-800 border border-emerald-300 shadow"
+              >
+                <span className="text-sm font-bold leading-tight">עדכן קבוצת וואטסאפ</span>
+              </button>
+            )}
           </div>
         </div>
         <div className="hidden sm:flex flex-row justify-center gap-4 flex-wrap">
@@ -5952,6 +6018,21 @@ React.useEffect(()=>{
               </button>
             );
           })}
+          {currentEventId && hasWhatsAppGroup && (
+            <button
+              type="button"
+              style={{ cursor: 'pointer', position: 'relative', zIndex: 21, pointerEvents: 'auto' }}
+              onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                openWhatsAppGroupModal();
+              }}
+              className="bg-emerald-600 text-white border border-emerald-700 rounded-full px-8 py-4 font-bold ring-2 ring-emerald-600 ring-offset-2 ring-offset-emerald-50 hover:bg-emerald-700 transition-all text-lg shrink-0"
+            >
+              עדכן קבוצת וואטסאפ
+            </button>
+          )}
         </div>
       </div>
       )}
