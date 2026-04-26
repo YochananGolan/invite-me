@@ -1038,6 +1038,7 @@ useEffect(() => {
   };
 }, [canRenderCharts, currentEventId]);
 const shouldShowCharts = canRenderCharts && chartsReady;
+const shouldShowWhatsAppGroupUpdateButton = Boolean(currentEventId && (hasWhatsAppGroup || eventDataLoaded));
 
   /** נתוני גרף יתרת הודעות — useMemo כדי שלא ייווצר מערך חדש בכל רינדור (Recharts + הבהוב) */
   const messageCapacityChartModel = React.useMemo(() => {
@@ -6047,7 +6048,7 @@ React.useEffect(()=>{
               );
             })}
           </div>
-          <div className={`grid ${currentEventId && hasWhatsAppGroup ? 'grid-cols-3' : 'grid-cols-2'} gap-1.5`}>
+          <div className={`grid ${shouldShowWhatsAppGroupUpdateButton ? 'grid-cols-3' : 'grid-cols-2'} gap-1.5`}>
             {steps.slice(4).map((step, idx) => {
               const realIdx = idx + 4;
               const isFinished = finishedSteps.includes(realIdx);
@@ -6082,7 +6083,7 @@ React.useEffect(()=>{
                 </button>
               );
             })}
-            {currentEventId && hasWhatsAppGroup && (
+            {shouldShowWhatsAppGroupUpdateButton && (
               <button
                 type="button"
                 style={{ cursor: 'pointer', position: 'relative', zIndex: 21, pointerEvents: 'auto' }}
@@ -6135,7 +6136,7 @@ React.useEffect(()=>{
               </button>
             );
           })}
-          {currentEventId && hasWhatsAppGroup && (
+          {shouldShowWhatsAppGroupUpdateButton && (
             <button
               type="button"
               style={{ cursor: 'pointer', position: 'relative', zIndex: 21, pointerEvents: 'auto' }}
