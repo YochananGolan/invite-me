@@ -9532,7 +9532,9 @@ React.useEffect(()=>{
               <>
                 <div className="text-6xl md:text-7xl mb-6">✅</div>
                 <h2 className="text-2xl md:text-3xl font-bold text-green-600 mb-4">
-                  השליחה הצליחה!
+                  {invitationResult.message?.includes('קבוצת הוואטסאפ')
+                    ? 'עדכון הקבוצה הצליח!'
+                    : 'השליחה הצליחה!'}
                 </h2>
                 <p className="text-lg md:text-xl text-gray-700 mb-8">
                   {invitationResult.message}
