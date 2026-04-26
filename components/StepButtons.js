@@ -2187,12 +2187,12 @@ const handleOpenAddonModal = React.useCallback(() => {
   }));
 
   const triggerWhatsAppInvites = useCallback(async (eventId) => {
-    if (!eventId) return;
+    if (!eventId) return { ok: false, reason: 'missing_event' };
 
     const eventKey = String(eventId);
     // רק מניעת כפילות בזמן שבקשה כבר רצה — לא נעילה קבועה אחרי שליחה מוצלחת (היה חוסם טריגרים עתידיים לאותו eventId)
     if (whatsappInviteTriggerInFlightRef.current.has(eventKey)) {
-      return;
+      return { ok: false, reason: 'in_flight' };
     }
     whatsappInviteTriggerInFlightRef.current.add(eventKey);
 
@@ -2201,7 +2201,7 @@ const handleOpenAddonModal = React.useCallback(() => {
       const accessToken = authSession?.access_token || null;
       if (!accessToken) {
         addToast?.('חיבור המשתמש פג. התחבר מחדש כדי לשלוח וואטסאפ.', 'error');
-        return;
+        return { ok: false, reason: 'missing_auth' };
       }
       const response = await fetch('/api/greenapi/send-event-invite', {
         method: 'POST',
@@ -2241,15 +2241,18 @@ const handleOpenAddonModal = React.useCallback(() => {
             'info'
           );
         }
+        return { ok: true, payload };
       } else {
         if (updatedCount !== null) {
           setEventMessagesSentCount(updatedCount);
         }
         addToast?.(payload.error || 'שליחת הודעת וואטסאפ נכשלה', 'error');
+        return { ok: false, payload };
       }
     } catch (err) {
       console.error('Failed to trigger WhatsApp invites', err);
       addToast?.('שליחת הודעת וואטסאפ נכשלה', 'error');
+      return { ok: false, error: err };
     } finally {
       whatsappInviteTriggerInFlightRef.current.delete(eventKey);
     }
@@ -2491,7 +2494,7 @@ const handleOpenAddonModal = React.useCallback(() => {
           console.debug('[StepButtons] Insert success', inserted);
           setCurrentEventId(inserted.id);
           setEventMessagesSentCount(0);
-          triggerWhatsAppInvites(inserted.id);
+          await triggerWhatsAppInvites(inserted.id);
         }
         if(insertErr){
           console.error('[StepButtons] Insert error', insertErr);
