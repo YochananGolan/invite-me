@@ -6899,11 +6899,11 @@ React.useEffect(()=>{
                 <input type="tel" placeholder="טלפון" value={guestData.guestPhone} onChange={(e) => setGuestData({ ...guestData, guestPhone: e.target.value })} className={`w-full border rounded-md p-2 pr-12 sm:pr-2 ${guestErrors.guestPhone ? 'border-red-500' : ''}`} />
               </div>
               <div className="flex flex-col sm:flex-row justify-center gap-3 pt-4">
-                <button type="button" onClick={handleSendInvitationSms} className="bg-green-600 text-white border border-green-700 rounded-full px-8 py-3 font-medium hover:bg-green-700 transition-all">
-                  שלח הזמנה ב-SMS
-                </button>
-                <button type="button" onClick={handleSendInvitation} className="bg-primary text-white border border-primary rounded-full px-8 py-3 font-medium hover:bg-primary/90 transition-all">
+                <button type="button" onClick={handleSendInvitation} className="bg-green-600 text-white border border-green-700 rounded-full px-8 py-3 font-medium hover:bg-green-700 transition-all">
                   שלח הזמנה בוואטסאפ
+                </button>
+                <button type="button" onClick={handleSendInvitationSms} className="bg-primary text-white border border-primary rounded-full px-8 py-3 font-medium hover:bg-primary/90 transition-all">
+                  שלח הזמנה ב-SMS
                 </button>
               </div>
             </form>
