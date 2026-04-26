@@ -133,7 +133,15 @@ export default async function handler(req, res) {
   }
 
   const expectedName = formatEventGroupName(event);
-  const foundGroup = await findWhatsAppGroupByName({ groupName: expectedName });
+  const { data: guests } = await supabase
+    .from('invited_guests')
+    .select('phone')
+    .eq('event_id', eventId);
+  const guestPhones = (guests || []).map((guest) => guest.phone).filter(Boolean);
+  const foundGroup = await findWhatsAppGroupByName({
+    groupName: expectedName,
+    phones: guestPhones,
+  });
 
   if (!foundGroup.ok || !foundGroup.groupId) {
     return res.status(200).json({
