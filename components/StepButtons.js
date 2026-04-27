@@ -3469,66 +3469,8 @@ React.useEffect(() => {
     }
   }, [persistUserPlanSettings]);
 
-  // אחרי גמר אירוע (אין אירוע פעיל, האחרון בארכיון ועבר תאריך שמירה): איפוס מסלול. לא רץ אם הייתה מחיקה ידנית (דגל carry).
-  React.useEffect(() => {
-    if (!session) return;
-    if (currentEventId) return;
-    let cancelled = false;
-    (async () => {
-      if (!userPlanSettingsHydratedRef.current) return;
-      if (shouldRespectCarryPlanAfterManualDelete()) return;
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        const { data: { session: authSession } } = await supabase.auth.getSession();
-        const userId = user?.id ?? authSession?.user?.id ?? sessionRef.current?.user?.id ?? null;
-        if (!userId || cancelled) return;
-
-        const { data: activeEv } = await supabase
-          .from('events')
-          .select('id')
-          .eq('user_id', userId)
-          .or('status.neq.archived,status.is.null')
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-        if (activeEv?.id || cancelled) return;
-
-        const { data: latest } = await supabase
-          .from('events')
-          .select('id, status, event_details')
-          .eq('user_id', userId)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-        if (!latest || cancelled) return;
-        const st = typeof latest.status === 'string' ? latest.status.toLowerCase() : '';
-        if (st !== 'archived' || cancelled) return;
-
-        let details = {};
-        try {
-          details =
-            typeof latest.event_details === 'string'
-              ? JSON.parse(latest.event_details)
-              : latest.event_details || {};
-        } catch (_) {
-          details = {};
-        }
-        const raw = details.date || details.start_datetime || details.end_datetime || null;
-        const retentionDate = computePlanRetentionDate(raw);
-        if (!retentionDate || cancelled) return;
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        if (today < retentionDate || cancelled) return;
-
-        await clearPlanState();
-      } catch (e) {
-        console.warn('clear plan after ended event (bootstrap) failed', e);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [session, currentEventId, userPlanSettings?.plan, eventRefreshKey, clearPlanState]);
+  // אין איפוס אוטומטי למסלול ששולם אחרי רענון/ארכוב.
+  // איפוס מסלול מותר רק בתוך זרימת מחיקת אירוע לאחר סיום האירוע.
 
   const resetWizardStateForNoEvent = async () => {
     setSelectedEventType('');
@@ -4437,13 +4379,8 @@ React.useEffect(() => {
       (dbAddonCount ?? 0) > 0;
     if (!hasPlanData) return;
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const retentionUntil = planRetentionUntilRef.current;
-    if (!retentionUntil) return;
-    if (today < retentionUntil) return;
-
-    clearPlanState();
+    // מסלול ששולם נשאר זמין לאירוע הבא גם אם האירוע הקודם הסתיים.
+    // אין לאפס כאן אוטומטית; איפוס מותר רק במחיקה מפורשת לאחר סיום האירוע.
   }, [
     currentEventId,
     newEventStarted,
