@@ -707,12 +707,9 @@ const loadUserPlanSettings = React.useCallback(async () => {
           const raw =
             (localStorage.getItem('user_plan_code') || localStorage.getItem('selectedPlan') || '').trim();
           if (raw) {
-            const rawAddon = localStorage.getItem('additionalPackages_global');
-            const n = rawAddon != null ? parseInt(rawAddon, 10) : NaN;
-            const lsAddon = Number.isFinite(n) ? Math.max(0, Math.floor(n)) : 0;
-            await persistUserPlanSettings(raw, lsAddon);
-            applyPlanToWizardUi(raw, lsAddon);
-            return { plan: raw, addonCount: lsAddon };
+            await persistUserPlanSettings(raw, 0);
+            applyPlanToWizardUi(raw, 0);
+            return { plan: raw, addonCount: 0 };
           }
         }
       } catch (_) {}
@@ -726,9 +723,7 @@ const loadUserPlanSettings = React.useCallback(async () => {
           const raw =
             (localStorage.getItem('user_plan_code') || localStorage.getItem('selectedPlan') || '').trim();
           lsPlan = raw || null;
-          const rawAddon = localStorage.getItem('additionalPackages_global');
-          const n = rawAddon != null ? parseInt(rawAddon, 10) : NaN;
-          lsAddon = Number.isFinite(n) ? Math.max(0, Math.floor(n)) : 0;
+          lsAddon = 0;
         }
       } catch (_) {}
       if (lsPlan) {
@@ -757,13 +752,9 @@ const loadUserPlanSettings = React.useCallback(async () => {
         const raw =
           (localStorage.getItem('user_plan_code') || localStorage.getItem('selectedPlan') || '').trim();
         if (raw) {
-          const rawAddon = localStorage.getItem('additionalPackages_global');
-          const n = rawAddon != null ? parseInt(rawAddon, 10) : NaN;
-          const lsAddon = Number.isFinite(n) ? Math.max(0, Math.floor(n)) : 0;
-          const mergedAddon = Math.max(addonCount, lsAddon);
-          await persistUserPlanSettings(raw, mergedAddon);
-          applyPlanToWizardUi(raw, mergedAddon);
-          return { plan: raw, addonCount: mergedAddon };
+          await persistUserPlanSettings(raw, addonCount);
+          applyPlanToWizardUi(raw, addonCount);
+          return { plan: raw, addonCount };
         }
       } catch (_) {}
     }
@@ -788,11 +779,8 @@ const loadUserPlanSettings = React.useCallback(async () => {
         const raw =
           (localStorage.getItem('user_plan_code') || localStorage.getItem('selectedPlan') || '').trim();
         if (raw) {
-          const rawAddon = localStorage.getItem('additionalPackages_global');
-          const n = rawAddon != null ? parseInt(rawAddon, 10) : NaN;
-          const lsAddon = Number.isFinite(n) ? Math.max(0, Math.floor(n)) : 0;
-          applyPlanToWizardUi(raw, lsAddon);
-          return { plan: raw, addonCount: lsAddon };
+          applyPlanToWizardUi(raw, 0);
+          return { plan: raw, addonCount: 0 };
         }
       }
     } catch (_) {}
@@ -926,12 +914,8 @@ const noEventLoggedRef = useRef(false);
           (localStorage.getItem('user_plan_code') || localStorage.getItem('selectedPlan') || '').trim();
         if (raw) {
           persistedPlan = raw;
-          const rawAddon = localStorage.getItem('additionalPackages_global');
-          const n = rawAddon != null ? parseInt(rawAddon, 10) : NaN;
-          if (Number.isFinite(n)) {
-            persistedAddonCount = Math.max(0, Math.floor(n));
-          }
-          void persistUserPlanSettings(persistedPlan, persistedAddonCount);
+          persistedAddonCount = 0;
+          void persistUserPlanSettings(persistedPlan, 0);
         }
       } catch (_) {}
     }
@@ -4412,10 +4396,7 @@ React.useEffect(() => {
             setSelectedPlan(settings?.plan || null);
             try { localStorage.setItem('selectedPlan', settings?.plan || ''); } catch(e){}
           }
-          setDbAddonCount((prev) => {
-            const safeAddon = Math.max(prev ?? 0, fallbackAddon);
-            return safeAddon;
-          });
+          setDbAddonCount(fallbackAddon);
           setAdditionalPackages((prev) => {
             const prevCount = Array.isArray(prev) ? prev.length : 0;
             if (prevCount === fallbackAddon) {
@@ -4426,33 +4407,31 @@ React.useEffect(() => {
           return;
         }
         setEventMessagesSentCount(messagesSent);
-        const eventAddonCount = parseNonNegativeInt(ev.additional_packages);
         const settingsAddonCount = parseNonNegativeInt(userPlanSettingsRef.current?.addonCount);
-        const localAddonCount = Array.isArray(additionalPackagesRef.current)
-          ? additionalPackagesRef.current.filter((planId) => planId === 'addon').length
-          : 0;
-        const addonCount = Math.max(eventAddonCount, settingsAddonCount, localAddonCount);
-        setDbAddonCount((prev) => Math.max(prev ?? 0, addonCount));
+        const addonCount = settingsAddonCount;
+        setDbAddonCount(addonCount);
         setAdditionalPackages((prev) => {
           const prevCount = prev ? prev.length : 0;
-          if (addonCount > prevCount) return Array(addonCount).fill('addon');
+          if (prevCount !== addonCount) return Array(addonCount).fill('addon');
           return prev;
         });
         try { localStorage.setItem('additionalPackages_' + ev.id, String(addonCount)); } catch (_) {}
         setEventDataLoaded(true);
-        const capSync = parseNonNegativeInt(ev.allowed_guests);
-        setEventAllowedGuests(capSync > 0 ? capSync : null);
         const fallbackPlan = userPlanSettingsRef.current?.plan || selectedPlanRef.current || null;
         const planToUse = derivePlanFromRecord(ev) || fallbackPlan;
+        const repairedAllowedGuests = planToUse
+          ? (getPlanBaseLimit(planToUse) || 0) + addonCount * (getPlanBaseLimit('addon') || 100)
+          : parseNonNegativeInt(ev.allowed_guests);
+        setEventAllowedGuests(repairedAllowedGuests > 0 ? repairedAllowedGuests : null);
         if (planToUse) {
           setSelectedPlan(planToUse);
           selectionSourceRef.current = 'event';
           try { localStorage.setItem('selectedPlan', planToUse); } catch(e){}
           await persistUserPlanSettings(planToUse, addonCount);
-          if (addonCount > eventAddonCount) {
-            const repairedAllowedGuests =
-              (getPlanBaseLimit(planToUse) || 0) +
-              addonCount * (getPlanBaseLimit('addon') || 100);
+          if (
+            parseNonNegativeInt(ev.additional_packages) !== addonCount ||
+            parseNonNegativeInt(ev.allowed_guests) !== repairedAllowedGuests
+          ) {
             await supabase
               .from('events')
               .update({
@@ -4498,11 +4477,11 @@ React.useEffect(() => {
             setEventMessagesSentCount(ev.messages_sent_count);
           }
           if (ev.additional_packages != null && ev.additional_packages !== '') {
-            const ap = parseNonNegativeInt(ev.additional_packages);
-            setDbAddonCount((prev) => Math.max(prev ?? 0, ap));
+            const ap = parseNonNegativeInt(userPlanSettingsRef.current?.addonCount);
+            setDbAddonCount(ap);
             setAdditionalPackages((prev) => {
               const prevCount = prev ? prev.length : 0;
-              if (ap > prevCount) return Array(ap).fill('addon');
+              if (prevCount !== ap) return Array(ap).fill('addon');
               return prev;
             });
           }
@@ -4514,7 +4493,7 @@ React.useEffect(() => {
           if (planFromEvent) {
             setSelectedPlan(planFromEvent);
             try { localStorage.setItem('selectedPlan', planFromEvent); } catch (_) {}
-            persistUserPlanSettings(planFromEvent, ev.additional_packages ?? 0);
+            persistUserPlanSettings(planFromEvent, userPlanSettingsRef.current?.addonCount ?? 0);
           }
           setEventRefreshKey((k) => k + 1);
         }
@@ -5026,25 +5005,40 @@ React.useEffect(() => {
                 try { localStorage.removeItem('newEventStarted'); } catch(e){}
               }
               setEventMessagesSentCount(ev.messages_sent_count ?? 0);
-              const restoreAddonCount = parseNonNegativeInt(ev.additional_packages);
-              setDbAddonCount((prev) => Math.max(prev ?? 0, restoreAddonCount));
+              const restoreAddonCount = parseNonNegativeInt(userPlanSettingsRef.current?.addonCount);
+              setDbAddonCount(restoreAddonCount);
               setAdditionalPackages((prev) => {
                 const prevCount = prev ? prev.length : 0;
-                if (restoreAddonCount > prevCount) return Array(restoreAddonCount).fill('addon');
+                if (prevCount !== restoreAddonCount) return Array(restoreAddonCount).fill('addon');
                 return prev;
               });
               try { localStorage.setItem('additionalPackages_' + ev.id, String(restoreAddonCount)); } catch (_) {}
               setEventDataLoaded(true);
-              const capRestore = parseNonNegativeInt(ev.allowed_guests);
-              setEventAllowedGuests(capRestore > 0 ? capRestore : null);
               const fallbackPlan = userPlanSettingsRef.current?.plan || selectedPlanRef.current || null;
               const planToUse = derivePlanFromRecord(ev) || fallbackPlan;
+              const repairedAllowedGuests = planToUse
+                ? (getPlanBaseLimit(planToUse) || 0) + restoreAddonCount * (getPlanBaseLimit('addon') || 100)
+                : parseNonNegativeInt(ev.allowed_guests);
+              setEventAllowedGuests(repairedAllowedGuests > 0 ? repairedAllowedGuests : null);
               if (planToUse) {
                 setSelectedPlan(planToUse);
                 try { localStorage.setItem('selectedPlan', planToUse); } catch(e){}
                 try { localStorage.setItem('finishedSteps', JSON.stringify([1, 2])); } catch (e) {}
                 setFinishedSteps([1, 2]);
                 await persistUserPlanSettings(planToUse, restoreAddonCount);
+                if (
+                  parseNonNegativeInt(ev.additional_packages) !== restoreAddonCount ||
+                  parseNonNegativeInt(ev.allowed_guests) !== repairedAllowedGuests
+                ) {
+                  await supabase
+                    .from('events')
+                    .update({
+                      additional_packages: restoreAddonCount,
+                      allowed_guests: repairedAllowedGuests,
+                      selected_plan: planToUse,
+                    })
+                    .eq('id', ev.id);
+                }
               }
               setFormData(prev => ({ ...prev, ...details }));
 
@@ -5113,8 +5107,7 @@ React.useEffect(() => {
             ? (currentSelectedPlan || currentUserSettings?.plan || null)
             : null;
           const carriedAddon = newEventStarted
-            ? (() => {
-                if (Array.isArray(currentAdditionalPackages)) return currentAdditionalPackages.length;
+              ? (() => {
                 const addonFromSettings = Number(currentUserSettings?.addonCount ?? 0);
                 return Number.isFinite(addonFromSettings) ? Math.max(0, addonFromSettings) : 0;
               })()
@@ -5182,7 +5175,7 @@ React.useEffect(() => {
               try { localStorage.removeItem('user_plan_code'); } catch(e){}
               try { localStorage.removeItem('selectedPlan'); } catch(e){}
             }
-            setDbAddonCount((prev) => Math.max(prev ?? 0, settings.addonCount ?? 0));
+            setDbAddonCount(settings.addonCount ?? 0);
             setAdditionalPackages((prev) => {
               const addonToApply = settings.addonCount ?? 0;
               const prevCount = Array.isArray(prev) ? prev.length : 0;
@@ -5351,23 +5344,38 @@ React.useEffect(() => {
         if(ev){
           setCurrentEventId(ev.id);
           setEventMessagesSentCount(messagesSent);
-          const addonCount = parseNonNegativeInt(ev.additional_packages);
-          setDbAddonCount((prev) => Math.max(prev ?? 0, addonCount));
+          const addonCount = parseNonNegativeInt(userPlanSettingsRef.current?.addonCount);
+          setDbAddonCount(addonCount);
           setAdditionalPackages((prev) => {
             const prevCount = prev ? prev.length : 0;
-            if (addonCount > prevCount) return Array(addonCount).fill('addon');
+            if (prevCount !== addonCount) return Array(addonCount).fill('addon');
             return prev;
           });
           try { localStorage.setItem('additionalPackages_' + ev.id, String(addonCount)); } catch (_) {}
           setEventDataLoaded(true);
-          const capBoot = parseNonNegativeInt(ev.allowed_guests);
-          setEventAllowedGuests(capBoot > 0 ? capBoot : null);
           const fallbackPlan = userPlanSettingsRef.current?.plan || selectedPlanRef.current || null;
           const planToUse = derivePlanFromRecord(ev) || fallbackPlan;
+          const repairedAllowedGuests = planToUse
+            ? (getPlanBaseLimit(planToUse) || 0) + addonCount * (getPlanBaseLimit('addon') || 100)
+            : parseNonNegativeInt(ev.allowed_guests);
+          setEventAllowedGuests(repairedAllowedGuests > 0 ? repairedAllowedGuests : null);
           if (planToUse) {
             setSelectedPlan(planToUse);
             try { localStorage.setItem('selectedPlan', planToUse); } catch(e){}
             await persistUserPlanSettings(planToUse, addonCount);
+            if (
+              parseNonNegativeInt(ev.additional_packages) !== addonCount ||
+              parseNonNegativeInt(ev.allowed_guests) !== repairedAllowedGuests
+            ) {
+              await supabase
+                .from('events')
+                .update({
+                  additional_packages: addonCount,
+                  allowed_guests: repairedAllowedGuests,
+                  selected_plan: planToUse,
+                })
+                .eq('id', ev.id);
+            }
           }
           const details = typeof ev.event_details === 'string' 
             ? JSON.parse(ev.event_details) 
