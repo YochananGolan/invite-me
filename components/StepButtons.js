@@ -5022,7 +5022,7 @@ React.useEffect(() => {
           try {
             const { error: archiveErr } = await supabase
               .from('events')
-              .update({ status: 'archived', selected_plan: null, additional_packages: 0 })
+              .update({ status: 'archived' })
               .eq('id', currentEventId);
             if (archiveErr && !(archiveErr.message || '').toLowerCase().includes('column')) {
               console.error('Failed to archive past event:', archiveErr);
@@ -5033,24 +5033,6 @@ React.useEffect(() => {
             return;
           }
 
-          await persistUserPlanSettings(null, 0);
-          setUserPlanSettings((prev) => {
-            if (prev && prev.plan === null && (prev.addonCount ?? 0) === 0) {
-              return prev;
-            }
-            return { plan: null, addonCount: 0 };
-          });
-          setSelectedPlan(null);
-          setAdditionalPackages((prev) => {
-            if (Array.isArray(prev) && prev.length === 0) {
-              return prev;
-            }
-            return [];
-          });
-          setDbAddonCount(0);
-          try { localStorage.removeItem('selectedPlan'); } catch (e) {}
-          try { localStorage.removeItem('user_plan_code'); } catch (e) {}
-          try { localStorage.removeItem('additionalPackages_global'); } catch (e) {}
           setNewEventStarted(false);
           try { localStorage.removeItem('newEventStarted'); } catch(e){}
           setCurrentEventId(null);
