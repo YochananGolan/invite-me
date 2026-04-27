@@ -3519,19 +3519,10 @@ React.useEffect(() => {
     let deletionCompleted = false;
     let deletionErrorAlertShown = false;
     let eventIdToDelete = currentEventId;
-    const addonCountFromPackages = Array.isArray(additionalPackages)
-      ? additionalPackages.filter((pkg) => pkg === 'addon').length
-      : 0;
-    const addonCountFromDb = Number.isFinite(dbAddonCount) ? Math.max(0, dbAddonCount) : 0;
     const addonCountFromSettings = Number.isFinite(userPlanSettings?.addonCount)
       ? Math.max(0, userPlanSettings.addonCount)
       : 0;
-    let addonCountBeforeReset = Math.max(
-      0,
-      addonCountFromPackages,
-      addonCountFromDb,
-      addonCountFromSettings,
-    );
+    let addonCountBeforeReset = addonCountFromSettings;
     let planToCarryForward = selectedPlanRef.current || userPlanSettings?.plan || null;
     if (!planToCarryForward && typeof window !== 'undefined') {
       try {
@@ -3541,13 +3532,6 @@ React.useEffect(() => {
           null;
         if (storedPlan) {
           planToCarryForward = storedPlan;
-        }
-        if (!addonCountBeforeReset) {
-          const storedAddon = localStorage.getItem('additionalPackages_global');
-          const parsedAddon = Number(storedAddon);
-          if (Number.isFinite(parsedAddon) && parsedAddon > 0) {
-            addonCountBeforeReset = Math.max(addonCountBeforeReset, parsedAddon);
-          }
         }
       } catch (storageErr) {
         console.warn('Failed to recover plan from storage during deletion', storageErr);
@@ -3646,7 +3630,7 @@ React.useEffect(() => {
             eventData.status !== 'archived';
 
           if (shouldArchive) {
-            // סיום אירוע (אחרי תקופת השמירה): כמו ארכוב אוטומטי – גם המסלול מתאפס ברשומה
+            // סיום אירוע אחרי תקופת השמירה: רק כאן מאפסים את המסלול והתוספות ברשומת האירוע.
             let archiveErr = null;
             ({ error: archiveErr } = await supabase
               .from('events')
@@ -3715,11 +3699,6 @@ React.useEffect(() => {
               : '';
         // derivePlanFromRecord מחזיר null במצב draft/pending גם כש-selected_plan מלא (לפני "פרסום") — במחיקה נשמרים מה ששולם
         planToCarryForward = fromDb || (rawSelected ? rawSelected : null);
-      }
-      const apFromRow =
-        typeof fetchedEventRow.additional_packages === 'number' ? fetchedEventRow.additional_packages : 0;
-      if (apFromRow > 0) {
-        addonCountBeforeReset = Math.max(addonCountBeforeReset, apFromRow);
       }
     }
 
