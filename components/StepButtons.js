@@ -6870,13 +6870,6 @@ React.useEffect(()=>{
               >
                 ייבוא קובץ אורחים - אקסל
               </button>
-              <button
-                type="button"
-                onClick={() => openWhatsAppGroupModal()}
-                className="w-full text-primary font-medium border-2 border-primary rounded-lg px-4 py-3 hover:bg-primary hover:text-white transition-colors"
-              >
-                צור/עדכן קבוצת וואטסאפ
-              </button>
             </div>
 
             <h3 className="text-lg font-semibold text-gray-800 mb-3">שלח הזמנה לאורח בודד - פרטי אורח:</h3>
