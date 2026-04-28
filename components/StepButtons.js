@@ -2127,6 +2127,40 @@ const handleOpenAddonModal = React.useCallback(() => {
     setShowWhatsAppGroupModal(true);
   }, [buildDefaultWhatsAppGroupName, currentEventId]);
 
+  const getWhatsAppGroupFailureReason = (entry) => {
+    const rawReason =
+      entry?.error?.message ||
+      entry?.error ||
+      entry?.data?.message ||
+      entry?.data?.error ||
+      entry?.data?.reason ||
+      entry?.status ||
+      'סיבה לא ידועה';
+
+    return typeof rawReason === 'string' ? rawReason : JSON.stringify(rawReason);
+  };
+
+  const formatWhatsAppGroupFailureDetails = (failedEntries = []) => {
+    if (!Array.isArray(failedEntries) || failedEntries.length === 0) return '';
+
+    const maxDetails = 10;
+    const detailLines = failedEntries.slice(0, maxDetails).map((entry, index) => {
+      const guestName = [entry?.firstName, entry?.lastName].filter(Boolean).join(' ').trim() || `אורח ${index + 1}`;
+      const phone = entry?.phoneOriginal || entry?.phoneNormalized || entry?.participantChatId || '';
+      const reason = getWhatsAppGroupFailureReason(entry);
+      const status = entry?.status ? ` | סטטוס: ${entry.status}` : '';
+      const phoneText = phone ? ` | טלפון: ${phone}` : '';
+
+      return `${index + 1}. ${guestName}${phoneText} | סיבה: ${reason}${status}`;
+    });
+
+    const remaining = failedEntries.length > maxDetails
+      ? `\nועוד ${failedEntries.length - maxDetails} כשלים נוספים.`
+      : '';
+
+    return `\n\nפירוט הכשלים:\n${detailLines.join('\n')}${remaining}`;
+  };
+
   const handleCreateWhatsAppGroup = useCallback(async () => {
     const eventIdForGroup = whatsAppGroupEventId || currentEventId;
     if (!eventIdForGroup) {
@@ -2174,7 +2208,8 @@ const handleOpenAddonModal = React.useCallback(() => {
       }
 
       if (!response.ok) {
-        throw new Error(payload.error || `שגיאת שרת ${response.status}`);
+        const failureDetails = formatWhatsAppGroupFailureDetails(payload.failed);
+        throw new Error(`${payload.error || `שגיאת שרת ${response.status}`}${failureDetails}`);
       }
 
       const failedCount = Array.isArray(payload.failed) ? payload.failed.length : 0;
@@ -2190,6 +2225,7 @@ const handleOpenAddonModal = React.useCallback(() => {
       const persistenceText = payload.metadataPersisted === false
         ? '\nשים לב: פרטי הקבוצה לא נשמרו במסד הנתונים.'
         : '';
+      const failureDetails = formatWhatsAppGroupFailureDetails(payload.failed);
 
       setShowWhatsAppGroupModal(false);
       setInvitationResult({
@@ -2198,6 +2234,7 @@ const handleOpenAddonModal = React.useCallback(() => {
           `${payload.created ? 'קבוצת הוואטסאפ נוצרה' : 'קבוצת הוואטסאפ עודכנה'}: ` +
           `${added} מתוך ${total} אורחים נוספו/נשלחו להוספה.${failedCount > 0 ? ` ${failedCount} נכשלו.` : ''}` +
           duplicateText +
+          failureDetails +
           linkText +
           persistenceText,
       });
@@ -2220,6 +2257,7 @@ const handleOpenAddonModal = React.useCallback(() => {
     addToast,
     buildDefaultWhatsAppGroupName,
     currentEventId,
+    formatWhatsAppGroupFailureDetails,
     whatsAppGroupEventId,
     whatsAppGroupGuestIds,
     whatsAppGroupName,
@@ -9554,7 +9592,7 @@ React.useEffect(()=>{
                     ? 'עדכון הקבוצה הצליח!'
                     : 'השליחה הצליחה!'}
                 </h2>
-                <p className="text-lg md:text-xl text-gray-700 mb-8">
+                <p className="text-lg md:text-xl text-gray-700 mb-8 whitespace-pre-line">
                   {invitationResult.message}
                 </p>
                 <button
@@ -9577,11 +9615,13 @@ React.useEffect(()=>{
               </>
             ) : (
               <>
-                <div className="text-6xl md:text-7xl mb-6">❌</div>
-                <h2 className="text-2xl md:text-3xl font-bold text-red-600 mb-4">
-                  השליחה נכשלה
+                <div className="text-6xl md:text-7xl mb-6">
+                  {invitationResult.type === 'warning' ? '⚠️' : '❌'}
+                </div>
+                <h2 className={`text-2xl md:text-3xl font-bold mb-4 ${invitationResult.type === 'warning' ? 'text-yellow-600' : 'text-red-600'}`}>
+                  {invitationResult.type === 'warning' ? 'העדכון הסתיים עם כשלים' : 'השליחה נכשלה'}
                 </h2>
-                <p className="text-lg md:text-xl text-gray-700 mb-8">
+                <p className="text-lg md:text-xl text-gray-700 mb-8 whitespace-pre-line text-right">
                   {invitationResult.message}
                 </p>
                 <button
