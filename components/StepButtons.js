@@ -2786,6 +2786,17 @@ React.useEffect(() => {
     ws['!freeze'] = { xSplit: 0, ySplit: headerRow + 1 };
     ws['!views'] = [{ RTL: true, rightToLeft: true }];
 
+    // Excel sometimes renders merged-row styles from blank cells inconsistently,
+    // so materialize the merged title rows before styling them.
+    for (let r = 0; r <= 2; r += 1) {
+      for (let c = 0; c < columnCount; c += 1) {
+        const addr = XLSX.utils.encode_cell({ r, c });
+        if (!ws[addr]) {
+          ws[addr] = { t: 's', v: '' };
+        }
+      }
+    }
+
     const border = {
       top: { style: 'thin', color: { rgb: borderColor } },
       bottom: { style: 'thin', color: { rgb: borderColor } },
@@ -2810,7 +2821,7 @@ React.useEffect(() => {
         ws[addr].s = {
           font: {
             name: 'Arial',
-            sz: isTitle ? 18 : isHeader ? 12 : 11,
+            sz: isTitle ? 20 : isHeader ? 12 : 11,
             bold: isTitle || isHeader || isTotal || isSummary,
             color: { rgb: isTitle || isHeader ? 'FFFFFF' : primary },
           },
@@ -2836,6 +2847,16 @@ React.useEffect(() => {
           },
           border,
         };
+
+        if (isTitle) {
+          ws[addr].s.font = {
+            name: 'Arial',
+            sz: 20,
+            bold: true,
+            color: { rgb: 'FFFFFF' },
+          };
+          ws[addr].s.fill = { patternType: 'solid', fgColor: { rgb: headerAccent } };
+        }
 
         if (isSubtitle) {
           ws[addr].s.font = { name: 'Arial', sz: 11, bold: r === 1, color: { rgb: primary } };
