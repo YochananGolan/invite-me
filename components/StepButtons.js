@@ -5962,7 +5962,7 @@ React.useEffect(()=>{
                 }}
                 className="flex items-center justify-center gap-1.5 rounded-xl py-2.5 px-2 text-center transition-all bg-emerald-50 text-emerald-800 border border-emerald-300 shadow"
               >
-                <span className="text-sm font-bold leading-tight">עדכן קבוצת וואטסאפ</span>
+                <span className="text-sm font-bold leading-tight">צור/עדכן קבוצת וואטסאפ</span>
               </button>
             )}
           </div>
@@ -6016,7 +6016,7 @@ React.useEffect(()=>{
               }}
               className="bg-emerald-600 text-white border border-emerald-700 rounded-full px-8 py-4 font-bold ring-2 ring-emerald-600 ring-offset-2 ring-offset-emerald-50 hover:bg-emerald-700 transition-all text-lg shrink-0"
             >
-              עדכן קבוצת וואטסאפ
+              צור/עדכן קבוצת וואטסאפ
             </button>
           )}
         </div>
