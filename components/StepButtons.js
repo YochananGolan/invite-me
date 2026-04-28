@@ -7267,27 +7267,29 @@ React.useEffect(()=>{
             </div>
 
             {/* Action Buttons */}
-            <div className="flex justify-center gap-4 mt-6 flex-wrap">
-              <button
-                onClick={() => handleSaveExcelGuests(false, true)}
-                disabled={isSavingExcelGuests || excelPreviewData.filter(g => !g.errors || g.errors.length === 0).length === 0}
-                className="bg-green-600 text-white px-8 py-3 rounded-full font-medium hover:bg-green-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isSavingExcelGuests ? 'שומר...' : `שמור ושלח בוואטסאפ ל-${excelPreviewData.filter(g => !g.errors || g.errors.length === 0).length} אורחים`}
-              </button>
-              <button
-                onClick={() => handleSaveExcelGuests(true)}
-                disabled={isSavingExcelGuests || excelPreviewData.filter(g => !g.errors || g.errors.length === 0).length === 0}
-                className="bg-primary text-white px-8 py-3 rounded-full font-medium hover:bg-primary/90 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isSavingExcelGuests ? 'שומר ושולח...' : `שמור ושלח SMS ל-${excelPreviewData.filter(g => !g.errors || g.errors.length === 0).length} אורחים`}
-              </button>
+            <div className="flex flex-col items-center gap-4 mt-6">
+              <div className="flex justify-center gap-4 flex-wrap">
+                <button
+                  onClick={() => handleSaveExcelGuests(false, true)}
+                  disabled={isSavingExcelGuests || excelPreviewData.filter(g => !g.errors || g.errors.length === 0).length === 0}
+                  className="bg-green-600 text-white px-8 py-3 rounded-full font-medium hover:bg-green-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isSavingExcelGuests ? 'שומר...' : 'שלח בוואטסאפ'}
+                </button>
+                <button
+                  onClick={() => handleSaveExcelGuests(true)}
+                  disabled={isSavingExcelGuests || excelPreviewData.filter(g => !g.errors || g.errors.length === 0).length === 0}
+                  className="bg-primary text-white px-8 py-3 rounded-full font-medium hover:bg-primary/90 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isSavingExcelGuests ? 'שומר ושולח...' : 'שלח ב SMS'}
+                </button>
+              </div>
               <button
                 onClick={() => handleSaveExcelGuests(false, false, true)}
                 disabled={isSavingExcelGuests || excelPreviewData.filter(g => !g.errors || g.errors.length === 0).length === 0}
                 className="bg-emerald-600 text-white px-8 py-3 rounded-full font-medium hover:bg-emerald-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {isSavingExcelGuests ? 'שומר...' : `שמור והוסף לקבוצת וואטסאפ ${excelPreviewData.filter(g => !g.errors || g.errors.length === 0).length} אורחים`}
+                {isSavingExcelGuests ? 'שומר...' : 'צור/עדכן קבוצת וואטסאפ'}
               </button>
               <button
                 onClick={() => {
