@@ -2752,13 +2752,13 @@ React.useEffect(() => {
     summaryRowIndexes = [],
     columnCount,
   }) => {
-    const primary = '0F766E';
-    const headerAccent = '0EA5E9';
+    const primary = '1E1B4B';
+    const headerAccent = '2563EB';
     const gold = 'F59E0B';
     const softGold = 'FEF3C7';
     const softGreen = 'DCFCE7';
-    const zebra = 'F0FDFA';
-    const borderColor = '99F6E4';
+    const zebra = 'EFF6FF';
+    const borderColor = '93C5FD';
     const ref = XLSX.utils.decode_range(ws['!ref']);
     const headerRow = headerRowIndex;
     const totalRow = totalRowIndex;
@@ -2857,63 +2857,6 @@ React.useEffect(() => {
     ws['!protect'] = undefined;
   };
 
-  const createSummarySheet = ({ title, subtitle, generatedAt, totalRowLabel, totalRowValue, columnCount }) => {
-    const rows = [
-      [title],
-      [subtitle],
-      [`הופק בתאריך: ${generatedAt}`],
-      [],
-      [totalRowLabel, totalRowValue],
-      ['הערה', 'הנתונים המלאים מופיעים בגיליון הבא בקובץ'],
-    ];
-    const ws = XLSX.utils.aoa_to_sheet(rows);
-    ws['!dir'] = 'rtl';
-    ws['!cols'] = [{ wch: 28 }, { wch: 28 }];
-    ws['!rows'] = [{ hpt: 34 }, { hpt: 24 }, { hpt: 22 }, { hpt: 8 }, { hpt: 24 }, { hpt: 24 }];
-    ws['!merges'] = [
-      { s: { r: 0, c: 0 }, e: { r: 0, c: 1 } },
-      { s: { r: 1, c: 0 }, e: { r: 1, c: 1 } },
-      { s: { r: 2, c: 0 }, e: { r: 2, c: 1 } },
-    ];
-    ws['!views'] = [{ RTL: true, rightToLeft: true }];
-    const primary = '0F766E';
-    const headerAccent = '0EA5E9';
-    const softGold = 'FEF3C7';
-    const border = {
-      top: { style: 'thin', color: { rgb: 'D6C7A1' } },
-      bottom: { style: 'thin', color: { rgb: 'D6C7A1' } },
-      left: { style: 'thin', color: { rgb: 'D6C7A1' } },
-      right: { style: 'thin', color: { rgb: 'D6C7A1' } },
-    };
-    const ref = XLSX.utils.decode_range(ws['!ref']);
-    for (let r = ref.s.r; r <= ref.e.r; r += 1) {
-      for (let c = ref.s.c; c <= ref.e.c; c += 1) {
-        const addr = XLSX.utils.encode_cell({ r, c });
-        if (!ws[addr]) continue;
-        ws[addr].s = {
-          font: {
-            name: 'Arial',
-            sz: r === 0 ? 20 : 12,
-            bold: r === 0 || r === 4,
-            color: { rgb: r === 0 ? 'FFFFFF' : primary },
-          },
-          fill: {
-            patternType: 'solid',
-            fgColor: { rgb: r === 0 ? headerAccent : r === 4 ? softGold : 'FFFFFF' },
-          },
-          alignment: {
-            horizontal: r <= 2 ? 'center' : 'right',
-            vertical: 'center',
-            readingOrder: 2,
-            wrapText: true,
-          },
-          border: r === 3 ? undefined : border,
-        };
-      }
-    }
-    return ws;
-  };
-
   const createReportWorkbook = (sheetName, data, columns, styleOptions) => {
     const wb = XLSX.utils.book_new();
     wb.Workbook = { Views: [{ RTL: true }] };
@@ -2921,21 +2864,9 @@ React.useEffect(() => {
     ws['!cols'] = columns;
     styleReportWorksheet(ws, styleOptions);
     XLSX.utils.book_append_sheet(wb, ws, sheetName);
-    const summarySheet = createSummarySheet({
-      title: styleOptions.title,
-      subtitle: styleOptions.subtitle,
-      generatedAt: styleOptions.generatedAt,
-      totalRowLabel: styleOptions.totalRowLabel,
-      totalRowValue: styleOptions.totalRowValue,
-      columnCount: styleOptions.columnCount,
-    });
-    XLSX.utils.book_append_sheet(wb, summarySheet, 'סיכום');
     wb.Workbook = {
-      Views: [{ RTL: true, activeTab: 0, firstSheet: 0 }],
-      Sheets: [
-        { name: sheetName, Hidden: 0 },
-        { name: 'סיכום', Hidden: 0 },
-      ],
+      Views: [{ RTL: true }],
+      Sheets: [{ name: sheetName, Hidden: 0 }],
     };
     return wb;
   };
@@ -3013,19 +2944,19 @@ React.useEffect(() => {
 
     const columns = [
       {wch:5}, // #
-      {wch:16}, // שם פרטי
-      {wch:16}, // שם משפחה
-      {wch:18}, // מספר שולחן
-      {wch:20}, // phone
-      {wch:12}, // בוגרים
-      {wch:12}, // ילדים
-      {wch:12}, // סה"כ
-      {wch:13}, // צמחוני
-      {wch:13}, // טבעוני
-      {wch:12}, // גלאט
-      {wch:13}, // צליאקים
-      {wch:13}, // אלרגיה
-      {wch:26}, // סוג אלרגיה
+      {wch:18}, // שם פרטי
+      {wch:18}, // שם משפחה
+      {wch:22}, // מספר שולחן
+      {wch:22}, // phone
+      {wch:14}, // בוגרים
+      {wch:14}, // ילדים
+      {wch:14}, // סה"כ
+      {wch:15}, // צמחוני
+      {wch:15}, // טבעוני
+      {wch:14}, // גלאט
+      {wch:15}, // צליאקים
+      {wch:15}, // אלרגיה
+      {wch:30}, // סוג אלרגיה
     ];
     const wb = createReportWorkbook('דוח לפי שולחנות', data, columns, {
       title: 'דוח אורחים מפורט לפי שולחנות',
@@ -3083,19 +3014,19 @@ React.useEffect(() => {
 
     const columns = [
       {wch:5}, // #
-      {wch:16}, // שם פרטי
-      {wch:16}, // שם משפחה
-      {wch:18}, // מספר שולחן
-      {wch:20}, // phone
-      {wch:12}, // בוגרים
-      {wch:12}, // ילדים
-      {wch:12}, // סה"כ
-      {wch:13}, // צמחוני
-      {wch:13}, // טבעוני
-      {wch:12}, // גלאט
-      {wch:13}, // צליאקים
-      {wch:13}, // אלרגיות
-      {wch:26}, // הערות
+      {wch:18}, // שם פרטי
+      {wch:18}, // שם משפחה
+      {wch:22}, // מספר שולחן
+      {wch:22}, // phone
+      {wch:14}, // בוגרים
+      {wch:14}, // ילדים
+      {wch:14}, // סה"כ
+      {wch:15}, // צמחוני
+      {wch:15}, // טבעוני
+      {wch:14}, // גלאט
+      {wch:15}, // צליאקים
+      {wch:15}, // אלרגיות
+      {wch:30}, // הערות
     ];
     const wb = createReportWorkbook('מאשרים', data, columns, {
       title: 'דוח מאשרים מפורט',
