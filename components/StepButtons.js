@@ -2752,12 +2752,13 @@ React.useEffect(() => {
     summaryRowIndexes = [],
     columnCount,
   }) => {
-    const primary = '7C123A';
-    const gold = 'D4AF37';
-    const softGold = 'FFF4CF';
-    const softGreen = 'EAF8EF';
-    const zebra = 'FFFDF7';
-    const borderColor = 'D6C7A1';
+    const primary = '0F766E';
+    const headerAccent = '0EA5E9';
+    const gold = 'F59E0B';
+    const softGold = 'FEF3C7';
+    const softGreen = 'DCFCE7';
+    const zebra = 'F0FDFA';
+    const borderColor = '99F6E4';
     const ref = XLSX.utils.decode_range(ws['!ref']);
     const headerRow = headerRowIndex;
     const totalRow = totalRowIndex;
@@ -2817,9 +2818,9 @@ React.useEffect(() => {
             patternType: 'solid',
             fgColor: {
               rgb: isTitle
-                ? primary
+                ? headerAccent
                 : isHeader
-                  ? primary
+                  ? headerAccent
                   : isTotal
                     ? softGold
                     : isSummary
@@ -2875,9 +2876,9 @@ React.useEffect(() => {
       { s: { r: 2, c: 0 }, e: { r: 2, c: 1 } },
     ];
     ws['!views'] = [{ RTL: true, rightToLeft: true }];
-    const primary = '7C123A';
-    const gold = 'D4AF37';
-    const softGold = 'FFF4CF';
+    const primary = '0F766E';
+    const headerAccent = '0EA5E9';
+    const softGold = 'FEF3C7';
     const border = {
       top: { style: 'thin', color: { rgb: 'D6C7A1' } },
       bottom: { style: 'thin', color: { rgb: 'D6C7A1' } },
@@ -2898,7 +2899,7 @@ React.useEffect(() => {
           },
           fill: {
             patternType: 'solid',
-            fgColor: { rgb: r === 0 ? primary : r === 4 ? softGold : 'FFFFFF' },
+            fgColor: { rgb: r === 0 ? headerAccent : r === 4 ? softGold : 'FFFFFF' },
           },
           alignment: {
             horizontal: r <= 2 ? 'center' : 'right',
@@ -2916,6 +2917,10 @@ React.useEffect(() => {
   const createReportWorkbook = (sheetName, data, columns, styleOptions) => {
     const wb = XLSX.utils.book_new();
     wb.Workbook = { Views: [{ RTL: true }] };
+    const ws = XLSX.utils.aoa_to_sheet(data);
+    ws['!cols'] = columns;
+    styleReportWorksheet(ws, styleOptions);
+    XLSX.utils.book_append_sheet(wb, ws, sheetName);
     const summarySheet = createSummarySheet({
       title: styleOptions.title,
       subtitle: styleOptions.subtitle,
@@ -2925,10 +2930,13 @@ React.useEffect(() => {
       columnCount: styleOptions.columnCount,
     });
     XLSX.utils.book_append_sheet(wb, summarySheet, 'סיכום');
-    const ws = XLSX.utils.aoa_to_sheet(data);
-    ws['!cols'] = columns;
-    styleReportWorksheet(ws, styleOptions);
-    XLSX.utils.book_append_sheet(wb, ws, sheetName);
+    wb.Workbook = {
+      Views: [{ RTL: true, activeTab: 0, firstSheet: 0 }],
+      Sheets: [
+        { name: sheetName, Hidden: 0 },
+        { name: 'סיכום', Hidden: 0 },
+      ],
+    };
     return wb;
   };
 
@@ -3007,16 +3015,16 @@ React.useEffect(() => {
       {wch:5}, // #
       {wch:16}, // שם פרטי
       {wch:16}, // שם משפחה
-      {wch:13}, // מספר שולחן
-      {wch:16}, // phone
-      {wch:9}, // בוגרים
-      {wch:9}, // ילדים
-      {wch:9}, // סה"כ
-      {wch:10}, // צמחוני
-      {wch:10}, // טבעוני
-      {wch:9}, // גלאט
-      {wch:10}, // צליאקים
-      {wch:10}, // אלרגיה
+      {wch:18}, // מספר שולחן
+      {wch:20}, // phone
+      {wch:12}, // בוגרים
+      {wch:12}, // ילדים
+      {wch:12}, // סה"כ
+      {wch:13}, // צמחוני
+      {wch:13}, // טבעוני
+      {wch:12}, // גלאט
+      {wch:13}, // צליאקים
+      {wch:13}, // אלרגיה
       {wch:26}, // סוג אלרגיה
     ];
     const wb = createReportWorkbook('דוח לפי שולחנות', data, columns, {
@@ -3077,16 +3085,16 @@ React.useEffect(() => {
       {wch:5}, // #
       {wch:16}, // שם פרטי
       {wch:16}, // שם משפחה
-      {wch:13}, // מספר שולחן
-      {wch:16}, // phone
-      {wch:9}, // בוגרים
-      {wch:9}, // ילדים
-      {wch:9}, // סה"כ
-      {wch:10}, // צמחוני
-      {wch:10}, // טבעוני
-      {wch:9}, // גלאט
-      {wch:10}, // צליאקים
-      {wch:10}, // אלרגיות
+      {wch:18}, // מספר שולחן
+      {wch:20}, // phone
+      {wch:12}, // בוגרים
+      {wch:12}, // ילדים
+      {wch:12}, // סה"כ
+      {wch:13}, // צמחוני
+      {wch:13}, // טבעוני
+      {wch:12}, // גלאט
+      {wch:13}, // צליאקים
+      {wch:13}, // אלרגיות
       {wch:26}, // הערות
     ];
     const wb = createReportWorkbook('מאשרים', data, columns, {
