@@ -507,15 +507,7 @@ const [hasWhatsAppGroup, setHasWhatsAppGroup] = useState(false);
     }
   },[]);
 
-  const [selectedPlan, setSelectedPlan] = useState(() => {
-    if (typeof window === 'undefined') return null;
-    try {
-      const saved = localStorage.getItem('selectedPlan');
-      return saved || null;
-    } catch (e) {
-      return null;
-    }
-  });
+  const [selectedPlan, setSelectedPlan] = useState(null);
   const selectionSourceRef = useRef('manual');
   const planRetentionUntilRef = useRef(null);
   const isMobileView = typeof window !== 'undefined' && window.innerWidth < 640;
@@ -702,36 +694,16 @@ const loadUserPlanSettings = React.useCallback(async () => {
       .maybeSingle();
     if (error) {
       console.error('loadUserPlanSettings failed', error);
-      try {
-        if (typeof window !== 'undefined') {
-          const raw =
-            (localStorage.getItem('user_plan_code') || localStorage.getItem('selectedPlan') || '').trim();
-          if (raw) {
-            await persistUserPlanSettings(raw, 0);
-            applyPlanToWizardUi(raw, 0);
-            return { plan: raw, addonCount: 0 };
-          }
-        }
-      } catch (_) {}
       return null;
     }
     if (!data) {
-      let lsPlan = null;
-      let lsAddon = 0;
-      try {
-        if (typeof window !== 'undefined') {
-          const raw =
-            (localStorage.getItem('user_plan_code') || localStorage.getItem('selectedPlan') || '').trim();
-          lsPlan = raw || null;
-          lsAddon = 0;
-        }
-      } catch (_) {}
-      if (lsPlan) {
-        await persistUserPlanSettings(lsPlan, lsAddon);
-        applyPlanToWizardUi(lsPlan, lsAddon);
-        return { plan: lsPlan, addonCount: lsAddon };
-      }
       selectionSourceRef.current = 'manual';
+      setSelectedPlan(null);
+      setDbAddonCount(0);
+      setAdditionalPackages([]);
+      try { localStorage.removeItem('selectedPlan'); } catch (e) {}
+      try { localStorage.removeItem('user_plan_code'); } catch (e) {}
+      try { localStorage.removeItem('additionalPackages_global'); } catch (e) {}
       setUserPlanSettings((prev) => {
         if (prev && prev.plan === null && (prev.addonCount ?? 0) === 0) {
           return prev;
@@ -746,18 +718,6 @@ const loadUserPlanSettings = React.useCallback(async () => {
         : data.plan_code || null;
     const parsedAddon = Number(data.addon_balance);
     let addonCount = Number.isFinite(parsedAddon) ? Math.max(0, Math.floor(parsedAddon)) : 0;
-    // שורה ב-user_settings עם plan_code ריק אבל המסלול נשמר בדפדפן בלבד (לפני סנכרון)
-    if (!plan && typeof window !== 'undefined') {
-      try {
-        const raw =
-          (localStorage.getItem('user_plan_code') || localStorage.getItem('selectedPlan') || '').trim();
-        if (raw) {
-          await persistUserPlanSettings(raw, addonCount);
-          applyPlanToWizardUi(raw, addonCount);
-          return { plan: raw, addonCount };
-        }
-      } catch (_) {}
-    }
     const settings = { plan, addonCount };
     setUserPlanSettings((prev) => {
       if (prev && prev.plan === settings.plan && (prev.addonCount ?? 0) === settings.addonCount) {
@@ -767,23 +727,22 @@ const loadUserPlanSettings = React.useCallback(async () => {
     });
     if (plan) {
       applyPlanToWizardUi(plan, addonCount);
+    } else {
+      setSelectedPlan(null);
+      setDbAddonCount(0);
+      setAdditionalPackages([]);
+      try { localStorage.removeItem('selectedPlan'); } catch (e) {}
+      try { localStorage.removeItem('user_plan_code'); } catch (e) {}
+      try { localStorage.removeItem('additionalPackages_global'); } catch (e) {}
     }
-    try { localStorage.setItem('user_plan_code', plan || ''); } catch (e) {}
-    try { localStorage.setItem('additionalPackages_global', String(addonCount)); } catch (e) {}
+    if (plan) {
+      try { localStorage.setItem('user_plan_code', plan); } catch (e) {}
+      try { localStorage.setItem('additionalPackages_global', String(addonCount)); } catch (e) {}
+    }
     selectionSourceRef.current = plan ? 'persistent' : 'manual';
     return settings;
   } catch (err) {
     console.error('loadUserPlanSettings threw', err);
-    try {
-      if (typeof window !== 'undefined') {
-        const raw =
-          (localStorage.getItem('user_plan_code') || localStorage.getItem('selectedPlan') || '').trim();
-        if (raw) {
-          applyPlanToWizardUi(raw, 0);
-          return { plan: raw, addonCount: 0 };
-        }
-      }
-    } catch (_) {}
     return null;
   } finally {
     userPlanSettingsHydratedRef.current = true;
@@ -822,20 +781,6 @@ const planForDisplay = useMemo(() => {
     let fromState = normalizePlanToken(selectedPlan || userPlanSettings?.plan || null);
     if (fromState && CANONICAL_PLAN_CODES.has(fromState)) {
       return fromState;
-    }
-
-    let fromLs = null;
-    if (session && typeof window !== 'undefined') {
-      try {
-        const raw =
-          (localStorage.getItem('user_plan_code') || localStorage.getItem('selectedPlan') || '').trim();
-        fromLs = normalizePlanToken(raw);
-      } catch (_) {
-        fromLs = null;
-      }
-    }
-    if (fromLs && CANONICAL_PLAN_CODES.has(fromLs)) {
-      return fromLs;
     }
 
     const addonCount = Math.max(
@@ -908,18 +853,6 @@ const noEventLoggedRef = useRef(false);
       ? Math.max(0, Math.floor(userPlanSettings.addonCount))
       : 0;
 
-    if (!persistedPlan && typeof window !== 'undefined') {
-      try {
-        const raw =
-          (localStorage.getItem('user_plan_code') || localStorage.getItem('selectedPlan') || '').trim();
-        if (raw) {
-          persistedPlan = raw;
-          persistedAddonCount = 0;
-          void persistUserPlanSettings(persistedPlan, 0);
-        }
-      } catch (_) {}
-    }
-
   if (persistedPlan) {
     setSelectedPlan(persistedPlan);
     setDbAddonCount(persistedAddonCount);
@@ -933,8 +866,12 @@ const noEventLoggedRef = useRef(false);
     return;
   }
 
-  // לא לאפס selectedPlan כאן: גרם למחיקת מסלול תקף מ-localStorage לפני/במקביל לטעינת user_settings.
-  // איפוס מסלול — רק בהתנתקות, clearPlanState, או loadUserPlanSettings כשאין userId.
+  setSelectedPlan(null);
+  setDbAddonCount(0);
+  setAdditionalPackages([]);
+  try { localStorage.removeItem('selectedPlan'); } catch (_) {}
+  try { localStorage.removeItem('user_plan_code'); } catch (_) {}
+  try { localStorage.removeItem('additionalPackages_global'); } catch (_) {}
   }, [currentEventId, userPlanSettings, persistUserPlanSettings]);
 
 const totalGuestsCount = guestSummary.adults + guestSummary.children;
