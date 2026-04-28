@@ -919,8 +919,9 @@ const totalGuestsCount = guestSummary.adults + guestSummary.children;
 // הודעות שנשלחו: מבוסס על ספירת הצלחות בפועל בלבד.
 const invitedCountFromStatus =
   (guestStatusSummary?.approved ?? 0) + (guestStatusSummary?.rejected ?? 0) + (guestStatusSummary?.pending ?? 0);
-const invitedCount = Math.max(invitedGuestsCount || 0, invitedCountFromStatus || 0);
-const effectiveMessagesSentCount = Number.isFinite(eventMessagesSentCount) ? eventMessagesSentCount : 0;
+const invitedCount = invitedCountFromStatus || invitedGuestsCount || 0;
+const persistedMessagesSentCount = Number.isFinite(eventMessagesSentCount) ? eventMessagesSentCount : 0;
+const effectiveMessagesSentCount = Math.max(persistedMessagesSentCount, invitedCountFromStatus || 0);
 const addonCountForDisplay = Math.max(
   parseNonNegativeInt(dbAddonCount),
   parseNonNegativeInt(userPlanSettings?.addonCount),
