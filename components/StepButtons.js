@@ -32,6 +32,47 @@ function parseNonNegativeInt(value) {
   return Number.isFinite(parsed) ? Math.max(0, Math.floor(parsed)) : 0;
 }
 
+function getGuestIdentityKey(guest = {}) {
+  const phone = guest.phone ?? guest.guestPhone ?? guest.phoneOriginal ?? guest.phoneNormalized ?? '';
+  const normalizedPhone = normalizePhoneNumber(phone);
+  if (normalizedPhone) return `phone:${normalizedPhone}`;
+
+  const firstName = String(guest.first_name ?? guest.guestFirstName ?? '').trim().toLowerCase();
+  const lastName = String(guest.last_name ?? guest.guestLastName ?? '').trim().toLowerCase();
+  const tableNumber = String(guest.table_number ?? guest.guestTable ?? '').trim().toLowerCase();
+  return `name:${firstName}|${lastName}|${tableNumber}`;
+}
+
+function getGuestStatusBucket(status) {
+  return status === 'approved' || status === 'rejected' ? status : 'pending';
+}
+
+function dedupeGuestsByIdentity(guests = []) {
+  const byIdentity = new Map();
+
+  for (const guest of guests || []) {
+    const key = getGuestIdentityKey(guest);
+    const current = byIdentity.get(key);
+
+    if (!current) {
+      byIdentity.set(key, guest);
+      continue;
+    }
+
+    const currentStatus = getGuestStatusBucket(current.status);
+    const nextStatus = getGuestStatusBucket(guest.status);
+    if (currentStatus === 'pending' && nextStatus !== 'pending') {
+      byIdentity.set(key, guest);
+    }
+  }
+
+  return Array.from(byIdentity.values());
+}
+
+function getPendingGuestsFromRows(guests = []) {
+  return dedupeGuestsByIdentity(guests).filter((guest) => getGuestStatusBucket(guest.status) === 'pending');
+}
+
 // Register Hebrew locale for datepicker
 registerLocale('he', he);
 
@@ -3224,16 +3265,45 @@ React.useEffect(() => {
       // Check capacity before saving
       const { data: existingGuests } = await supabase
         .from('invited_guests')
-        .select('adults, children')
+        .select('id, first_name, last_name, phone, table_number, adults, children, status')
         .eq('event_id', bulkEventId);
 
       const currentAdultsCount = (existingGuests || []).reduce((sum, g) => sum + (g.adults || 0), 0);
       const currentChildrenCount = (existingGuests || []).reduce((sum, g) => sum + (g.children || 0), 0);
       const currentGuestCount = currentAdultsCount + currentChildrenCount;
-      const newGuestsToAdd = validGuests.length; // Each guest in Excel = 1 person
+      const existingGuestKeys = new Set((existingGuests || []).map(getGuestIdentityKey));
+      const importedGuestKeys = new Set();
+      const guestsToSave = validGuests.filter((guest) => {
+        const key = getGuestIdentityKey(guest);
+        if (existingGuestKeys.has(key) || importedGuestKeys.has(key)) {
+          return false;
+        }
+        importedGuestKeys.add(key);
+        return true;
+      });
+      const duplicateGuestsSkipped = validGuests.length - guestsToSave.length;
+      const duplicateSkipText = duplicateGuestsSkipped > 0
+        ? ` ${duplicateGuestsSkipped} אורחים כבר היו קיימים/כפולים ולכן לא נרשמו שוב ולא נספרו כשליחות.`
+        : '';
+
+      if (guestsToSave.length === 0) {
+        setShowExcelPreview(false);
+        setExcelPreviewData([]);
+        setExcelErrors([]);
+        setIsSavingExcelGuests(false);
+        setGuestSummaryRefreshKey((k) => k + 1);
+        setInvitationResult({
+          type: 'warning',
+          message: `לא נוספו אורחים חדשים. ${duplicateGuestsSkipped} אורחים כבר קיימים באירוע ולכן לא נרשמו שוב ולא נספרו כשליחות.`,
+        });
+        setShowInvitationResultModal(true);
+        return;
+      }
+
+      const newGuestsToAdd = guestsToSave.length; // Each guest in Excel = 1 person
       // Quota is by messages sent only - saving guests is allowed; we check message limit when sending SMS below
       // Prepare guests for bulk insert
-      const guestsToInsert = validGuests.map(g => {
+      const guestsToInsert = guestsToSave.map(g => {
         const normalizedBulkPhone = normalizePhoneNumber(g.guestPhone);
         return {
           user_id: user.id,
@@ -3264,7 +3334,7 @@ React.useEffect(() => {
         setExcelErrors([]);
         setIsSavingExcelGuests(false);
         const guestIds = insertedGuests.map((g) => g.id).filter(Boolean);
-        setSentGuests((prev) => [...prev, ...validGuests]);
+        setSentGuests((prev) => [...prev, ...guestsToSave]);
         await openWhatsAppGroupModal({ eventId: bulkEventId, guestIds });
       // Send SMS to all guests if requested
       } else if (sendSms && insertedGuests && insertedGuests.length > 0) {
@@ -3293,7 +3363,7 @@ React.useEffect(() => {
           setIsSavingExcelGuests(false);
           setInvitationResult({ 
             type: 'error', 
-            message: `נשמרו ${validGuests.length} אורחים. אין מספיק הודעות במכסה לשליחת SMS (נשלחו ${effectiveMessagesSentCount}, מכסה ${totalLimitBulk}). נא לרכוש חבילת הרחבה.` 
+            message: `נשמרו ${guestsToSave.length} אורחים חדשים.${duplicateSkipText} אין מספיק הודעות במכסה לשליחת SMS (נשלחו ${effectiveMessagesSentCount}, מכסה ${totalLimitBulk}). נא לרכוש חבילת הרחבה.` 
           });
           setShowInvitationResultModal(true);
           setPendingAddonCount(Math.max(1, Math.ceil((effectiveMessagesSentCount + smsGuests.length - totalLimitBulk) / 100)));
@@ -3346,7 +3416,7 @@ React.useEffect(() => {
             );
             if (successIds.size > 0) {
               const guestsById = insertedGuests.reduce((acc, inserted, idx) => {
-                acc[inserted.id] = { inserted, original: validGuests[idx] };
+                acc[inserted.id] = { inserted, original: guestsToSave[idx] };
                 return acc;
               }, {});
               const successfulGuests = Array.from(successIds)
@@ -3365,17 +3435,17 @@ React.useEffect(() => {
               }
             }
           }
-          if (smsResult.success && smsResult.sent === validGuests.length) {
+          if (smsResult.success && smsResult.sent === guestsToSave.length) {
             setInvitationResult({ 
               type: 'success', 
-              message: `נשמרו ${validGuests.length} אורחים ונשלחו ${smsResult.sent} הודעות SMS בהצלחה!` 
+              message: `נשמרו ${guestsToSave.length} אורחים חדשים ונשלחו ${smsResult.sent} הודעות SMS בהצלחה!${duplicateSkipText}` 
             });
             setShowInvitationResultModal(true);
           } else if (smsResult.sent > 0) {
             // Partial success
             setInvitationResult({ 
               type: 'error', 
-              message: `נשמרו ${validGuests.length} אורחים. נשלחו ${smsResult.sent} הודעות, ${smsResult.failed} נכשלו.` 
+              message: `נשמרו ${guestsToSave.length} אורחים חדשים. נשלחו ${smsResult.sent} הודעות, ${smsResult.failed} נכשלו.${duplicateSkipText}` 
             });
             setShowInvitationResultModal(true);
           } else {
@@ -3384,11 +3454,11 @@ React.useEffect(() => {
             const errHint = firstErr ? ` (${firstErr})` : '';
             const apiErr = !smsResponse.ok ? ` קוד: ${smsResponse.status}` : '';
             if (firstErr && firstErr.includes('ACTIVETRAIL')) {
-              setInvitationResult({ type: 'error', message: `נשמרו ${validGuests.length} אורחים. ${firstErr} הגדר ACTIVETRAIL_API_KEY ב-.env.local` });
+              setInvitationResult({ type: 'error', message: `נשמרו ${guestsToSave.length} אורחים חדשים.${duplicateSkipText} ${firstErr} הגדר ACTIVETRAIL_API_KEY ב-.env.local` });
             } else {
               setInvitationResult({ 
                 type: 'error', 
-                message: `נשמרו ${validGuests.length} אורחים, אך אירעה שגיאה בשליחת ה-SMS.${errHint}${apiErr}` 
+                message: `נשמרו ${guestsToSave.length} אורחים חדשים, אך אירעה שגיאה בשליחת ה-SMS.${errHint}${apiErr}${duplicateSkipText}` 
               });
             }
             setShowInvitationResultModal(true);
@@ -3402,7 +3472,7 @@ React.useEffect(() => {
           const errMsg = smsError?.message || '';
           setInvitationResult({ 
             type: 'error', 
-            message: `נשמרו ${validGuests.length} אורחים, אך אירעה שגיאה בשליחת ה-SMS. ${errMsg}` 
+            message: `נשמרו ${guestsToSave.length} אורחים חדשים, אך אירעה שגיאה בשליחת ה-SMS. ${errMsg}${duplicateSkipText}` 
           });
           setShowInvitationResultModal(true);
         }
@@ -3439,7 +3509,7 @@ React.useEffect(() => {
             }
             if (successIds.size > 0) {
               const guestsById = insertedGuests.reduce((acc, inserted, idx) => {
-                acc[inserted.id] = { inserted, original: validGuests[idx] };
+                acc[inserted.id] = { inserted, original: guestsToSave[idx] };
                 return acc;
               }, {});
               const successfulGuests = Array.from(successIds)
@@ -3459,8 +3529,8 @@ React.useEffect(() => {
             }
             const msg =
               sent === guestIds.length
-                ? `נשמרו ${validGuests.length} אורחים ונשלחו ${sent} הודעות וואטסאפ בהצלחה!`
-                : `נשמרו ${validGuests.length} אורחים. נשלחו ${sent} הודעות וואטסאפ, בדוק את רשימת הכשלים.`;
+                ? `נשמרו ${guestsToSave.length} אורחים חדשים ונשלחו ${sent} הודעות וואטסאפ בהצלחה!${duplicateSkipText}`
+                : `נשמרו ${guestsToSave.length} אורחים חדשים. נשלחו ${sent} הודעות וואטסאפ, בדוק את רשימת הכשלים.${duplicateSkipText}`;
             setInvitationResult({
               type: sent === guestIds.length ? 'success' : 'warning',
               message: msg,
@@ -3476,13 +3546,13 @@ React.useEffect(() => {
               'אירעה שגיאה בשליחת הודעות הוואטסאפ.';
             setInvitationResult({
               type: 'error',
-              message: `נשמרו ${validGuests.length} אורחים, אך שליחת הודעות וואטסאפ נכשלה. ${errMsg}`,
+              message: `נשמרו ${guestsToSave.length} אורחים חדשים, אך שליחת הודעות וואטסאפ נכשלה. ${errMsg}${duplicateSkipText}`,
             });
           }
         } else {
           setInvitationResult({
             type: 'warning',
-            message: `נשמרו ${validGuests.length} אורחים. שמור את האירוע לפני שליחת הודעות וואטסאפ.`,
+            message: `נשמרו ${guestsToSave.length} אורחים חדשים. שמור את האירוע לפני שליחת הודעות וואטסאפ.${duplicateSkipText}`,
           });
         }
         setShowInvitationResultModal(true);
@@ -3492,10 +3562,10 @@ React.useEffect(() => {
         setExcelPreviewData([]);
         setExcelErrors([]);
         setIsSavingExcelGuests(false);
-        setSentGuests((prev) => [...prev, ...validGuests]);
+        setSentGuests((prev) => [...prev, ...guestsToSave]);
         setInvitationResult({ 
           type: 'success', 
-          message: `נשמרו בהצלחה ${validGuests.length} אורחים למסד הנתונים!` 
+          message: `נשמרו בהצלחה ${guestsToSave.length} אורחים חדשים למסד הנתונים!${duplicateSkipText}` 
         });
         setShowInvitationResultModal(true);
       }
@@ -4975,9 +5045,8 @@ React.useEffect(() => {
         const { data } = await supabase
           .from('invited_guests')
           .select('*')
-          .eq('event_id', eventIdToUse)
-          .or('status.is.null,status.eq.pending,status.eq.""');
-        setPendingGuests(data || []);
+          .eq('event_id', eventIdToUse);
+        setPendingGuests(getPendingGuestsFromRows(data || []));
       } catch (e) {
         console.error('fetch pending guests failed', e);
       }
@@ -5022,8 +5091,8 @@ React.useEffect(() => {
           const { data } = await supabase.from('invited_guests').select('*').eq('event_id', eventIdToUse).eq('status', 'rejected');
           setReportGuests(data || []);
         } else if (reportTitle === 'אורחים שטרם הגיבו') {
-          const { data } = await supabase.from('invited_guests').select('*').eq('event_id', eventIdToUse).or('status.is.null,status.eq.pending,status.eq.""');
-          setReportGuests(data || []);
+          const { data } = await supabase.from('invited_guests').select('*').eq('event_id', eventIdToUse);
+          setReportGuests(getPendingGuestsFromRows(data || []));
         }
       } catch (e) {
         console.error('Failed to refresh report data', e);
@@ -5580,7 +5649,7 @@ React.useEffect(()=>{
         
         const { data: guests, error: guestsError } = await supabase
           .from('invited_guests')
-          .select('status, adults, children, veg_adults, veg_children, vegan_adults, vegan_children, glatt_adults, glatt_children, allergy_adults, allergy_children')
+          .select('first_name, last_name, phone, table_number, status, adults, children, veg_adults, veg_children, vegan_adults, vegan_children, glatt_adults, glatt_children, allergy_adults, allergy_children')
           .eq('event_id', currentEventId);
 
         if(guestsError) console.error('StepButtons - guests fetch error:', guestsError);
@@ -5595,7 +5664,7 @@ React.useEffect(()=>{
         };
         
         if(guests){
-          guests.forEach(g => {
+          dedupeGuestsByIdentity(guests).forEach(g => {
             
             // Count by status
             if(g.status === 'approved') {
@@ -7608,11 +7677,10 @@ React.useEffect(()=>{
                   const { data, error } = await supabase
                     .from('invited_guests')
                     .select('*')
-                    .eq('event_id', eventIdToUse)
-                    .or('status.is.null,status.eq.pending,status.eq.""');
+                    .eq('event_id', eventIdToUse);
                   if (error) throw error;
 
-                  setReportGuests(data || []);
+                  setReportGuests(getPendingGuestsFromRows(data || []));
                   setReportTitle('אורחים שטרם הגיבו');
                   setShowReportModal(true);
                 } catch (e) {

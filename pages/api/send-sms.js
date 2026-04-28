@@ -1,6 +1,28 @@
 import { createClient } from '@supabase/supabase-js';
 import { sendSmsToGuests } from '../../lib/activeTrailSms';
 
+function normalizeSmsPhone(phone) {
+  const cleaned = String(phone || '').replace(/\D/g, '');
+  if (!cleaned) return null;
+  if (cleaned.startsWith('972')) return cleaned;
+  if (cleaned.startsWith('0') && cleaned.length === 10) return `972${cleaned.slice(1)}`;
+  return cleaned;
+}
+
+function dedupeGuestsByPhone(guests = []) {
+  const seenPhones = new Set();
+  const uniqueGuests = [];
+
+  for (const guest of guests) {
+    const normalizedPhone = normalizeSmsPhone(guest?.phone);
+    if (!normalizedPhone || seenPhones.has(normalizedPhone)) continue;
+    seenPhones.add(normalizedPhone);
+    uniqueGuests.push(guest);
+  }
+
+  return uniqueGuests;
+}
+
 async function atomicIncrement(supabase, eventId, delta) {
   // 1) Try the dedicated RPC (truly atomic at DB level)
   const { data: rpcResult, error: rpcErr } = await supabase.rpc('increment_event_messages_sent', {
@@ -68,7 +90,9 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { sent, failed, results, errors } = await sendSmsToGuests(guests, message, 'Invitation SMS');
+    const uniqueGuests = dedupeGuestsByPhone(guests);
+    const skippedDuplicates = guests.length - uniqueGuests.length;
+    const { sent, failed, results, errors } = await sendSmsToGuests(uniqueGuests, message, 'Invitation SMS');
 
     let updatedMessagesSentCount = null;
 
@@ -89,6 +113,7 @@ export default async function handler(req, res) {
       success: failed === 0,
       sent,
       failed,
+      skippedDuplicates,
       results,
       errors,
       updatedMessagesSentCount,
