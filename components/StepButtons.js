@@ -7287,7 +7287,7 @@ React.useEffect(()=>{
               <button
                 onClick={() => handleSaveExcelGuests(false, false, true)}
                 disabled={isSavingExcelGuests || excelPreviewData.filter(g => !g.errors || g.errors.length === 0).length === 0}
-                className="bg-emerald-600 text-white px-8 py-3 rounded-full font-medium hover:bg-emerald-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                className="mt-2 bg-gradient-to-r from-sky-600 to-indigo-600 text-white px-8 py-3 rounded-full font-medium hover:from-sky-700 hover:to-indigo-700 transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isSavingExcelGuests ? 'שומר...' : 'צור/עדכן קבוצת וואטסאפ'}
               </button>
