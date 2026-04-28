@@ -6,7 +6,7 @@ import { normalizePhoneNumber } from '../lib/whatsappClient';
 import DatePicker, { registerLocale } from 'react-datepicker';
 import he from 'date-fns/locale/he';
 import 'react-datepicker/dist/react-datepicker.css';
-import * as XLSX from 'xlsx';
+import * as XLSX from 'xlsx-js-style';
 import { format } from 'date-fns';
 import { useToast } from './Toast';
 import TranzilaPayment from './TranzilaPayment';
@@ -2744,11 +2744,149 @@ React.useEffect(() => {
 
 
   // Helper to export report guests (sorted by table) to Excel
+  const styleReportWorksheet = (ws, {
+    title,
+    subtitle,
+    headerRowIndex,
+    totalRowIndex,
+    summaryRowIndexes = [],
+    columnCount,
+  }) => {
+    const primary = '7C123A';
+    const gold = 'D4AF37';
+    const softGold = 'FFF4CF';
+    const softGreen = 'EAF8EF';
+    const zebra = 'FFFDF7';
+    const borderColor = 'D6C7A1';
+    const ref = XLSX.utils.decode_range(ws['!ref']);
+    const headerRow = headerRowIndex;
+    const totalRow = totalRowIndex;
+    const summaryRows = new Set(summaryRowIndexes);
+
+    ws['!dir'] = 'rtl';
+    ws['!autofilter'] = {
+      ref: XLSX.utils.encode_range({
+        s: { r: headerRow, c: 0 },
+        e: { r: Math.max(headerRow, totalRow - 1), c: columnCount - 1 },
+      }),
+    };
+    ws['!merges'] = [
+      { s: { r: 0, c: 0 }, e: { r: 0, c: columnCount - 1 } },
+      { s: { r: 1, c: 0 }, e: { r: 1, c: columnCount - 1 } },
+      { s: { r: 2, c: 0 }, e: { r: 2, c: columnCount - 1 } },
+    ];
+    ws['!rows'] = [
+      { hpt: 30 },
+      { hpt: 23 },
+      { hpt: 22 },
+      { hpt: 8 },
+      ...Array(Math.max(0, totalRow + 1 - 4)).fill({ hpt: 21 }),
+    ];
+    ws['!freeze'] = { xSplit: 0, ySplit: headerRow + 1 };
+    ws['!views'] = [{ RTL: true, rightToLeft: true }];
+
+    const border = {
+      top: { style: 'thin', color: { rgb: borderColor } },
+      bottom: { style: 'thin', color: { rgb: borderColor } },
+      left: { style: 'thin', color: { rgb: borderColor } },
+      right: { style: 'thin', color: { rgb: borderColor } },
+    };
+    const baseAlignment = { horizontal: 'center', vertical: 'center', readingOrder: 2, wrapText: true };
+
+    for (let r = ref.s.r; r <= ref.e.r; r += 1) {
+      for (let c = ref.s.c; c <= ref.e.c; c += 1) {
+        const addr = XLSX.utils.encode_cell({ r, c });
+        if (!ws[addr]) continue;
+
+        const isTitle = r === 0;
+        const isSubtitle = r === 1 || r === 2;
+        const isHeader = r === headerRow;
+        const isTotal = r === totalRow;
+        const isSummary = summaryRows.has(r);
+        const isData = r > headerRow && r < totalRow;
+        const isTextColumn = c === 1 || c === 2 || c === 4 || c === columnCount - 1;
+
+        ws[addr].s = {
+          font: {
+            name: 'Arial',
+            sz: isTitle ? 18 : isHeader ? 12 : 11,
+            bold: isTitle || isHeader || isTotal || isSummary,
+            color: { rgb: isTitle || isHeader ? 'FFFFFF' : primary },
+          },
+          fill: {
+            patternType: 'solid',
+            fgColor: {
+              rgb: isTitle
+                ? primary
+                : isHeader
+                  ? primary
+                  : isTotal
+                    ? softGold
+                    : isSummary
+                      ? softGreen
+                      : isData && r % 2 === 0
+                        ? zebra
+                        : 'FFFFFF',
+            },
+          },
+          alignment: {
+            ...baseAlignment,
+            horizontal: isTitle || isSubtitle ? 'center' : isTextColumn ? 'right' : 'center',
+          },
+          border,
+        };
+
+        if (isSubtitle) {
+          ws[addr].s.font = { name: 'Arial', sz: 11, bold: r === 1, color: { rgb: primary } };
+          ws[addr].s.fill = { patternType: 'solid', fgColor: { rgb: r === 1 ? softGold : 'FFFFFF' } };
+        }
+        if (isTotal) {
+          ws[addr].s.border = {
+            ...border,
+            top: { style: 'medium', color: { rgb: gold } },
+          };
+        }
+        if (c === 4 && r > headerRow) {
+          ws[addr].t = 's';
+          ws[addr].z = '@';
+        }
+      }
+    }
+
+    ws['!protect'] = undefined;
+  };
+
+  const createReportWorkbook = (sheetName, data, columns, styleOptions) => {
+    const wb = XLSX.utils.book_new();
+    wb.Workbook = { Views: [{ RTL: true }] };
+    const ws = XLSX.utils.aoa_to_sheet(data);
+    ws['!cols'] = columns;
+    styleReportWorksheet(ws, styleOptions);
+    XLSX.utils.book_append_sheet(wb, ws, sheetName);
+    return wb;
+  };
+
+  const downloadWorkbook = (wb, fileName) => {
+    const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array', cellStyles: true });
+    const blob = new Blob([wbout], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const exportReportXlsx = () => {
     if (!reportGuests.length) return;
 
-    const buildRow = (arr)=>[...arr].reverse();
+    const generatedAt = new Date().toLocaleString('he-IL');
+    const summaryRowIndexes = [];
     const data = [
+      ['דוח אורחים מפורט לפי שולחנות'],
+      [`סה"כ אורחים ברשימה: ${reportGuests.filter((g) => !g.isSummary).length}`],
+      [`הופק בתאריך: ${generatedAt}`],
+      [],
       ['#','שם פרטי','שם משפחה','מספר שולחן','טלפון','בוגרים','ילדים','סה"כ','צמחוני','טבעוני','גלאט','צליאקים','אלרגיה','סוג אלרגיה'],
     ];
 
@@ -2757,6 +2895,7 @@ React.useEffect(() => {
     reportGuests.forEach((g, idx) => {
       if (g.isSummary) {
         // Summary row
+        summaryRowIndexes.push(data.length);
         data.push([
           '',
           g.summary_label,
@@ -2798,43 +2937,43 @@ React.useEffect(() => {
     // Totals row
     data.push(['','סה"כ','','','',totalReportAdults,totalReportChildren,totalReportAdults+totalReportChildren,totalVeg,totalVegan,totalGlatt,totalCeliac,totalAllergy,'']);
 
-    const wb = XLSX.utils.book_new();
-    const ws = XLSX.utils.aoa_to_sheet(data);
-    ws['!dir'] = 'rtl';
-    // Set column widths (wch = char width)
-    ws['!cols'] = [
-      {wch:3}, // #
-      {wch:12}, // שם פרטי
-      {wch:12}, // שם משפחה
-      {wch:10}, // מספר שולחן
-      {wch:12}, // phone
-      {wch:6}, // בוגרים
-      {wch:6}, // ילדים
-      {wch:6}, // סה"כ
-      {wch:7}, // צמחוני
-      {wch:7}, // טבעוני
-      {wch:6}, // גלאט
-      {wch:7}, // צליאקים
-      {wch:7}, // אלרגיה
-      {wch:18}, // סוג אלרגיה
+    const columns = [
+      {wch:5}, // #
+      {wch:16}, // שם פרטי
+      {wch:16}, // שם משפחה
+      {wch:13}, // מספר שולחן
+      {wch:16}, // phone
+      {wch:9}, // בוגרים
+      {wch:9}, // ילדים
+      {wch:9}, // סה"כ
+      {wch:10}, // צמחוני
+      {wch:10}, // טבעוני
+      {wch:9}, // גלאט
+      {wch:10}, // צליאקים
+      {wch:10}, // אלרגיה
+      {wch:26}, // סוג אלרגיה
     ];
-    XLSX.utils.book_append_sheet(wb, ws, 'report_by_table');
-    const wbout = XLSX.write(wb,{bookType:'xlsx',type:'array'});
-    const blob = new Blob([wbout],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'guests_by_table.xlsx';
-    a.click();
-    URL.revokeObjectURL(url);
+    const wb = createReportWorkbook('דוח לפי שולחנות', data, columns, {
+      title: 'דוח אורחים מפורט לפי שולחנות',
+      subtitle: `סה"כ אורחים ברשימה: ${reportGuests.filter((g) => !g.isSummary).length}`,
+      headerRowIndex: 4,
+      totalRowIndex: data.length - 1,
+      summaryRowIndexes,
+      columnCount: columns.length,
+    });
+    downloadWorkbook(wb, 'guests_by_table.xlsx');
   };
 
   // Helper to export approved guests to CSV (Excel)
   const exportApprovedXlsx = () => {
     if (!approvedGuests.length) return;
 
-    const buildRow = (arr)=>[...arr].reverse();
+    const generatedAt = new Date().toLocaleString('he-IL');
     const data = [
+      ['דוח מאשרים מפורט'],
+      [`סה"כ רשומות: ${approvedGuests.length}`],
+      [`הופק בתאריך: ${generatedAt}`],
+      [],
       ['#','שם פרטי','שם משפחה','מספר שולחן','טלפון','בוגרים','ילדים','סה"כ','צמחוני','טבעוני','גלאט','צליאקים','אלרגיות','הערות'],
       ...approvedGuests.map((g,idx)=>[
         idx+1,
@@ -2865,35 +3004,31 @@ React.useEffect(() => {
 
     data.push(['','סה"כ','','','',totalAdults,totalChildren,totalAdults+totalChildren,totalVeg,totalVegan,totalGlatt,totalCeliac,totalAllergy,'']);
 
-    const wb = XLSX.utils.book_new();
-    const ws = XLSX.utils.aoa_to_sheet(data);
-    ws['!dir'] = 'rtl';
-    // Set column widths (wch = char width)
-    ws['!cols'] = [
-      {wch:3}, // #
-      {wch:12}, // שם פרטי
-      {wch:12}, // שם משפחה
-      {wch:10}, // מספר שולחן
-      {wch:12}, // phone
-      {wch:6}, // בוגרים
-      {wch:6}, // ילדים
-      {wch:6}, // סה"כ
-      {wch:7}, // צמחוני
-      {wch:7}, // טבעוני
-      {wch:6}, // גלאט
-      {wch:7}, // צליאקים
-      {wch:7}, // אלרגיות
-      {wch:18}, // הערות
+    const columns = [
+      {wch:5}, // #
+      {wch:16}, // שם פרטי
+      {wch:16}, // שם משפחה
+      {wch:13}, // מספר שולחן
+      {wch:16}, // phone
+      {wch:9}, // בוגרים
+      {wch:9}, // ילדים
+      {wch:9}, // סה"כ
+      {wch:10}, // צמחוני
+      {wch:10}, // טבעוני
+      {wch:9}, // גלאט
+      {wch:10}, // צליאקים
+      {wch:10}, // אלרגיות
+      {wch:26}, // הערות
     ];
-    XLSX.utils.book_append_sheet(wb, ws, 'approved');
-    const wbout = XLSX.write(wb,{bookType:'xlsx',type:'array'});
-    const blob = new Blob([wbout],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'approved_guests.xlsx';
-    a.click();
-    URL.revokeObjectURL(url);
+    const wb = createReportWorkbook('מאשרים', data, columns, {
+      title: 'דוח מאשרים מפורט',
+      subtitle: `סה"כ רשומות: ${approvedGuests.length}`,
+      headerRowIndex: 4,
+      totalRowIndex: data.length - 1,
+      summaryRowIndexes: [],
+      columnCount: columns.length,
+    });
+    downloadWorkbook(wb, 'approved_guests.xlsx');
   };
 
   const fileInputRef = useRef();
