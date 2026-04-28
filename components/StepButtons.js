@@ -4862,7 +4862,7 @@ React.useEffect(() => {
   }, [showGuestListModal, currentEventId, guestSummaryRefreshKey]);
 
   // ---- Auto-archive when event ends (after date has passed) ----
-  // סנכרון מסלול כשאין אירוע פעיל: רק באפקט עם userPlanSettingsHydratedRef (למטה), לא כאן — אפקט כפול היה מאפס selectedPlan לפני טעינת user_settings
+  // אחרי שהאירוע הסתיים בפועל, המסלול שנרכש לא ממשיך לאירוע הבא.
 
   React.useEffect(() => {
     if (!currentEventId) return;
@@ -4893,7 +4893,6 @@ React.useEffect(() => {
 
         const rowStatus = typeof dbEvent.status === 'string' ? dbEvent.status.toLowerCase() : '';
         if (rowStatus === 'archived') {
-          // אירוע כבר בארכיון (למשל רשומה ישנה אחרי מחיקה/רענון) — לא לאפס מסלול ולא להציג "האירוע הסתיים"
           setCurrentEventId(null);
           setEventAllowedGuests(null);
           return;
@@ -4917,7 +4916,7 @@ React.useEffect(() => {
           try {
             const { error: archiveErr } = await supabase
               .from('events')
-              .update({ status: 'archived' })
+              .update({ status: 'archived', selected_plan: null, additional_packages: 0 })
               .eq('id', currentEventId);
             if (archiveErr && !(archiveErr.message || '').toLowerCase().includes('column')) {
               console.error('Failed to archive past event:', archiveErr);
@@ -4934,6 +4933,7 @@ React.useEffect(() => {
           setEventAllowedGuests(null);
           setEventMessagesSentCount(0);
           clearCarryPlanAfterManualDelete();
+          await clearPlanState();
 
           setShowEventEndedNotice(true);
         })();
@@ -4943,7 +4943,7 @@ React.useEffect(() => {
     };
 
     archiveIfPast();
-  }, [currentEventId]);
+  }, [currentEventId, clearPlanState]);
 
   // Fetch Tranzila terminal info
   React.useEffect(() => {
