@@ -4336,8 +4336,9 @@ React.useEffect(() => {
       (dbAddonCount ?? 0) > 0;
     if (!hasPlanData) return;
 
-    // מסלול ששולם נשאר זמין לאירוע הבא גם אם האירוע הקודם הסתיים.
-    // אין לאפס כאן אוטומטית; איפוס מותר רק במחיקה מפורשת לאחר סיום האירוע.
+    if (!shouldRespectCarryPlanAfterManualDelete()) {
+      void clearPlanState();
+    }
   }, [
     currentEventId,
     newEventStarted,
@@ -5118,19 +5119,22 @@ React.useEffect(() => {
 
           const settings = await loadUserPlanSettings();
           if (settings) {
-            if (settings.plan) {
+            const canCarryPlan = shouldRespectCarryPlanAfterManualDelete();
+            if (settings.plan && canCarryPlan) {
               setSelectedPlan(settings.plan);
               // Keep the purchased/retained plan ready, but do NOT start the wizard automatically.
               // The user should explicitly click "צור אירוע חדש" before seeing step modals.
               try { localStorage.setItem('selectedPlan', settings.plan); } catch(e){}
+            } else if (settings.plan) {
+              await clearPlanState();
             } else {
               setSelectedPlan(null);
               try { localStorage.removeItem('user_plan_code'); } catch(e){}
               try { localStorage.removeItem('selectedPlan'); } catch(e){}
             }
-            setDbAddonCount(settings.addonCount ?? 0);
+            const addonToApply = settings.plan && canCarryPlan ? (settings.addonCount ?? 0) : 0;
+            setDbAddonCount(addonToApply);
             setAdditionalPackages((prev) => {
-              const addonToApply = settings.addonCount ?? 0;
               const prevCount = Array.isArray(prev) ? prev.length : 0;
               if (prevCount === addonToApply) {
                 return prev;
