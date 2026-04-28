@@ -918,7 +918,7 @@ const displayPlanCode =
   null;
 const activePlanDescription =
   displayPlanCode === 'basic' || displayPlanCode === 'free'
-    ? 'מסלול א - ₪49 לאירועים קטנים עם כל הפיצ\'רים הבסיסיים'
+    ? 'מסלול א - ₪1 לאירועים קטנים עם כל הפיצ\'רים הבסיסיים'
     : displayPlanCode === 'standard'
       ? 'מסלול ב - מקצועי עם תמיכה מלאה ועיצובים מתקדמים'
       : displayPlanCode === 'premium'
@@ -3804,7 +3804,7 @@ React.useEffect(() => {
     switch(plan) {
       case 'free':
       case 'basic':
-        return 49;
+        return 1;
       case 'standard':
         return 149;
       case 'premium':
@@ -3812,7 +3812,7 @@ React.useEffect(() => {
       case 'luxury':
         return 259;
       default:
-        return 49;
+        return 1;
     }
   };
 
@@ -3821,7 +3821,7 @@ React.useEffect(() => {
     switch(plan) {
       case 'free':
       case 'basic':
-        return 'מסלול א - ₪49';
+        return 'מסלול א - ₪1';
       case 'standard':
         return 'מסלול ב - 149₪';
       case 'premium':
@@ -6177,12 +6177,12 @@ React.useEffect(()=>{
                          displayPlanCode === 'supreme' ? 'מסלול ו' : 'מסלול א'}
                       </div>
                       <div className="text-base text-gray-700 font-semibold">
-                        {displayPlanCode === 'basic' || displayPlanCode === 'free' ? '₪49 - עד 50 הודעות' :
+                        {displayPlanCode === 'basic' || displayPlanCode === 'free' ? '₪1 - עד 50 הודעות' :
                          displayPlanCode === 'standard' ? '149₪ - מ 51 עד 200 הודעות' :
                          displayPlanCode === 'premium' ? '199₪ - מ 201 עד 350 הודעות' :
                          displayPlanCode === 'luxury' ? '259₪ - מ 351 עד 500 הודעות' :
                          displayPlanCode === 'elite' ? '349₪ - מ 501 עד 650 הודעות' :
-                         displayPlanCode === 'supreme' ? '499₪ - מ 651 עד 1000 הודעות' : '₪49 - עד 50 הודעות'}
+                         displayPlanCode === 'supreme' ? '499₪ - מ 651 עד 1000 הודעות' : '₪1 - עד 50 הודעות'}
                       </div>
                     </div>
                     <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
@@ -8956,7 +8956,7 @@ React.useEffect(()=>{
                   <div className="space-y-2">
                     <p className="text-gray-700 text-base leading-relaxed">בשלב זה תבחר את המסלול המתאים לאירוע שלך:</p>
                     <ul className="list-disc list-inside space-y-1.5 mr-3 text-base">
-                      <li><strong>מסלול א (49₪)</strong> - עד 50 הודעות</li>
+                      <li><strong>מסלול א (1₪)</strong> - עד 50 הודעות</li>
                       <li><strong>מסלול ב (149₪)</strong> - מ 51 עד 200 הודעות</li>
                       <li><strong>מסלול ג (199₪)</strong> - מ 201 עד 350 הודעות</li>
                       <li><strong>מסלול ד (259₪)</strong> - מ 351 עד 500 הודעות</li>
@@ -9134,9 +9134,9 @@ React.useEffect(()=>{
                 <div className="mb-4 text-primary">
                   <div className="sm:hidden text-center space-y-1 text-2xl font-semibold" dir="rtl">
                     <div>מס' הודעות: <span className="font-bold">עד 50</span></div>
-                    <div className="font-bold">מחיר: 49 ₪</div>
+                    <div className="font-bold">מחיר: 1 ₪</div>
                   </div>
-                  <span className="hidden sm:inline text-base md:text-xl font-bold">49 ₪</span>
+                  <span className="hidden sm:inline text-base md:text-xl font-bold">1 ₪</span>
                 </div>
                 <div className="mb-6 text-right">
                   <p className="text-base md:text-xl font-semibold text-primary mb-3 whitespace-nowrap tracking-wide hidden sm:block">
