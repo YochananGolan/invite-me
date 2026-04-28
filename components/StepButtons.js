@@ -2823,7 +2823,7 @@ React.useEffect(() => {
             name: 'Arial',
             sz: isTitle ? 20 : isHeader ? 12 : 11,
             bold: isTitle || isHeader || isTotal || isSummary,
-            color: { rgb: isTitle || isHeader ? 'FFFFFF' : primary },
+            color: { rgb: isTitle || isHeader ? 'FFFFFFFF' : primary },
           },
           fill: {
             patternType: 'solid',
@@ -2851,9 +2851,9 @@ React.useEffect(() => {
         if (isTitle) {
           ws[addr].s.font = {
             name: 'Arial',
-            sz: 20,
+            sz: 22,
             bold: true,
-            color: { rgb: 'FFFFFF' },
+            color: { rgb: 'FFFFFFFF' },
           };
           ws[addr].s.fill = { patternType: 'solid', fgColor: { rgb: headerAccent } };
         }
