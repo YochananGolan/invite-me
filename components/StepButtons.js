@@ -2752,9 +2752,9 @@ React.useEffect(() => {
     summaryRowIndexes = [],
     columnCount,
   }) => {
-    const primary = '1E1B4B';
-    const headerAccent = '2563EB';
-    const titleFill = '1E1B4B';
+    const primary = '002060';
+    const headerAccent = '0070C0';
+    const titleFill = '002060';
     const gold = 'F59E0B';
     const softGold = 'FEF3C7';
     const softGreen = 'DCFCE7';
@@ -2786,17 +2786,6 @@ React.useEffect(() => {
     ];
     ws['!freeze'] = { xSplit: 0, ySplit: headerRow + 1 };
     ws['!views'] = [{ RTL: true, rightToLeft: true }];
-
-    // Excel sometimes renders merged-row styles from blank cells inconsistently,
-    // so materialize the merged title rows before styling them.
-    for (let r = 0; r <= 2; r += 1) {
-      for (let c = 0; c < columnCount; c += 1) {
-        const addr = XLSX.utils.encode_cell({ r, c });
-        if (!ws[addr]) {
-          ws[addr] = { t: 's', v: '' };
-        }
-      }
-    }
 
     const border = {
       top: { style: 'thin', color: { rgb: borderColor } },
@@ -2851,7 +2840,7 @@ React.useEffect(() => {
 
         if (isTitle) {
           ws[addr].s.font = {
-            name: 'Arial',
+            name: 'Arial Black',
             sz: 24,
             bold: true,
             color: { rgb: 'FFFFFFFF' },
