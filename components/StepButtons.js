@@ -3492,6 +3492,63 @@ React.useEffect(() => {
     setEventMessagesSentCount(0);
   };
 
+  const getEventDateFromRecord = (record) => {
+    if (!record) return null;
+    const details = typeof record.event_details === 'string'
+      ? (() => {
+          try {
+            return JSON.parse(record.event_details);
+          } catch (_) {
+            return {};
+          }
+        })()
+      : record.event_details || {};
+    const rawDate =
+      details.date ||
+      details.event_date ||
+      details.start_datetime ||
+      details.end_datetime ||
+      null;
+    return parseEventDate(rawDate);
+  };
+
+  const hasEventEnded = (record) => {
+    const eventDate = getEventDateFromRecord(record);
+    if (!eventDate) return false;
+    eventDate.setHours(0, 0, 0, 0);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return eventDate < today;
+  };
+
+  const clearEndedEvent = async (eventId) => {
+    if (!eventId) return;
+    try {
+      let { error } = await supabase
+        .from('events')
+        .update({ status: 'archived', selected_plan: null, additional_packages: 0 })
+        .eq('id', eventId);
+      if (error && (error.message || '').toLowerCase().includes('column')) {
+        ({ error } = await supabase
+          .from('events')
+          .update({ status: 'archived' })
+          .eq('id', eventId));
+      }
+      if (error) {
+        console.error('Failed to clear ended event:', error);
+        return;
+      }
+    } catch (err) {
+      console.error('Failed to clear ended event:', err);
+      return;
+    }
+
+    clearCarryPlanAfterManualDelete();
+    await clearPlanState();
+    await resetWizardStateForNoEvent();
+    setShowEventEndedNotice(true);
+  };
+
   const handleNewEvent = async (showDeletionMessage = false) => {
     setShowExistingEventWarning(false);
     setShowArchiveConfirm(false);
@@ -4406,6 +4463,10 @@ React.useEffect(() => {
           });
           return;
         }
+        if (hasEventEnded(ev)) {
+          await clearEndedEvent(ev.id);
+          return;
+        }
         setEventMessagesSentCount(messagesSent);
         const settingsAddonCount = parseNonNegativeInt(userPlanSettingsRef.current?.addonCount);
         const addonCount = settingsAddonCount;
@@ -4473,6 +4534,15 @@ React.useEffect(() => {
         { event: '*', schema: 'public', table: 'events', filter: `id=eq.${currentEventId}` },
         (payload) => {
           const ev = payload.new || payload.old || {};
+          const rowStatus = typeof ev.status === 'string' ? ev.status.toLowerCase() : '';
+          if (payload.eventType === 'DELETE' || rowStatus === 'archived') {
+            setCurrentEventId(null);
+            setEventAllowedGuests(null);
+            setEventDataLoaded(false);
+            setEventMessagesSentCount(0);
+            setEventRefreshKey((k) => k + 1);
+            return;
+          }
           if (typeof ev.messages_sent_count === 'number') {
             setEventMessagesSentCount(ev.messages_sent_count);
           }
@@ -4913,29 +4983,7 @@ React.useEffect(() => {
         if (eventDate >= today) return;
 
         (async () => {
-          try {
-            const { error: archiveErr } = await supabase
-              .from('events')
-              .update({ status: 'archived', selected_plan: null, additional_packages: 0 })
-              .eq('id', currentEventId);
-            if (archiveErr && !(archiveErr.message || '').toLowerCase().includes('column')) {
-              console.error('Failed to archive past event:', archiveErr);
-              return;
-            }
-          } catch (e) {
-            console.error('Failed to archive past event:', e);
-            return;
-          }
-
-          setNewEventStarted(false);
-          try { localStorage.removeItem('newEventStarted'); } catch(e){}
-          setCurrentEventId(null);
-          setEventAllowedGuests(null);
-          setEventMessagesSentCount(0);
-          clearCarryPlanAfterManualDelete();
-          await clearPlanState();
-
-          setShowEventEndedNotice(true);
+          await clearEndedEvent(currentEventId);
         })();
       } catch (err) {
         console.error('auto-archive fetch failed', err);
@@ -4943,7 +4991,7 @@ React.useEffect(() => {
     };
 
     archiveIfPast();
-  }, [currentEventId, clearPlanState]);
+  }, [currentEventId]);
 
   // Fetch Tranzila terminal info
   React.useEffect(() => {
@@ -5049,43 +5097,11 @@ React.useEffect(() => {
               }
             } else {
               if (lastRestoredEventIdRef.current !== 'ended') {
-                console.log('Event found but has ended, not restoring – ensuring clean slate');
+                console.log('Event found but has ended, clearing active event');
                 lastRestoredEventIdRef.current = 'ended';
               }
-              setCurrentEventId(null);
-              setEventAllowedGuests(null);
-              setFormData(initialFormState);
-              setSelectedEventType('');
-              setSelectedDesign(null);
-              setFinishedSteps([]);
-              setEventDetailsCompleted(false);
-              setNewEventStarted(false);
-              try { localStorage.removeItem('newEventStarted'); } catch(e){}
-              try { localStorage.removeItem('selectedEventType'); } catch(e){}
-              try { localStorage.removeItem('savedEventDetails'); } catch(e){}
-              try { localStorage.removeItem('selectedDesign'); } catch(e){}
-              try { localStorage.removeItem('finishedSteps'); } catch(e){}
-              setShowGuestListModal(false);
-              setShowReportsOptions(false);
-              const settingsPast = await loadUserPlanSettings();
-              if (settingsPast?.plan) {
-                setSelectedPlan(settingsPast.plan);
-                try { localStorage.setItem('selectedPlan', settingsPast.plan); } catch(e){}
-                try { localStorage.setItem('user_plan_code', settingsPast.plan); } catch(e){}
-              } else {
-                setSelectedPlan(null);
-                try { localStorage.removeItem('selectedPlan'); } catch(e){}
-              }
-              const addonPast = settingsPast?.addonCount ?? 0;
-              setDbAddonCount(addonPast);
-              setAdditionalPackages((prev) => {
-                const prevCount = Array.isArray(prev) ? prev.length : 0;
-                if (prevCount === addonPast) {
-                  return prev;
-                }
-                return Array(addonPast).fill('addon');
-              });
-              try { localStorage.setItem('additionalPackages_global', String(addonPast)); } catch(e){}
+              await clearEndedEvent(ev.id);
+              return;
             }
           }
         } else {
@@ -5338,6 +5354,11 @@ React.useEffect(() => {
             return Array(ac).fill('addon');
           });
           try { localStorage.setItem('additionalPackages_global', String(ac)); } catch (e) {}
+          isInitialLoadRef.current = false;
+          return;
+        }
+        if (ev && hasEventEnded(ev)) {
+          await clearEndedEvent(ev.id);
           isInitialLoadRef.current = false;
           return;
         }
