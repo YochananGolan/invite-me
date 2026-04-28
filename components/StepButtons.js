@@ -2754,6 +2754,7 @@ React.useEffect(() => {
   }) => {
     const primary = '1E1B4B';
     const headerAccent = '2563EB';
+    const titleFill = '1E1B4B';
     const gold = 'F59E0B';
     const softGold = 'FEF3C7';
     const softGreen = 'DCFCE7';
@@ -2777,7 +2778,7 @@ React.useEffect(() => {
       { s: { r: 2, c: 0 }, e: { r: 2, c: columnCount - 1 } },
     ];
     ws['!rows'] = [
-      { hpt: 30 },
+      { hpt: 38 },
       { hpt: 23 },
       { hpt: 22 },
       { hpt: 8 },
@@ -2821,7 +2822,7 @@ React.useEffect(() => {
         ws[addr].s = {
           font: {
             name: 'Arial',
-            sz: isTitle ? 20 : isHeader ? 12 : 11,
+            sz: isTitle ? 24 : isHeader ? 12 : 11,
             bold: isTitle || isHeader || isTotal || isSummary,
             color: { rgb: isTitle || isHeader ? 'FFFFFFFF' : primary },
           },
@@ -2829,7 +2830,7 @@ React.useEffect(() => {
             patternType: 'solid',
             fgColor: {
               rgb: isTitle
-                ? headerAccent
+                ? titleFill
                 : isHeader
                   ? headerAccent
                   : isTotal
@@ -2851,11 +2852,11 @@ React.useEffect(() => {
         if (isTitle) {
           ws[addr].s.font = {
             name: 'Arial',
-            sz: 22,
+            sz: 24,
             bold: true,
             color: { rgb: 'FFFFFFFF' },
           };
-          ws[addr].s.fill = { patternType: 'solid', fgColor: { rgb: headerAccent } };
+          ws[addr].s.fill = { patternType: 'solid', fgColor: { rgb: titleFill } };
         }
 
         if (isSubtitle) {
