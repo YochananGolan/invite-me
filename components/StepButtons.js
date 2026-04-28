@@ -2856,9 +2856,75 @@ React.useEffect(() => {
     ws['!protect'] = undefined;
   };
 
+  const createSummarySheet = ({ title, subtitle, generatedAt, totalRowLabel, totalRowValue, columnCount }) => {
+    const rows = [
+      [title],
+      [subtitle],
+      [`הופק בתאריך: ${generatedAt}`],
+      [],
+      [totalRowLabel, totalRowValue],
+      ['הערה', 'הנתונים המלאים מופיעים בגיליון הבא בקובץ'],
+    ];
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    ws['!dir'] = 'rtl';
+    ws['!cols'] = [{ wch: 28 }, { wch: 28 }];
+    ws['!rows'] = [{ hpt: 34 }, { hpt: 24 }, { hpt: 22 }, { hpt: 8 }, { hpt: 24 }, { hpt: 24 }];
+    ws['!merges'] = [
+      { s: { r: 0, c: 0 }, e: { r: 0, c: 1 } },
+      { s: { r: 1, c: 0 }, e: { r: 1, c: 1 } },
+      { s: { r: 2, c: 0 }, e: { r: 2, c: 1 } },
+    ];
+    ws['!views'] = [{ RTL: true, rightToLeft: true }];
+    const primary = '7C123A';
+    const gold = 'D4AF37';
+    const softGold = 'FFF4CF';
+    const border = {
+      top: { style: 'thin', color: { rgb: 'D6C7A1' } },
+      bottom: { style: 'thin', color: { rgb: 'D6C7A1' } },
+      left: { style: 'thin', color: { rgb: 'D6C7A1' } },
+      right: { style: 'thin', color: { rgb: 'D6C7A1' } },
+    };
+    const ref = XLSX.utils.decode_range(ws['!ref']);
+    for (let r = ref.s.r; r <= ref.e.r; r += 1) {
+      for (let c = ref.s.c; c <= ref.e.c; c += 1) {
+        const addr = XLSX.utils.encode_cell({ r, c });
+        if (!ws[addr]) continue;
+        ws[addr].s = {
+          font: {
+            name: 'Arial',
+            sz: r === 0 ? 20 : 12,
+            bold: r === 0 || r === 4,
+            color: { rgb: r === 0 ? 'FFFFFF' : primary },
+          },
+          fill: {
+            patternType: 'solid',
+            fgColor: { rgb: r === 0 ? primary : r === 4 ? softGold : 'FFFFFF' },
+          },
+          alignment: {
+            horizontal: r <= 2 ? 'center' : 'right',
+            vertical: 'center',
+            readingOrder: 2,
+            wrapText: true,
+          },
+          border: r === 3 ? undefined : border,
+        };
+      }
+    }
+    return ws;
+  };
+
   const createReportWorkbook = (sheetName, data, columns, styleOptions) => {
     const wb = XLSX.utils.book_new();
     wb.Workbook = { Views: [{ RTL: true }] };
+    const summarySheet = createSummarySheet({
+      title: styleOptions.title,
+      subtitle: styleOptions.subtitle,
+      generatedAt: styleOptions.generatedAt,
+      totalRowLabel: styleOptions.totalRowLabel,
+      totalRowValue: styleOptions.totalRowValue,
+      columnCount: styleOptions.columnCount,
+    });
+    XLSX.utils.book_append_sheet(wb, summarySheet, 'סיכום');
     const ws = XLSX.utils.aoa_to_sheet(data);
     ws['!cols'] = columns;
     styleReportWorksheet(ws, styleOptions);
@@ -2956,12 +3022,15 @@ React.useEffect(() => {
     const wb = createReportWorkbook('דוח לפי שולחנות', data, columns, {
       title: 'דוח אורחים מפורט לפי שולחנות',
       subtitle: `סה"כ אורחים ברשימה: ${reportGuests.filter((g) => !g.isSummary).length}`,
+      generatedAt,
+      totalRowLabel: 'סה"כ משתתפים',
+      totalRowValue: totalReportAdults + totalReportChildren,
       headerRowIndex: 4,
       totalRowIndex: data.length - 1,
       summaryRowIndexes,
       columnCount: columns.length,
     });
-    downloadWorkbook(wb, 'guests_by_table.xlsx');
+    downloadWorkbook(wb, 'דוח_אורחים_לפי_שולחנות_מעוצב.xlsx');
   };
 
   // Helper to export approved guests to CSV (Excel)
@@ -3023,12 +3092,15 @@ React.useEffect(() => {
     const wb = createReportWorkbook('מאשרים', data, columns, {
       title: 'דוח מאשרים מפורט',
       subtitle: `סה"כ רשומות: ${approvedGuests.length}`,
+      generatedAt,
+      totalRowLabel: 'סה"כ משתתפים מאושרים',
+      totalRowValue: totalAdults + totalChildren,
       headerRowIndex: 4,
       totalRowIndex: data.length - 1,
       summaryRowIndexes: [],
       columnCount: columns.length,
     });
-    downloadWorkbook(wb, 'approved_guests.xlsx');
+    downloadWorkbook(wb, 'דוח_מאשרים_מעוצב.xlsx');
   };
 
   const fileInputRef = useRef();
