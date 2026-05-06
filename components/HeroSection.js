@@ -60,7 +60,7 @@ const useTypewriter = (text, speed = 100, pauseDuration = 5000) => {
   return displayedText;
 };
 
-export default forwardRef(function HeroSection({ onStart, onShowFeatures, isLoggedIn, onPressCreateEvent, onPressReports, onOpenTutorial }, ref) {
+export default forwardRef(function HeroSection({ onStart, onShowFeatures, isLoggedIn, onPressCreateEvent, onPressReports }, ref) {
   const handleCreateNewEvent = (e) => {
     e?.preventDefault?.();
     if (typeof onPressCreateEvent === 'function') {
@@ -128,22 +128,6 @@ export default forwardRef(function HeroSection({ onStart, onShowFeatures, isLogg
                 aria-label={'\u05E6\u05D5\u05E8 \u05D0\u05D9\u05E8\u05D5\u05E2 \u05D7\u05D3\u05E9'}
               >
                 {'\u05E6\u05D5\u05E8 \u05D0\u05D9\u05E8\u05D5\u05E2 \u05D7\u05D3\u05E9'}
-              </button>
-              <button
-                type="button"
-                onClick={() => typeof onOpenTutorial === 'function' && onOpenTutorial()}
-                className="group relative inline-flex items-center justify-center gap-3 overflow-hidden rounded-xl
-                           bg-gradient-to-r from-amber-400 via-yellow-400 to-orange-400 px-7 py-4
-                           text-base font-extrabold text-gray-950 shadow-[0_14px_35px_rgba(245,158,11,0.35)]
-                           ring-4 ring-amber-200/80 ring-offset-2 ring-offset-white transition-all duration-200
-                           hover:-translate-y-0.5 hover:from-amber-300 hover:to-orange-500 hover:shadow-[0_0_45px_rgba(245,158,11,0.55)]
-                           focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-amber-500"
-                aria-label="פתח סרטון הדרכה על Meet-M"
-              >
-                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white/80 text-sm shadow-sm transition group-hover:scale-110">
-                  ▶
-                </span>
-                <span>צפה בסרטון הדרכה</span>
               </button>
               <button
                 type="button"

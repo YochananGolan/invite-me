@@ -7,7 +7,6 @@ import { useState, useEffect, useRef } from 'react';
 import AuthModal from '../components/AuthModal';
 import Footer from '../components/Footer';
 import PricingTableModal from '../components/PricingTableModal';
-import TutorialVideoModal from '../components/TutorialVideoModal';
 
 export default function Home({ session }) {
   const router = useRouter();
@@ -15,7 +14,6 @@ export default function Home({ session }) {
   const [authMode, setAuthMode] = useState('sign_in');
   const [showFeatures, setShowFeatures] = useState(false);
   const [showPricingTable, setShowPricingTable] = useState(false);
-  const [showTutorialVideo, setShowTutorialVideo] = useState(false);
   const [pendingCreateEvent, setPendingCreateEvent] = useState(false);
   const [triggerCreateEvent, setTriggerCreateEvent] = useState(false);
   const [showRegistrationSuccess, setShowRegistrationSuccess] = useState(false);
@@ -123,7 +121,6 @@ export default function Home({ session }) {
             onPressCreateEvent={handleCreateEvent}
             onPressReports={handleShowReports}
             onShowFeatures={handleShowFeatures}
-            onOpenTutorial={() => setShowTutorialVideo(true)}
             isLoggedIn={!!session}
           />
           <div id="pricing" className="mb-8 scroll-mt-20 scroll-mb-28 pb-36 sm:pb-24">
@@ -147,7 +144,6 @@ export default function Home({ session }) {
       />
 
       <PricingTableModal isOpen={showPricingTable} onClose={() => setShowPricingTable(false)} />
-      <TutorialVideoModal isOpen={showTutorialVideo} onClose={() => setShowTutorialVideo(false)} />
 
       {/* Registration Success Modal - after email verification - stays until user clicks */}
       {showRegistrationSuccess && (
