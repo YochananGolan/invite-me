@@ -346,10 +346,20 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick, trig
   const [formErrors, setFormErrors] = useState({});
   const [eventDetailsCompleted, setEventDetailsCompleted] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const [eventDetailsSubmitAttempted, setEventDetailsSubmitAttempted] = useState(false);
+  const visibleFormErrors = eventDetailsSubmitAttempted ? formErrors : {};
   // Global error message for skipped steps
   const [stepErrorMsg, setStepErrorMsg] = useState('');
   const [clickedStepName, setClickedStepName] = useState('');
   const [showStepError, setShowStepError] = useState(false);
+
+  React.useEffect(() => {
+    setEventDetailsSubmitAttempted(false);
+    if (showEventDetails) {
+      setErrorMsg('');
+      setFormErrors({});
+    }
+  }, [showEventDetails]);
 
   // ---- finished steps persistence ----
   const [finishedSteps, setFinishedSteps] = useState(()=>{
@@ -379,6 +389,10 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick, trig
     { key: 'pending', name: 'טרם הגיבו', value: guestStatusSummary.pending, color: '#facc15' },
     { key: 'rejected', name: 'לא אישרו', value: guestStatusSummary.rejected, color: '#dc2626' }
   ]), [guestStatusSummary]);
+  const statusChartDataNonZero = React.useMemo(
+    () => statusChartData.filter(item => Number(item.value) > 0),
+    [statusChartData]
+  );
   const statusTotal = React.useMemo(
     () => statusChartData.reduce((sum, item) => sum + (Number(item.value) || 0), 0),
     [statusChartData]
@@ -428,23 +442,20 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick, trig
     if (!slice) return null;
     const total = statusTotal;
     const isOnlySlice = total > 0 && numericValue === total;
-    const radius = isOnlySlice
+    const labelRadius = isOnlySlice
       ? innerRadius + (outerRadius - innerRadius) / 2
-      : innerRadius + (outerRadius - innerRadius) * 0.65;
-    const x = isOnlySlice ? cx : cx + radius * Math.cos(-midAngle * RADIAN);
-    const y = isOnlySlice ? cy : cy + radius * Math.sin(-midAngle * RADIAN);
+      : outerRadius + 14;
+    const x = isOnlySlice ? cx : cx + labelRadius * Math.cos(-midAngle * RADIAN);
+    const y = isOnlySlice ? cy : cy + labelRadius * Math.sin(-midAngle * RADIAN);
     return (
       <text
         x={x}
         y={y}
-        fill="#111827"
+        fill="#e2e8f0"
         textAnchor="middle"
         dominantBaseline="central"
         fontWeight="700"
         fontSize={isOnlySlice ? 14 : 13}
-        stroke="#FFFFFF"
-        strokeWidth={isOnlySlice ? 3 : 2}
-        style={{ paintOrder: 'stroke' }}
         {...getContainedStatusSliceLabelProps(numericValue, innerRadius, isOnlySlice)}
       >
         {numericValue}
@@ -478,17 +489,21 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick, trig
   // Selected event context for reports
   const [selectedEventForReport,setSelectedEventForReport]=useState(null);
 
-  // Clear global "missing details" error once all required fields are provided
+  // Keep details validation visible only after Save, and clear it once fixed.
   React.useEffect(() => {
-    if (errorMsg !== 'נא למלא את כל הפרטים.') return;
+    if (!eventDetailsSubmitAttempted || !errorMsg) return;
 
     // Re-evaluate missing fields with the same rules used in handleSaveDetails
     const missing = computeMissingDetails(formData, selectedEventType);
     if (missing.length === 0) {
       setErrorMsg('');
       setFormErrors({});
+      return;
     }
-  }, [formData, selectedEventType, errorMsg]);
+
+    const nextErrors = missing.reduce((acc, [key]) => ({ ...acc, [key]: true }), {});
+    setFormErrors(nextErrors);
+  }, [formData, selectedEventType, errorMsg, eventDetailsSubmitAttempted]);
 
   // --- Guest invitation state ---
   const [showGuestForm, setShowGuestForm] = useState(false);
@@ -500,6 +515,8 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick, trig
   });
   const [guestErrors, setGuestErrors] = useState({});
   const [guestErrorMsg, setGuestErrorMsg] = useState('');
+  const [guestSubmitAttempted, setGuestSubmitAttempted] = useState(false);
+  const visibleGuestErrors = guestSubmitAttempted ? guestErrors : {};
   const [invitationSent, setInvitationSent] = useState(false);
   const [rsvpConfirmed, setRsvpConfirmed] = useState(false);
   // Invitation send result modal
@@ -517,6 +534,23 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick, trig
   const [searchTerm, setSearchTerm] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [searchError, setSearchError] = useState('');
+  const [guestSearchAttempted, setGuestSearchAttempted] = useState(false);
+
+  React.useEffect(() => {
+    setGuestSubmitAttempted(false);
+    if (showGuestForm) {
+      setGuestErrorMsg('');
+      setGuestErrors({});
+    }
+  }, [showGuestForm]);
+
+  React.useEffect(() => {
+    setGuestSearchAttempted(false);
+    if (showSearchGuest) {
+      setSearchError('');
+      setSearchResults([]);
+    }
+  }, [showSearchGuest]);
 
   // Archive events list modal
   const [showArchiveList,setShowArchiveList]=useState(false);
@@ -907,6 +941,7 @@ const [planLimitWarningError, setPlanLimitWarningError] = useState('');
 const [planAddOnMode, setPlanAddOnMode] = useState(false);
 const [planSelectionError, setPlanSelectionError] = useState('');
 const [planWarningSuppressed, setPlanWarningSuppressed] = useState(false);
+const [pricingActionAttempted, setPricingActionAttempted] = useState(false);
 const [eventMessagesSentCount, setEventMessagesSentCount] = useState(0);
 const [invitedGuestsCount, setInvitedGuestsCount] = useState(0);
 const [currentEventId,setCurrentEventId]=useState(null);
@@ -919,6 +954,13 @@ const selectedPlanRef = useRef(selectedPlan);
 useEffect(() => {
   selectedPlanRef.current = selectedPlan;
 }, [selectedPlan]);
+
+React.useEffect(() => {
+  setPricingActionAttempted(false);
+  if (showPricingPlan) {
+    setPlanSelectionError('');
+  }
+}, [showPricingPlan]);
 
 const userPlanSettingsRef = useRef(userPlanSettings);
 useEffect(() => {
@@ -1210,7 +1252,8 @@ const displayPackageEntries = packageEntries;
 const handleOpenAddonModal = React.useCallback(() => {
   const hasPaidPlan = selectedPlan && selectedPlan !== 'basic' && selectedPlan !== 'free';
   setPlanLimitWarningError('');
-  setPlanSelectionError(hasPaidPlan ? '' : 'בחר מסלול בתשלום כדי להמשיך ולהוסיף אורחים.');
+  setPlanSelectionError('');
+  setPricingActionAttempted(false);
   setPlanAddOnMode(Boolean(hasPaidPlan));
   setPlanWarningSuppressed(true);
   setShowPlanLimitWarning(false);
@@ -1230,6 +1273,7 @@ const handleOpenAddonModal = React.useCallback(() => {
   const [adultsCount, setAdultsCount] = useState(1);
   const [childrenCount, setChildrenCount] = useState(0);
   const [countError, setCountError] = useState('');
+  const [countSubmitAttempted, setCountSubmitAttempted] = useState(false);
   const mealCategories = [
     { key: 'vegetarian', label: 'צמחוני' },
     { key: 'vegan', label: 'טבעוני' },
@@ -1244,6 +1288,13 @@ const handleOpenAddonModal = React.useCallback(() => {
   });
 
   const [allergies, setAllergies] = useState([{ description: '', adults: 0, children: 0 }]);
+
+  React.useEffect(() => {
+    setCountSubmitAttempted(false);
+    if (showCountModal) {
+      setCountError('');
+    }
+  }, [showCountModal]);
 
   const updateMeal = (cat, field, val) => {
     setSpecialMeals((prev) => ({
@@ -1286,6 +1337,7 @@ const handleOpenAddonModal = React.useCallback(() => {
   // ------------------------------
 
   const handleSaveDetails = async () => {
+    setEventDetailsSubmitAttempted(true);
     // Validate date is in the future (> today)
     const today = new Date();
     today.setHours(0,0,0,0);
@@ -1410,6 +1462,7 @@ const handleOpenAddonModal = React.useCallback(() => {
     };
 
     const handleSendInvitation = async () => {
+      setGuestSubmitAttempted(true);
       // Persist current event details so they survive any reloads after sending
       try{ localStorage.setItem('savedEventDetails', JSON.stringify(formData)); }catch{}
 
@@ -1584,6 +1637,7 @@ const handleOpenAddonModal = React.useCallback(() => {
 
   // Quick SMS sender – opens default SMS app with pre-filled text (mobile browsers)
   const handleSendInvitationSms = async () => {
+    setGuestSubmitAttempted(true);
     // Show loading modal IMMEDIATELY
     setIsSendingInvitation(true);
     
@@ -2898,6 +2952,7 @@ React.useEffect(() => {
 
   // Handle guest search
   const handleGuestSearch = async () => {
+    setGuestSearchAttempted(true);
     setSearchError('');
     setSearchResults([]);
     if (!searchTerm.trim()) {
@@ -4234,6 +4289,7 @@ React.useEffect(() => {
 
   // Handle plan selection in pricing modal
   const handleSelectPlan = async (plan) => {
+    setPricingActionAttempted(true);
     // Check if user is logged in
     if (!session) {
       setInvitationResult({ 
@@ -4287,6 +4343,7 @@ React.useEffect(() => {
 
   // Handle adding package plan (for addon mode)
   const handleAddPackagePlan = (plan) => {
+    setPricingActionAttempted(true);
     // Add the selected plan to additional packages
     setAdditionalPackages((prev) => [...prev, plan]);
     setShowPricingPlan(false);
@@ -6422,8 +6479,8 @@ React.useEffect(()=>{
 
       {/* Error message is now displayed in HeroSection instead */}
       {/* Status and Summary Tables */}
-      <div className="w-full px-4 mb-0 mt-4 pb-24" style={{ marginBottom: '200px' }}>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+      <div className="w-full px-4 mb-0 mt-4 pb-16">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-[1600px] mx-auto">
           
           {/* First Column - Event Status */}
           <div className="w-full flex flex-col gap-6">
@@ -6437,13 +6494,7 @@ React.useEffect(()=>{
               </div>
             )}
             {currentEventId ? (
-              <div className="bg-white/[0.055] border border-emerald-400/20 backdrop-blur-xl rounded-lg p-3 sm:p-4 text-center shadow-lg w-full" style={{
-                border: '3px solid #D4AF37',
-                outline: '2px solid #B8860B',
-                outlineOffset: '2px',
-                borderRadius: '8px',
-                minHeight: 'min(280px, 50vh)'
-              }}>
+              <div className="bg-white/[0.055] border border-white/15 backdrop-blur-xl rounded-2xl p-3 sm:p-4 text-center shadow-[0_8px_40px_rgba(0,0,0,0.35)] ring-2 ring-indigo-400/30 w-full">
                 <div className="flex items-center justify-center gap-2 mb-2">
                   <span className="text-2xl">✅</span>
                   <h3 className="text-lg font-bold text-emerald-300">יש אירוע פעיל במערכת</h3>
@@ -6486,12 +6537,7 @@ React.useEffect(()=>{
                 </p>
               </div>
             ) : newEventStarted ? (
-              <div className="bg-white/[0.055] border border-indigo-400/20 backdrop-blur-xl rounded-lg p-4 text-center shadow-lg flex-1" style={{
-                border: '3px solid #3b82f6',
-                outline: '2px solid #1d4ed8',
-                outlineOffset: '2px',
-                borderRadius: '8px',
-              }}>
+              <div className="bg-white/[0.055] border border-white/15 backdrop-blur-xl rounded-2xl p-4 text-center shadow-[0_8px_40px_rgba(0,0,0,0.35)] ring-2 ring-indigo-400/30 flex-1">
                 <div className="flex items-center justify-center gap-2 mb-2">
                   <span className="text-2xl">🚀</span>
                   <h3 className="text-lg font-bold text-indigo-300">מסלול פעיל – הזמן להתחיל אירוע חדש</h3>
@@ -6534,13 +6580,7 @@ React.useEffect(()=>{
               </div>
             )}
             {(planForDisplay || currentEventId) && (
-              <div className="bg-white/[0.055] border border-amber-400/20 backdrop-blur-xl rounded-lg p-3 sm:p-4 text-center shadow-lg w-full" style={{
-                border: '3px solid #D4AF37',
-                outline: '2px solid #B8860B',
-                outlineOffset: '2px',
-                borderRadius: '8px',
-                minHeight: 'min(280px, 50vh)'
-              }}>
+              <div className="bg-white/[0.055] border border-white/15 backdrop-blur-xl rounded-2xl p-3 sm:p-4 text-center shadow-[0_8px_40px_rgba(0,0,0,0.35)] ring-2 ring-amber-400/30 w-full" style={{ minHeight: 'min(280px, 50vh)' }}>
                 <div className="flex items-center justify-center gap-2 mb-2">
                   <span className="text-2xl">💰</span>
                   <h3 className="text-lg font-bold text-amber-300">מסלול פעיל</h3>
@@ -6624,12 +6664,7 @@ React.useEffect(()=>{
           {/* Second Column - Guest Summary + Table Report */}
           {currentEventId && (
             <div className="w-full flex flex-col gap-6">
-              <div className="bg-white/[0.055] border border-indigo-400/20 backdrop-blur-xl rounded-lg p-3 sm:p-4 text-center shadow-lg w-full min-h-[320px]" style={{
-                border: '3px solid #D4AF37',
-                outline: '2px solid #B8860B',
-                outlineOffset: '2px',
-                borderRadius: '8px',
-              }}>
+              <div className="bg-white/[0.055] border border-white/15 backdrop-blur-xl rounded-2xl p-3 sm:p-4 text-center shadow-[0_8px_40px_rgba(0,0,0,0.35)] ring-2 ring-indigo-400/30 w-full">
                 <div className="flex items-center justify-center gap-2 mb-2">
                   <span className="text-xl">👥</span>
                   <h3 className="text-base font-bold text-indigo-300">סיכום כל האורחים המוזמנים</h3>
@@ -6639,8 +6674,8 @@ React.useEffect(()=>{
                     {!shouldShowCharts ? (
                       <div className="py-10 text-sm text-slate-400 text-center">טוען נתונים...</div>
                     ) : hasGuestSummaryData ? (
-                      <div className="h-56 min-h-[200px] sm:h-56">
-                        <ResponsiveContainer width="100%" height="100%">
+                      <div>
+                        <ResponsiveContainer width="100%" height={260}>
                           <BarChart
                             data={guestSummaryChartData}
                             margin={{ top: 16, right: 20, left: -10, bottom: 8 }}
@@ -6704,14 +6739,7 @@ React.useEffect(()=>{
               </div>
 
               {tableSummary.length > 0 && (
-                <div className="bg-white/[0.055] border border-orange-400/20 backdrop-blur-xl rounded-lg p-3 text-center shadow-lg w-full" style={{
-                  border: '3px solid #D4AF37',
-                  outline: '2px solid #B8860B',
-                  outlineOffset: '2px',
-                  borderRadius: '8px',
-                  display: 'flex',
-                  flexDirection: 'column'
-                }}>
+                <div className="bg-white/[0.055] border border-white/15 backdrop-blur-xl rounded-2xl p-3 text-center shadow-[0_8px_40px_rgba(0,0,0,0.35)] ring-2 ring-orange-400/30 w-full flex flex-col">
                   <div className="flex items-center justify-center gap-3 mb-3 flex-shrink-0">
                     <span className="text-2xl">📊</span>
                     <h3 className="text-lg font-extrabold text-orange-300 tracking-wide">דוח סיכום שולחנות</h3>
@@ -6754,35 +6782,30 @@ React.useEffect(()=>{
           {/* Third Column - Guest Status Summary */}
           {currentEventId && (
             <div className="w-full flex flex-col gap-6">
-              <div className="bg-white/[0.055] border border-violet-400/20 backdrop-blur-xl rounded-lg p-3 sm:p-4 text-center shadow-lg w-full min-h-[320px]" style={{
-                border: '3px solid #D4AF37',
-                outline: '2px solid #B8860B',
-                outlineOffset: '2px',
-                borderRadius: '8px',
-              }}>
+              <div className="bg-white/[0.055] border border-white/15 backdrop-blur-xl rounded-2xl p-3 sm:p-4 text-center shadow-[0_8px_40px_rgba(0,0,0,0.35)] ring-2 ring-violet-400/30 w-full">
                 <div className="flex items-center justify-center gap-2 mb-2">
                   <span className="text-xl">📊</span>
                   <h3 className="text-base font-bold text-violet-300">סטטוס אישורי הגעה</h3>
                 </div>
-                <div className="bg-white/5 border border-white/10 rounded-xl text-right p-2 mt-3">
+                <div className="bg-white/5 border border-white/10 rounded-xl p-3 mt-3">
                     {!shouldShowCharts ? (
                     <div className="py-10 text-sm text-slate-400 text-center">טוען נתונים...</div>
                   ) : hasStatusData ? (
-                    <div className="relative h-56 min-h-[200px] sm:h-56">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <PieChart margin={{ top: 8, right: 8, bottom: 8, left: 8 }}>
+                    <div>
+                      <ResponsiveContainer width="100%" height={260}>
+                        <PieChart margin={{ top: 12, right: 24, bottom: 12, left: 24 }}>
                           <Pie
-                            data={statusChartData}
+                            data={statusChartDataNonZero}
                             dataKey="value"
                             nameKey="name"
-                            innerRadius={isMobileView ? 46 : 58}
-                            outerRadius={isMobileView ? 78 : 88}
-                            paddingAngle={3}
+                            innerRadius={isMobileView ? 40 : 50}
+                            outerRadius={isMobileView ? 66 : 76}
+                            paddingAngle={statusChartDataNonZero.length > 1 ? 2 : 0}
                             isAnimationActive={false}
                             label={renderStatusSliceLabel}
-                            labelLine={false}
+                            labelLine={{ stroke: '#94a3b8', strokeWidth: 1 }}
                           >
-                            {statusChartData.map((item) => (
+                            {statusChartDataNonZero.map((item) => (
                               <Cell key={item.key} fill={item.color} />
                             ))}
                           </Pie>
@@ -6793,7 +6816,7 @@ React.useEffect(()=>{
                           layout={isMobileView ? 'horizontal' : 'vertical'}
                             iconType="circle"
                           wrapperStyle={{
-                            maxWidth: isMobileView ? '100%' : 112,
+                            maxWidth: isMobileView ? '100%' : 160,
                             direction: 'rtl',
                             textAlign: isMobileView ? 'center' : 'right',
                             color: '#cbd5e1',
@@ -6830,12 +6853,7 @@ React.useEffect(()=>{
                 )}
               </div>
               {(planForDisplay || currentEventId) && messageCapacityChartModel && (
-                  <div className="bg-white/[0.055] border border-amber-400/20 backdrop-blur-xl rounded-lg p-3 sm:p-4 text-center shadow-lg w-full min-h-[320px]" style={{
-                    border: '3px solid #D4AF37',
-                    outline: '2px solid #B8860B',
-                    outlineOffset: '2px',
-                    borderRadius: '8px',
-                  }}>
+                  <div className="bg-white/[0.055] border border-white/15 backdrop-blur-xl rounded-2xl p-3 sm:p-4 text-center shadow-[0_8px_40px_rgba(0,0,0,0.35)] ring-2 ring-amber-400/30 w-full">
                     <div className="flex items-center justify-center gap-2 mb-2">
                       <span className="text-xl">📈</span>
                       <h3 className="text-base font-bold text-amber-300">יתרת הודעות</h3>
@@ -6845,8 +6863,8 @@ React.useEffect(()=>{
                       {!shouldShowCharts ? (
                         <div className="py-10 text-sm text-slate-400 text-center">טוען נתונים...</div>
                       ) : messageCapacityChartModel.hasCapacityChartData ? (
-                        <div className="h-56 min-h-[200px] sm:h-56">
-                          <ResponsiveContainer width="100%" height="100%">
+                        <div>
+                          <ResponsiveContainer width="100%" height={260}>
                             <BarChart
                               data={messageCapacityChartModel.capacityChartData}
                               margin={{ top: 16, right: 20, left: -10, bottom: 8 }}
@@ -6954,19 +6972,19 @@ React.useEffect(()=>{
         <DrawerHeader onClose={() => setShowEventDetails(false)}>{`פרטי האירוע - ${selectedEventType}`}</DrawerHeader>
         <DrawerBody scroll className="px-6 py-5">
           <div dir="rtl">
-          {errorMsg && <p className="text-red-400 text-sm text-center mb-3 bg-red-500/10 border border-red-400/30 rounded-xl p-2.5">{errorMsg}</p>}
+          {eventDetailsSubmitAttempted && errorMsg && <p className="text-red-400 text-sm text-center mb-3 bg-red-500/10 border border-red-400/30 rounded-xl p-2.5">{errorMsg}</p>}
           <form dir="rtl" className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {/* Existing event details form (unchanged) */}
               {['חתונה', 'חינה', 'מסיבת אירוסין'].includes(selectedEventType) && (
                 <div>
                   <label className="block mb-1.5 font-semibold text-sm text-slate-300">שם הכלה</label>
-                  <input type="text" placeholder="שם הכלה" value={formData.brideName} onChange={(e) => setFormData({ ...formData, brideName: e.target.value })} className={`w-full bg-white/10 border border-white/20 text-white placeholder-slate-400 rounded-xl focus:border-indigo-400 p-2.5 text-base transition-all ${formErrors.brideName ? 'border-red-400 ring-2 ring-red-400/20' : ''}`} />
+                  <input type="text" placeholder="שם הכלה" value={formData.brideName} onChange={(e) => setFormData({ ...formData, brideName: e.target.value })} className={`w-full bg-white/10 border border-white/20 text-white placeholder-slate-400 rounded-xl focus:border-indigo-400 p-2.5 text-base transition-all ${visibleFormErrors.brideName ? 'border-red-400 ring-2 ring-red-400/20' : ''}`} />
                 </div>
               )}
               {['חתונה', 'חינה', 'מסיבת אירוסין'].includes(selectedEventType) && (
                 <div>
                   <label className="block mb-1.5 font-semibold text-sm text-slate-300">שם החתן</label>
-                  <input type="text" placeholder="שם החתן" value={formData.groomName} onChange={(e) => setFormData({ ...formData, groomName: e.target.value })} className={`w-full bg-white/10 border border-white/20 text-white placeholder-slate-400 rounded-xl focus:border-indigo-400 p-2.5 text-base transition-all ${formErrors.groomName ? 'border-red-400 ring-2 ring-red-400/20' : ''}`} />
+                  <input type="text" placeholder="שם החתן" value={formData.groomName} onChange={(e) => setFormData({ ...formData, groomName: e.target.value })} className={`w-full bg-white/10 border border-white/20 text-white placeholder-slate-400 rounded-xl focus:border-indigo-400 p-2.5 text-base transition-all ${visibleFormErrors.groomName ? 'border-red-400 ring-2 ring-red-400/20' : ''}`} />
                 </div>
               )}
               {selectedEventType === 'הפרשת חלה' && (
@@ -6977,31 +6995,31 @@ React.useEffect(()=>{
                     placeholder="שם המארחת"
                     value={formData.hostName}
                     onChange={(e) => setFormData({ ...formData, hostName: e.target.value })}
-                    className={`w-full bg-white/10 border border-white/20 text-white placeholder-slate-400 rounded-xl focus:border-indigo-400 p-2.5 text-base transition-all ${formErrors.hostName ? 'border-red-400 ring-2 ring-red-400/20' : ''}`}
+                    className={`w-full bg-white/10 border border-white/20 text-white placeholder-slate-400 rounded-xl focus:border-indigo-400 p-2.5 text-base transition-all ${visibleFormErrors.hostName ? 'border-red-400 ring-2 ring-red-400/20' : ''}`}
                   />
                 </div>
               )}
               {['חתונה', 'חינה'].includes(selectedEventType) && (
                 <div>
                   <label className="block mb-1.5 font-semibold text-sm text-slate-300">שם הורי הכלה</label>
-                  <input type="text" placeholder="שם הורי הכלה" value={formData.brideParents} onChange={(e) => setFormData({ ...formData, brideParents: e.target.value })} className={`w-full bg-white/10 border border-white/20 text-white placeholder-slate-400 rounded-xl focus:border-indigo-400 p-2.5 text-base transition-all ${formErrors.brideParents ? 'border-red-400 ring-2 ring-red-400/20' : ''}`} />
+                  <input type="text" placeholder="שם הורי הכלה" value={formData.brideParents} onChange={(e) => setFormData({ ...formData, brideParents: e.target.value })} className={`w-full bg-white/10 border border-white/20 text-white placeholder-slate-400 rounded-xl focus:border-indigo-400 p-2.5 text-base transition-all ${visibleFormErrors.brideParents ? 'border-red-400 ring-2 ring-red-400/20' : ''}`} />
                 </div>
               )}
               {['חתונה', 'חינה'].includes(selectedEventType) && (
                 <div>
                   <label className="block mb-1.5 font-semibold text-sm text-slate-300">שם הורי החתן</label>
-                  <input type="text" placeholder="שם הורי החתן" value={formData.groomParents} onChange={(e) => setFormData({ ...formData, groomParents: e.target.value })} className={`w-full bg-white/10 border border-white/20 text-white placeholder-slate-400 rounded-xl focus:border-indigo-400 p-2.5 text-base transition-all ${formErrors.groomParents ? 'border-red-400 ring-2 ring-red-400/20' : ''}`} />
+                  <input type="text" placeholder="שם הורי החתן" value={formData.groomParents} onChange={(e) => setFormData({ ...formData, groomParents: e.target.value })} className={`w-full bg-white/10 border border-white/20 text-white placeholder-slate-400 rounded-xl focus:border-indigo-400 p-2.5 text-base transition-all ${visibleFormErrors.groomParents ? 'border-red-400 ring-2 ring-red-400/20' : ''}`} />
                 </div>
               )}
               {selectedEventType === 'בר מצווה' && (
                 <>
                   <div>
                     <label className="block mb-1.5 font-semibold text-sm text-slate-300">שם חתן בר מצווה</label>
-                    <input type="text" placeholder="שם חתן בר מצווה" value={formData.boyName} onChange={(e) => setFormData({ ...formData, boyName: e.target.value })} className={`w-full bg-white/10 border border-white/20 text-white placeholder-slate-400 rounded-xl focus:border-indigo-400 p-3 text-base transition-all ${formErrors.boyName ? 'border-red-400 ring-2 ring-red-400/20' : ''}`} />
+                    <input type="text" placeholder="שם חתן בר מצווה" value={formData.boyName} onChange={(e) => setFormData({ ...formData, boyName: e.target.value })} className={`w-full bg-white/10 border border-white/20 text-white placeholder-slate-400 rounded-xl focus:border-indigo-400 p-3 text-base transition-all ${visibleFormErrors.boyName ? 'border-red-400 ring-2 ring-red-400/20' : ''}`} />
                   </div>
                   <div>
                     <label className="block mb-1.5 font-semibold text-sm text-slate-300">שם ההורים</label>
-                    <input type="text" placeholder="שם ההורים" value={formData.boyParents} onChange={(e) => setFormData({ ...formData, boyParents: e.target.value })} className={`w-full bg-white/10 border border-white/20 text-white placeholder-slate-400 rounded-xl focus:border-indigo-400 p-3 text-base transition-all ${formErrors.boyParents ? 'border-red-400 ring-2 ring-red-400/20' : ''}`} />
+                    <input type="text" placeholder="שם ההורים" value={formData.boyParents} onChange={(e) => setFormData({ ...formData, boyParents: e.target.value })} className={`w-full bg-white/10 border border-white/20 text-white placeholder-slate-400 rounded-xl focus:border-indigo-400 p-3 text-base transition-all ${visibleFormErrors.boyParents ? 'border-red-400 ring-2 ring-red-400/20' : ''}`} />
                   </div>
                 </>
               )}
@@ -7009,11 +7027,11 @@ React.useEffect(()=>{
                 <>
                   <div>
                     <label className="block mb-1.5 font-semibold text-sm text-slate-300">שם כלת בת מצווה</label>
-                    <input type="text" placeholder="שם כלת בת מצווה" value={formData.girlName} onChange={(e) => setFormData({ ...formData, girlName: e.target.value })} className={`w-full bg-white/10 border border-white/20 text-white placeholder-slate-400 rounded-xl focus:border-indigo-400 p-3 text-base transition-all ${formErrors.girlName ? 'border-red-400 ring-2 ring-red-400/20' : ''}`} />
+                    <input type="text" placeholder="שם כלת בת מצווה" value={formData.girlName} onChange={(e) => setFormData({ ...formData, girlName: e.target.value })} className={`w-full bg-white/10 border border-white/20 text-white placeholder-slate-400 rounded-xl focus:border-indigo-400 p-3 text-base transition-all ${visibleFormErrors.girlName ? 'border-red-400 ring-2 ring-red-400/20' : ''}`} />
                   </div>
                   <div>
                     <label className="block mb-1.5 font-semibold text-sm text-slate-300">שם ההורים</label>
-                    <input type="text" placeholder="שם ההורים" value={formData.girlParents} onChange={(e) => setFormData({ ...formData, girlParents: e.target.value })} className={`w-full bg-white/10 border border-white/20 text-white placeholder-slate-400 rounded-xl focus:border-indigo-400 p-3 text-base transition-all ${formErrors.girlParents ? 'border-red-400 ring-2 ring-red-400/20' : ''}`} />
+                    <input type="text" placeholder="שם ההורים" value={formData.girlParents} onChange={(e) => setFormData({ ...formData, girlParents: e.target.value })} className={`w-full bg-white/10 border border-white/20 text-white placeholder-slate-400 rounded-xl focus:border-indigo-400 p-3 text-base transition-all ${visibleFormErrors.girlParents ? 'border-red-400 ring-2 ring-red-400/20' : ''}`} />
                   </div>
                 </>
               )}
@@ -7021,7 +7039,7 @@ React.useEffect(()=>{
                 <>
                   <div>
                     <label className="block mb-1.5 font-semibold text-sm text-slate-300">שם ההורים</label>
-                    <input type="text" placeholder="שם ההורים" value={formData.babyParents} onChange={(e) => setFormData({ ...formData, babyParents: e.target.value })} className={`w-full bg-white/10 border border-white/20 text-white placeholder-slate-400 rounded-xl focus:border-indigo-400 p-3 text-base transition-all ${formErrors.babyParents ? 'border-red-400 ring-2 ring-red-400/20' : ''}`} />
+                    <input type="text" placeholder="שם ההורים" value={formData.babyParents} onChange={(e) => setFormData({ ...formData, babyParents: e.target.value })} className={`w-full bg-white/10 border border-white/20 text-white placeholder-slate-400 rounded-xl focus:border-indigo-400 p-3 text-base transition-all ${visibleFormErrors.babyParents ? 'border-red-400 ring-2 ring-red-400/20' : ''}`} />
                   </div>
                 </>
               )}
@@ -7029,11 +7047,11 @@ React.useEffect(()=>{
                 <>
                   <div>
                     <label className="block mb-1.5 font-semibold text-sm text-slate-300">שם החוגג/ת</label>
-                    <input type="text" placeholder="שם החוגג/ת" value={formData.birthdayName} onChange={(e) => setFormData({ ...formData, birthdayName: e.target.value })} className={`w-full bg-white/10 border border-white/20 text-white placeholder-slate-400 rounded-xl focus:border-indigo-400 p-3 text-base transition-all ${formErrors.birthdayName ? 'border-red-400 ring-2 ring-red-400/20' : ''}`} />
+                    <input type="text" placeholder="שם החוגג/ת" value={formData.birthdayName} onChange={(e) => setFormData({ ...formData, birthdayName: e.target.value })} className={`w-full bg-white/10 border border-white/20 text-white placeholder-slate-400 rounded-xl focus:border-indigo-400 p-3 text-base transition-all ${visibleFormErrors.birthdayName ? 'border-red-400 ring-2 ring-red-400/20' : ''}`} />
                   </div>
                   <div>
                     <label className="block mb-1.5 font-semibold text-sm text-slate-300">גיל</label>
-                    <input type="number" placeholder="גיל" value={formData.birthdayAge} onChange={(e) => setFormData({ ...formData, birthdayAge: e.target.value })} className={`w-full bg-white/10 border border-white/20 text-white placeholder-slate-400 rounded-xl focus:border-indigo-400 p-3 text-base transition-all ${formErrors.birthdayAge ? 'border-red-400 ring-2 ring-red-400/20' : ''}`} />
+                    <input type="number" placeholder="גיל" value={formData.birthdayAge} onChange={(e) => setFormData({ ...formData, birthdayAge: e.target.value })} className={`w-full bg-white/10 border border-white/20 text-white placeholder-slate-400 rounded-xl focus:border-indigo-400 p-3 text-base transition-all ${visibleFormErrors.birthdayAge ? 'border-red-400 ring-2 ring-red-400/20' : ''}`} />
                   </div>
                 </>
               )}
@@ -7041,11 +7059,11 @@ React.useEffect(()=>{
                 <>
                   <div>
                     <label className="block mb-1.5 font-semibold text-sm text-slate-300">שם החברה</label>
-                    <input type="text" placeholder="שם החברה" value={formData.businessName} onChange={(e) => setFormData({ ...formData, businessName: e.target.value })} className={`w-full bg-white/10 border border-white/20 text-white placeholder-slate-400 rounded-xl focus:border-indigo-400 p-3 text-base transition-all ${formErrors.businessName ? 'border-red-400 ring-2 ring-red-400/20' : ''}`} />
+                    <input type="text" placeholder="שם החברה" value={formData.businessName} onChange={(e) => setFormData({ ...formData, businessName: e.target.value })} className={`w-full bg-white/10 border border-white/20 text-white placeholder-slate-400 rounded-xl focus:border-indigo-400 p-3 text-base transition-all ${visibleFormErrors.businessName ? 'border-red-400 ring-2 ring-red-400/20' : ''}`} />
                   </div>
                   <div>
                     <label className="block mb-1.5 font-semibold text-sm text-slate-300">איש קשר</label>
-                    <input type="text" placeholder="איש קשר" value={formData.businessContact} onChange={(e) => setFormData({ ...formData, businessContact: e.target.value })} className={`w-full bg-white/10 border border-white/20 text-white placeholder-slate-400 rounded-xl focus:border-indigo-400 p-3 text-base transition-all ${formErrors.businessContact ? 'border-red-400 ring-2 ring-red-400/20' : ''}`} />
+                    <input type="text" placeholder="איש קשר" value={formData.businessContact} onChange={(e) => setFormData({ ...formData, businessContact: e.target.value })} className={`w-full bg-white/10 border border-white/20 text-white placeholder-slate-400 rounded-xl focus:border-indigo-400 p-3 text-base transition-all ${visibleFormErrors.businessContact ? 'border-red-400 ring-2 ring-red-400/20' : ''}`} />
                   </div>
                 </>
               )}
@@ -7057,13 +7075,13 @@ React.useEffect(()=>{
                   dateFormat="dd/MM/yyyy"
                   locale="he"
                   placeholderText="בחר תאריך"
-                  className={`w-full bg-white/10 border border-white/20 text-white placeholder-slate-400 rounded-xl focus:border-indigo-400 p-2.5 text-base transition-all ${formErrors.date ? 'border-red-400 ring-2 ring-red-400/20' : ''}`}
+                  className={`w-full bg-white/10 border border-white/20 text-white placeholder-slate-400 rounded-xl focus:border-indigo-400 p-2.5 text-base transition-all ${visibleFormErrors.date ? 'border-red-400 ring-2 ring-red-400/20' : ''}`}
                   calendarStartDay={0}
                 />
               </div>
               <div>
                 <label className="block mb-1.5 font-semibold text-sm text-slate-300">שעת האירוע</label>
-                <select value={formData.time} onChange={(e) => setFormData({ ...formData, time: e.target.value })} className={`w-full bg-white/10 border border-white/20 text-white placeholder-slate-400 rounded-xl focus:border-indigo-400 p-2.5 text-base transition-all ${formErrors.time ? 'border-red-400 ring-2 ring-red-400/20' : ''}`}>
+                <select value={formData.time} onChange={(e) => setFormData({ ...formData, time: e.target.value })} className={`w-full bg-white/10 border border-white/20 text-white placeholder-slate-400 rounded-xl focus:border-indigo-400 p-2.5 text-base transition-all ${visibleFormErrors.time ? 'border-red-400 ring-2 ring-red-400/20' : ''}`}>
                   <option value="">בחר שעה</option>
                   {times.map((t) => (
                     <option key={t} value={t}>{t}</option>
@@ -7073,7 +7091,7 @@ React.useEffect(()=>{
               {selectedEventType === 'חתונה' && (
                 <div>
                   <label className="block mb-1.5 font-semibold text-sm text-slate-300">שעת החופה</label>
-                  <select value={formData.chuppahTime} onChange={(e) => setFormData({ ...formData, chuppahTime: e.target.value })} className={`w-full bg-white/10 border border-white/20 text-white placeholder-slate-400 rounded-xl focus:border-indigo-400 p-2.5 text-base transition-all ${formErrors.chuppahTime ? 'border-red-400 ring-2 ring-red-400/20' : ''}`}>
+                  <select value={formData.chuppahTime} onChange={(e) => setFormData({ ...formData, chuppahTime: e.target.value })} className={`w-full bg-white/10 border border-white/20 text-white placeholder-slate-400 rounded-xl focus:border-indigo-400 p-2.5 text-base transition-all ${visibleFormErrors.chuppahTime ? 'border-red-400 ring-2 ring-red-400/20' : ''}`}>
                     <option value="">בחר שעה</option>
                     {times.map((t) => (
                       <option key={t} value={t}>{t}</option>
@@ -7083,11 +7101,11 @@ React.useEffect(()=>{
               )}
               <div>
                 <label className="block mb-1.5 font-semibold text-sm text-slate-300">שם האולם</label>
-                <input type="text" placeholder="שם האולם" value={formData.hallName} onChange={(e) => setFormData({ ...formData, hallName: e.target.value })} className={`w-full bg-white/10 border border-white/20 text-white placeholder-slate-400 rounded-xl focus:border-indigo-400 p-2.5 text-base transition-all ${formErrors.hallName ? 'border-red-400 ring-2 ring-red-400/20' : ''}`} />
+                <input type="text" placeholder="שם האולם" value={formData.hallName} onChange={(e) => setFormData({ ...formData, hallName: e.target.value })} className={`w-full bg-white/10 border border-white/20 text-white placeholder-slate-400 rounded-xl focus:border-indigo-400 p-2.5 text-base transition-all ${visibleFormErrors.hallName ? 'border-red-400 ring-2 ring-red-400/20' : ''}`} />
               </div>
               <div>
                 <label className="block mb-1.5 font-semibold text-sm text-slate-300">כתובת האולם</label>
-                <input type="text" placeholder="כתובת האולם" value={formData.hallAddress} onChange={(e) => setFormData({ ...formData, hallAddress: e.target.value })} className={`w-full bg-white/10 border border-white/20 text-white placeholder-slate-400 rounded-xl focus:border-indigo-400 p-2.5 text-base transition-all ${formErrors.hallAddress ? 'border-red-400 ring-2 ring-red-400/20' : ''}`} />
+                <input type="text" placeholder="כתובת האולם" value={formData.hallAddress} onChange={(e) => setFormData({ ...formData, hallAddress: e.target.value })} className={`w-full bg-white/10 border border-white/20 text-white placeholder-slate-400 rounded-xl focus:border-indigo-400 p-2.5 text-base transition-all ${visibleFormErrors.hallAddress ? 'border-red-400 ring-2 ring-red-400/20' : ''}`} />
               </div>
           </form>
           </div>
@@ -7122,23 +7140,23 @@ React.useEffect(()=>{
           </div>
 
           <h3 className="text-lg font-semibold text-slate-100 mb-3">שלח הזמנה לאורח בודד - פרטי אורח:</h3>
-          {guestErrorMsg && <p className="mb-3 rounded-xl border border-red-400/30 bg-red-500/10 p-3 text-red-300 text-base font-semibold text-center">{guestErrorMsg}</p>}
+          {guestSubmitAttempted && guestErrorMsg && <p className="mb-3 rounded-xl border border-red-400/30 bg-red-500/10 p-3 text-red-300 text-base font-semibold text-center">{guestErrorMsg}</p>}
           <form className="space-y-4">
             <div>
               <label className="block mb-1 font-medium">שם פרטי</label>
-              <input type="text" placeholder="שם פרטי" value={guestData.guestFirstName} onChange={(e) => setGuestData({ ...guestData, guestFirstName: e.target.value })} className={`w-full bg-white/10 border border-white/20 text-white placeholder-slate-400 rounded-xl focus:border-indigo-400 p-2 pr-12 sm:pr-2 outline-none ${guestErrors.guestFirstName ? 'border-red-400 ring-2 ring-red-400/20' : ''}`} />
+              <input type="text" placeholder="שם פרטי" value={guestData.guestFirstName} onChange={(e) => setGuestData({ ...guestData, guestFirstName: e.target.value })} className={`w-full bg-white/10 border border-white/20 text-white placeholder-slate-400 rounded-xl focus:border-indigo-400 p-2 pr-12 sm:pr-2 outline-none ${visibleGuestErrors.guestFirstName ? 'border-red-400 ring-2 ring-red-400/20' : ''}`} />
             </div>
             <div>
               <label className="block mb-1 font-medium">שם משפחה</label>
-              <input type="text" placeholder="שם משפחה" value={guestData.guestLastName} onChange={(e) => setGuestData({ ...guestData, guestLastName: e.target.value })} className={`w-full bg-white/10 border border-white/20 text-white placeholder-slate-400 rounded-xl focus:border-indigo-400 p-2 pr-12 sm:pr-2 outline-none ${guestErrors.guestLastName ? 'border-red-400 ring-2 ring-red-400/20' : ''}`} />
+              <input type="text" placeholder="שם משפחה" value={guestData.guestLastName} onChange={(e) => setGuestData({ ...guestData, guestLastName: e.target.value })} className={`w-full bg-white/10 border border-white/20 text-white placeholder-slate-400 rounded-xl focus:border-indigo-400 p-2 pr-12 sm:pr-2 outline-none ${visibleGuestErrors.guestLastName ? 'border-red-400 ring-2 ring-red-400/20' : ''}`} />
             </div>
             <div>
               <label className="block mb-1 font-medium">מספר שולחן</label>
-              <input type="text" placeholder="מספר שולחן" value={guestData.guestTable} onChange={(e) => setGuestData({ ...guestData, guestTable: e.target.value })} required className={`w-full bg-white/10 border border-white/20 text-white placeholder-slate-400 rounded-xl focus:border-indigo-400 p-2 pr-12 sm:pr-2 outline-none ${guestErrors.guestTable ? 'border-red-400 ring-2 ring-red-400/20' : ''}`} />
+              <input type="text" placeholder="מספר שולחן" value={guestData.guestTable} onChange={(e) => setGuestData({ ...guestData, guestTable: e.target.value })} required className={`w-full bg-white/10 border border-white/20 text-white placeholder-slate-400 rounded-xl focus:border-indigo-400 p-2 pr-12 sm:pr-2 outline-none ${visibleGuestErrors.guestTable ? 'border-red-400 ring-2 ring-red-400/20' : ''}`} />
             </div>
             <div>
               <label className="block mb-1 font-medium">טלפון</label>
-              <input type="tel" placeholder="טלפון" value={guestData.guestPhone} onChange={(e) => setGuestData({ ...guestData, guestPhone: e.target.value })} className={`w-full bg-white/10 border border-white/20 text-white placeholder-slate-400 rounded-xl focus:border-indigo-400 p-2 pr-12 sm:pr-2 outline-none ${guestErrors.guestPhone ? 'border-red-400 ring-2 ring-red-400/20' : ''}`} />
+              <input type="tel" placeholder="טלפון" value={guestData.guestPhone} onChange={(e) => setGuestData({ ...guestData, guestPhone: e.target.value })} className={`w-full bg-white/10 border border-white/20 text-white placeholder-slate-400 rounded-xl focus:border-indigo-400 p-2 pr-12 sm:pr-2 outline-none ${visibleGuestErrors.guestPhone ? 'border-red-400 ring-2 ring-red-400/20' : ''}`} />
             </div>
           </form>
         </DrawerBody>
@@ -7486,7 +7504,7 @@ React.useEffect(()=>{
       <Drawer open={showCountModal} onClose={() => setShowCountModal(false)} size="md">
         <DrawerHeader onClose={() => setShowCountModal(false)}>כמה אורחים מגיעים?</DrawerHeader>
         <DrawerBody>
-          {countError && (
+          {countSubmitAttempted && countError && (
               <div className="bg-red-500/10 border border-red-400/30 rounded-lg p-4 text-right">
                 <div className="flex items-center justify-center mb-2">
                   <span className="text-red-300 text-2xl mr-2">✗</span>
@@ -7585,6 +7603,7 @@ React.useEffect(()=>{
                 // totals for validation
                 const totalSpecialAdults = Object.values(specialMeals).reduce((sum, m)=>sum+m.adults,0)+allergies.reduce((s,a)=>s+a.adults,0);
                 const totalSpecialChildren = Object.values(specialMeals).reduce((sum, m)=>sum+m.children,0)+allergies.reduce((s,a)=>s+a.children,0);
+                setCountSubmitAttempted(true);
 
                 if (adultsCount < 0 || childrenCount < 0) {
                   setCountError('מספר אורחים לא יכול להיות שלילי');
@@ -7777,108 +7796,89 @@ React.useEffect(()=>{
       )}
 
       {/* Step 3 - Design chooser */}
-      <Drawer open={showDesignChooser} onClose={() => setShowDesignChooser(false)} size="xl">
-        <DrawerHeader onClose={() => setShowDesignChooser(false)}>עיצוב הזמנה</DrawerHeader>
-        <DrawerBody className="p-0 flex flex-col overflow-hidden">
-            {/* Mobile tabs */}
-            <div className="flex sm:hidden border-b border-white/10">
-              <button
-                onClick={() => setDesignMobileTab('text')}
-                className={`flex-1 py-3 text-center font-bold text-base transition-all ${designMobileTab === 'text' ? 'text-indigo-300 border-b-2 border-indigo-400 bg-indigo-500/10' : 'text-slate-400'}`}
-              >
-                א. עיצוב טקסט
-              </button>
-              <button
-                onClick={() => setDesignMobileTab('templates')}
-                className={`flex-1 py-3 text-center font-bold text-base transition-all ${designMobileTab === 'templates' ? 'text-indigo-300 border-b-2 border-indigo-400 bg-indigo-500/10' : 'text-slate-400'}`}
-              >
-                ב. בחירת תבנית
-              </button>
-            </div>
+      {/* ─── Design Chooser — full-screen centered modal ─── */}
+      <Modal open={showDesignChooser} onClose={() => setShowDesignChooser(false)} size="full">
+        <ModalHeader onClose={() => setShowDesignChooser(false)} subtitle="עצב את הטקסט, צפה בתצוגה מקדימה ובחר תבנית">
+          🎨 עיצוב הזמנה
+        </ModalHeader>
 
-            {/* Main content area */}
-            <div className="flex-1 flex flex-col sm:flex-row overflow-hidden min-h-0">
-              {/* Text editing section */}
-              <div className={`${designMobileTab === 'text' ? 'flex' : 'hidden'} sm:flex flex-col sm:w-1/2 sm:border-r border-white/10 overflow-y-auto p-4 sm:p-6`}>
-                <h3 className="hidden sm:block text-xl font-semibold text-primary mb-4 text-center">א. עצב טקסט הזמנה.</h3>
-                {/* Styled Container */}
-                <div className="bg-white/[0.055] border border-white/15 backdrop-blur-xl rounded-lg p-4 shadow-sm space-y-4 text-slate-100">
+        <ModalBody className="p-0 overflow-hidden flex flex-col">
+          {/* Mobile tabs */}
+          <div className="flex sm:hidden border-b border-white/10 shrink-0">
+            <button
+              onClick={() => setDesignMobileTab('text')}
+              className={`flex-1 py-3 text-center font-bold text-sm transition-all ${designMobileTab === 'text' ? 'text-indigo-300 border-b-2 border-indigo-400 bg-indigo-500/10' : 'text-slate-400'}`}
+            >
+              א. עיצוב טקסט
+            </button>
+            <button
+              onClick={() => setDesignMobileTab('templates')}
+              className={`flex-1 py-3 text-center font-bold text-sm transition-all ${designMobileTab === 'templates' ? 'text-indigo-300 border-b-2 border-indigo-400 bg-indigo-500/10' : 'text-slate-400'}`}
+            >
+              ב. בחירת תבנית
+            </button>
+          </div>
+
+          {/* Desktop: 3-column layout | Mobile: tab-driven single column */}
+          <div className="flex-1 flex flex-col sm:flex-row min-h-0 overflow-hidden">
+
+            {/* ── Col 1: Text editor ── */}
+            <div className={`${designMobileTab === 'text' ? 'flex' : 'hidden'} sm:flex flex-col w-full sm:w-[25%] border-b sm:border-b-0 sm:border-l border-white/10 overflow-y-auto p-4 gap-4`}>
+              <h3 className="text-sm font-bold text-slate-300 text-center sm:text-right">א. עצב טקסט הזמנה</h3>
+
               {/* Font chooser */}
               <div className="text-right">
-                <label className="block mb-1 font-bold">אפשרות לשינוי גופן</label>
+                <label className="block mb-1 text-xs font-semibold text-slate-400">גופן</label>
                 <select
                   value={selectedFontKey}
-                  onChange={(e)=>setSelectedFontKey(e.target.value)}
-                  className="w-full bg-white/10 border border-white/20 text-white placeholder-slate-400 rounded-xl focus:border-indigo-400 p-2"
+                  onChange={(e) => setSelectedFontKey(e.target.value)}
+                  className="w-full bg-white/10 border border-white/20 text-white rounded-xl focus:border-indigo-400 p-2 text-sm"
                 >
-                  {fontsOptions.map(f=>(
+                  {fontsOptions.map(f => (
                     <option key={f.key} value={f.key}>{f.label}</option>
                   ))}
                 </select>
               </div>
 
-              {/* Invitation text editor with advanced formatting */}
+              {/* Line editor */}
               <div>
-                <label className="block mb-1 font-bold text-right">אפשרות לשינוי נוסח ועיצוב ההזמנה</label>
-                <div className="bg-white/5 border border-white/15 rounded-xl p-2 sm:p-3">
-                  <div className="flex justify-center items-center mb-2">
-                    <button
-                      onClick={addNewLineAtTop}
-                      className="bg-green-500 text-white px-3 py-1.5 rounded text-xs sm:text-sm hover:bg-emerald-600 font-medium"
-                    >
-                      + הוסף שורה למעלה
-                    </button>
-                    <span className="text-xs sm:text-sm text-slate-400 mr-3">
-                      {customInvitationText.split('\n').length} שורות
-                    </span>
-                  </div>
-                  
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs text-slate-400">{customInvitationText.split('\n').length} שורות</span>
+                  <button
+                    onClick={addNewLineAtTop}
+                    className="bg-emerald-600 hover:bg-emerald-500 text-white px-2.5 py-1 rounded-lg text-xs font-medium"
+                  >+ שורה למעלה</button>
+                </div>
+
+                <div className="space-y-1.5">
                   {customInvitationText.split('\n').map((line, index) => (
-                    <div key={index} className="mb-1.5 p-1.5 bg-white/5 border border-white/10 rounded-xl">
+                    <div key={index} className="p-1.5 bg-white/5 border border-white/10 rounded-xl">
                       <textarea
                         value={line}
                         onChange={(e) => updateLineText(index, e.target.value)}
-                        className="w-full bg-white/10 border border-white/20 text-white placeholder-slate-400 rounded-xl focus:border-indigo-400 p-2 text-right text-sm sm:text-base"
+                        className="w-full bg-white/10 border border-white/15 text-white placeholder-slate-400 rounded-lg focus:border-indigo-400 p-1.5 text-right text-sm resize-none"
                         style={{
-                          fontSize: `${getEffectiveLineStyle(index).fontSize}px`,
+                          fontSize: `${Math.min(getEffectiveLineStyle(index).fontSize, 16)}px`,
                           color: getDarkThemePreviewColor(getEffectiveLineStyle(index).color),
-                          fontWeight: getEffectiveLineStyle(index).fontWeight || 'normal'
+                          fontWeight: getEffectiveLineStyle(index).fontWeight || 'normal',
                         }}
                         rows={1}
                       />
-                      <div className="flex items-center justify-end gap-1.5 mt-1">
+                      <div className="flex items-center justify-end gap-1 mt-1">
                         <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setShowAdvancedEdit(index);
-                          }}
-                          className="px-2 py-1 bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white rounded text-xs font-medium"
-                          title="עיצוב מתקדם"
-                        >
-                          ✨ עיצוב
-                        </button>
+                          onClick={(e) => { e.stopPropagation(); setShowAdvancedEdit(index); }}
+                          className="px-2 py-0.5 bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white rounded text-xs font-medium"
+                        >✨ עיצוב</button>
                         <button
                           onClick={() => deleteLine(index)}
-                          className="px-2 py-1 bg-red-400 hover:bg-red-500 rounded text-xs text-white font-medium"
-                          title="מחק שורה"
-                        >
-                          🗑️
-                        </button>
+                          className="px-2 py-0.5 bg-red-500/70 hover:bg-red-500 rounded text-xs text-white font-medium"
+                        >🗑️</button>
                       </div>
                     </div>
                   ))}
-                  
-                  {/* Add Row Button at Bottom */}
-                  <div className="flex justify-center mt-3">
-                    <button
-                      onClick={addNewLine}
-                      className="bg-green-500 text-white px-4 py-2 rounded text-sm hover:bg-emerald-600 font-medium"
-                    >
-                      + הוסף שורה למטה
-                    </button>
-                  </div>
                 </div>
-                <div className="text-right mt-2 flex gap-4 justify-start">
+
+                <div className="flex items-center justify-between mt-3">
                   <button
                     type="button"
                     onClick={() => {
@@ -7889,208 +7889,184 @@ React.useEffect(()=>{
                         setLineStyles({ 0: { ...defaultFirstLineStyle } });
                       }
                     }}
-                    className="text-base underline font-bold text-primary hover:text-primary/80"
-                  >חזרה לנוסח ברירת מחדל</button>
-                </div>
-                
-                {/* Preview of formatted text */}
-                <div className="mt-3 p-2 sm:p-4 bg-white/5 border border-white/10 rounded-xl">
-                  <h3 className="text-sm sm:text-lg font-bold mb-2 text-center text-slate-100">תצוגה מקדימה:</h3>
-                  <div className="bg-white/5 p-2 sm:p-4 rounded-xl border border-white/10 text-center">
-                    {customInvitationText.split('\n').map((line, index) => {
-                      const s = getEffectiveLineStyle(index);
-                      return (
-                      <div
-                        key={index}
-                        style={{
-                          ...invitationPreviewLineContainmentStyle,
-                          fontSize: `${s.fontSize}px`,
-                          color: getDarkThemePreviewColor(s.color),
-                          fontWeight: s.fontWeight || 'normal',
-                          lineHeight: s.lineHeight || 1.5,
-                          letterSpacing: `${s.letterSpacing || 0}px`,
-                          textAlign: s.textAlign || 'center',
-                          textDecoration: s.textDecoration || 'none',
-                          fontStyle: 'normal',
-                          textShadow: 'none',
-                          transform: s.fontStyle === 'italic' ? 'skewX(20deg)' : s.fontStyle === 'back-slant' ? 'skewX(-20deg)' : 'none',
-                          whiteSpace: 'pre-wrap',
-                          marginBottom: '8px'
-                        }}
-                      >
-                        {line}
-                      </div>
-                    );})}
-                  </div>
+                    className="text-xs underline text-slate-400 hover:text-slate-200"
+                  >ברירת מחדל</button>
+                  <button
+                    onClick={addNewLine}
+                    className="bg-emerald-600 hover:bg-emerald-500 text-white px-2.5 py-1 rounded-lg text-xs font-medium"
+                  >+ שורה למטה</button>
                 </div>
               </div>
             </div>
-              </div>
 
-              {/* Templates section */}
-              <div className={`${designMobileTab === 'templates' ? 'flex' : 'hidden'} sm:flex flex-col sm:w-1/2 overflow-y-auto p-4 sm:p-6`}>
-                <h3 className="hidden sm:block text-xl font-semibold text-primary mb-4 text-center">ב. לחץ לבחירת הזמנה.</h3>
-                {designImages.length === 0 ? (
-                  <p className="text-center text-slate-400 mt-10">לא נמצאו תמונות בתיקייה /public/images</p>
+            {/* ── Col 2: Live centered invitation preview ── */}
+            <div className="hidden sm:flex flex-col items-center justify-center w-full sm:w-[45%] p-4 gap-3 bg-white/[0.02] border-l border-white/10">
+              <h3 className="text-sm font-bold text-slate-300 shrink-0">תצוגה מקדימה</h3>
+              <div
+                className="relative rounded-2xl overflow-hidden shadow-[0_12px_48px_rgba(0,0,0,0.6)] ring-2 ring-indigo-400/20"
+                style={{ width: '100%', maxWidth: 480, aspectRatio: '3/4' }}
+              >
+                {selectedDesign ? (
+                  <img src={selectedDesign} alt="תבנית נבחרת" className="absolute inset-0 w-full h-full object-cover" />
                 ) : (
-                  <div className="grid grid-cols-2 gap-3 sm:gap-6">
-                    {designImages.map((src) => {
-                      // Improved comparison logic to handle different path formats
-                      const isSelected = (()=>{ 
-                        if(!selectedDesign) return false;
-                        
-                        // Normalize paths for comparison
-                        const normalizePath = (path) => {
-                          if (!path) return '';
-                          try {
-                            // Decode URI components
-                            let normalized = decodeURIComponent(path);
-                            // Remove leading/trailing slashes and normalize separators
-                            normalized = normalized.replace(/^\/+|\/+$/g, '').replace(/\\/g, '/');
-                            // Convert to lowercase for case-insensitive comparison
-                            return normalized.toLowerCase();
-                          } catch(e) {
-                            // If decode fails, try without decoding
-                            return path.replace(/^\/+|\/+$/g, '').replace(/\\/g, '/').toLowerCase();
-                          }
-                        };
-                        
-                        const selNormalized = normalizePath(selectedDesign);
-                        const srcNormalized = normalizePath(src);
-                        
-                        // Check if full paths match
-                        if (selNormalized === srcNormalized) {
-                          return true;
-                        }
-                        
-                        // Check if filenames match (extract filename from path)
-                        const getFilename = (path) => {
-                          const normalized = normalizePath(path);
-                          return normalized.split('/').pop() || normalized;
-                        };
-                        
-                        const selFile = getFilename(selectedDesign);
-                        const srcFile = getFilename(src);
-                        
-                        const matches = selFile === srcFile && selFile !== '';
-                        return matches;
-                      })();
-                      
-                      return (
-                        <div
-                          key={src}
-                          className={`relative cursor-pointer hover:opacity-80 rounded-md ${
-                            isSelected 
-                              ? 'ring-4 ring-emerald-400/70 ring-offset-4 ring-offset-[#12143a] border-4 border-emerald-400/70' 
-                              : 'border-2 border-white/15'
-                          }`}
-                          onClick={() => {
-                            setLightboxSrc(src);
-                            setShowLightbox(true);
-                          }}
-                          onDoubleClick={async () => {
-                            // Double-click to select design directly
-                            setSelectedDesign(src);
-                            try { 
-                              localStorage.setItem('selectedDesign', src);
-                            } catch(e) {}
-                            
-                            // Update event_details in database
-                            if(currentEventId) {
-                              try {
-                                const { data: eventData, error: fetchError } = await supabase
-                                  .from('events')
-                                  .select('event_details')
-                                  .eq('id', currentEventId)
-                                  .single();
-                                
-                                if (!fetchError && eventData && eventData.event_details) {
-                                  let details = {};
-                                  try {
-                                    details = typeof eventData.event_details === 'string'
-                                      ? JSON.parse(eventData.event_details)
-                                      : (eventData.event_details || {});
-                                  } catch (parseErr) {
-                                    details = {};
-                                  }
-                                  
-                                  const updatedDetails = { ...details, template_src: src };
-                                  await supabase
-                                    .from('events')
-                                    .update({ event_details: updatedDetails })
-                                    .eq('id', currentEventId);
-                                }
-                              } catch (err) {
-                                console.error('Failed to save design selection:', err);
-                              }
-                            }
-                          }}
-                        >
-                          <div className="relative aspect-[4/5] w-full rounded-xl overflow-hidden border border-white/10 bg-white/5">
-                            <div className="absolute inset-0">
-                              <img
-                                src={src}
-                                alt="Invitation design"
-                                className="absolute inset-0 w-full h-full object-cover"
-                              />
-                              <div className="absolute inset-0 rounded-md pointer-events-none" style={{ background: 'rgba(255,255,255,0.22)' }} aria-hidden />
-                              <div className="absolute inset-0 flex flex-col items-center justify-center px-4" dir="rtl">
-                                {(customInvitationText || invitationText || 'דוגמת טקסט להזמנה').split('\n').map((line, lineIndex) => {
-                                  if (!line || !line.trim()) return <div key={lineIndex} style={{ height: '0.5em' }} />;
-                                  const style = getEffectiveLineStyle(lineIndex);
-                                  const fontSize = style.fontSize ? parseInt(style.fontSize) : (lineIndex === 0 ? 28 : 20);
-                                  let textColor = style.color || '#000000';
-                                  if (!textColor.startsWith('#')) {
-                                    const colorMap = {
-                                      'black': '#000000', 'red': '#FF0000', 'blue': '#0000FF', 'green': '#008000',
-                                      'purple': '#800080', 'orange': '#FFA500', 'brown': '#A52A2A', 'gold': '#FFD700',
-                                      'pink': '#FFC0CB', 'cyan': '#00FFFF', 'indigo': '#4B0082', 'teal': '#008080'
-                                    };
-                                    textColor = colorMap[textColor.toLowerCase()] || '#000000';
-                                  }
-                                  return (
-                                    <div
-                                      key={lineIndex}
-                                      style={{
-                                        ...invitationPreviewLineContainmentStyle,
-                                        fontSize: `${fontSize}px`,
-                                        fontFamily: selectedFontCss || 'Assistant, sans-serif',
-                                        fontWeight: style.fontWeight || 'normal',
-                                        color: textColor,
-                                    lineHeight: style.lineHeight ? `${style.lineHeight}` : '1.4',
-                                        letterSpacing: style.letterSpacing ? `${style.letterSpacing}px` : '0',
-                                        textAlign: style.textAlign || 'center',
-                                        textDecoration: style.textDecoration || 'none',
-                                        fontStyle: style.fontStyle || 'normal',
-                                        textShadow: 'none',
-                                        transform: style.fontStyle === 'italic' ? 'skewX(20deg)' : style.fontStyle === 'back-slant' ? 'skewX(-20deg)' : 'none',
-                                        whiteSpace: 'pre-wrap',
-                                        marginBottom: lineIndex < (customInvitationText || invitationText || '').split('\n').length - 1 ? '0.25em' : '0',
-                                      }}
-                                    >
-                                      {line.trim()}
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                              {isSelected && (
-                                <div className="absolute top-2 left-2 bg-green-500 rounded-none w-8 h-8 flex items-center justify-center shadow-lg z-10">
-                                  <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                                  </svg>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
+                  <div className="absolute inset-0 bg-gradient-to-br from-[#f0e8ff] to-[#fdf6ee]" />
+                )}
+                <div className="absolute inset-0 pointer-events-none" style={{ background: 'rgba(255,255,255,0.2)' }} />
+                <div
+                  className="absolute inset-0 flex flex-col items-center justify-center px-4 py-6 overflow-hidden"
+                  dir="rtl"
+                  style={{ gap: 0 }}
+                >
+                  {(customInvitationText || invitationText || '').split('\n').map((line, lineIndex) => {
+                    if (!line || !line.trim()) return <div key={lineIndex} style={{ height: '0.4em', flexShrink: 0 }} />;
+                    const style = getEffectiveLineStyle(lineIndex);
+                    const rawSize = style.fontSize ? parseInt(style.fontSize) : (lineIndex === 0 ? 28 : 18);
+                    const scaledSize = Math.round(rawSize * 0.9);
+                    let textColor = style.color || '#000000';
+                    if (!textColor.startsWith('#')) {
+                      const colorMap = { black:'#000000',red:'#FF0000',blue:'#0000FF',green:'#008000',purple:'#800080',orange:'#FFA500',brown:'#A52A2A',gold:'#FFD700',pink:'#FFC0CB',cyan:'#00FFFF',indigo:'#4B0082',teal:'#008080' };
+                      textColor = colorMap[textColor.toLowerCase()] || '#000000';
+                    }
+                    return (
+                      <div
+                        key={lineIndex}
+                        style={{
+                          width: '100%',
+                          maxWidth: '92%',
+                          minWidth: 0,
+                          boxSizing: 'border-box',
+                          overflowWrap: 'anywhere',
+                          wordBreak: 'break-word',
+                          flexShrink: 0,
+                          fontSize: `${scaledSize}px`,
+                          fontFamily: selectedFontCss || 'Assistant, sans-serif',
+                          fontWeight: style.fontWeight || 'normal',
+                          color: textColor,
+                          lineHeight: style.lineHeight ? `${style.lineHeight}` : '1.35',
+                          letterSpacing: style.letterSpacing ? `${style.letterSpacing * 0.7}px` : '0',
+                          textAlign: style.textAlign || 'center',
+                          textDecoration: style.textDecoration || 'none',
+                          transform: style.fontStyle === 'italic' ? 'skewX(20deg)' : style.fontStyle === 'back-slant' ? 'skewX(-20deg)' : 'none',
+                          whiteSpace: 'pre-wrap',
+                          marginBottom: '0.2em',
+                        }}
+                      >
+                        {line.trim()}
+                      </div>
+                    );
+                  })}
+                </div>
+                {!selectedDesign && (
+                  <div className="absolute bottom-3 inset-x-4 text-center text-[10px] text-slate-500 pointer-events-none">
+                    בחר תבנית מהרשימה ←
                   </div>
                 )}
               </div>
+              {selectedDesign && (
+                <p className="text-xs text-emerald-400 font-semibold shrink-0">✓ תבנית נבחרת</p>
+              )}
             </div>
-        </DrawerBody>
-      </Drawer>
+
+            {/* ── Col 3: Template grid ── */}
+            <div className={`${designMobileTab === 'templates' ? 'flex' : 'hidden'} sm:flex flex-col w-full sm:w-[30%] overflow-y-auto p-4 gap-3`}>
+              <h3 className="text-sm font-bold text-slate-300 text-center sm:text-right shrink-0">ב. לחץ פעמיים לבחירת תבנית</h3>
+              {designImages.length === 0 ? (
+                <p className="text-center text-slate-400 mt-10 text-sm">לא נמצאו תמונות</p>
+              ) : (
+                <div className="grid grid-cols-2 gap-2">
+                  {designImages.map((src) => {
+                    const normalizePath = (path) => {
+                      if (!path) return '';
+                      try {
+                        let n = decodeURIComponent(path);
+                        return n.replace(/^\/+|\/+$/g, '').replace(/\\/g, '/').toLowerCase();
+                      } catch { return path.replace(/^\/+|\/+$/g, '').replace(/\\/g, '/').toLowerCase(); }
+                    };
+                    const getFilename = (path) => normalizePath(path).split('/').pop() || normalizePath(path);
+                    const isSelected = (() => {
+                      if (!selectedDesign) return false;
+                      if (normalizePath(selectedDesign) === normalizePath(src)) return true;
+                      return getFilename(selectedDesign) === getFilename(src) && getFilename(src) !== '';
+                    })();
+
+                    return (
+                      <div
+                        key={src}
+                        className={`relative cursor-pointer rounded-xl overflow-hidden transition-all duration-150 ${
+                          isSelected
+                            ? 'ring-4 ring-emerald-400/80 ring-offset-2 ring-offset-[#12143a] scale-[1.02]'
+                            : 'ring-1 ring-white/15 hover:ring-indigo-400/50 hover:scale-[1.01]'
+                        }`}
+                        onClick={() => { setLightboxSrc(src); setShowLightbox(true); }}
+                        onDoubleClick={async () => {
+                          setSelectedDesign(src);
+                          try { localStorage.setItem('selectedDesign', src); } catch {}
+                          if (currentEventId) {
+                            try {
+                              const { data: eventData, error: fetchError } = await supabase
+                                .from('events').select('event_details').eq('id', currentEventId).single();
+                              if (!fetchError && eventData?.event_details) {
+                                let details = {};
+                                try { details = typeof eventData.event_details === 'string' ? JSON.parse(eventData.event_details) : (eventData.event_details || {}); } catch {}
+                                await supabase.from('events').update({ event_details: { ...details, template_src: src } }).eq('id', currentEventId);
+                              }
+                            } catch (err) { console.error('Failed to save design selection:', err); }
+                          }
+                        }}
+                      >
+                        <div className="relative aspect-[3/4] w-full bg-white/5">
+                          <img src={src} alt="Invitation design" className="absolute inset-0 w-full h-full object-cover" />
+                          <div className="absolute inset-0 pointer-events-none" style={{ background: 'rgba(255,255,255,0.15)' }} />
+                          <div className="absolute inset-0 flex flex-col items-center justify-center px-2 overflow-hidden" dir="rtl">
+                            {(customInvitationText || invitationText || '').split('\n').map((line, lineIndex) => {
+                              if (!line || !line.trim()) return <div key={lineIndex} style={{ height: '0.3em', flexShrink: 0 }} />;
+                              const style = getEffectiveLineStyle(lineIndex);
+                              const rawSize = style.fontSize ? parseInt(style.fontSize) : (lineIndex === 0 ? 28 : 18);
+                              const scaledSize = Math.round(rawSize * 0.38);
+                              let textColor = style.color || '#000000';
+                              if (!textColor.startsWith('#')) {
+                                const colorMap = { black:'#000000',red:'#FF0000',blue:'#0000FF',green:'#008000',purple:'#800080',orange:'#FFA500',brown:'#A52A2A',gold:'#FFD700',pink:'#FFC0CB',cyan:'#00FFFF',indigo:'#4B0082',teal:'#008080' };
+                                textColor = colorMap[textColor.toLowerCase()] || '#000000';
+                              }
+                              return (
+                                <div
+                                  key={lineIndex}
+                                  style={{
+                                    width: '100%', maxWidth: '92%', minWidth: 0,
+                                    boxSizing: 'border-box', overflowWrap: 'anywhere', wordBreak: 'break-word',
+                                    flexShrink: 0,
+                                    fontSize: `${scaledSize}px`,
+                                    fontFamily: selectedFontCss || 'Assistant, sans-serif',
+                                    fontWeight: style.fontWeight || 'normal',
+                                    color: textColor,
+                                    lineHeight: '1.3',
+                                    textAlign: style.textAlign || 'center',
+                                    whiteSpace: 'pre-wrap',
+                                    marginBottom: '0.15em',
+                                  }}
+                                >
+                                  {line.trim()}
+                                </div>
+                              );
+                            })}
+                          </div>
+                          {isSelected && (
+                            <div className="absolute top-1.5 right-1.5 bg-emerald-500 rounded-full w-6 h-6 flex items-center justify-center shadow-lg z-10">
+                              <svg className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                              </svg>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        </ModalBody>
+      </Modal>
       {/* Lightbox for design preview */}
       <Modal open={showLightbox} onClose={() => setShowLightbox(false)} size="lg">
         <ModalHeader onClose={() => setShowLightbox(false)}>תצוגה מקדימה</ModalHeader>
@@ -8927,7 +8903,7 @@ React.useEffect(()=>{
               />
               <button onClick={handleGuestSearch} className="bg-primary text-white px-3 sm:px-4 py-2 rounded-md hover:bg-primary/90 whitespace-nowrap text-sm">חפש</button>
             </div>
-            {searchError && <p className="mb-4 rounded-xl border border-red-400/30 bg-red-500/10 p-3 text-center text-sm font-semibold text-red-300">{searchError}</p>}
+            {guestSearchAttempted && searchError && <p className="mb-4 rounded-xl border border-red-400/30 bg-red-500/10 p-3 text-center text-sm font-semibold text-red-300">{searchError}</p>}
             {searchResults.length>0 && (
               <div className="max-h-[60vh] overflow-y-auto overflow-x-auto">
                 <table className="w-full text-right border border-white/10 border-collapse" style={{fontSize: '11px'}}>
@@ -9364,7 +9340,7 @@ React.useEffect(()=>{
               בחר חבילת הרחבה בתשלום כדי להוסיף עוד הודעות למכסה.
             </div>
           )}
-          {planSelectionError && (
+          {pricingActionAttempted && planSelectionError && (
             <div className="mb-3 bg-red-500/10 border border-red-400/30 rounded-xl p-2.5 text-red-400 font-semibold text-sm text-center">
               {planSelectionError}
             </div>

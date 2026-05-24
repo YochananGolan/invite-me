@@ -79,7 +79,7 @@ const CardHeader = ({ title, children }) => (
 
 const GlassCard = ({ className = '', children }) => (
   <div
-    className={`overflow-hidden rounded-lg border border-white/15 bg-white/[0.055] text-slate-100 shadow-[0_18px_60px_rgba(0,0,0,0.28)] backdrop-blur-xl ${className}`}
+    className={`overflow-hidden rounded-2xl border border-white/15 bg-white/[0.055] text-slate-100 shadow-[0_8px_40px_rgba(0,0,0,0.35)] backdrop-blur-xl ring-2 ring-indigo-400/30 ${className}`}
   >
     {children}
   </div>
@@ -109,7 +109,7 @@ const InviteCard = () => {
   const lines = displayedText.split('\n');
 
   return (
-    <div className="overflow-hidden rounded-lg border bg-gradient-to-br from-[#f0e8ff] to-[#fdf6ee] text-[#1e1432] shadow-[0_18px_60px_rgba(0,0,0,0.28)] backdrop-blur-xl h-full p-2" style={{ borderColor: 'rgba(165,148,255,0.25)' }}>
+    <div className="overflow-hidden rounded-2xl border border-white/15 bg-gradient-to-br from-[#f0e8ff] to-[#fdf6ee] text-[#1e1432] shadow-[0_8px_40px_rgba(0,0,0,0.35)] backdrop-blur-xl ring-2 ring-indigo-400/30 h-full p-2">
       <div className="relative h-full min-h-[340px] overflow-hidden rounded-md bg-white text-[#1e1432]">
         <img
           src="/images/wedding-couple-bright-luxury.jpg"

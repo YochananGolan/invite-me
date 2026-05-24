@@ -5,6 +5,7 @@ const SIZES = {
   md: 'max-w-md',
   lg: 'max-w-2xl',
   xl: 'max-w-4xl',
+  full: 'max-w-[98vw]',
 };
 
 export default function Modal({ open, onClose, size = 'md', children, className = '' }) {
@@ -29,7 +30,7 @@ export default function Modal({ open, onClose, size = 'md', children, className 
       onClick={(e) => { if (e.target === e.currentTarget) onClose?.(); }}
     >
       <div
-        className={`relative bg-gradient-to-b from-[#1a1d4a]/95 to-[#12143a]/95 backdrop-blur-2xl border border-white/[0.12] rounded-t-3xl sm:rounded-3xl overflow-hidden shadow-[0_24px_64px_-12px_rgba(0,0,0,0.6),inset_0_1px_0_rgba(255,255,255,0.08)] w-full ${SIZES[size]} max-h-[92vh] sm:max-h-[85vh] flex flex-col ${className}`}
+        className={`relative bg-gradient-to-b from-[#1a1d4a]/95 to-[#12143a]/95 backdrop-blur-2xl border border-white/[0.12] rounded-t-3xl sm:rounded-3xl overflow-hidden shadow-[0_24px_64px_-12px_rgba(0,0,0,0.6),inset_0_1px_0_rgba(255,255,255,0.08)] w-full ${SIZES[size]} ${size === 'full' ? 'max-h-[96vh]' : 'max-h-[92vh] sm:max-h-[85vh]'} flex flex-col ${className}`}
         onClick={(e) => e.stopPropagation()}
       >
         {/* glow accents */}

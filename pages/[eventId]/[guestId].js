@@ -405,19 +405,18 @@ export default function GuestPage({ initialData, initialError }) {
                   dir="rtl"
                 >
                   {invitationTextLines.map((line, idx) => {
-                    if (!line || !line.trim()) return null;
-                    const style = lineStyles[idx] || {};
-                    const defaultFontSize = 24;
-                    const baseFontSize = style.fontSize ? parseInt(style.fontSize) : defaultFontSize;
-                    // שורה ראשונה (שמות) מודגשת מאוד כברירת מחדל; תאריך (שורה 3) מודגש
-                    const fontSize = idx === 0 && !style.fontSize ? 28 : baseFontSize;
-                    const fontWeight = idx === 0 ? 'bold' : (idx === 3 ? (style.fontWeight || 'bold') : (style.fontWeight || 'normal'));
+                    if (!line || !line.trim()) return <div key={idx} style={{ height: '0.4em', flexShrink: 0 }} />;
+                    const defaultStyle = idx === 0
+                      ? { fontSize: 28, fontWeight: 'bold', textAlign: 'center', color: 'black' }
+                      : { fontSize: 16, fontWeight: 'normal', textAlign: 'center', color: 'black', lineHeight: 1.5, letterSpacing: 0, textDecoration: 'none', fontStyle: 'normal' };
+                    const style = { ...defaultStyle, ...(lineStyles[idx] || {}) };
+
+                    const fontSize = Math.round((style.fontSize ? parseInt(style.fontSize) : (idx === 0 ? 28 : 16)) * 0.9);
+                    const fontWeight = style.fontWeight || 'normal';
                     const lineHeight = style.lineHeight ? parseFloat(style.lineHeight) : 1.4;
-                    
-                    // Clean font CSS
+
                     let cleanFontCSS = fontCSS ? fontCSS.replace(/['"]/g, '') : 'Assistant, sans-serif';
-                    
-                    // Get text color
+
                     let textColor = style.color || '#000000';
                     if (!textColor.startsWith('#')) {
                       const colorMap = {
@@ -428,14 +427,11 @@ export default function GuestPage({ initialData, initialError }) {
                       textColor = colorMap[textColor.toLowerCase()] || '#000000';
                     }
 
-                    // Debug log for first line with styles
-                    if (idx === 0 && style.color) {
-                      console.log(`🎨 Rendering line ${idx} with style:`, {
-                        color: textColor,
-                        style: style,
-                        lineStyles: lineStyles
-                      });
-                    }
+                    const skewTransform = style.fontStyle === 'italic'
+                      ? 'skewX(20deg)'
+                      : style.fontStyle === 'back-slant'
+                        ? 'skewX(-20deg)'
+                        : 'none';
 
                     return (
                       <div
@@ -449,12 +445,9 @@ export default function GuestPage({ initialData, initialError }) {
                           letterSpacing: style.letterSpacing ? `${style.letterSpacing}px` : '0',
                           textAlign: style.textAlign || 'center',
                           textDecoration: style.textDecoration || 'none',
-                          fontStyle: style.fontStyle || 'normal',
-                          // Enhanced text shadow for better readability
-                          textShadow: style.textShadow && style.textShadow !== 'none' 
-                            ? '2px 2px 4px rgba(0, 0, 0, 0.3)' 
-                            : '0 2px 6px rgba(0, 0, 0, 0.35)',
-                          transform: style.transform || 'none',
+                          fontStyle: (style.fontStyle === 'italic' || style.fontStyle === 'back-slant') ? 'normal' : (style.fontStyle || 'normal'),
+                          textShadow: '0 2px 6px rgba(0, 0, 0, 0.35)',
+                          transform: skewTransform,
                           whiteSpace: 'pre-wrap',
                           wordBreak: 'break-word',
                           marginBottom: idx < invitationTextLines.length - 1 ? '0.5em' : '0',
@@ -471,7 +464,6 @@ export default function GuestPage({ initialData, initialError }) {
                           boxSizing: 'border-box',
                           overflowWrap: 'anywhere',
                           wordWrap: 'break-word',
-                          textAlign: 'center'
                         }}
                       >
                         {line.trim()}
@@ -491,7 +483,7 @@ export default function GuestPage({ initialData, initialError }) {
         </div>
       )}
 
-      <div className="w-full max-w-xl rounded-2xl border border-white/15 bg-white/[0.055] backdrop-blur-xl shadow-[0_4px_32px_rgba(0,0,0,0.3)] px-5 pb-5 pt-4 text-right text-sm mt-1 flex-shrink-0">
+      <div className="w-full max-w-xl rounded-2xl border border-white/[0.12] bg-gradient-to-b from-[#1a1d4a]/80 to-[#12143a]/80 backdrop-blur-2xl shadow-[0_8px_40px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(255,255,255,0.08)] ring-2 ring-indigo-400/30 px-5 pb-5 pt-4 text-right text-sm mt-1 flex-shrink-0">
         <h1 className="mb-3 text-2xl font-black text-white">אישור הגעה</h1>
 
         <p className="mb-3 text-base text-slate-300">
@@ -574,8 +566,8 @@ export default function GuestPage({ initialData, initialError }) {
 
       {/* Embedded Map Modal */}
       {showMap && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black/70 backdrop-blur-sm z-50 p-4">
-          <div className="relative rounded-2xl border border-white/15 bg-[#12143a] w-full max-w-4xl h-[80vh] flex flex-col shadow-[0_4px_48px_rgba(0,0,0,0.5)]">
+        <div className="fixed inset-0 flex items-center justify-center bg-[#0a0b1e]/75 backdrop-blur-sm z-50 p-4">
+          <div className="relative rounded-2xl border border-white/[0.12] bg-gradient-to-b from-[#1a1d4a]/95 to-[#12143a]/95 backdrop-blur-2xl w-full max-w-4xl h-[80vh] flex flex-col shadow-[0_24px_64px_-12px_rgba(0,0,0,0.6),inset_0_1px_0_rgba(255,255,255,0.08)] ring-2 ring-indigo-400/20">
             <button
               onClick={() => setShowMap(false)}
               className="absolute top-4 left-4 text-2xl text-slate-400 hover:text-white bg-white/10 hover:bg-white/15 rounded-full w-10 h-10 flex items-center justify-center transition-all z-10"
@@ -626,9 +618,9 @@ export default function GuestPage({ initialData, initialError }) {
 
       {/* Details Modal - opens when clicking "מגיעים" */}
       {showDetailsModal && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 overflow-y-auto">
+        <div className="fixed inset-0 bg-[#0a0b1e]/75 backdrop-blur-sm z-50 overflow-y-auto">
           <div className="min-h-screen flex items-center justify-center p-2 sm:p-4">
-            <div className="relative rounded-2xl border border-white/15 bg-[#12143a] w-full max-w-6xl my-4 flex flex-col max-h-[95vh] shadow-[0_4px_48px_rgba(0,0,0,0.5)] text-slate-100">
+            <div className="relative rounded-2xl border border-white/[0.12] bg-gradient-to-b from-[#1a1d4a]/95 to-[#12143a]/95 backdrop-blur-2xl w-full max-w-6xl my-4 flex flex-col max-h-[95vh] shadow-[0_24px_64px_-12px_rgba(0,0,0,0.6),inset_0_1px_0_rgba(255,255,255,0.08)] ring-2 ring-indigo-400/20 text-slate-100">
               <button
                 onClick={() => {
                   setAttending(null);
@@ -662,7 +654,7 @@ export default function GuestPage({ initialData, initialError }) {
                   </div>
                 )}
 
-                <div className="rounded-xl border border-indigo-400/20 bg-indigo-500/10 p-3 sm:p-4">
+                <div className="rounded-2xl border border-white/15 bg-white/[0.055] backdrop-blur-xl shadow-[0_8px_40px_rgba(0,0,0,0.35)] ring-2 ring-indigo-400/30 p-3 sm:p-4">
                   <h3 className="text-base sm:text-lg font-bold text-indigo-200 mb-3 text-center">מספר משתתפים</h3>
                   <div className="grid grid-cols-2 gap-3 sm:gap-4">
                     <div>

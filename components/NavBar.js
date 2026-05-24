@@ -143,7 +143,7 @@ export default function NavBar({ onAuthClick = null, onAboutClick, onShowPricing
                 onClick={() => openAuth('sign_up')}
                 className="rounded-lg bg-gradient-to-br from-indigo-600 to-violet-600 px-4 py-2 text-sm font-bold text-white shadow-[0_8px_24px_rgba(99,70,230,0.3)] transition-transform hover:-translate-y-0.5"
               >
-                התנסות בחינם
+                הרשמה בחינם
               </button>
             </>
           )}
