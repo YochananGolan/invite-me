@@ -516,8 +516,8 @@ export default function TranzilaPayment({
   const notifyUrl = `${baseUrl || 'https://invite-me-two.vercel.app'}/api/tranzila/notify`;
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center bg-black/70 z-[200] p-0 sm:p-4">
-      <div className="relative bg-white w-full h-[100dvh] sm:h-auto sm:rounded-lg sm:max-w-4xl sm:max-h-[95vh] overflow-hidden shadow-2xl flex flex-col">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4">
+      <div className="relative bg-[#12143a] border border-white/15 w-full h-[100dvh] sm:h-auto sm:rounded-2xl sm:max-w-4xl sm:max-h-[95vh] overflow-hidden shadow-[0_4px_32px_rgba(0,0,0,0.3)] flex flex-col">
         {/* Header - single compact line on mobile */}
         <div className="bg-gradient-to-r from-primary to-primary/80 text-white px-3 py-1.5 sm:p-6 flex justify-between items-center flex-shrink-0">
           <p className="text-sm sm:text-2xl font-bold">
@@ -529,7 +529,7 @@ export default function TranzilaPayment({
           </p>
           <button
             onClick={() => onCloseRef.current && onCloseRef.current()}
-            className="text-white hover:bg-white/20 rounded-full w-7 h-7 sm:w-10 sm:h-10 flex items-center justify-center text-xl sm:text-3xl transition-colors flex-shrink-0"
+            className="text-slate-400 hover:text-white rounded-full w-7 h-7 sm:w-10 sm:h-10 flex items-center justify-center text-xl sm:text-3xl transition-colors flex-shrink-0"
             aria-label="סגור"
           >
             &times;
@@ -538,12 +538,12 @@ export default function TranzilaPayment({
 
         {/* Payment Form Container */}
         <div className="p-0 sm:p-6 flex-1 min-h-0 flex flex-col overflow-hidden">
-          <div className="hidden sm:block mb-4 bg-blue-50 border border-blue-200 rounded-lg p-4 text-right">
+          <div className="hidden sm:block mb-4 bg-indigo-500/10 border border-indigo-400/20 rounded-2xl p-4 text-right">
             <div className="flex items-start">
-              <span className="text-blue-600 text-xl ml-3">🔒</span>
+              <span className="text-indigo-300 text-xl ml-3">🔒</span>
               <div>
-                <p className="font-semibold text-blue-900 mb-1">תשלום מאובטח</p>
-                <p className="text-sm text-blue-700">
+                <p className="font-semibold text-indigo-300 mb-1">תשלום מאובטח</p>
+                <p className="text-sm text-slate-300">
                   התשלום מתבצע דרך מערכת Tranzila המאובטחת. פרטי האשראי שלך מוצפנים ומועברים ישירות לחברת סליקה ללא שמירה במערכת שלנו.
                 </p>
               </div>
@@ -551,17 +551,17 @@ export default function TranzilaPayment({
           </div>
 
           {(handshakeMode === 'legacy' || isTestTerminal) && (
-            <div className="mb-4 bg-amber-50 border border-amber-200 rounded-lg p-4 text-right">
-              <p className="font-semibold text-amber-900 mb-1">
+            <div className="mb-4 bg-amber-500/10 border border-amber-400/30 rounded-2xl p-4 text-right">
+              <p className="font-semibold text-amber-300 mb-1">
                 {isTestTerminal ? 'מסוף תשלומים במצב בדיקות' : 'מצב תשלום להרצה'}
               </p>
-              <p className="text-sm text-amber-800">
+              <p className="text-sm text-slate-300">
                 {isTestTerminal
                   ? 'המסוף מחובר במצב בדיקות של Tranzila. השתמש במספרי כרטיס בדיקה של Tranzila בלבד – העסקה לא תחייב בפועל, וארנקים דיגיטליים (Google Pay / Apple Pay) מושבתים כדי למנוע תקלות.'
                   : 'התשלום פועל במצב בדיקות עם מסוף Tranzila לדוגמה. כדי לאפשר סליקה אמיתית, הגדר ערכי TRANZILA_TERMINAL ו-TRANZILA_TERMINAL_PASSWORD בקובץ ‎.env.local ולאחר מכן הפעל מחדש את השרת.'}
               </p>
               {(handshakeDetails?.message || handshakeError) && (
-                <p className="text-xs text-amber-700 mt-2">
+                <p className="text-xs text-amber-400/80 mt-2">
                   {handshakeDetails?.message || handshakeError}
                 </p>
               )}
@@ -628,30 +628,30 @@ export default function TranzilaPayment({
           </form>
 
           {/* Amount banner - always visible, especially for Google Pay where Tranzila may not show it */}
-          <div className="mb-3 py-2 px-4 bg-amber-50 border border-amber-200 rounded-lg text-center">
-            <p className="text-lg font-bold text-amber-900">סכום לתשלום: {amount} ₪</p>
-            <p className="text-sm text-amber-700">{planName}</p>
+          <div className="mb-3 py-2 px-4 bg-indigo-500/10 border border-indigo-400/20 rounded-2xl text-center">
+            <p className="text-lg font-black text-white">סכום לתשלום: {amount} ₪</p>
+            <p className="text-sm text-slate-400">{planName}</p>
           </div>
           {/* Iframe container - no border/padding on mobile to maximize space */}
-          <div className="relative bg-gray-50 sm:rounded-lg sm:border-2 sm:border-gray-200 flex-1 min-h-0 sm:flex-none sm:h-[600px]">
+          <div className="relative bg-white/5 rounded-xl border border-white/10 flex-1 min-h-0 sm:flex-none sm:h-[600px]">
             {(isHandshakeLoading || isIframeLoading) && !handshakeError && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center bg-white z-10">
-                <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-primary mb-4"></div>
-                <p className="text-gray-600 font-medium text-lg mb-2">
+              <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#12143a] z-10">
+                <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-indigo-500 mb-4"></div>
+                <p className="text-slate-300 font-medium text-lg mb-2">
                   {isHandshakeLoading
                     ? 'מתחבר למסוף Tranzila...'
                     : 'טוען טופס תשלום מאובטח...'}
                 </p>
-                <p className="text-gray-500 text-sm">אנא המתן, הטופס ייטען בקרוב</p>
+                <p className="text-slate-400 text-sm">אנא המתן, הטופס ייטען בקרוב</p>
               </div>
             )}
             {handshakeError && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center bg-white z-20 p-6">
+              <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#12143a] z-20 p-6">
                 <div className="text-4xl mb-4">⚠️</div>
-                <p className="text-gray-700 font-semibold text-lg mb-2 text-center">
+                <p className="text-slate-100 font-semibold text-lg mb-2 text-center">
                   לא הצלחנו להתחבר למסוף התשלומים.
                 </p>
-                <p className="text-gray-600 text-center mb-4">
+                <p className="text-slate-300 text-center mb-4">
                   {handshakeError}
                 </p>
                 <div className="flex gap-3">
@@ -660,13 +660,13 @@ export default function TranzilaPayment({
                       setHandshakeAttempt((prev) => prev + 1);
                       setHandshakeError(null);
                     }}
-                    className="bg-primary text-white px-4 py-2 rounded-md hover:bg-primary/90 transition-colors"
+                    className="bg-gradient-to-br from-indigo-600 to-violet-600 shadow-[0_5px_22px_rgba(99,70,230,0.45)] text-white font-bold px-4 py-2 rounded-xl transition-opacity hover:opacity-90"
                   >
                     נסה שוב
                   </button>
                   <button
                     onClick={onClose}
-                    className="px-4 py-2 rounded-md border border-gray-300 hover:bg-gray-100 transition-colors"
+                    className="px-4 py-2 rounded-xl border border-white/15 bg-transparent text-white hover:border-indigo-300 transition-colors"
                   >
                     סגור
                   </button>
@@ -684,43 +684,43 @@ export default function TranzilaPayment({
           </div>
 
           {/* Payment methods info - hidden on mobile to maximize iframe space */}
-          <div className="hidden sm:block mt-4 bg-gray-50 border border-gray-200 rounded-lg p-4 flex-shrink-0">
-            <p className="text-center font-semibold text-gray-800 mb-3">אפשרויות תשלום זמינות:</p>
+          <div className="hidden sm:block mt-4 bg-white/[0.055] border border-white/15 backdrop-blur-xl rounded-2xl p-4 flex-shrink-0">
+            <p className="text-center font-semibold text-slate-100 mb-3">אפשרויות תשלום זמינות:</p>
             <div className="flex flex-wrap justify-center gap-4 items-center">
               <div className="flex items-center gap-2">
                 <span className="text-2xl">💳</span>
-                <span className="text-sm text-gray-700">כרטיס אשראי</span>
+                <span className="text-sm text-slate-300">כרטיס אשראי</span>
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-2xl">📱</span>
-                <span className="text-sm text-gray-700">Bit</span>
+                <span className="text-sm text-slate-300">Bit</span>
               </div>
               {googlePayEnabled && (
               <div className="flex items-center gap-2">
                 <span className="text-2xl">🟢</span>
-                <span className="text-sm text-gray-700">Google Pay</span>
+                <span className="text-sm text-slate-300">Google Pay</span>
                 {typeof window !== 'undefined' && window.location.protocol === 'http:' && (
-                  <span className="text-xs text-amber-600 mr-1">(זמין רק ב-HTTPS)</span>
+                  <span className="text-xs text-amber-400 mr-1">(זמין רק ב-HTTPS)</span>
                 )}
               </div>
               )}
               {applePayEnabled && (
               <div className="flex items-center gap-2">
                 <span className="text-2xl">&#63743;</span>
-                <span className="text-sm text-gray-700">Apple Pay</span>
+                <span className="text-sm text-slate-300">Apple Pay</span>
               </div>
               )}
             </div>
             {googlePayEnabled &&
              typeof window !== 'undefined' && window.location.protocol === 'http:' && (
-              <p className="text-center text-xs text-amber-600 mt-2">
+              <p className="text-center text-xs text-amber-400 mt-2">
                 ⚠️ Google Pay זמין רק באתרים מאובטחים (HTTPS). באתר ייצור Google Pay יופיע אוטומטית.
               </p>
             )}
           </div>
 
           {/* Additional info - hidden on mobile */}
-          <div className="hidden sm:block mt-4 text-center text-sm text-gray-600 flex-shrink-0">
+          <div className="hidden sm:block mt-4 text-center text-sm text-slate-400 flex-shrink-0">
             <p>💳 מקבלים את כל סוגי כרטיסי האשראי</p>
             <p className="mt-1">🔐 אבטחה מלאה בתקן PCI-DSS</p>
           </div>

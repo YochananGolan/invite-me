@@ -19,7 +19,7 @@ export default function EventSummary() {
         .in('status', ['draft', 'active'])
         .order('created_at', { ascending: false })
         .limit(100);
-      
+
       if (evErr) throw evErr;
 
       const today = new Date();
@@ -63,8 +63,8 @@ export default function EventSummary() {
           .order('created_at', { ascending: false })
           .limit(1)
           .maybeSingle();
-        
-        
+
+
         if(error){
           console.error('EventSummary fetch error', error);
         }
@@ -147,10 +147,10 @@ export default function EventSummary() {
   if (!event) {
     return (
       <section className="container mx-auto mb-8 px-4">
-        <div className="bg-gray-50 border border-dashed border-gray-400 rounded-lg p-6 text-center text-gray-600 rtl">
+        <div className="bg-white/[0.055] border border-dashed border-white/15 backdrop-blur-xl rounded-2xl shadow-[0_4px_32px_rgba(0,0,0,0.3)] p-6 text-center text-slate-400 rtl">
           <p className="text-lg mb-4">אין אירוע פעיל כרגע</p>
-          <p className="mb-4">התחילו בלחיצה על <span className="font-medium text-primary">צור אירוע חדש</span></p>
-          <p className="text-sm">לצפייה באירועים מהעבר ובטבלאות נתונים, לחצו על <span className="font-medium text-primary">אירועים מהעבר</span> בתפריט הדוחות</p>
+          <p className="mb-4">התחילו בלחיצה על <span className="font-medium text-indigo-300">צור אירוע חדש</span></p>
+          <p className="text-sm">לצפייה באירועים מהעבר ובטבלאות נתונים, לחצו על <span className="font-medium text-indigo-300">אירועים מהעבר</span> בתפריט הדוחות</p>
         </div>
       </section>
     );
@@ -164,32 +164,32 @@ export default function EventSummary() {
   return (
     <section className="container mx-auto mb-8 px-4 flex flex-col md:flex-row-reverse justify-end gap-6">
       {/* Approval Stats Card */}
-      <div className="bg-[#FFF9E0] border border-primary rounded-lg p-6 w-64 text-center rtl flex-shrink-0 text-lg md:text-xl ring-2 ring-primary ring-offset-2 ring-offset-[#FFF9E0]">
-        <h3 className="text-xl md:text-2xl font-bold mb-4">סיכום מספר אישורים</h3>
-        <p className="mb-2 text-lg md:text-xl">מגיעים: <span className="font-bold text-green-700">{stats.approved}</span></p>
-        <p className="mb-2 text-lg md:text-xl">לא מגיעים: <span className="font-bold text-red-600">{stats.rejected}</span></p>
-        <p className="text-lg md:text-xl">טרם השיבו: <span className="font-bold">{stats.pending}</span></p>
+      <div className="bg-white/[0.055] border border-white/15 backdrop-blur-xl rounded-2xl shadow-[0_4px_32px_rgba(0,0,0,0.3)] p-6 w-64 text-center rtl flex-shrink-0 text-lg md:text-xl ring-2 ring-indigo-400/30 ring-offset-2 ring-offset-transparent">
+        <h3 className="text-xl md:text-2xl font-bold mb-4 text-slate-100">סיכום מספר אישורים</h3>
+        <p className="mb-2 text-lg md:text-xl text-slate-300">מגיעים: <span className="font-bold text-emerald-300">{stats.approved}</span></p>
+        <p className="mb-2 text-lg md:text-xl text-slate-300">לא מגיעים: <span className="font-bold text-red-400">{stats.rejected}</span></p>
+        <p className="text-lg md:text-xl text-slate-300">טרם השיבו: <span className="font-bold text-slate-100">{stats.pending}</span></p>
       </div>
 
       {/* Participants Card */}
-      <div key={refreshKey} className="bg-[#FFF9E0] border border-primary rounded-lg p-6 w-64 text-center rtl flex-shrink-0 text-lg md:text-xl ring-2 ring-primary ring-offset-2 ring-offset-[#FFF9E0]">
-        <h3 className="text-xl md:text-2xl font-bold mb-4">סיכום מספר משתתפים</h3>
-        <p className="mb-2 text-lg md:text-xl">מבוגרים: <span className="font-bold">{stats.adults}</span></p>
-        <p className="mb-2 text-lg md:text-xl">ילדים: <span className="font-bold">{stats.children}</span></p>
-        <p className="text-lg md:text-xl">סה"כ: <span className="font-bold text-primary">{stats.adults + stats.children}</span></p>
+      <div key={refreshKey} className="bg-white/[0.055] border border-white/15 backdrop-blur-xl rounded-2xl shadow-[0_4px_32px_rgba(0,0,0,0.3)] p-6 w-64 text-center rtl flex-shrink-0 text-lg md:text-xl ring-2 ring-indigo-400/30 ring-offset-2 ring-offset-transparent">
+        <h3 className="text-xl md:text-2xl font-bold mb-4 text-slate-100">סיכום מספר משתתפים</h3>
+        <p className="mb-2 text-lg md:text-xl text-slate-300">מבוגרים: <span className="font-bold text-slate-100">{stats.adults}</span></p>
+        <p className="mb-2 text-lg md:text-xl text-slate-300">ילדים: <span className="font-bold text-slate-100">{stats.children}</span></p>
+        <p className="text-lg md:text-xl text-slate-300">סה"כ: <span className="font-bold text-indigo-300">{stats.adults + stats.children}</span></p>
       </div>
 
       {/* Event Card */}
-      <div className="bg-[#FFF9E0] border border-primary rounded-lg p-6 flex flex-col items-center text-center rtl w-64 flex-shrink-0 min-h-[200px] text-lg md:text-xl ring-2 ring-primary ring-offset-2 ring-offset-[#FFF9E0]">
+      <div className="bg-white/[0.055] border border-white/15 backdrop-blur-xl rounded-2xl shadow-[0_4px_32px_rgba(0,0,0,0.3)] p-6 flex flex-col items-center text-center rtl w-64 flex-shrink-0 min-h-[200px] text-lg md:text-xl ring-2 ring-indigo-400/30 ring-offset-2 ring-offset-transparent">
         <div className="flex-1">
-          <p className="font-bold text-xl md:text-2xl mb-1">האירוע הפעיל שלך</p>
-          <p className="text-lg md:text-xl">סוג: <span className="font-medium">{event.event_type}</span></p>
+          <p className="font-bold text-xl md:text-2xl mb-1 text-slate-100">האירוע הפעיל שלך</p>
+          <p className="text-lg md:text-xl text-slate-300">סוג: <span className="font-medium text-slate-100">{event.event_type}</span></p>
           {dateObj && (
-            <p className="text-lg md:text-xl">תאריך: <span className="font-medium">{format(dateObj,'dd/MM/yyyy', { locale: he })}</span></p>
+            <p className="text-lg md:text-xl text-slate-300">תאריך: <span className="font-medium text-slate-100">{format(dateObj,'dd/MM/yyyy', { locale: he })}</span></p>
           )}
-          <p className="text-lg md:text-xl">מיקום: <span className="font-medium">{location}</span></p>
+          <p className="text-lg md:text-xl text-slate-300">מיקום: <span className="font-medium text-slate-100">{location}</span></p>
           {daysLeft !== null && (
-            <p className={`text-2xl md:text-3xl font-bold mt-2 ${daysLeft >= 0 ? 'text-primary' : 'text-red-600'}`}>
+            <p className={`text-2xl md:text-3xl font-bold mt-2 ${daysLeft >= 0 ? 'text-indigo-300' : 'text-red-400'}`}>
               {daysLeft >= 0 ? `נותרו ${daysLeft} ימים` : `נותרו ${Math.abs(daysLeft)}- ימים`}
             </p>
           )}

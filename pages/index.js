@@ -7,6 +7,7 @@ import { useState, useEffect, useRef } from 'react';
 import AuthModal from '../components/AuthModal';
 import Footer from '../components/Footer';
 import PricingTableModal from '../components/PricingTableModal';
+import Modal, { ModalHeader, ModalBody, ModalFooter } from '../components/Modal';
 
 export default function Home({ session }) {
   const router = useRouter();
@@ -25,6 +26,7 @@ export default function Home({ session }) {
       sessionStorage.setItem('fromEmailConfirmation', 'true');
     }
   }, []);
+
 
   useEffect(() => {
     if (!session) return;
@@ -89,6 +91,16 @@ export default function Home({ session }) {
     }
   };
 
+  useEffect(() => {
+    if (!router.isReady) return;
+    const open = router.query.open;
+    if (!open) return;
+    if (open === 'features') setShowFeatures(true);
+    else if (open === 'pricing') setShowPricingTable(true);
+    else if (open === 'reports') { handleShowReports(); }
+    router.replace('/', undefined, { shallow: true });
+  }, [router.isReady, router.query.open]);
+
   const handleCreateEvent = () => {
     if (!session) {
       setAuthMode('sign_in');
@@ -107,30 +119,34 @@ export default function Home({ session }) {
     <>
       <Head>
         <title>Meet-M | הדרך המושלמת להזמין ולנהל אורחים</title>
-        <meta name="description" content="Send stylish invitations and manage guests effortlessly" />
+        <meta name="description" content="ניהול הזמנות, אישורי הגעה, שליחת הודעות ודוחות אירוע במקום אחד." />
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
-        <meta name="theme-color" content="#D1B45B" />
+        <meta name="theme-color" content="#0d0f2b" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
       </Head>
-      <div className="min-h-screen flex flex-col">
+      <div className="min-h-screen flex flex-col bg-[#0d0f2b] text-slate-100">
         <main className="flex-1">
-          <NavBar onAuthClick={handleAuthClick} onAboutClick={handleShowFeatures} onShowPricing={() => setShowPricingTable(true)} onShowReports={handleShowReports} />
-          <HeroSection
-            onStart={handleShowProcess}
-            onPressCreateEvent={handleCreateEvent}
-            onPressReports={handleShowReports}
-            onShowFeatures={handleShowFeatures}
-            isLoggedIn={!!session}
-          />
-          <div id="pricing" className="mb-8 scroll-mt-20 scroll-mb-28 pb-36 sm:pb-24">
-            <StepButtons 
-              ref={stepRef} 
-              session={session} 
-              onAuthClick={handleAuthClick}
-              triggerCreateEvent={triggerCreateEvent}
-              onConsumedCreateTrigger={() => setTriggerCreateEvent(false)}
+          <div className="relative bg-[linear-gradient(160deg,#0d0f2b_0%,#130f35_52%,#1a0f40_100%)]">
+            <NavBar onAuthClick={handleAuthClick} onAboutClick={handleShowFeatures} onShowPricing={() => setShowPricingTable(true)} onShowReports={handleShowReports} />
+            <HeroSection
+              onStart={handleShowProcess}
+              onPressCreateEvent={handleCreateEvent}
+              onPressReports={handleShowReports}
+              onShowFeatures={handleShowFeatures}
+              isLoggedIn={!!session}
             />
+          </div>
+          <div id="pricing" className="scroll-mt-20 scroll-mb-28 bg-[linear-gradient(160deg,#0d0f2b_0%,#130f35_52%,#1a0f40_100%)] px-4 pt-0 pb-36 text-slate-100 sm:pb-24">
+            <div className="mx-auto max-w-6xl">
+              <StepButtons 
+                ref={stepRef} 
+                session={session} 
+                onAuthClick={handleAuthClick}
+                triggerCreateEvent={triggerCreateEvent}
+                onConsumedCreateTrigger={() => setTriggerCreateEvent(false)}
+              />
+            </div>
           </div>
         </main>
         <Footer />
@@ -147,10 +163,10 @@ export default function Home({ session }) {
 
       {/* Registration Success Modal - after email verification - stays until user clicks */}
       {showRegistrationSuccess && (
-        <div className="fixed inset-0 bg-black/70 z-[200] flex items-center justify-center px-6" dir="rtl">
-          <div className="bg-white border-4 border-green-400 rounded-3xl shadow-2xl w-full max-w-sm text-center px-6 py-10 space-y-6">
-            <div className="text-3xl font-extrabold text-green-600">ההרשמה בוצעה בהצלחה!</div>
-            <div className="text-base font-semibold text-green-700 leading-relaxed">
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm px-6" dir="rtl">
+          <div className="bg-[#12143a] border border-white/15 rounded-2xl shadow-[0_4px_32px_rgba(0,0,0,0.3)] w-full max-w-sm text-center px-6 py-10 space-y-6">
+            <div className="text-3xl font-extrabold text-emerald-300">ההרשמה בוצעה בהצלחה!</div>
+            <div className="text-base font-semibold text-slate-300 leading-relaxed">
               החשבון החדש הוכן. ניתן להתחיל ליצור אירוע או לחזור למסך הראשי.
             </div>
             <div className="flex flex-col gap-3">
@@ -167,7 +183,7 @@ export default function Home({ session }) {
                   setShowRegistrationSuccess(false);
                   handleCreateEvent();
                 }}
-                className="w-full border-2 border-green-600 text-green-600 hover:bg-green-600 hover:text-white font-semibold py-2 rounded-full transition-colors"
+                className="w-full bg-gradient-to-br from-indigo-600 to-violet-600 shadow-[0_5px_22px_rgba(99,70,230,0.45)] text-white font-bold rounded-xl py-2 transition-opacity hover:opacity-90"
               >
                 צור אירוע חדש
               </button>
@@ -183,7 +199,7 @@ export default function Home({ session }) {
                   if (router.query?.registration) router.replace('/', undefined, { shallow: true });
                   setShowRegistrationSuccess(false);
                 }}
-                className="w-full border-2 border-gray-300 text-gray-700 hover:bg-gray-200 font-semibold py-2 rounded-full transition-colors"
+                className="w-full border border-white/15 bg-transparent text-white hover:border-indigo-300 hover:text-indigo-200 font-semibold rounded-xl py-2 transition-colors"
               >
                 חזרה למסך הראשי
               </button>
@@ -193,108 +209,89 @@ export default function Home({ session }) {
       )}
       
       {/* Features Modal */}
-      {showFeatures && (
-        <div className="fixed inset-0 bg-black/50 z-50">
-          <div className="bg-white w-full h-full overflow-y-auto shadow-xl relative p-6 md:p-8">
-            {/* Close Button */}
-            <button
-              onClick={() => setShowFeatures(false)}
-              aria-label="סגור"
-              className="absolute top-4 left-4 text-3xl text-gray-500 hover:text-gray-700 focus:outline-none leading-none w-8 h-8 flex items-center justify-center"
-            >
-              &times;
-            </button>
-
-            <h2 className="text-4xl font-bold text-center mb-4 text-primary">🚀 Meet-M - המערכת המושלמת לניהול אירועים</h2>
-            <p className="text-xl text-center text-gray-600 mb-6">המערכת היחידה שמאפשרת לך ליצור, לשלוח ולנהל את האירוע שלך במקום אחד!</p>
-            
-            {/* Main Value Proposition */}
-            <div className="bg-gradient-to-r from-primary/10 to-blue-100 p-6 rounded-xl mb-6 text-center">
-              <h3 className="text-2xl font-bold text-primary mb-3">⚡ תוך 5 דקות יש לך הזמנות מעוצבות לכל האורחים!</h3>
-              <div className="grid md:grid-cols-3 gap-4 mt-4">
-                <div className="bg-white p-4 rounded-lg shadow-sm">
-                  <div className="text-3xl mb-2">🎨</div>
-                  <h4 className="font-bold text-lg mb-2">עיצוב מקצועי</h4>
-                  <p className="text-sm text-gray-600">45 תבניות מעוצבות + עריכה מלאה</p>
-                </div>
-                <div className="bg-white p-4 rounded-lg shadow-sm">
-                  <div className="text-3xl mb-2">📱</div>
-                  <h4 className="font-bold text-lg mb-2">שליחה ל SMS ו-WhatsApp</h4>
-                  <p className="text-sm text-gray-600">שליחה אוטומטית מקובץ אקסל לאורחים</p>
-                </div>
-                <div className="bg-white p-4 rounded-lg shadow-sm">
-                  <div className="text-3xl mb-2">👥</div>
-                  <h4 className="font-bold text-lg mb-2">ניהול חכם</h4>
-                  <p className="text-sm text-gray-600">מעקב אורחים + דוחות בקרה</p>
-                </div>
+      <Modal open={showFeatures} onClose={() => setShowFeatures(false)} size="lg">
+        <ModalHeader onClose={() => setShowFeatures(false)} subtitle="המערכת היחידה לניהול אירועים מקצה לקצה">
+          Meet-M — ניהול אירועים חכם
+        </ModalHeader>
+        <ModalBody>
+          {/* 3 pillars */}
+          <div className="grid grid-cols-3 gap-3 mb-5">
+            {[
+              { icon: '🎨', title: 'עיצוב מקצועי', desc: '45 תבניות + עריכה מלאה' },
+              { icon: '📱', title: 'שליחה חכמה',   desc: 'SMS + WhatsApp מאקסל' },
+              { icon: '👥', title: 'ניהול חכם',    desc: 'מעקב + דוחות בזמן אמת' },
+            ].map((p) => (
+              <div key={p.title} className="bg-white/[0.05] border border-white/10 rounded-2xl p-3 text-center">
+                <div className="text-2xl mb-1">{p.icon}</div>
+                <h4 className="font-bold text-sm text-slate-100 mb-1">{p.title}</h4>
+                <p className="text-xs text-slate-400">{p.desc}</p>
               </div>
-            </div>
+            ))}
+          </div>
 
-            {/* Benefits */}
-            <div className="grid md:grid-cols-2 gap-6 mb-6 text-lg text-gray-700">
-              <div className="space-y-3">
-                <h3 className="text-xl font-bold text-primary">✅ למה לבחור בנו?</h3>
-                <ul className="space-y-1.5">
-                  <li className="flex items-center"><span className="text-green-500 mr-2">✓</span> <strong>פשוט ומהיר</strong> - 5 דקות מהרשמה ועד שליחה</li>
-                  <li className="flex items-center"><span className="text-green-500 mr-2">✓</span> <strong>חיסכון משמעותי</strong> - אין צורך במעצב או הדפסות</li>
-                  <li className="flex items-center"><span className="text-green-500 mr-2">✓</span> <strong>מעקב בזמן אמת</strong> - מי מגיע, מי לא, כמה אוכל להזמין</li>
-                  <li className="flex items-center"><span className="text-green-500 mr-2">✓</span> <strong>עובד על כל מכשיר</strong> - מחשב, טאבלט, סמארטפון</li>
-                  <li className="flex items-center">
-                    <span className="text-green-500 mr-2">✓</span>
-                    <strong>הזמנות ללא הגבלה</strong> – אפשרות לרכוש חבילות תוספת אורחים מעבר לתקרה הרגילה ולהזמין כמה שצריך
+          {/* Why us + what you get */}
+          <div className="grid sm:grid-cols-2 gap-4 mb-4">
+            <div>
+              <h3 className="text-sm font-bold text-indigo-300 mb-2">✅ למה לבחור בנו?</h3>
+              <ul className="space-y-1.5 text-sm text-slate-300">
+                {[
+                  ['פשוט ומהיר', '5 דקות מהרשמה ועד שליחה'],
+                  ['חיסכון', 'אין צורך במעצב או הדפסות'],
+                  ['מעקב בזמן אמת', 'מי מגיע, מי לא, כמה להזמין'],
+                  ['כל מכשיר', 'מחשב, טאבלט, סמארטפון'],
+                ].map(([strong, rest]) => (
+                  <li key={strong} className="flex items-start gap-2">
+                    <span className="text-emerald-400 shrink-0 mt-0.5">✓</span>
+                    <span><strong className="text-slate-100">{strong}</strong> — {rest}</span>
                   </li>
-                </ul>
-              </div>
-              <div className="space-y-3">
-                <h3 className="text-xl font-bold text-primary">🎯 מה תקבל?</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-gray-700">
-                  <ol className="space-y-2 list-decimal list-inside">
-                    <li>הזמנות מעוצבות מקצועית</li>
-                    <li>שליחה אוטומטית לכל האורחים</li>
-                    <li>שליחת הודעות SMS ו-WhatsApp</li>
-                    <li>שליחת תזכורת לפני אירוע</li>
-                    <li>מעקב אחר אישורי הגעה</li>
-                    <li>הצגת דוחות בקרה מתעדכנים בזמן אמת בדף הבית</li>
-                  </ol>
-                  <ol start={7} className="space-y-2 list-decimal list-inside">
-                    <li>ניהול פרטי אורחים</li>
-                    <li>ניהול העדפות מזון ואלרגיות</li>
-                    <li>דוחות בקרה מפורטים + ייצוא ל-Excel</li>
-                    <li>שמירת אירועי עבר בארכיון</li>
-                    <li>הצגת מפת אזור האירוע</li>
-                    <li>ניווט ישיר לאולם האירועים</li>
-                  </ol>
-                </div>
-              </div>
+                ))}
+              </ul>
             </div>
-
-
-            <div className="text-center mt-6 space-y-3">
-              <div className="text-lg font-bold text-gray-800 mb-3">
-                🎉 הצטרף לאלפי לקוחות מרוצים שכבר מנהלים את האירועים שלהם עם Meet-M!
+            <div>
+              <h3 className="text-sm font-bold text-indigo-300 mb-2">🎯 מה תקבל?</h3>
+              <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs text-slate-300">
+                {[
+                  'הזמנות מעוצבות',
+                  'שליחה אוטומטית',
+                  'SMS + WhatsApp',
+                  'תזכורות',
+                  'מעקב אישורים',
+                  'דוחות בזמן אמת',
+                  'ניהול אורחים',
+                  'העדפות מזון',
+                  'ייצוא Excel',
+                  'ארכיון',
+                  'מפה + ניווט',
+                ].map((f) => (
+                  <div key={f} className="flex items-center gap-1">
+                    <span className="text-indigo-400">✓</span>
+                    <span>{f}</span>
+                  </div>
+                ))}
               </div>
-              <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                <button
-                  onClick={() => {
-                    setShowFeatures(false);
-                    stepRef.current?.createNewEvent?.();
-                  }}
-                  className="bg-gradient-to-r from-green-500 to-emerald-600 text-white px-8 py-4 rounded-full font-bold hover:from-green-600 hover:to-emerald-700 transition-all shadow-lg transform hover:scale-105 text-lg"
-                >
-                  🚀 התחל עכשיו
-                </button>
-                <button
-                  onClick={() => setShowFeatures(false)}
-                  className="bg-gray-200 text-gray-700 px-6 py-3 rounded-full font-medium hover:bg-gray-300 transition-colors"
-                >
-                  סגור
-                </button>
-              </div>
-              
             </div>
           </div>
-        </div>
-      )}
+
+          <p className="text-center text-xs text-slate-400">🎉 אלפי לקוחות מרוצים שכבר מנהלים את האירועים שלהם עם Meet-M</p>
+        </ModalBody>
+        <ModalFooter>
+          <button
+            onClick={() => setShowFeatures(false)}
+            className="px-5 py-2.5 rounded-xl border border-white/15 text-sm text-slate-300 hover:text-white hover:border-white/30 transition-colors"
+          >
+            סגור
+          </button>
+          <button
+            onClick={() => {
+              setShowFeatures(false);
+              stepRef.current?.createNewEvent?.();
+            }}
+            className="bg-gradient-to-br from-indigo-600 to-violet-600 shadow-[0_5px_22px_rgba(99,70,230,0.45)] text-white font-bold rounded-xl px-6 py-2.5 text-sm hover:opacity-90 transition-opacity"
+          >
+            התחל עכשיו
+          </button>
+        </ModalFooter>
+      </Modal>
     </>
   );
 }

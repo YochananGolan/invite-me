@@ -10,9 +10,47 @@ import * as XLSX from 'xlsx-js-style';
 import { format } from 'date-fns';
 import { useToast } from './Toast';
 import TranzilaPayment from './TranzilaPayment';
+import Modal, { ModalHeader, ModalBody, ModalFooter } from './Modal';
+import Drawer, { DrawerHeader, DrawerBody, DrawerFooter } from './Drawer';
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid, LabelList } from 'recharts';
 
 const RADIAN = Math.PI / 180;
+const previewMetricValueClass = 'max-w-full min-w-0 break-all tabular-nums leading-tight';
+const previewTableNumberClass = 'inline-block max-w-full min-w-0 break-all tabular-nums leading-tight';
+const invitationPreviewLineContainmentStyle = {
+  width: '100%',
+  maxWidth: '88%',
+  minWidth: 0,
+  boxSizing: 'border-box',
+  overflowWrap: 'anywhere',
+  wordBreak: 'break-word',
+};
+
+const getContainedChartNumberProps = (value, width) => {
+  const text = String(value ?? '');
+  const availableWidth = Math.max(10, (Number(width) || 0) - 8);
+  const estimatedTextWidth = text.length * 8;
+
+  return {
+    style: { fontVariantNumeric: 'tabular-nums' },
+    ...(text && estimatedTextWidth > availableWidth
+      ? { textLength: availableWidth, lengthAdjust: 'spacingAndGlyphs' }
+      : {}),
+  };
+};
+
+const getContainedStatusSliceLabelProps = (value, innerRadius, isOnlySlice) => {
+  const text = String(value ?? '');
+  const availableWidth = Math.max(14, (Number(innerRadius) || 0) * (isOnlySlice ? 1.25 : 0.85));
+  const estimatedTextWidth = text.length * (isOnlySlice ? 8 : 7);
+
+  return {
+    style: { fontVariantNumeric: 'tabular-nums' },
+    ...(text && estimatedTextWidth > availableWidth
+      ? { textLength: availableWidth, lengthAdjust: 'spacingAndGlyphs' }
+      : {}),
+  };
+};
 
 const CANONICAL_PLAN_CODES = new Set([
   'free',
@@ -124,6 +162,8 @@ const fieldLabels = {
 const DEFAULT_EVENT_TIME = '19:30';
 const DEFAULT_CHUPPAH_TIME = '21:00';
 const DEFAULT_CUSTOM_DESCRIPTION = 'תיאור האירוע';
+const STEP_BAR_SETTLE_DELAY_MS = 90;
+const STEP_BAR_SETTLE_DURATION_MS = 180;
 
 const parseEventDate = (str) => {
   if (!str) return null;
@@ -202,6 +242,7 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick, trig
   const router = useRouter();
   const { addToast } = useToast();
   const sessionRef = useRef(session);
+  const hasSession = !!session;
   // After the user מחק אירוע קיים once successfully in this session, we don't need
   // to לבקש מחיקה שוב בכל לחיצה על "צור אירוע חדש".
   const [hasClearedExistingEvent, setHasClearedExistingEvent] = useState(false);
@@ -373,6 +414,7 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick, trig
         dominantBaseline={insideBar ? 'middle' : 'baseline'}
         fontWeight="700"
         fontSize="14"
+        {...getContainedChartNumberProps(value, width)}
       >
         {value}
       </text>
@@ -399,10 +441,11 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick, trig
         textAnchor="middle"
         dominantBaseline="central"
         fontWeight="700"
-        fontSize={isOnlySlice ? 22 : 18}
+        fontSize={isOnlySlice ? 14 : 13}
         stroke="#FFFFFF"
-        strokeWidth={isOnlySlice ? 5 : 3}
+        strokeWidth={isOnlySlice ? 3 : 2}
         style={{ paintOrder: 'stroke' }}
+        {...getContainedStatusSliceLabelProps(numericValue, innerRadius, isOnlySlice)}
       >
         {numericValue}
       </text>
@@ -497,6 +540,74 @@ const [hasWhatsAppGroup, setHasWhatsAppGroup] = useState(false);
 // Process flow diagram modal
   const [showFlowDiagram, setShowFlowDiagram] = useState(false);
   const [selectedFlowStep, setSelectedFlowStep] = useState(null);
+  const [stepBarPhase, setStepBarPhase] = useState('fixed');
+  const [stepBarTransform, setStepBarTransform] = useState('translate3d(0, 0, 0)');
+  const [stepBarHeight, setStepBarHeight] = useState(null);
+  const stepBarAnchorRef = useRef(null);
+  const stepBarRef = useRef(null);
+
+  useEffect(() => {
+    if (!hasSession) {
+      setStepBarPhase('fixed');
+      setStepBarTransform('translate3d(0, 0, 0)');
+      setStepBarHeight(null);
+      return undefined;
+    }
+
+    let startTimer;
+    let settleTimer;
+    let firstFrame;
+    let secondFrame;
+
+    const settleImmediately = () => {
+      setStepBarPhase('settled');
+      setStepBarTransform('translate3d(0, 0, 0)');
+    };
+
+    setStepBarPhase('fixed');
+    setStepBarTransform('translate3d(0, 0, 0)');
+
+    startTimer = window.setTimeout(() => {
+      const bar = stepBarRef.current;
+      const anchor = stepBarAnchorRef.current;
+
+      if (!bar || !anchor) {
+        settleImmediately();
+        return;
+      }
+
+      const barRect = bar.getBoundingClientRect();
+      const anchorRect = anchor.getBoundingClientRect();
+      const prefersReducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+
+      setStepBarHeight(barRect.height);
+
+      if (prefersReducedMotion) {
+        settleImmediately();
+        return;
+      }
+
+      const deltaX = Math.round(anchorRect.left - barRect.left);
+      const deltaY = Math.round(anchorRect.top - barRect.top);
+      const nextTransform = `translate3d(${deltaX}px, ${deltaY}px, 0)`;
+
+      firstFrame = window.requestAnimationFrame(() => {
+        secondFrame = window.requestAnimationFrame(() => {
+          setStepBarPhase('settling');
+          setStepBarTransform(nextTransform);
+        });
+      });
+
+      settleTimer = window.setTimeout(settleImmediately, STEP_BAR_SETTLE_DURATION_MS + 80);
+    }, STEP_BAR_SETTLE_DELAY_MS);
+
+    return () => {
+      window.clearTimeout(startTimer);
+      window.clearTimeout(settleTimer);
+      if (firstFrame) window.cancelAnimationFrame(firstFrame);
+      if (secondFrame) window.cancelAnimationFrame(secondFrame);
+    };
+  }, [hasSession]);
 
   // Pricing plan selection modal
   const [showPricingPlan, setShowPricingPlan] = useState(false);
@@ -1061,6 +1172,7 @@ const shouldShowWhatsAppGroupUpdateButton = Boolean(currentEventId && (hasWhatsA
           dominantBaseline={insideBar ? 'middle' : 'baseline'}
           fontWeight="700"
           fontSize="14"
+          {...getContainedChartNumberProps(value, width)}
         >
           {value}
         </text>
@@ -1725,6 +1837,10 @@ const handleOpenAddonModal = React.useCallback(() => {
     const def = getDefaultStyleForRow(index);
     return { ...def, ...style };
   };
+  const getDarkThemePreviewColor = (color) => {
+    if (!color || color === 'black' || color === '#000000') return '#f8fafc';
+    return color;
+  };
 
   const [customInvitationText, setCustomInvitationText] = useState('');
   const [lineStyles, setLineStyles] = useState({});
@@ -1759,7 +1875,7 @@ const handleOpenAddonModal = React.useCallback(() => {
     rose: 'bg-rose-500',
     violet: 'bg-violet-600',
     darkgreen: 'bg-green-800',
-    crimson: 'bg-red-700',
+    crimson: 'bg-red-600',
     turquoise: 'bg-teal-400'
   };
   const colorKeys = ['black', 'red', 'blue', 'green', 'purple', 'orange', 'brown', 'gold', 'pink', 'cyan', 'indigo', 'teal', 'navy', 'maroon', 'lime', 'olive', 'coral', 'lavender', 'slate', 'rose', 'violet', 'darkgreen', 'crimson', 'turquoise'];
@@ -5927,86 +6043,81 @@ React.useEffect(()=>{
     return (
       <>
         {showFlowDiagram && (
-          <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50 p-2">
-            <div className="relative bg-white rounded-lg p-4 w-full max-w-6xl h-[98vh] overflow-hidden flex flex-col">
-              <button
-                onClick={() => setShowFlowDiagram(false)}
-                className="absolute top-4 left-4 text-3xl text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-full w-10 h-10 flex items-center justify-center font-bold transition-all z-10"
-                aria-label="\u05E1\u05D2\u05D5\u05E8"
-              >&times;</button>
-              <h2 className="text-2xl md:text-3xl font-bold mb-3 text-center text-primary">{'\u05EA\u05D9\u05D0\u05D5\u05E8 \u05EA\u05D4\u05DC\u05D9\u05DA \u05D9\u05E6\u05D9\u05E8\u05EA \u05D0\u05D9\u05E8\u05D5\u05E2 \u05D1-Meet-M'}</h2>
-              <p className="text-center text-gray-600 text-base mb-3">{'\u05DB\u05DA \u05E0\u05E8\u05D0\u05D4 \u05D4\u05EA\u05D4\u05DC\u05D9\u05DA \u05DC\u05D9\u05E6\u05D9\u05E8\u05EA \u05D4\u05D0\u05D9\u05E8\u05D5\u05E2 \u05E9\u05DC\u05DA'}</p>
+          <Modal open={showFlowDiagram} onClose={() => setShowFlowDiagram(false)} size="xl">
+            <ModalHeader onClose={() => setShowFlowDiagram(false)}>{'\u05EA\u05D9\u05D0\u05D5\u05E8 \u05EA\u05D4\u05DC\u05D9\u05DA \u05D9\u05E6\u05D9\u05E8\u05EA \u05D0\u05D9\u05E8\u05D5\u05E2 \u05D1-Meet-M'}</ModalHeader>
+            <ModalBody>
+              <p className="text-center text-slate-400 text-base mb-3">{'\u05DB\u05DA \u05E0\u05E8\u05D0\u05D4 \u05D4\u05EA\u05D4\u05DC\u05D9\u05DA \u05DC\u05D9\u05E6\u05D9\u05E8\u05EA \u05D4\u05D0\u05D9\u05E8\u05D5\u05E2 \u05E9\u05DC\u05DA'}</p>
               <div className="border-b-2 border-primary mb-3"></div>
-              <div className="w-full mx-auto flex-1 overflow-y-auto px-2">
+              <div className="w-full mx-auto px-2">
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                   <div className="space-y-2">
                     <h3 className="text-xl font-bold text-primary text-right mb-3 pr-2">{'\u05D4\u05EA\u05D7\u05DC\u05D4:'}</h3>
-                    <div className="border-2 border-gray-300 rounded-lg p-4 flex items-center gap-3">
+                    <div className="bg-white/5 border border-white/10 rounded-xl p-4 flex items-center gap-3">
                       <div className="text-4xl flex-shrink-0">{'\u2705'}</div>
                       <div className="flex-1 text-right">
                         <h3 className="text-lg font-bold text-primary">{'\u05E4\u05EA\u05D9\u05D7\u05EA \u05D0\u05D9\u05E8\u05D5\u05E2 \u05D7\u05D3\u05E9'}</h3>
-                        <p className="text-base text-gray-600">{'\u05D0\u05D9\u05E9\u05D5\u05E8 \u05D5\u05D0\u05D9\u05E4\u05D5\u05E1 \u05D4\u05DE\u05E2\u05E8\u05DB\u05EA \u05DC\u05D0\u05D9\u05E8\u05D5\u05E2 \u05D7\u05D3\u05E9'}</p>
+                        <p className="text-base text-slate-400">{'\u05D0\u05D9\u05E9\u05D5\u05E8 \u05D5\u05D0\u05D9\u05E4\u05D5\u05E1 \u05D4\u05DE\u05E2\u05E8\u05DB\u05EA \u05DC\u05D0\u05D9\u05E8\u05D5\u05E2 \u05D7\u05D3\u05E9'}</p>
                       </div>
                     </div>
-                    <div className="border-2 border-gray-300 rounded-lg p-4 flex items-center gap-3">
+                    <div className="bg-white/5 border border-white/10 rounded-xl p-4 flex items-center gap-3">
                       <div className="text-4xl flex-shrink-0">{'\uD83D\uDCB0'}</div>
                       <div className="flex-1 text-right">
                         <h3 className="text-lg font-bold text-primary">{'\u05D1\u05D7\u05D9\u05E8\u05EA \u05DE\u05E1\u05DC\u05D5\u05DC'}</h3>
-                        <p className="text-base text-gray-600">{'\u05D1\u05D7\u05E8 \u05D0\u05EA \u05D4\u05D7\u05D1\u05D9\u05DC\u05D4 \u05D4\u05DE\u05EA\u05D0\u05D9\u05DE\u05D4 \u05DC\u05D0\u05D9\u05E8\u05D5\u05E2 \u05E9\u05DC\u05DA'}</p>
+                        <p className="text-base text-slate-400">{'\u05D1\u05D7\u05E8 \u05D0\u05EA \u05D4\u05D7\u05D1\u05D9\u05DC\u05D4 \u05D4\u05DE\u05EA\u05D0\u05D9\u05DE\u05D4 \u05DC\u05D0\u05D9\u05E8\u05D5\u05E2 \u05E9\u05DC\u05DA'}</p>
                       </div>
                     </div>
                   </div>
                   <div className="space-y-2">
                     <h3 className="text-xl font-bold text-primary text-right mb-3 pr-2">{'\u05D4\u05D2\u05D3\u05E8\u05EA \u05D4\u05D0\u05D9\u05E8\u05D5\u05E2:'}</h3>
-                    <div className="border-2 border-gray-300 rounded-lg p-4 flex items-center gap-3">
+                    <div className="bg-white/5 border border-white/10 rounded-xl p-4 flex items-center gap-3">
                       <div className="text-4xl flex-shrink-0">{'\uD83C\uDF89'}</div>
                       <div className="flex-1 text-right">
                         <h3 className="text-lg font-bold text-primary">{'\u05E9\u05DC\u05D1 1: \u05E1\u05D5\u05D2 \u05D0\u05D9\u05E8\u05D5\u05E2'}</h3>
-                        <p className="text-base text-gray-600">{'\u05D7\u05EA\u05D5\u05E0\u05D4, \u05D1\u05E8 \u05DE\u05E6\u05D5\u05D5\u05D4, \u05D9\u05D5\u05DD \u05D4\u05D5\u05DC\u05D3\u05EA \u05D5\u05E2\u05D5\u05D3'}</p>
+                        <p className="text-base text-slate-400">{'\u05D7\u05EA\u05D5\u05E0\u05D4, \u05D1\u05E8 \u05DE\u05E6\u05D5\u05D5\u05D4, \u05D9\u05D5\u05DD \u05D4\u05D5\u05DC\u05D3\u05EA \u05D5\u05E2\u05D5\u05D3'}</p>
                       </div>
                     </div>
-                    <div className="border-2 border-gray-300 rounded-lg p-4 flex items-center gap-3">
+                    <div className="bg-white/5 border border-white/10 rounded-xl p-4 flex items-center gap-3">
                       <div className="text-4xl flex-shrink-0">{'\uD83D\uDCDD'}</div>
                       <div className="flex-1 text-right">
                         <h3 className="text-lg font-bold text-primary">{'\u05E9\u05DC\u05D1 2: \u05E4\u05E8\u05D8\u05D9 \u05D4\u05D0\u05D9\u05E8\u05D5\u05E2'}</h3>
-                        <p className="text-base text-gray-600">{'\u05EA\u05D0\u05E8\u05D9\u05DA, \u05E9\u05E2\u05D4, \u05DE\u05E7\u05D5\u05DD \u05D5\u05E4\u05E8\u05D8\u05D9\u05DD \u05E0\u05D5\u05E1\u05E4\u05D9\u05DD'}</p>
+                        <p className="text-base text-slate-400">{'\u05EA\u05D0\u05E8\u05D9\u05DA, \u05E9\u05E2\u05D4, \u05DE\u05E7\u05D5\u05DD \u05D5\u05E4\u05E8\u05D8\u05D9\u05DD \u05E0\u05D5\u05E1\u05E4\u05D9\u05DD'}</p>
                       </div>
                     </div>
-                    <div className="border-2 border-gray-300 rounded-lg p-4 flex items-center gap-3">
+                    <div className="bg-white/5 border border-white/10 rounded-xl p-4 flex items-center gap-3">
                       <div className="text-4xl flex-shrink-0">{'\uD83C\uDFA8'}</div>
                       <div className="flex-1 text-right">
                         <h3 className="text-lg font-bold text-primary">{'\u05E9\u05DC\u05D1 3: \u05E2\u05D9\u05E6\u05D5\u05D1 \u05D4\u05D6\u05DE\u05E0\u05D4'}</h3>
-                        <p className="text-base text-gray-600">{'\u05D1\u05D7\u05E8 \u05DE\u05EA\u05D5\u05DA 45 \u05EA\u05D1\u05E0\u05D9\u05D5\u05EA \u05DE\u05E2\u05D5\u05E6\u05D1\u05D5\u05EA'}</p>
+                        <p className="text-base text-slate-400">{'\u05D1\u05D7\u05E8 \u05DE\u05EA\u05D5\u05DA 45 \u05EA\u05D1\u05E0\u05D9\u05D5\u05EA \u05DE\u05E2\u05D5\u05E6\u05D1\u05D5\u05EA'}</p>
                       </div>
                     </div>
                   </div>
                   <div className="space-y-2">
                     <h3 className="text-xl font-bold text-primary text-right mb-3 pr-2">{'\u05E0\u05D9\u05D4\u05D5\u05DC \u05D5\u05DE\u05E2\u05E7\u05D1:'}</h3>
-                    <div className="border-2 border-gray-300 rounded-lg p-4 flex items-center gap-3">
+                    <div className="bg-white/5 border border-white/10 rounded-xl p-4 flex items-center gap-3">
                       <div className="text-4xl flex-shrink-0">{'\uD83D\uDCF1'}</div>
                       <div className="flex-1 text-right">
                         <h3 className="text-lg font-bold text-primary">{'\u05E9\u05DC\u05D1 4: \u05E9\u05DC\u05D9\u05D7\u05EA \u05D4\u05D6\u05DE\u05E0\u05D5\u05EA'}</h3>
-                        <p className="text-base text-gray-600">{'\u05E9\u05DC\u05D9\u05D7\u05D4 \u05D0\u05D5\u05D8\u05D5\u05DE\u05D8\u05D9\u05EA \u05DC SMS \u05D5-WhatsApp'}</p>
+                        <p className="text-base text-slate-400">{'\u05E9\u05DC\u05D9\u05D7\u05D4 \u05D0\u05D5\u05D8\u05D5\u05DE\u05D8\u05D9\u05EA \u05DC SMS \u05D5-WhatsApp'}</p>
                       </div>
                     </div>
-                    <div className="border-2 border-gray-300 rounded-lg p-4 flex items-center gap-3">
+                    <div className="bg-white/5 border border-white/10 rounded-xl p-4 flex items-center gap-3">
                       <div className="text-4xl flex-shrink-0">{'\uD83D\uDCCA'}</div>
                       <div className="flex-1 text-right">
                         <h3 className="text-lg font-bold text-primary">{'\u05E9\u05DC\u05D1 5: \u05D3\u05D5\u05D7\u05D5\u05EA \u05D1\u05E7\u05E8\u05D4'}</h3>
-                        <p className="text-base text-gray-600">{'\u05DE\u05E2\u05E7\u05D1 \u05D0\u05D9\u05E9\u05D5\u05E8\u05D9 \u05D4\u05D2\u05E2\u05D4 \u05D5\u05D9\u05D9\u05E6\u05D5\u05D0 \u05DC\u05D0\u05E7\u05E1\u05DC'}</p>
+                        <p className="text-base text-slate-400">{'\u05DE\u05E2\u05E7\u05D1 \u05D0\u05D9\u05E9\u05D5\u05E8\u05D9 \u05D4\u05D2\u05E2\u05D4 \u05D5\u05D9\u05D9\u05E6\u05D5\u05D0 \u05DC\u05D0\u05E7\u05E1\u05DC'}</p>
                       </div>
                     </div>
                   </div>
                 </div>
               </div>
-              <div className="flex justify-center gap-4 mt-4 pt-3 border-t border-gray-200">
-                <button
-                  onClick={() => setShowFlowDiagram(false)}
-                  className="bg-gray-200 text-gray-700 border border-gray-300 rounded-full px-8 py-3 font-medium hover:bg-gray-300 transition-all"
-                >{'\u05E1\u05D2\u05D5\u05E8'}</button>
-              </div>
-            </div>
-          </div>
+            </ModalBody>
+            <ModalFooter>
+              <button
+                onClick={() => setShowFlowDiagram(false)}
+                className="border border-white/15 bg-transparent text-white hover:border-indigo-300 hover:text-indigo-200 rounded-full px-8 py-3 font-medium transition-all"
+              >{'\u05E1\u05D2\u05D5\u05E8'}</button>
+            </ModalFooter>
+          </Modal>
         )}
       </>
     );
@@ -6015,46 +6126,46 @@ React.useEffect(()=>{
   return (
     <>
       {/* Capacity Limit Warning Modal */}
-      {showPlanLimitWarning && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black/70 z-[100]">
-          <div className="bg-white rounded-lg p-4 sm:p-6 w-full max-w-lg mx-3 text-center shadow-2xl">
-            {(() => {
-              const baseLimit = getPlanBaseLimit(selectedPlan || planForDisplay || userPlanSettings?.plan || null) || 0;
-              const extraCapacity = addonCountForDisplay * (getPlanBaseLimit('addon') || 100);
-              const totalLimit = baseLimit + extraCapacity;
-              const messagesOverQuota = Math.max(0, effectiveMessagesSentCount - totalLimit);
-              const addonUnit = getPlanBaseLimit('addon') || 100;
-              const numPackages = Math.max(1, pendingAddonCount);
-              const totalMessages = numPackages * addonUnit;
-              const totalCost = numPackages * 100;
+      <Modal open={showPlanLimitWarning} onClose={() => { setShowPlanLimitWarning(false); resetCapacityWarningGuests(); }} size="md">
+        <ModalHeader onClose={() => { setShowPlanLimitWarning(false); resetCapacityWarningGuests(); }}>חרגת ממכסת ההודעות!</ModalHeader>
+        <ModalBody>
+          {showPlanLimitWarning && (() => {
+            const baseLimit = getPlanBaseLimit(selectedPlan || planForDisplay || userPlanSettings?.plan || null) || 0;
+            const extraCapacity = addonCountForDisplay * (getPlanBaseLimit('addon') || 100);
+            const totalLimit = baseLimit + extraCapacity;
+            const messagesOverQuota = Math.max(0, effectiveMessagesSentCount - totalLimit);
+            const addonUnit = getPlanBaseLimit('addon') || 100;
+            const numPackages = Math.max(1, pendingAddonCount);
+            const totalMessages = numPackages * addonUnit;
+            const totalCost = numPackages * 100;
 
-              return (
-                <div>
-                  <h2 className="text-xl font-bold text-primary mb-2">חרגת ממכסת ההודעות!</h2>
-                  <p className="text-sm text-gray-700 mb-3">
-                    נשלחו <strong className="text-primary">{effectiveMessagesSentCount}</strong> הודעות
+            return (
+              <div className="text-center">
+                  <h2 className="text-xl font-bold text-amber-200 mb-2">חרגת ממכסת ההודעות!</h2>
+                  <p className="text-sm text-slate-300 mb-3">
+                    נשלחו <strong className="text-amber-200">{effectiveMessagesSentCount}</strong> הודעות
                   </p>
 
-                  <div className="bg-blue-50 border border-blue-300 rounded-lg p-3 mb-3">
+                  <div className="bg-indigo-500/10 border border-indigo-400/20 rounded-xl p-3 mb-3">
                     <div className="flex items-center justify-center gap-3 mb-1">
                       <div className="text-center">
-                        <div className="text-2xl font-bold text-primary">{totalLimit}</div>
-                        <div className="text-xs text-gray-600">מכסת הודעות נוכחית</div>
+                        <div className="text-2xl font-bold text-slate-100">{totalLimit}</div>
+                        <div className="text-xs text-slate-400">מכסת הודעות נוכחית</div>
                       </div>
-                      <div className="text-xl text-gray-400">→</div>
+                      <div className="text-xl text-slate-400">→</div>
                       <div className="text-center">
-                        <div className="text-2xl font-bold text-green-600">{effectiveMessagesSentCount}</div>
-                        <div className="text-xs text-gray-600">הודעות שנשלחו</div>
+                        <div className="text-2xl font-bold text-emerald-300">{effectiveMessagesSentCount}</div>
+                        <div className="text-xs text-slate-400">הודעות שנשלחו</div>
                       </div>
                     </div>
-                    <p className="text-sm font-semibold text-gray-700">
-                      נדרשים עוד <strong className="text-red-600">{messagesOverQuota}</strong> הודעות במכסה
+                    <p className="text-sm font-semibold text-slate-300">
+                      נדרשים עוד <strong className="text-red-400">{messagesOverQuota}</strong> הודעות במכסה
                     </p>
                   </div>
 
-                  <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-300 rounded-lg p-3 mb-3">
-                    <h3 className="text-base font-bold text-green-800 mb-1">💰 חבילות הרחבה – 100 הודעות / ₪100</h3>
-                    <p className="text-xs text-gray-700 font-semibold mb-2">בחר כמה חבילות לרכוש:</p>
+                  <div className="bg-emerald-500/20 border border-emerald-400/30 rounded-xl p-3 mb-3">
+                    <h3 className="text-base font-bold text-emerald-300 mb-1">💰 חבילות הרחבה – 100 הודעות / ₪100</h3>
+                    <p className="text-xs text-slate-300 font-semibold mb-2">בחר כמה חבילות לרכוש:</p>
                     <div className="flex flex-wrap justify-center gap-1.5 mb-2">
                       {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => (
                         <button
@@ -6063,25 +6174,25 @@ React.useEffect(()=>{
                           onClick={() => setPendingAddonCount(n)}
                           className={`w-9 h-9 rounded-full font-bold border-2 text-sm transition-all ${
                             numPackages === n
-                              ? 'bg-green-600 text-white border-green-700'
-                              : 'bg-white text-gray-700 border-gray-300 hover:border-green-500'
+                              ? 'bg-emerald-600 text-white border-emerald-400/50'
+                              : 'bg-white/10 border border-white/20 text-white hover:border-emerald-400'
                           }`}
                         >
                           {n}
                         </button>
                       ))}
                     </div>
-                    <p className="text-sm text-gray-700">
+                    <p className="text-sm text-slate-300">
                       <strong>{numPackages}</strong> {numPackages === 1 ? 'חבילה' : 'חבילות'} = <strong>{totalMessages}</strong> הודעות נוספות
                       {' · '}
-                      <strong>סה"כ:</strong> <span className="text-lg font-bold text-green-600">₪{totalCost}</span>
+                      <strong>סה"כ:</strong> <span className="text-lg font-bold text-emerald-300">₪{totalCost}</span>
                     </p>
                   </div>
 
                   <div className="flex justify-center gap-3">
                     <button
                       onClick={handlePurchaseAddon}
-                      className="bg-gradient-to-r from-green-600 to-emerald-600 text-white border-2 border-green-700 rounded-full px-6 py-3 font-bold text-base hover:from-green-700 hover:to-emerald-700 transition-all shadow-lg"
+                      className="bg-gradient-to-r from-emerald-600 to-emerald-600 text-white border-2 border-emerald-400/50 rounded-full px-6 py-3 font-bold text-base hover:from-emerald-700 hover:to-emerald-700 transition-all shadow-lg"
                     >
                       🛒 רכוש {numPackages} {numPackages === 1 ? 'חבילה' : 'חבילות'} (₪{totalCost})
                     </button>
@@ -6090,26 +6201,25 @@ React.useEffect(()=>{
                         setShowPlanLimitWarning(false);
                         resetCapacityWarningGuests();
                       }}
-                      className="bg-gray-200 text-gray-700 border border-gray-300 rounded-full px-5 py-3 font-medium text-sm hover:bg-gray-300 transition-all"
+                      className="border border-white/15 bg-transparent text-white hover:border-indigo-300 hover:text-indigo-200 rounded-full px-5 py-3 font-medium text-sm transition-all"
                     >
                       ביטול
                     </button>
                   </div>
 
-                  <p className="text-xs text-gray-400 mt-2">
-                    * תשלום חד פעמי לאירוע • ללא מנויים
-                  </p>
-                </div>
-              );
-            })()}
-          </div>
-        </div>
-      )}
+                <p className="text-xs text-slate-400 mt-2">
+                  * תשלום חד פעמי לאירוע • ללא מנויים
+                </p>
+              </div>
+            );
+          })()}
+        </ModalBody>
+      </Modal>
 
       {/* הודעה כשהאירוע הסתיים (עבר התאריך) – מאפשר למשתמש להבין שאפשר לפתוח אירוע חדש */}
       {showEventEndedNotice && !currentEventId && !newEventStarted && (
-        <div className="fixed left-4 right-4 bottom-32 z-40 max-w-2xl mx-auto bg-green-50 border-2 border-green-500 rounded-xl shadow-lg p-4 flex flex-col gap-3">
-          <p className="text-green-900 font-semibold text-center text-lg">
+        <div className="fixed left-4 right-4 bottom-32 z-40 max-w-2xl mx-auto bg-emerald-500/20 border border-emerald-400/30 rounded-xl shadow-lg p-4 flex flex-col gap-3">
+          <p className="text-emerald-300 font-semibold text-center text-lg">
             האירוע הסתיים. כעת ניתן לפתוח אירוע חדש.
           </p>
           <div className="flex justify-center gap-3">
@@ -6118,7 +6228,7 @@ React.useEffect(()=>{
               onClick={() => {
                 setShowEventEndedNotice(false);
               }}
-              className="bg-white border border-green-400 text-green-800 font-medium py-2 px-6 rounded-full hover:bg-green-50"
+              className="bg-gradient-to-br from-indigo-600 to-violet-600 shadow-[0_5px_22px_rgba(99,70,230,0.45)] text-white font-bold py-2 px-6 rounded-xl"
             >
               הבנתי
             </button>
@@ -6128,12 +6238,12 @@ React.useEffect(()=>{
 
       {/* הודעה כשהמשתמש לוחץ על שלב 1–4 בלי ליצור אירוע ולבחור מסלול */}
       {showStepError && (
-        <div className="fixed left-4 right-4 bottom-24 z-30 max-w-2xl mx-auto bg-amber-50 border-2 border-amber-500 rounded-xl shadow-lg p-4 flex flex-col gap-3">
-          <p className="text-amber-900 font-semibold text-center text-lg">{stepErrorMsg}</p>
+        <div className="fixed left-4 right-4 bottom-24 z-30 max-w-2xl mx-auto bg-amber-500/10 border border-amber-400/30 backdrop-blur-xl rounded-xl shadow-2xl shadow-amber-950/30 p-4 flex flex-col gap-3">
+          <p className="text-amber-100 font-semibold text-center text-lg">{stepErrorMsg}</p>
           <button
             type="button"
             onClick={() => { setShowStepError(false); setStepErrorMsg(''); }}
-            className="bg-amber-500 hover:bg-amber-600 text-white font-bold py-2 px-6 rounded-full mx-auto"
+            className="bg-amber-500/20 hover:bg-amber-500/30 text-amber-100 border border-amber-300/30 font-bold py-2 px-6 rounded-full mx-auto transition-colors"
           >
             הבנתי
           </button>
@@ -6141,8 +6251,29 @@ React.useEffect(()=>{
       )}
 
       {/* סרגל שלבים: למשתמש מחובר תמיד (לא רק כשיש אירוע פעיל) — אחרת נעלם אחרי מחיקת אירוע / רענון */}
-      {session && (
-      <div className="fixed left-0 right-0 bottom-0 z-20 w-full bg-white/95 backdrop-blur-sm border-t border-gray-200 shadow-[0_-4px_12px_rgba(0,0,0,0.08)] py-2 px-2 sm:pt-3 sm:px-2" style={{ paddingBottom: 'max(0.4rem, env(safe-area-inset-bottom, 0.4rem))' }}>
+      {hasSession && (
+      <div
+        ref={stepBarAnchorRef}
+        className="relative mx-[calc(50%-50vw)] w-screen min-h-[7.25rem] sm:min-h-[5.25rem]"
+        style={stepBarHeight ? { minHeight: `${stepBarHeight}px` } : undefined}
+      >
+      <div
+        ref={stepBarRef}
+        className={`${stepBarPhase === 'settled' ? 'absolute inset-x-0 bottom-0' : 'fixed inset-x-0 bottom-0'} z-20 w-screen bg-gradient-to-b from-[#1a1d4a]/95 to-[#12143a]/95 backdrop-blur-2xl border-y border-white/[0.12] shadow-[0_-8px_32px_-4px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.08)] py-2.5 px-3 sm:pt-3 sm:px-4`}
+        style={{
+          paddingBottom: 'max(0.6rem, env(safe-area-inset-bottom, 0.6rem))',
+          transform: stepBarPhase === 'settled' ? undefined : stepBarTransform,
+          transition: stepBarPhase === 'settling'
+            ? `transform ${STEP_BAR_SETTLE_DURATION_MS}ms cubic-bezier(0.22, 1, 0.36, 1)`
+            : 'none',
+          willChange: stepBarPhase === 'settled' ? undefined : 'transform',
+        }}
+        onTransitionEnd={(event) => {
+          if (event.currentTarget !== event.target || event.propertyName !== 'transform') return;
+          setStepBarPhase('settled');
+          setStepBarTransform('translate3d(0, 0, 0)');
+        }}
+      >
         <div className="flex flex-col gap-1.5 sm:hidden px-1">
           <div className="grid grid-cols-3 gap-1.5">
             {steps.slice(1, 4).map((step, idx) => {
@@ -6169,13 +6300,13 @@ React.useEffect(()=>{
                   }}
                   className={`flex items-center justify-center gap-1.5 rounded-xl py-2.5 px-2 text-center transition-all ${
                     isFinished
-                      ? 'bg-primary text-white shadow-md'
+                      ? 'bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-[0_4px_14px_rgba(99,70,230,0.45)]'
                       : isDesign
-                        ? 'bg-gradient-to-r from-pink-50 to-purple-50 text-purple-800 border border-purple-300 shadow'
-                        : 'bg-[#FCE6AC] text-primary border border-primary/40'
+                        ? 'bg-violet-500/15 text-violet-100 border border-violet-400/40 shadow-[0_2px_10px_rgba(139,92,246,0.25)]'
+                        : 'bg-white/[0.06] text-slate-100 border border-white/15 hover:bg-white/[0.10] hover:border-indigo-400/40'
                   }`}
                 >
-                  <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-white/80 text-xs font-bold text-primary shrink-0">{realIdx}</span>
+                  <span className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-xs font-bold shrink-0 ${isFinished ? 'bg-white/25 text-white' : 'bg-indigo-500/30 text-indigo-200'}`}>{realIdx}</span>
                   <span className="text-sm font-bold leading-tight">{stepsMobile[realIdx]}</span>
                 </button>
               );
@@ -6207,11 +6338,11 @@ React.useEffect(()=>{
                   }}
                   className={`flex items-center justify-center gap-1.5 rounded-xl py-2.5 px-2 text-center transition-all ${
                     isFinished
-                      ? 'bg-primary text-white shadow-md'
-                      : 'bg-[#FCE6AC] text-primary border border-primary/40'
+                      ? 'bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-[0_4px_14px_rgba(99,70,230,0.45)]'
+                      : 'bg-white/[0.06] text-slate-100 border border-white/15 hover:bg-white/[0.10] hover:border-indigo-400/40'
                   }`}
                 >
-                  <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-white/80 text-xs font-bold text-primary shrink-0">{realIdx}</span>
+                  <span className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-xs font-bold shrink-0 ${isFinished ? 'bg-white/25 text-white' : 'bg-indigo-500/30 text-indigo-200'}`}>{realIdx}</span>
                   <span className="text-sm font-bold leading-tight">{stepsMobile[realIdx]}</span>
                 </button>
               );
@@ -6225,7 +6356,7 @@ React.useEffect(()=>{
                   e.stopPropagation();
                   openWhatsAppGroupModal();
                 }}
-                className="flex items-center justify-center gap-1.5 rounded-xl py-2.5 px-2 text-center transition-all bg-emerald-50 text-emerald-800 border border-emerald-300 shadow"
+                className="flex items-center justify-center gap-1.5 rounded-xl py-2.5 px-2 text-center transition-all bg-emerald-500/15 text-emerald-200 border border-emerald-400/40 shadow-[0_2px_10px_rgba(16,185,129,0.25)]"
               >
                 <span className="text-sm font-bold leading-tight">צור/עדכן קבוצת וואטסאפ</span>
               </button>
@@ -6259,10 +6390,10 @@ React.useEffect(()=>{
                 }}
                 className={`${
                   finishedSteps.includes(realIdx) || (realIdx === 3 && finishedSteps.includes(2))
-                    ? 'bg-primary text-white border border-primary rounded-full px-8 py-4 font-bold ring-2 ring-primary ring-offset-2 ring-offset-[#FCE6AC] hover:bg-[#FCE6AC]/90 transition-all text-lg shrink-0'
+                    ? 'bg-gradient-to-br from-indigo-600 to-violet-600 text-white border border-indigo-400/50 rounded-full px-7 py-3 font-bold shadow-[0_6px_20px_rgba(99,70,230,0.45)] hover:opacity-90 transition-all text-base shrink-0'
                     : realIdx === 3
-                      ? 'bg-gradient-to-r from-pink-100 to-purple-100 text-purple-800 border-2 border-purple-400 ring-2 ring-purple-400 ring-offset-2 ring-offset-purple-100 shadow-lg rounded-full px-8 py-4 font-bold transition-all text-lg shrink-0'
-                      : 'bg-[#FCE6AC] text-primary border border-primary rounded-full px-8 py-4 font-bold ring-2 ring-primary ring-offset-2 ring-offset-[#FCE6AC] hover:bg-[#FCE6AC]/90 transition-all text-lg shrink-0'
+                      ? 'bg-violet-500/15 text-violet-100 border border-violet-400/40 rounded-full px-7 py-3 font-bold shadow-[0_4px_14px_rgba(139,92,246,0.3)] hover:bg-violet-500/25 transition-all text-base shrink-0'
+                      : 'bg-white/[0.06] text-slate-100 border border-white/15 rounded-full px-7 py-3 font-bold hover:bg-white/[0.10] hover:border-indigo-400/50 transition-all text-base shrink-0'
                 }`}
               >
                 {step}
@@ -6279,12 +6410,13 @@ React.useEffect(()=>{
                 e.stopPropagation();
                 openWhatsAppGroupModal();
               }}
-              className="bg-emerald-600 text-white border border-emerald-700 rounded-full px-8 py-4 font-bold ring-2 ring-emerald-600 ring-offset-2 ring-offset-emerald-50 hover:bg-emerald-700 transition-all text-lg shrink-0"
+              className="bg-emerald-500/15 text-emerald-200 border border-emerald-400/40 rounded-full px-7 py-3 font-bold shadow-[0_4px_14px_rgba(16,185,129,0.3)] hover:bg-emerald-500/25 transition-all text-base shrink-0"
             >
               צור/עדכן קבוצת וואטסאפ
             </button>
           )}
         </div>
+      </div>
       </div>
       )}
 
@@ -6297,18 +6429,15 @@ React.useEffect(()=>{
           <div className="w-full flex flex-col gap-6">
             {/* Tranzila terminal name - always visible */}
             {tranzilaTerminalInfo && (
-              <div className="bg-slate-50 p-2 text-center shadow w-full text-sm" style={{
-                border: '1px solid #94a3b8',
-                borderRadius: '6px',
-              }}>
+              <div className="bg-white/[0.06] border border-white/15 p-2 text-center rounded-lg w-full text-sm text-slate-200">
                 מסוף טרנזילה: <strong>{tranzilaTerminalInfo.terminal}</strong>
                 {tranzilaTerminalInfo.isTestTerminal && (
-                  <span className="text-orange-600 mr-1">(מסוף בדיקות)</span>
+                  <span className="text-orange-300 mr-1">(מסוף בדיקות)</span>
                 )}
               </div>
             )}
             {currentEventId ? (
-              <div className="bg-green-50 p-3 sm:p-4 text-center shadow-lg w-full" style={{
+              <div className="bg-white/[0.055] border border-emerald-400/20 backdrop-blur-xl rounded-lg p-3 sm:p-4 text-center shadow-lg w-full" style={{
                 border: '3px solid #D4AF37',
                 outline: '2px solid #B8860B',
                 outlineOffset: '2px',
@@ -6317,24 +6446,24 @@ React.useEffect(()=>{
               }}>
                 <div className="flex items-center justify-center gap-2 mb-2">
                   <span className="text-2xl">✅</span>
-                  <h3 className="text-lg font-bold text-green-800">יש אירוע פעיל במערכת</h3>
+                  <h3 className="text-lg font-bold text-emerald-300">יש אירוע פעיל במערכת</h3>
                 </div>
-                <p className="text-green-700">
+                <p className="text-slate-300">
                   <strong>סוג האירוע:</strong> {selectedEventType || 'לא מוגדר'}
                 </p>
                 {formData.date && (
-                  <p className="text-green-700">
+                  <p className="text-slate-300">
                     <strong>תאריך האירוע:</strong> {new Date(formData.date).toLocaleDateString('he-IL')}
                   </p>
                 )}
                 {formData.hallName && (
-                  <p className="text-green-700">
+                  <p className="text-slate-300">
                     <strong>אולם:</strong> {formData.hallName}
                   </p>
                 )}
                 {formData.date && (
-                  <div className="bg-green-100 border-2 border-green-600 rounded-lg p-3 mt-3 mb-2">
-                    <p className="text-green-800 font-bold text-2xl text-center">
+                  <div className="bg-emerald-500/10 border border-emerald-400/30 rounded-lg p-3 mt-3 mb-2">
+                    <p className="text-emerald-200 font-bold text-2xl text-center">
                       {(() => {
                         const eventDate = new Date(formData.date);
                         const today = new Date();
@@ -6352,12 +6481,12 @@ React.useEffect(()=>{
                     </p>
                   </div>
                 )}
-                <p className="text-green-600 text-base mt-2 font-bold">
+                <p className="text-emerald-300 text-base mt-2 font-bold">
                   האירוע מוכן לשליחת הזמנות ואישורי הגעה
                 </p>
               </div>
             ) : newEventStarted ? (
-              <div className="bg-blue-50 p-4 text-center shadow-lg flex-1" style={{
+              <div className="bg-white/[0.055] border border-indigo-400/20 backdrop-blur-xl rounded-lg p-4 text-center shadow-lg flex-1" style={{
                 border: '3px solid #3b82f6',
                 outline: '2px solid #1d4ed8',
                 outlineOffset: '2px',
@@ -6365,12 +6494,12 @@ React.useEffect(()=>{
               }}>
                 <div className="flex items-center justify-center gap-2 mb-2">
                   <span className="text-2xl">🚀</span>
-                  <h3 className="text-lg font-bold text-blue-800">מסלול פעיל – הזמן להתחיל אירוע חדש</h3>
+                  <h3 className="text-lg font-bold text-indigo-300">מסלול פעיל – הזמן להתחיל אירוע חדש</h3>
                 </div>
-                <p className="text-blue-700 mb-2">
+                <p className="text-slate-300 mb-2">
                   רכשת {getPlanDisplayName(selectedPlan) || 'מסלול'} בהצלחה. האירוע הקודם נסגר והמערכת מוכנה לאירוע חדש.
                 </p>
-                <p className="text-blue-700">
+                <p className="text-slate-300">
                   התחל בשלב 1 כדי לבחור סוג אירוע ולהזין את הפרטים.
                 </p>
                 <div className="flex justify-center gap-3 mt-4">
@@ -6387,30 +6516,25 @@ React.useEffect(()=>{
                   <button
                     type="button"
                     onClick={() => setShowPricingPlan(true)}
-                    className="bg-white text-primary font-semibold border border-primary py-2 px-4 rounded-full hover:bg-primary/10 transition-all"
+                    className="border border-white/15 bg-transparent text-white font-semibold hover:border-indigo-300 hover:text-indigo-200 py-2 px-4 rounded-full transition-all"
                   >
                     בחר מסלול אחר
                   </button>
                 </div>
               </div>
             ) : (
-              <div className="bg-gray-50 p-4 text-center shadow-lg flex-1" style={{
-                border: '3px solid #6b7280',
-                outline: '2px solid #374151',
-                outlineOffset: '2px',
-                borderRadius: '8px',
-              }}>
+              <div className="bg-white/[0.055] border border-white/15 backdrop-blur-xl rounded-2xl p-4 text-center shadow-lg flex-1">
                 <div className="flex items-center justify-center gap-2 mb-2">
                   <span className="text-2xl">📅</span>
-                  <h3 className="text-lg font-bold text-gray-800">אין אירוע פעיל</h3>
+                  <h3 className="text-lg font-bold text-slate-100">אין אירוע פעיל</h3>
                 </div>
-                <p className="text-gray-700">
+                <p className="text-slate-300">
                   אין אירוע פעיל במערכת. לחץ על "צור אירוע חדש" כדי להתחיל.
                 </p>
               </div>
             )}
             {(planForDisplay || currentEventId) && (
-              <div className="bg-yellow-50 p-3 sm:p-4 text-center shadow-lg w-full" style={{
+              <div className="bg-white/[0.055] border border-amber-400/20 backdrop-blur-xl rounded-lg p-3 sm:p-4 text-center shadow-lg w-full" style={{
                 border: '3px solid #D4AF37',
                 outline: '2px solid #B8860B',
                 outlineOffset: '2px',
@@ -6419,21 +6543,21 @@ React.useEffect(()=>{
               }}>
                 <div className="flex items-center justify-center gap-2 mb-2">
                   <span className="text-2xl">💰</span>
-                  <h3 className="text-lg font-bold text-yellow-800">מסלול פעיל</h3>
+                  <h3 className="text-lg font-bold text-amber-300">מסלול פעיל</h3>
                 </div>
                 {/* Display Tranzila Terminal Info */}
                 {tranzilaTerminalInfo && (
-                  <div className="text-xs text-gray-600 mb-2 px-2">
+                  <div className="text-xs text-slate-400 mb-2 px-2">
                     מסוף טרנזילה: <strong>{tranzilaTerminalInfo.terminal}</strong>
                     {tranzilaTerminalInfo.isTestTerminal && (
-                      <span className="text-orange-600 ml-1">(מסוף בדיקות)</span>
+                      <span className="text-orange-300 ml-1">(מסוף בדיקות)</span>
                     )}
                   </div>
                 )}
                 <div className="mt-3">
-                  <div className="bg-white p-3 rounded-lg border border-yellow-200 mb-3 space-y-3">
+                  <div className="bg-white/5 border border-white/10 rounded-xl p-3 mb-3 space-y-3">
                     <div>
-                      <div className="text-lg font-bold text-yellow-700 mb-1">
+                      <div className="text-lg font-bold text-amber-300 mb-1">
                         {displayPlanCode === 'basic' || displayPlanCode === 'free' ? 'מסלול א' : 
                          displayPlanCode === 'standard' ? 'מסלול ב' : 
                          displayPlanCode === 'premium' ? 'מסלול ג' : 
@@ -6441,7 +6565,7 @@ React.useEffect(()=>{
                          displayPlanCode === 'elite' ? 'מסלול ה' : 
                          displayPlanCode === 'supreme' ? 'מסלול ו' : 'מסלול א'}
                       </div>
-                      <div className="text-base text-gray-700 font-semibold">
+                      <div className="text-base text-slate-300 font-semibold">
                         {displayPlanCode === 'basic' || displayPlanCode === 'free' ? '₪1 - עד 50 הודעות' :
                          displayPlanCode === 'standard' ? '149₪ - מ 51 עד 200 הודעות' :
                          displayPlanCode === 'premium' ? '199₪ - מ 201 עד 350 הודעות' :
@@ -6450,20 +6574,20 @@ React.useEffect(()=>{
                          displayPlanCode === 'supreme' ? '499₪ - מ 651 עד 1000 הודעות' : '₪1 - עד 50 הודעות'}
                       </div>
                     </div>
-                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-                      <div className="text-sm font-semibold text-yellow-800 flex items-center justify-center gap-2 mb-2">
+                    <div className="bg-amber-500/10 border border-amber-400/30 rounded-lg p-3">
+                      <div className="text-sm font-semibold text-amber-200 flex items-center justify-center gap-2 mb-2">
                         <span className="text-lg">📦</span>
                         <span>חבילות נוספות שנרכשו:</span>
                       </div>
                       {displayPackageEntries.length > 0 ? (
                         <div className="flex flex-wrap justify-center gap-2 mb-3">
                           {displayPackageEntries.map(({ id, label, count, extra }) => (
-                            <div key={id} className="flex items-center gap-2 bg-white border border-yellow-300 rounded-full px-3 py-1 shadow-sm">
-                              <span className="text-sm font-semibold text-yellow-700">
+                            <div key={id} className="flex items-center gap-2 bg-white/5 border border-amber-400/20 rounded-full px-3 py-1 shadow-sm">
+                              <span className="text-sm font-semibold text-amber-200">
                                 {label} × {count}
                               </span>
                               {extra > 0 && (
-                                <span className="text-xs text-yellow-500">
+                                <span className="text-xs text-amber-300">
                                   +{extra} הודעות נוספות
                                 </span>
                               )}
@@ -6471,13 +6595,13 @@ React.useEffect(()=>{
                           ))}
                         </div>
                       ) : displayAdditionalCapacityValue > 0 ? (
-                        <p className="text-sm text-yellow-700 text-center">
+                        <p className="text-sm text-slate-300 text-center">
                           הקיבולת הוגדלה ב-{displayAdditionalCapacityValue} באמצעות חבילות הרחבה.
                         </p>
                       ) : (
-                        <p className="text-sm text-yellow-700 text-center">לא נרכשו חבילות נוספות</p>
+                        <p className="text-sm text-slate-300 text-center">לא נרכשו חבילות נוספות</p>
                       )}
-                      <div className="text-base font-bold text-yellow-800">
+                      <div className="text-base font-bold text-amber-200">
                         סה״כ כיסוי: {totalPlanCapacity} הודעות
                         {additionalCapacity > 0 && (
                           <> (מתוכם {additionalCapacity} באמצעות חבילות הרחבה)</>
@@ -6485,8 +6609,8 @@ React.useEffect(()=>{
                       </div>
                     </div>
                     {activePlanDescription && (
-                      <div className="bg-white p-2 rounded-lg border border-yellow-200">
-                        <div className="text-base text-gray-700 text-right leading-relaxed">
+                      <div className="bg-white/5 border border-white/10 rounded-xl p-2">
+                        <div className="text-base text-slate-300 text-right leading-relaxed">
                           {activePlanDescription}
                         </div>
                       </div>
@@ -6500,7 +6624,7 @@ React.useEffect(()=>{
           {/* Second Column - Guest Summary + Table Report */}
           {currentEventId && (
             <div className="w-full flex flex-col gap-6">
-              <div className="bg-blue-50 p-3 sm:p-4 text-center shadow-lg w-full min-h-[320px]" style={{
+              <div className="bg-white/[0.055] border border-indigo-400/20 backdrop-blur-xl rounded-lg p-3 sm:p-4 text-center shadow-lg w-full min-h-[320px]" style={{
                 border: '3px solid #D4AF37',
                 outline: '2px solid #B8860B',
                 outlineOffset: '2px',
@@ -6508,12 +6632,12 @@ React.useEffect(()=>{
               }}>
                 <div className="flex items-center justify-center gap-2 mb-2">
                   <span className="text-xl">👥</span>
-                  <h3 className="text-base font-bold text-blue-800">סיכום כל האורחים המוזמנים</h3>
+                  <h3 className="text-base font-bold text-indigo-300">סיכום כל האורחים המוזמנים</h3>
                 </div>
                 <div className="mt-1">
-                  <div className="bg-white p-3 rounded-lg border border-blue-100">
+                  <div className="bg-white/5 border border-white/10 rounded-xl p-3">
                     {!shouldShowCharts ? (
-                      <div className="py-10 text-sm text-gray-500 text-center">טוען נתונים...</div>
+                      <div className="py-10 text-sm text-slate-400 text-center">טוען נתונים...</div>
                     ) : hasGuestSummaryData ? (
                       <div className="h-56 min-h-[200px] sm:h-56">
                         <ResponsiveContainer width="100%" height="100%">
@@ -6524,11 +6648,11 @@ React.useEffect(()=>{
                             <CartesianGrid strokeDasharray="3 3" vertical={false} />
                             <XAxis
                               dataKey="name"
-                              stroke="#1f2937"
+                              stroke="#cbd5e1"
                               tick={{
                                 fontSize: isMobileView ? 12 : 16,
                                 fontWeight: 600,
-                                fill: isMobileView ? '#FDE68A' : '#1f2937',
+                                fill: isMobileView ? '#FDE68A' : '#cbd5e1',
                               }}
                               interval={0}
                               tickFormatter={(value) => {
@@ -6558,29 +6682,29 @@ React.useEffect(()=>{
                         </ResponsiveContainer>
                       </div>
                     ) : (
-                      <div className="py-10 text-sm text-gray-500 text-center">אין נתונים להצגה עדיין</div>
+                      <div className="py-10 text-sm text-slate-400 text-center">אין נתונים להצגה עדיין</div>
                     )}
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-3 text-base">
-                    <div className="bg-white p-2 rounded-lg border border-green-100 text-right">
-                      <div className="text-sm font-semibold text-green-600">מבוגרים</div>
-                      <div className="text-2xl font-bold text-green-700">{guestSummary.adults}</div>
+                    <div className="min-w-0 bg-white/5 border border-white/10 rounded-xl p-2 text-right">
+                      <div className="text-sm font-semibold text-emerald-300">מבוגרים</div>
+                      <div className={`${previewMetricValueClass} text-2xl font-bold text-emerald-200`}>{guestSummary.adults}</div>
                     </div>
-                    <div className="bg-white p-2 rounded-lg border border-orange-100 text-right">
-                      <div className="text-sm font-semibold text-orange-600">ילדים</div>
-                      <div className="text-2xl font-bold text-orange-700">{guestSummary.children}</div>
+                    <div className="min-w-0 bg-white/5 border border-white/10 rounded-xl p-2 text-right">
+                      <div className="text-sm font-semibold text-orange-400">ילדים</div>
+                      <div className={`${previewMetricValueClass} text-2xl font-bold text-orange-300`}>{guestSummary.children}</div>
                     </div>
-                    <div className="bg-white p-2 rounded-lg border border-purple-100 text-right">
-                      <div className="text-sm font-semibold text-purple-600">סה"כ</div>
-                      <div className="text-2xl font-bold text-purple-700">{guestSummary.adults + guestSummary.children}</div>
+                    <div className="min-w-0 bg-white/5 border border-white/10 rounded-xl p-2 text-right">
+                      <div className="text-sm font-semibold text-indigo-300">סה"כ</div>
+                      <div className={`${previewMetricValueClass} text-2xl font-bold text-indigo-200`}>{guestSummary.adults + guestSummary.children}</div>
                     </div>
                   </div>
                 </div>
               </div>
 
               {tableSummary.length > 0 && (
-                <div className="bg-orange-50 p-3 text-center shadow-lg w-full" style={{
+                <div className="bg-white/[0.055] border border-orange-400/20 backdrop-blur-xl rounded-lg p-3 text-center shadow-lg w-full" style={{
                   border: '3px solid #D4AF37',
                   outline: '2px solid #B8860B',
                   outlineOffset: '2px',
@@ -6590,34 +6714,34 @@ React.useEffect(()=>{
                 }}>
                   <div className="flex items-center justify-center gap-3 mb-3 flex-shrink-0">
                     <span className="text-2xl">📊</span>
-                    <h3 className="text-lg font-extrabold text-orange-900 tracking-wide">דוח סיכום שולחנות</h3>
+                    <h3 className="text-lg font-extrabold text-orange-300 tracking-wide">דוח סיכום שולחנות</h3>
                   </div>
                   <div className="mt-3 overflow-x-auto flex-grow">
                     <table className="w-full text-right border text-sm min-w-full">
                       <thead>
-                        <tr className="bg-white">
-                          <th className="p-2 border font-bold text-center text-orange-800">מס. שולחן</th>
-                          <th className="p-2 border font-bold text-center text-green-700">בוגרים</th>
-                          <th className="p-2 border font-bold text-center text-purple-700">ילדים</th>
-                          <th className="p-2 border font-bold text-center text-blue-700">סה"כ</th>
+                        <tr className="bg-white/5">
+                          <th className="p-2 border border-white/10 font-bold text-center text-orange-300">מס. שולחן</th>
+                          <th className="p-2 border border-white/10 font-bold text-center text-emerald-300">בוגרים</th>
+                          <th className="p-2 border border-white/10 font-bold text-center text-violet-300">ילדים</th>
+                          <th className="p-2 border border-white/10 font-bold text-center text-indigo-300">סה"כ</th>
                         </tr>
                       </thead>
                       <tbody>
                         {tableSummary.map((row, idx) => (
-                          <tr key={`table-${row.table_number}-${idx}`} className={idx % 2 === 0 ? 'bg-white' : 'bg-orange-100'}>
-                            <td className="p-2 border text-center font-semibold text-orange-800 text-xl">{row.table_number}</td>
-                            <td className="p-2 border text-center font-semibold text-green-700 text-xl">{row.adults}</td>
-                            <td className="p-2 border text-center font-semibold text-purple-700 text-xl">{row.children}</td>
-                            <td className="p-2 border text-center font-bold text-blue-700 text-2xl">{row.total}</td>
+                          <tr key={`table-${row.table_number}-${idx}`} className={idx % 2 === 0 ? 'bg-white/5' : 'bg-amber-500/10'}>
+                            <td className="p-2 border border-white/10 text-center font-semibold text-orange-200 text-xl"><span className={previewTableNumberClass}>{row.table_number}</span></td>
+                            <td className="p-2 border border-white/10 text-center font-semibold text-emerald-200 text-xl"><span className={previewTableNumberClass}>{row.adults}</span></td>
+                            <td className="p-2 border border-white/10 text-center font-semibold text-violet-200 text-xl"><span className={previewTableNumberClass}>{row.children}</span></td>
+                            <td className="p-2 border border-white/10 text-center font-bold text-indigo-200 text-2xl"><span className={previewTableNumberClass}>{row.total}</span></td>
                           </tr>
                         ))}
                       </tbody>
                       <tfoot>
-                        <tr className="bg-orange-200 font-bold">
-                          <td className="p-2 border text-center text-orange-900 text-xl">סה"כ</td>
-                          <td className="p-2 border text-center text-green-800 text-xl">{tableSummary.reduce((sum, r) => sum + r.adults, 0)}</td>
-                          <td className="p-2 border text-center text-purple-800 text-xl">{tableSummary.reduce((sum, r) => sum + r.children, 0)}</td>
-                          <td className="p-2 border text-center text-blue-800 text-2xl">{tableSummary.reduce((sum, r) => sum + r.total, 0)}</td>
+                        <tr className="bg-orange-500/15 font-bold">
+                          <td className="p-2 border border-white/10 text-center text-orange-200 text-xl">סה"כ</td>
+                          <td className="p-2 border border-white/10 text-center text-emerald-200 text-xl"><span className={previewTableNumberClass}>{tableSummary.reduce((sum, r) => sum + r.adults, 0)}</span></td>
+                          <td className="p-2 border border-white/10 text-center text-violet-200 text-xl"><span className={previewTableNumberClass}>{tableSummary.reduce((sum, r) => sum + r.children, 0)}</span></td>
+                          <td className="p-2 border border-white/10 text-center text-indigo-200 text-2xl"><span className={previewTableNumberClass}>{tableSummary.reduce((sum, r) => sum + r.total, 0)}</span></td>
                         </tr>
                       </tfoot>
                     </table>
@@ -6630,7 +6754,7 @@ React.useEffect(()=>{
           {/* Third Column - Guest Status Summary */}
           {currentEventId && (
             <div className="w-full flex flex-col gap-6">
-              <div className="bg-purple-50 p-3 sm:p-4 text-center shadow-lg w-full min-h-[320px]" style={{
+              <div className="bg-white/[0.055] border border-violet-400/20 backdrop-blur-xl rounded-lg p-3 sm:p-4 text-center shadow-lg w-full min-h-[320px]" style={{
                 border: '3px solid #D4AF37',
                 outline: '2px solid #B8860B',
                 outlineOffset: '2px',
@@ -6638,21 +6762,21 @@ React.useEffect(()=>{
               }}>
                 <div className="flex items-center justify-center gap-2 mb-2">
                   <span className="text-xl">📊</span>
-                  <h3 className="text-base font-bold text-purple-800">סטטוס אישורי הגעה</h3>
+                  <h3 className="text-base font-bold text-violet-300">סטטוס אישורי הגעה</h3>
                 </div>
-                <div className="bg-white rounded-lg text-right p-2 mt-3">
+                <div className="bg-white/5 border border-white/10 rounded-xl text-right p-2 mt-3">
                     {!shouldShowCharts ? (
-                    <div className="py-10 text-sm text-gray-500 text-center">טוען נתונים...</div>
+                    <div className="py-10 text-sm text-slate-400 text-center">טוען נתונים...</div>
                   ) : hasStatusData ? (
                     <div className="relative h-56 min-h-[200px] sm:h-56">
                       <ResponsiveContainer width="100%" height="100%">
-                        <PieChart>
+                        <PieChart margin={{ top: 8, right: 8, bottom: 8, left: 8 }}>
                           <Pie
                             data={statusChartData}
                             dataKey="value"
                             nameKey="name"
-                            innerRadius={55}
-                            outerRadius={95}
+                            innerRadius={isMobileView ? 46 : 58}
+                            outerRadius={isMobileView ? 78 : 88}
                             paddingAngle={3}
                             isAnimationActive={false}
                             label={renderStatusSliceLabel}
@@ -6669,43 +6793,44 @@ React.useEffect(()=>{
                           layout={isMobileView ? 'horizontal' : 'vertical'}
                             iconType="circle"
                           wrapperStyle={{
+                            maxWidth: isMobileView ? '100%' : 112,
                             direction: 'rtl',
                             textAlign: isMobileView ? 'center' : 'right',
-                            color: '#111827',
+                            color: '#cbd5e1',
                             marginTop: isMobileView ? 8 : 0,
                             fontSize: isMobileView ? 12 : 14
                           }}
                             formatter={(value) => (
-                              <span style={{ color: '#111827', fontWeight: 600 }}>{value}</span>
+                              <span style={{ color: '#cbd5e1', fontWeight: 600 }}>{value}</span>
                             )}
                           />
                         </PieChart>
                       </ResponsiveContainer>
                     </div>
                   ) : (
-                    <div className="py-10 text-sm text-gray-500">אין נתונים להצגה עדיין</div>
+                    <div className="py-10 text-sm text-slate-400">אין נתונים להצגה עדיין</div>
                   )}
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-3 text-base">
-                  <div className="bg-white p-2 rounded-lg border border-green-100 text-right">
-                    <div className="text-sm font-semibold text-green-600">אישרו הגעה</div>
-                    <div className="text-2xl font-bold text-green-700">{guestStatusSummary.approved}</div>
+                  <div className="min-w-0 bg-white/5 border border-white/10 rounded-xl p-2 text-right">
+                    <div className="text-sm font-semibold text-emerald-400">אישרו הגעה</div>
+                    <div className={`${previewMetricValueClass} text-2xl font-bold text-emerald-300`}>{guestStatusSummary.approved}</div>
                   </div>
-                  <div className="bg-white p-2 rounded-lg border border-yellow-200 text-right">
-                    <div className="text-sm font-semibold text-black">טרם הגיבו</div>
-                    <div className="text-2xl font-bold text-black">{guestStatusSummary.pending}</div>
+                  <div className="min-w-0 bg-white/5 border border-white/10 rounded-xl p-2 text-right">
+                    <div className="text-sm font-semibold text-amber-300">טרם הגיבו</div>
+                    <div className={`${previewMetricValueClass} text-2xl font-bold text-amber-200`}>{guestStatusSummary.pending}</div>
                   </div>
-                  <div className="bg-white p-2 rounded-lg border border-red-100 text-right">
-                    <div className="text-sm font-semibold text-red-600">לא אישרו</div>
-                    <div className="text-2xl font-bold text-red-700">{guestStatusSummary.rejected}</div>
+                  <div className="min-w-0 bg-white/5 border border-white/10 rounded-xl p-2 text-right">
+                    <div className="text-sm font-semibold text-red-400">לא אישרו</div>
+                    <div className={`${previewMetricValueClass} text-2xl font-bold text-red-300`}>{guestStatusSummary.rejected}</div>
                   </div>
                 </div>
                 {!hasStatusData && (
-                  <p className="text-xs text-gray-500 mt-2 text-center">נתוני אישור הגעה יופיעו לאחר שליחת הזמנות ותגובות אורחים</p>
+                  <p className="text-xs text-slate-400 mt-2 text-center">נתוני אישור הגעה יופיעו לאחר שליחת הזמנות ותגובות אורחים</p>
                 )}
               </div>
               {(planForDisplay || currentEventId) && messageCapacityChartModel && (
-                  <div className="bg-yellow-50 p-3 sm:p-4 text-center shadow-lg w-full min-h-[320px]" style={{
+                  <div className="bg-white/[0.055] border border-amber-400/20 backdrop-blur-xl rounded-lg p-3 sm:p-4 text-center shadow-lg w-full min-h-[320px]" style={{
                     border: '3px solid #D4AF37',
                     outline: '2px solid #B8860B',
                     outlineOffset: '2px',
@@ -6713,12 +6838,12 @@ React.useEffect(()=>{
                   }}>
                     <div className="flex items-center justify-center gap-2 mb-2">
                       <span className="text-xl">📈</span>
-                      <h3 className="text-base font-bold text-yellow-800">יתרת הודעות</h3>
+                      <h3 className="text-base font-bold text-amber-300">יתרת הודעות</h3>
                     </div>
 
-                    <div className="bg-white p-3 rounded-lg border border-yellow-200">
+                    <div className="bg-white/5 border border-white/10 rounded-xl p-3">
                       {!shouldShowCharts ? (
-                        <div className="py-10 text-sm text-gray-500 text-center">טוען נתונים...</div>
+                        <div className="py-10 text-sm text-slate-400 text-center">טוען נתונים...</div>
                       ) : messageCapacityChartModel.hasCapacityChartData ? (
                         <div className="h-56 min-h-[200px] sm:h-56">
                           <ResponsiveContainer width="100%" height="100%">
@@ -6729,8 +6854,8 @@ React.useEffect(()=>{
                               <CartesianGrid strokeDasharray="3 3" vertical={false} />
                               <XAxis
                                 dataKey="name"
-                                stroke="#1f2937"
-                                tick={{ fontSize: isMobileView ? 12 : 16, fontWeight: 600, fill: isMobileView ? '#FDE68A' : '#1f2937' }}
+                                stroke="#cbd5e1"
+                                tick={{ fontSize: isMobileView ? 12 : 16, fontWeight: 600, fill: isMobileView ? '#FDE68A' : '#cbd5e1' }}
                                 interval={0}
                                 tickLine={false}
                                 axisLine={false}
@@ -6753,24 +6878,24 @@ React.useEffect(()=>{
                           </ResponsiveContainer>
                         </div>
                       ) : (
-                        <div className="py-10 text-sm text-gray-500 text-center">אין נתונים להצגה עדיין</div>
+                        <div className="py-10 text-sm text-slate-400 text-center">אין נתונים להצגה עדיין</div>
                       )}
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-3 text-base">
-                      <div className="bg-white p-2 rounded-lg border border-yellow-100 text-right">
-                        <div className="text-sm font-semibold text-yellow-600">מגבלת הודעות</div>
-                        <div className="text-2xl font-bold text-yellow-800">{messageCapacityChartModel.messageLimit}</div>
+                      <div className="min-w-0 bg-white/5 border border-white/10 rounded-xl p-2 text-right">
+                        <div className="text-sm font-semibold text-amber-300">מגבלת הודעות</div>
+                        <div className={`${previewMetricValueClass} text-2xl font-bold text-amber-200`}>{messageCapacityChartModel.messageLimit}</div>
                       </div>
-                      <div className="bg-white p-2 rounded-lg border border-purple-100 text-right">
-                            <div className="text-sm font-semibold text-purple-600">הודעות שנשלחו</div>
-                        <div className="text-2xl font-bold text-purple-700">{messageCapacityChartModel.messagesSent}</div>
+                      <div className="min-w-0 bg-white/5 border border-white/10 rounded-xl p-2 text-right">
+                            <div className="text-sm font-semibold text-indigo-300">הודעות שנשלחו</div>
+                        <div className={`${previewMetricValueClass} text-2xl font-bold text-indigo-200`}>{messageCapacityChartModel.messagesSent}</div>
                       </div>
-                      <div className={`bg-white p-2 rounded-lg border ${messageCapacityChartModel.overMessages > 0 ? 'border-red-200' : 'border-green-200'} text-right`}>
-                        <div className={`text-sm font-semibold ${messageCapacityChartModel.overMessages > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                      <div className={`min-w-0 bg-white/5 rounded-xl border ${messageCapacityChartModel.overMessages > 0 ? 'border-red-400/30' : 'border-emerald-400/30'} p-2 text-right`}>
+                        <div className={`text-sm font-semibold ${messageCapacityChartModel.overMessages > 0 ? 'text-red-400' : 'text-emerald-300'}`}>
                           {messageCapacityChartModel.overMessages > 0 ? 'חריגה' : 'יתרה'}
                         </div>
-                        <div className={`text-2xl font-bold ${messageCapacityChartModel.overMessages > 0 ? 'text-red-700' : 'text-green-700'}`}>
+                        <div className={`${previewMetricValueClass} text-2xl font-bold ${messageCapacityChartModel.overMessages > 0 ? 'text-red-300' : 'text-emerald-200'}`}>
                           {messageCapacityChartModel.overMessages > 0 ? `-${messageCapacityChartModel.overMessages}` : messageCapacityChartModel.remainingMessages}
                         </div>
                       </div>
@@ -6784,167 +6909,161 @@ React.useEffect(()=>{
         </div>
       </div>
 
-      {showEventTypes && (
-        <div className="fixed inset-0 flex items-end sm:items-center justify-center bg-black/50 z-50 p-0 sm:p-4">
-          <div className="relative bg-white rounded-t-2xl sm:rounded-lg p-6 w-full max-w-md max-h-[90vh] flex flex-col">
-            <button onClick={() => setShowEventTypes(false)} className="absolute top-2 left-2 text-2xl text-gray-500 hover:text-gray-700">&times;</button>
-            <h2 className="text-xl font-medium mb-4 text-center flex-shrink-0">בחר סוג אירוע</h2>
-            <ul className="space-y-2 overflow-y-auto flex-1 min-h-0 pb-2">
-              {eventTypes.map((type) => (
-                <li key={type}>
-                  <button
-                    onClick={() => handleSelectEvent(type)}
-                     className={`w-full ${selectedEventType === type ? 'bg-primary text-white' : 'bg-[#FCE6AC] text-primary'} border border-primary rounded-full px-4 py-2 text-base sm:text-lg font-medium hover:bg-[#FCE6AC]/90 transition-all`}
-                  >
-                    {type}
-                  </button>
-                </li>
-              ))}
-            </ul>
+      <Modal open={showEventTypes} onClose={() => setShowEventTypes(false)} size="md">
+        <ModalHeader onClose={() => setShowEventTypes(false)}>בחר סוג אירוע</ModalHeader>
+        <ModalBody>
+          <ul className="space-y-2">
+            {eventTypes.map((type) => (
+              <li key={type}>
+                <button
+                  onClick={() => handleSelectEvent(type)}
+                   className={`w-full ${selectedEventType === type ? 'bg-gradient-to-br from-indigo-600 to-violet-600 text-white border-transparent' : 'bg-indigo-500/20 text-indigo-200 border border-indigo-400/30'} rounded-full px-4 py-2 text-base sm:text-lg font-medium hover:opacity-90 transition-all`}
+                >
+                  {type}
+                </button>
+              </li>
+            ))}
+          </ul>
+          {selectedEventType && (
+            <p className="text-center text-indigo-300 font-medium text-lg sm:text-xl mt-3">האירוע הנבחר: {selectedEventType}</p>
+          )}
+        </ModalBody>
+        <ModalFooter>
+          <button
+            onClick={() => {
+              console.log('Save and close button clicked');
+              setShowEventTypes(false);
+              if (!currentEventId) {
+                setFormData(initialFormState);
+                setFormErrors({});
+                try { localStorage.removeItem('savedEventDetails'); } catch(e){}
+                eventDetailsOpenedRef.current = true; // Mark as opened so we don't reset on reopen
+              }
+              setShowEventDetails(true);
+              markStepDone(0); // Mark step 1 as completed when saving
+              console.log('markStepDone(0) called');
+            }}
+            className="w-full bg-gradient-to-br from-indigo-600 to-violet-600 text-white font-bold rounded-xl px-4 py-3 hover:opacity-90 transition-all"
+          >
+            שמור וסגור
+          </button>
+        </ModalFooter>
+      </Modal>
 
-            <div className="flex-shrink-0 pt-2 border-t border-gray-100">
-              {selectedEventType && (
-                <p className="text-center text-primary font-medium text-lg sm:text-xl mb-3">האירוע הנבחר: {selectedEventType}</p>
-              )}
-
-              <button
-                onClick={() => { 
-                  console.log('Save and close button clicked');
-                  setShowEventTypes(false);
-                  if (!currentEventId) {
-                    setFormData(initialFormState);
-                    setFormErrors({});
-                    try { localStorage.removeItem('savedEventDetails'); } catch(e){}
-                    eventDetailsOpenedRef.current = true; // Mark as opened so we don't reset on reopen
-                  }
-                  setShowEventDetails(true);
-                  markStepDone(0); // Mark step 1 as completed when saving
-                  console.log('markStepDone(0) called');
-                }}
-                className="w-full bg-primary text-white border border-primary rounded-full px-4 py-3 font-medium hover:bg-primary/90 transition-all"
-              >
-                שמור וסגור
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {showEventDetails && (
-        <div className="fixed inset-0 flex items-end sm:items-center justify-center bg-black/50 z-50 p-0 sm:p-4">
-          <div className="relative bg-white rounded-t-2xl sm:rounded-lg p-6 w-full max-w-4xl max-h-[95vh] flex flex-col">
-            <button onClick={() => setShowEventDetails(false)} className="absolute top-2 left-2 text-2xl text-gray-500 hover:text-gray-700">&times;</button>
-            <h2 className="text-2xl sm:text-3xl font-bold mb-4 text-center flex-shrink-0">{`פרטי האירוע - ${selectedEventType}`}</h2>
-            {errorMsg && <p className="text-red-600 text-lg sm:text-xl text-center mb-3 flex-shrink-0">{errorMsg}</p>}
-            <form className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 overflow-y-auto flex-1 min-h-0 pb-4">
+      <Drawer open={showEventDetails} onClose={() => setShowEventDetails(false)} size="xl">
+        <DrawerHeader onClose={() => setShowEventDetails(false)}>{`פרטי האירוע - ${selectedEventType}`}</DrawerHeader>
+        <DrawerBody scroll className="px-6 py-5">
+          <div dir="rtl">
+          {errorMsg && <p className="text-red-400 text-sm text-center mb-3 bg-red-500/10 border border-red-400/30 rounded-xl p-2.5">{errorMsg}</p>}
+          <form dir="rtl" className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {/* Existing event details form (unchanged) */}
               {['חתונה', 'חינה', 'מסיבת אירוסין'].includes(selectedEventType) && (
                 <div>
-                  <label className="block mb-2 font-bold text-lg">שם הכלה</label>
-                  <input type="text" placeholder="שם הכלה" value={formData.brideName} onChange={(e) => setFormData({ ...formData, brideName: e.target.value })} className={`w-full border-2 border-gray-300 rounded-lg p-3 text-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all ${formErrors.brideName ? 'border-red-500 ring-2 ring-red-200' : ''}`} />
+                  <label className="block mb-1.5 font-semibold text-sm text-slate-300">שם הכלה</label>
+                  <input type="text" placeholder="שם הכלה" value={formData.brideName} onChange={(e) => setFormData({ ...formData, brideName: e.target.value })} className={`w-full bg-white/10 border border-white/20 text-white placeholder-slate-400 rounded-xl focus:border-indigo-400 p-2.5 text-base transition-all ${formErrors.brideName ? 'border-red-400 ring-2 ring-red-400/20' : ''}`} />
                 </div>
               )}
               {['חתונה', 'חינה', 'מסיבת אירוסין'].includes(selectedEventType) && (
                 <div>
-                  <label className="block mb-2 font-bold text-lg">שם החתן</label>
-                  <input type="text" placeholder="שם החתן" value={formData.groomName} onChange={(e) => setFormData({ ...formData, groomName: e.target.value })} className={`w-full border-2 border-gray-300 rounded-lg p-3 text-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all ${formErrors.groomName ? 'border-red-500 ring-2 ring-red-200' : ''}`} />
+                  <label className="block mb-1.5 font-semibold text-sm text-slate-300">שם החתן</label>
+                  <input type="text" placeholder="שם החתן" value={formData.groomName} onChange={(e) => setFormData({ ...formData, groomName: e.target.value })} className={`w-full bg-white/10 border border-white/20 text-white placeholder-slate-400 rounded-xl focus:border-indigo-400 p-2.5 text-base transition-all ${formErrors.groomName ? 'border-red-400 ring-2 ring-red-400/20' : ''}`} />
                 </div>
               )}
               {selectedEventType === 'הפרשת חלה' && (
                 <div>
-                  <label className="block mb-2 font-bold text-lg">שם המארחת</label>
+                  <label className="block mb-1.5 font-semibold text-sm text-slate-300">שם המארחת</label>
                   <input
                     type="text"
                     placeholder="שם המארחת"
                     value={formData.hostName}
                     onChange={(e) => setFormData({ ...formData, hostName: e.target.value })}
-                    className={`w-full border-2 border-gray-300 rounded-lg p-3 text-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all ${formErrors.hostName ? 'border-red-500 ring-2 ring-red-200' : ''}`}
+                    className={`w-full bg-white/10 border border-white/20 text-white placeholder-slate-400 rounded-xl focus:border-indigo-400 p-2.5 text-base transition-all ${formErrors.hostName ? 'border-red-400 ring-2 ring-red-400/20' : ''}`}
                   />
                 </div>
               )}
               {['חתונה', 'חינה'].includes(selectedEventType) && (
                 <div>
-                  <label className="block mb-2 font-bold text-lg">שם הורי הכלה</label>
-                  <input type="text" placeholder="שם הורי הכלה" value={formData.brideParents} onChange={(e) => setFormData({ ...formData, brideParents: e.target.value })} className={`w-full border-2 border-gray-300 rounded-lg p-3 text-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all ${formErrors.brideParents ? 'border-red-500 ring-2 ring-red-200' : ''}`} />
+                  <label className="block mb-1.5 font-semibold text-sm text-slate-300">שם הורי הכלה</label>
+                  <input type="text" placeholder="שם הורי הכלה" value={formData.brideParents} onChange={(e) => setFormData({ ...formData, brideParents: e.target.value })} className={`w-full bg-white/10 border border-white/20 text-white placeholder-slate-400 rounded-xl focus:border-indigo-400 p-2.5 text-base transition-all ${formErrors.brideParents ? 'border-red-400 ring-2 ring-red-400/20' : ''}`} />
                 </div>
               )}
               {['חתונה', 'חינה'].includes(selectedEventType) && (
                 <div>
-                  <label className="block mb-2 font-bold text-lg">שם הורי החתן</label>
-                  <input type="text" placeholder="שם הורי החתן" value={formData.groomParents} onChange={(e) => setFormData({ ...formData, groomParents: e.target.value })} className={`w-full border-2 border-gray-300 rounded-lg p-3 text-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all ${formErrors.groomParents ? 'border-red-500 ring-2 ring-red-200' : ''}`} />
+                  <label className="block mb-1.5 font-semibold text-sm text-slate-300">שם הורי החתן</label>
+                  <input type="text" placeholder="שם הורי החתן" value={formData.groomParents} onChange={(e) => setFormData({ ...formData, groomParents: e.target.value })} className={`w-full bg-white/10 border border-white/20 text-white placeholder-slate-400 rounded-xl focus:border-indigo-400 p-2.5 text-base transition-all ${formErrors.groomParents ? 'border-red-400 ring-2 ring-red-400/20' : ''}`} />
                 </div>
               )}
               {selectedEventType === 'בר מצווה' && (
                 <>
                   <div>
-                    <label className="block mb-1 font-medium">שם חתן בר מצווה</label>
-                    <input type="text" placeholder="שם חתן בר מצווה" value={formData.boyName} onChange={(e) => setFormData({ ...formData, boyName: e.target.value })} className={`w-full border rounded-md p-2 ${formErrors.boyName ? 'border-red-500' : ''}`} />
+                    <label className="block mb-1.5 font-semibold text-sm text-slate-300">שם חתן בר מצווה</label>
+                    <input type="text" placeholder="שם חתן בר מצווה" value={formData.boyName} onChange={(e) => setFormData({ ...formData, boyName: e.target.value })} className={`w-full bg-white/10 border border-white/20 text-white placeholder-slate-400 rounded-xl focus:border-indigo-400 p-3 text-base transition-all ${formErrors.boyName ? 'border-red-400 ring-2 ring-red-400/20' : ''}`} />
                   </div>
                   <div>
-                    <label className="block mb-1 font-medium">שם ההורים</label>
-                    <input type="text" placeholder="שם ההורים" value={formData.boyParents} onChange={(e) => setFormData({ ...formData, boyParents: e.target.value })} className={`w-full border rounded-md p-2 ${formErrors.boyParents ? 'border-red-500' : ''}`} />
+                    <label className="block mb-1.5 font-semibold text-sm text-slate-300">שם ההורים</label>
+                    <input type="text" placeholder="שם ההורים" value={formData.boyParents} onChange={(e) => setFormData({ ...formData, boyParents: e.target.value })} className={`w-full bg-white/10 border border-white/20 text-white placeholder-slate-400 rounded-xl focus:border-indigo-400 p-3 text-base transition-all ${formErrors.boyParents ? 'border-red-400 ring-2 ring-red-400/20' : ''}`} />
                   </div>
                 </>
               )}
               {selectedEventType === 'בת מצווה' && (
                 <>
                   <div>
-                    <label className="block mb-1 font-medium">שם כלת בת מצווה</label>
-                    <input type="text" placeholder="שם כלת בת מצווה" value={formData.girlName} onChange={(e) => setFormData({ ...formData, girlName: e.target.value })} className={`w-full border rounded-md p-2 ${formErrors.girlName ? 'border-red-500' : ''}`} />
+                    <label className="block mb-1.5 font-semibold text-sm text-slate-300">שם כלת בת מצווה</label>
+                    <input type="text" placeholder="שם כלת בת מצווה" value={formData.girlName} onChange={(e) => setFormData({ ...formData, girlName: e.target.value })} className={`w-full bg-white/10 border border-white/20 text-white placeholder-slate-400 rounded-xl focus:border-indigo-400 p-3 text-base transition-all ${formErrors.girlName ? 'border-red-400 ring-2 ring-red-400/20' : ''}`} />
                   </div>
                   <div>
-                    <label className="block mb-1 font-medium">שם ההורים</label>
-                    <input type="text" placeholder="שם ההורים" value={formData.girlParents} onChange={(e) => setFormData({ ...formData, girlParents: e.target.value })} className={`w-full border rounded-md p-2 ${formErrors.girlParents ? 'border-red-500' : ''}`} />
+                    <label className="block mb-1.5 font-semibold text-sm text-slate-300">שם ההורים</label>
+                    <input type="text" placeholder="שם ההורים" value={formData.girlParents} onChange={(e) => setFormData({ ...formData, girlParents: e.target.value })} className={`w-full bg-white/10 border border-white/20 text-white placeholder-slate-400 rounded-xl focus:border-indigo-400 p-3 text-base transition-all ${formErrors.girlParents ? 'border-red-400 ring-2 ring-red-400/20' : ''}`} />
                   </div>
                 </>
               )}
               {['ברית','בריתה'].includes(selectedEventType) && (
                 <>
                   <div>
-                    <label className="block mb-1 font-medium">שם ההורים</label>
-                    <input type="text" placeholder="שם ההורים" value={formData.babyParents} onChange={(e) => setFormData({ ...formData, babyParents: e.target.value })} className={`w-full border rounded-md p-2 ${formErrors.babyParents ? 'border-red-500' : ''}`} />
+                    <label className="block mb-1.5 font-semibold text-sm text-slate-300">שם ההורים</label>
+                    <input type="text" placeholder="שם ההורים" value={formData.babyParents} onChange={(e) => setFormData({ ...formData, babyParents: e.target.value })} className={`w-full bg-white/10 border border-white/20 text-white placeholder-slate-400 rounded-xl focus:border-indigo-400 p-3 text-base transition-all ${formErrors.babyParents ? 'border-red-400 ring-2 ring-red-400/20' : ''}`} />
                   </div>
                 </>
               )}
               {selectedEventType === 'יום הולדת' && (
                 <>
                   <div>
-                    <label className="block mb-1 font-medium">שם החוגג/ת</label>
-                    <input type="text" placeholder="שם החוגג/ת" value={formData.birthdayName} onChange={(e) => setFormData({ ...formData, birthdayName: e.target.value })} className={`w-full border rounded-md p-2 ${formErrors.birthdayName ? 'border-red-500' : ''}`} />
+                    <label className="block mb-1.5 font-semibold text-sm text-slate-300">שם החוגג/ת</label>
+                    <input type="text" placeholder="שם החוגג/ת" value={formData.birthdayName} onChange={(e) => setFormData({ ...formData, birthdayName: e.target.value })} className={`w-full bg-white/10 border border-white/20 text-white placeholder-slate-400 rounded-xl focus:border-indigo-400 p-3 text-base transition-all ${formErrors.birthdayName ? 'border-red-400 ring-2 ring-red-400/20' : ''}`} />
                   </div>
                   <div>
-                    <label className="block mb-1 font-medium">גיל</label>
-                    <input type="number" placeholder="גיל" value={formData.birthdayAge} onChange={(e) => setFormData({ ...formData, birthdayAge: e.target.value })} className={`w-full border rounded-md p-2 ${formErrors.birthdayAge ? 'border-red-500' : ''}`} />
+                    <label className="block mb-1.5 font-semibold text-sm text-slate-300">גיל</label>
+                    <input type="number" placeholder="גיל" value={formData.birthdayAge} onChange={(e) => setFormData({ ...formData, birthdayAge: e.target.value })} className={`w-full bg-white/10 border border-white/20 text-white placeholder-slate-400 rounded-xl focus:border-indigo-400 p-3 text-base transition-all ${formErrors.birthdayAge ? 'border-red-400 ring-2 ring-red-400/20' : ''}`} />
                   </div>
                 </>
               )}
               {selectedEventType === 'אירוע עסקי' && (
                 <>
                   <div>
-                    <label className="block mb-1 font-medium">שם החברה</label>
-                    <input type="text" placeholder="שם החברה" value={formData.businessName} onChange={(e) => setFormData({ ...formData, businessName: e.target.value })} className={`w-full border rounded-md p-2 ${formErrors.businessName ? 'border-red-500' : ''}`} />
+                    <label className="block mb-1.5 font-semibold text-sm text-slate-300">שם החברה</label>
+                    <input type="text" placeholder="שם החברה" value={formData.businessName} onChange={(e) => setFormData({ ...formData, businessName: e.target.value })} className={`w-full bg-white/10 border border-white/20 text-white placeholder-slate-400 rounded-xl focus:border-indigo-400 p-3 text-base transition-all ${formErrors.businessName ? 'border-red-400 ring-2 ring-red-400/20' : ''}`} />
                   </div>
                   <div>
-                    <label className="block mb-1 font-medium">איש קשר</label>
-                    <input type="text" placeholder="איש קשר" value={formData.businessContact} onChange={(e) => setFormData({ ...formData, businessContact: e.target.value })} className={`w-full border rounded-md p-2 ${formErrors.businessContact ? 'border-red-500' : ''}`} />
+                    <label className="block mb-1.5 font-semibold text-sm text-slate-300">איש קשר</label>
+                    <input type="text" placeholder="איש קשר" value={formData.businessContact} onChange={(e) => setFormData({ ...formData, businessContact: e.target.value })} className={`w-full bg-white/10 border border-white/20 text-white placeholder-slate-400 rounded-xl focus:border-indigo-400 p-3 text-base transition-all ${formErrors.businessContact ? 'border-red-400 ring-2 ring-red-400/20' : ''}`} />
                   </div>
                 </>
               )}
               <div className="md:col-span-2">
-                <label className="block mb-2 font-bold text-lg">תאריך האירוע</label>
+                <label className="block mb-1.5 font-semibold text-sm text-slate-300">תאריך האירוע</label>
                 <DatePicker
                   selected={formData.date ? new Date(formData.date) : null}
                   onChange={(date)=> setFormData({ ...formData, date: date ? formatISODateLocal(date) : '' })}
                   dateFormat="dd/MM/yyyy"
                   locale="he"
                   placeholderText="בחר תאריך"
-                  className={`w-full border-2 border-gray-300 rounded-lg p-3 text-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all ${formErrors.date ? 'border-red-500 ring-2 ring-red-200' : ''}`}
+                  className={`w-full bg-white/10 border border-white/20 text-white placeholder-slate-400 rounded-xl focus:border-indigo-400 p-2.5 text-base transition-all ${formErrors.date ? 'border-red-400 ring-2 ring-red-400/20' : ''}`}
                   calendarStartDay={0}
                 />
               </div>
               <div>
-                <label className="block mb-2 font-bold text-lg">שעת האירוע</label>
-                <select value={formData.time} onChange={(e) => setFormData({ ...formData, time: e.target.value })} className={`w-full border-2 border-gray-300 rounded-lg p-3 text-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all ${formErrors.time ? 'border-red-500 ring-2 ring-red-200' : ''}`}>
+                <label className="block mb-1.5 font-semibold text-sm text-slate-300">שעת האירוע</label>
+                <select value={formData.time} onChange={(e) => setFormData({ ...formData, time: e.target.value })} className={`w-full bg-white/10 border border-white/20 text-white placeholder-slate-400 rounded-xl focus:border-indigo-400 p-2.5 text-base transition-all ${formErrors.time ? 'border-red-400 ring-2 ring-red-400/20' : ''}`}>
                   <option value="">בחר שעה</option>
                   {times.map((t) => (
                     <option key={t} value={t}>{t}</option>
@@ -6953,8 +7072,8 @@ React.useEffect(()=>{
               </div>
               {selectedEventType === 'חתונה' && (
                 <div>
-                  <label className="block mb-2 font-bold text-lg">שעת החופה</label>
-                  <select value={formData.chuppahTime} onChange={(e) => setFormData({ ...formData, chuppahTime: e.target.value })} className={`w-full border-2 border-gray-300 rounded-lg p-3 text-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all ${formErrors.chuppahTime ? 'border-red-500 ring-2 ring-red-200' : ''}`}>
+                  <label className="block mb-1.5 font-semibold text-sm text-slate-300">שעת החופה</label>
+                  <select value={formData.chuppahTime} onChange={(e) => setFormData({ ...formData, chuppahTime: e.target.value })} className={`w-full bg-white/10 border border-white/20 text-white placeholder-slate-400 rounded-xl focus:border-indigo-400 p-2.5 text-base transition-all ${formErrors.chuppahTime ? 'border-red-400 ring-2 ring-red-400/20' : ''}`}>
                     <option value="">בחר שעה</option>
                     {times.map((t) => (
                       <option key={t} value={t}>{t}</option>
@@ -6963,22 +7082,22 @@ React.useEffect(()=>{
                 </div>
               )}
               <div>
-                <label className="block mb-2 font-bold text-lg">שם האולם</label>
-                <input type="text" placeholder="שם האולם" value={formData.hallName} onChange={(e) => setFormData({ ...formData, hallName: e.target.value })} className={`w-full border-2 border-gray-300 rounded-lg p-3 text-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all ${formErrors.hallName ? 'border-red-500 ring-2 ring-red-200' : ''}`} />
+                <label className="block mb-1.5 font-semibold text-sm text-slate-300">שם האולם</label>
+                <input type="text" placeholder="שם האולם" value={formData.hallName} onChange={(e) => setFormData({ ...formData, hallName: e.target.value })} className={`w-full bg-white/10 border border-white/20 text-white placeholder-slate-400 rounded-xl focus:border-indigo-400 p-2.5 text-base transition-all ${formErrors.hallName ? 'border-red-400 ring-2 ring-red-400/20' : ''}`} />
               </div>
               <div>
-                <label className="block mb-2 font-bold text-lg">כתובת האולם</label>
-                <input type="text" placeholder="כתובת האולם" value={formData.hallAddress} onChange={(e) => setFormData({ ...formData, hallAddress: e.target.value })} className={`w-full border-2 border-gray-300 rounded-lg p-3 text-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all ${formErrors.hallAddress ? 'border-red-500 ring-2 ring-red-200' : ''}`} />
+                <label className="block mb-1.5 font-semibold text-sm text-slate-300">כתובת האולם</label>
+                <input type="text" placeholder="כתובת האולם" value={formData.hallAddress} onChange={(e) => setFormData({ ...formData, hallAddress: e.target.value })} className={`w-full bg-white/10 border border-white/20 text-white placeholder-slate-400 rounded-xl focus:border-indigo-400 p-2.5 text-base transition-all ${formErrors.hallAddress ? 'border-red-400 ring-2 ring-red-400/20' : ''}`} />
               </div>
-            </form>
-            <div className="flex-shrink-0 pt-4 border-t border-gray-100 mt-4">
-              <button type="button" onClick={handleSaveDetails} className="w-full bg-[#FCE6AC] text-primary border border-primary rounded-full px-10 py-4 font-bold text-xl ring-2 ring-primary ring-offset-2 ring-offset-[#FCE6AC] hover:bg-[#FCE6AC]/90 transition-all">
-                שמור וסגור
-              </button>
-            </div>
+          </form>
           </div>
-        </div>
-      )}
+        </DrawerBody>
+        <DrawerFooter className="px-6 py-4 justify-center">
+          <button type="button" onClick={handleSaveDetails} className="w-full bg-gradient-to-br from-indigo-600 to-violet-600 shadow-[0_5px_22px_rgba(99,70,230,0.45)] text-white font-bold rounded-xl py-3 text-base hover:opacity-90 transition-opacity">
+            שמור וסגור
+          </button>
+        </DrawerFooter>
+      </Drawer>
 
       {/* Hidden file input for Excel upload */}
       <input
@@ -6989,79 +7108,70 @@ React.useEffect(()=>{
         style={{ display: 'none' }}
       />
 
-      {showGuestForm && (
-        <div className="fixed inset-0 flex items-end sm:items-center justify-center bg-black/50 z-50">
-          <div className="relative bg-white rounded-t-2xl sm:rounded-lg p-6 w-full max-w-md min-h-[85vh] sm:min-h-0 sm:max-h-[90vh] overflow-y-auto event-form">
-            <button onClick={() => setShowGuestForm(false)} className="absolute top-2 left-2 text-4xl leading-none w-8 h-8 flex items-center justify-center text-gray-500 hover:text-gray-700">&times;</button>
-            <h2 className="text-xl font-bold text-primary text-center mb-5">שליחת הזמנות</h2>
-
-            <div className="flex flex-col gap-3 mb-6">
-              <button
-                type="button"
-                onClick={() => setShowExcelInstructions(true)}
-                className="w-full text-primary font-medium border-2 border-primary rounded-lg px-4 py-3 hover:bg-primary hover:text-white transition-colors"
-              >
-                ייבוא קובץ אורחים - אקסל
-              </button>
-            </div>
-
-            <h3 className="text-lg font-semibold text-gray-800 mb-3">שלח הזמנה לאורח בודד - פרטי אורח:</h3>
-            {guestErrorMsg && <p className="text-red-600 text-lg text-center mb-2">{guestErrorMsg}</p>}
-            <form className="space-y-4">
-              <div>
-                <label className="block mb-1 font-medium">שם פרטי</label>
-                <input type="text" placeholder="שם פרטי" value={guestData.guestFirstName} onChange={(e) => setGuestData({ ...guestData, guestFirstName: e.target.value })} className={`w-full border rounded-md p-2 pr-12 sm:pr-2 ${guestErrors.guestFirstName ? 'border-red-500' : ''}`} />
-              </div>
-              <div>
-                <label className="block mb-1 font-medium">שם משפחה</label>
-                <input type="text" placeholder="שם משפחה" value={guestData.guestLastName} onChange={(e) => setGuestData({ ...guestData, guestLastName: e.target.value })} className={`w-full border rounded-md p-2 pr-12 sm:pr-2 ${guestErrors.guestLastName ? 'border-red-500' : ''}`} />
-              </div>
-              <div>
-                <label className="block mb-1 font-medium">מספר שולחן</label>
-                <input type="text" placeholder="מספר שולחן" value={guestData.guestTable} onChange={(e) => setGuestData({ ...guestData, guestTable: e.target.value })} required className={`w-full border rounded-md p-2 pr-12 sm:pr-2 ${guestErrors.guestTable ? 'border-red-500' : ''}`} />
-              </div>
-              <div>
-                <label className="block mb-1 font-medium">טלפון</label>
-                <input type="tel" placeholder="טלפון" value={guestData.guestPhone} onChange={(e) => setGuestData({ ...guestData, guestPhone: e.target.value })} className={`w-full border rounded-md p-2 pr-12 sm:pr-2 ${guestErrors.guestPhone ? 'border-red-500' : ''}`} />
-              </div>
-              <div className="flex flex-col sm:flex-row justify-center gap-3 pt-4" dir="rtl">
-                <button type="button" onClick={handleSendInvitation} className="order-1 bg-green-600 text-white border border-green-700 rounded-full px-8 py-3 font-medium hover:bg-green-700 transition-all">
-                  שלח הזמנה בוואטסאפ
-                </button>
-                <button type="button" onClick={handleSendInvitationSms} className="order-2 bg-primary text-white border border-primary rounded-full px-8 py-3 font-medium hover:bg-primary/90 transition-all">
-                  שלח הזמנה ב-SMS
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {showWhatsAppGroupModal && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50">
-          <div className="relative bg-white rounded-lg p-6 w-full max-w-md event-form text-right">
+      <Drawer open={showGuestForm} onClose={() => setShowGuestForm(false)} size="md">
+        <DrawerHeader onClose={() => setShowGuestForm(false)}>שליחת הזמנות</DrawerHeader>
+        <DrawerBody>
+          <div className="flex flex-col gap-3 mb-6">
             <button
-              onClick={() => setShowWhatsAppGroupModal(false)}
-              className="absolute top-2 left-2 text-3xl leading-none w-8 h-8 flex items-center justify-center text-gray-500 hover:text-gray-700"
-              disabled={isWhatsAppGroupSubmitting}
+              type="button"
+              onClick={() => setShowExcelInstructions(true)}
+              className="w-full text-primary font-medium border-2 border-primary rounded-lg px-4 py-3 hover:bg-primary hover:text-white transition-colors"
             >
-              &times;
+              ייבוא קובץ אורחים - אקסל
             </button>
-            <h2 className="text-xl font-bold text-primary text-center mb-4">קבוצת וואטסאפ לאירוע</h2>
-            <p className="text-gray-700 mb-4">
+          </div>
+
+          <h3 className="text-lg font-semibold text-slate-100 mb-3">שלח הזמנה לאורח בודד - פרטי אורח:</h3>
+          {guestErrorMsg && <p className="mb-3 rounded-xl border border-red-400/30 bg-red-500/10 p-3 text-red-300 text-base font-semibold text-center">{guestErrorMsg}</p>}
+          <form className="space-y-4">
+            <div>
+              <label className="block mb-1 font-medium">שם פרטי</label>
+              <input type="text" placeholder="שם פרטי" value={guestData.guestFirstName} onChange={(e) => setGuestData({ ...guestData, guestFirstName: e.target.value })} className={`w-full bg-white/10 border border-white/20 text-white placeholder-slate-400 rounded-xl focus:border-indigo-400 p-2 pr-12 sm:pr-2 outline-none ${guestErrors.guestFirstName ? 'border-red-400 ring-2 ring-red-400/20' : ''}`} />
+            </div>
+            <div>
+              <label className="block mb-1 font-medium">שם משפחה</label>
+              <input type="text" placeholder="שם משפחה" value={guestData.guestLastName} onChange={(e) => setGuestData({ ...guestData, guestLastName: e.target.value })} className={`w-full bg-white/10 border border-white/20 text-white placeholder-slate-400 rounded-xl focus:border-indigo-400 p-2 pr-12 sm:pr-2 outline-none ${guestErrors.guestLastName ? 'border-red-400 ring-2 ring-red-400/20' : ''}`} />
+            </div>
+            <div>
+              <label className="block mb-1 font-medium">מספר שולחן</label>
+              <input type="text" placeholder="מספר שולחן" value={guestData.guestTable} onChange={(e) => setGuestData({ ...guestData, guestTable: e.target.value })} required className={`w-full bg-white/10 border border-white/20 text-white placeholder-slate-400 rounded-xl focus:border-indigo-400 p-2 pr-12 sm:pr-2 outline-none ${guestErrors.guestTable ? 'border-red-400 ring-2 ring-red-400/20' : ''}`} />
+            </div>
+            <div>
+              <label className="block mb-1 font-medium">טלפון</label>
+              <input type="tel" placeholder="טלפון" value={guestData.guestPhone} onChange={(e) => setGuestData({ ...guestData, guestPhone: e.target.value })} className={`w-full bg-white/10 border border-white/20 text-white placeholder-slate-400 rounded-xl focus:border-indigo-400 p-2 pr-12 sm:pr-2 outline-none ${guestErrors.guestPhone ? 'border-red-400 ring-2 ring-red-400/20' : ''}`} />
+            </div>
+          </form>
+        </DrawerBody>
+        <DrawerFooter>
+          <div className="flex flex-col sm:flex-row justify-center gap-3 w-full" dir="rtl">
+            <button type="button" onClick={handleSendInvitation} className="order-1 bg-emerald-600 text-white border border-emerald-400/50 rounded-full px-8 py-3 font-medium hover:bg-emerald-700 transition-all">
+              שלח הזמנה בוואטסאפ
+            </button>
+            <button type="button" onClick={handleSendInvitationSms} className="order-2 bg-primary text-white border border-primary rounded-full px-8 py-3 font-medium hover:bg-primary/90 transition-all">
+              שלח הזמנה ב-SMS
+            </button>
+          </div>
+        </DrawerFooter>
+      </Drawer>
+
+      <Modal open={showWhatsAppGroupModal} onClose={() => !isWhatsAppGroupSubmitting && setShowWhatsAppGroupModal(false)} size="md">
+        <ModalHeader onClose={() => !isWhatsAppGroupSubmitting && setShowWhatsAppGroupModal(false)}>קבוצת וואטסאפ לאירוע</ModalHeader>
+        <ModalBody>
+          <div className="text-right">
+            <p className="text-slate-300 mb-4">
               המערכת תיצור קבוצה אחת לאירוע או תשתמש בקבוצה שכבר נשמרה, ותוסיף אליה את מספרי הטלפון התקינים של האורחים.
             </p>
-            <label className="block mb-2 font-medium">שם הקבוצה</label>
+            <label className="block mb-2 font-medium text-slate-300">שם הקבוצה</label>
             <input
               type="text"
               value={whatsAppGroupName}
               onChange={(e) => setWhatsAppGroupName(e.target.value)}
-              className="w-full border rounded-md p-2 mb-4"
+              className="w-full bg-white/10 border border-white/20 text-white placeholder-slate-400 rounded-xl focus:border-indigo-400 p-2 mb-4"
               maxLength={100}
               placeholder={buildDefaultWhatsAppGroupName()}
               disabled={isWhatsAppGroupSubmitting}
             />
-            <div className="bg-gray-50 border rounded-lg p-3 mb-4 text-gray-700">
+            <div className="bg-white/5 border border-white/10 rounded-xl p-3 mb-4 text-slate-300">
               <div>אורחים להוספה: <strong>{whatsAppGroupGuestCount}</strong></div>
               <div className="text-sm mt-1">
                 {whatsAppGroupGuestIds
@@ -7069,217 +7179,192 @@ React.useEffect(()=>{
                   : 'יתווספו כל האורחים השמורים באירוע.'}
               </div>
             </div>
-            <p className="text-sm text-gray-600 mb-5">
+            <p className="text-sm text-slate-400">
               ייתכן שחלק מהמספרים לא יתווספו בגלל הגדרות פרטיות של וואטסאפ או מגבלות Green API.
             </p>
-            <div className="flex flex-col sm:flex-row gap-3 justify-center">
-              <button
-                type="button"
-                onClick={handleCreateWhatsAppGroup}
-                disabled={isWhatsAppGroupSubmitting || whatsAppGroupGuestCount === 0}
-                className="bg-primary text-white border border-primary rounded-full px-6 py-3 font-bold hover:bg-primary/90 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isWhatsAppGroupSubmitting ? 'יוצר קבוצה...' : 'אישור - צור/עדכן קבוצה'}
-              </button>
-              <button
-                type="button"
-                onClick={() => setShowWhatsAppGroupModal(false)}
-                disabled={isWhatsAppGroupSubmitting}
-                className="bg-white text-gray-700 border border-gray-300 rounded-full px-6 py-3 font-medium hover:bg-gray-50 transition-all disabled:opacity-50"
-              >
-                ביטול
-              </button>
-            </div>
           </div>
-        </div>
-      )}
+        </ModalBody>
+        <ModalFooter>
+          <button
+            type="button"
+            onClick={handleCreateWhatsAppGroup}
+            disabled={isWhatsAppGroupSubmitting || whatsAppGroupGuestCount === 0}
+            className="bg-primary text-white border border-primary rounded-full px-6 py-3 font-bold hover:bg-primary/90 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isWhatsAppGroupSubmitting ? 'יוצר קבוצה...' : 'אישור - צור/עדכן קבוצה'}
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowWhatsAppGroupModal(false)}
+            disabled={isWhatsAppGroupSubmitting}
+            className="border border-white/15 bg-transparent text-white hover:border-indigo-300 hover:text-indigo-200 rounded-full px-6 py-3 font-medium transition-all disabled:opacity-50"
+          >
+            ביטול
+          </button>
+        </ModalFooter>
+      </Modal>
 
       {/* RSVP Confirmation Modal */}
-      {showGuestListModal && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50">
-          <div className="relative bg-white rounded-lg p-6 w-full max-w-md event-form">
-            <button onClick={() => setShowGuestListModal(false)} className="absolute top-2 left-2 text-2xl text-gray-500 hover:text-gray-700">&times;</button>
-            <h2 className="text-xl font-medium mb-4 text-center">דו"חות אישורי הגעה</h2>
-            {/* filter buttons */}
-            <div className="flex justify-center gap-2 mb-4">
-              {['approved','rejected','pending'].map(key=> (
-                <button key={key} onClick={()=>setSelectedReport(key)} className={`${selectedReport===key?'bg-primary text-white':'bg-[#FCE6AC] text-primary'} border border-primary rounded-full px-4 py-1 text-sm font-medium`}>
-                  {key==='approved'?'אישרו הגעה': key==='rejected'?'לא מגיעים':'טרם הגיבו'}
-                </button>
-              ))}
-            </div>
-            <div className="max-h-[70vh] overflow-y-auto">
-              {/* הטבלה הוסרה לפי דרישה */}
-            </div>
-            <div className="flex justify-center mt-6">
-              <button onClick={() => setShowGuestListModal(false)} className="bg-primary text-white border border-primary rounded-full px-8 py-3 font-medium hover:bg-primary/90 transition-all">סגור</button>
-            </div>
+      <Drawer open={showGuestListModal} onClose={() => setShowGuestListModal(false)} size="xl">
+        <DrawerHeader onClose={() => setShowGuestListModal(false)}>דו"חות אישורי הגעה</DrawerHeader>
+        <DrawerBody>
+          {/* filter buttons */}
+          <div className="flex justify-center gap-2 mb-4">
+            {['approved','rejected','pending'].map(key=> (
+              <button key={key} onClick={()=>setSelectedReport(key)} className={`${selectedReport===key?'bg-gradient-to-br from-indigo-600 to-violet-600 text-white border-indigo-400/50':'bg-white/[0.06] text-slate-100 border-white/15 hover:bg-indigo-500/15 hover:border-indigo-400/50'} border rounded-full px-4 py-1 text-sm font-medium transition-all`}>
+                {key==='approved'?'אישרו הגעה': key==='rejected'?'לא מגיעים':'טרם הגיבו'}
+              </button>
+            ))}
           </div>
-        </div>
-      )}
+          <div>
+            {/* הטבלה הוסרה לפי דרישה */}
+          </div>
+        </DrawerBody>
+        <DrawerFooter>
+          <button onClick={() => setShowGuestListModal(false)} className="bg-primary text-white border border-primary rounded-full px-8 py-3 font-medium hover:bg-primary/90 transition-all">סגור</button>
+        </DrawerFooter>
+      </Drawer>
 
       {/* Delete confirmation modal */}
-      {deleteIdx !== null && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-sm text-center">
-            <p className="text-lg mb-6">האם אתה בטוח שברצונך למחוק אורח זה?</p>
-            <div className="flex justify-center gap-4">
-              <button onClick={confirmDelete} className="bg-red-600 text-white px-6 py-2 rounded-md hover:bg-red-700">מחיקה</button>
-              <button onClick={cancelDelete} className="border border-gray-400 px-6 py-2 rounded-md hover:bg-gray-100">ביטול</button>
-            </div>
-          </div>
-        </div>
-      )}
+      <Modal open={deleteIdx !== null} onClose={cancelDelete} size="sm">
+        <ModalHeader onClose={cancelDelete}>אישור מחיקה</ModalHeader>
+        <ModalBody>
+          <p className="text-lg text-center text-slate-100">האם אתה בטוח שברצונך למחוק אורח זה?</p>
+        </ModalBody>
+        <ModalFooter>
+          <button onClick={confirmDelete} className="bg-gradient-to-br from-red-600 to-rose-600 text-white px-6 py-2 rounded-xl hover:opacity-90">מחיקה</button>
+          <button onClick={cancelDelete} className="border border-white/15 bg-transparent text-white hover:border-indigo-300 hover:text-indigo-200 px-6 py-2 rounded-xl">ביטול</button>
+        </ModalFooter>
+      </Modal>
 
       {/* Excel Instructions Modal */}
-      {showExcelInstructions && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50 p-4">
-          <div className="relative bg-white rounded-lg p-6 w-full max-w-lg">
-            <button
-              onClick={() => setShowExcelInstructions(false)}
-              className="absolute top-2 left-2 text-3xl text-gray-500 hover:text-gray-700"
-            >
-              &times;
-            </button>
-            <h2 className="text-xl font-bold text-primary text-center mb-4">הנחיות לייבוא קובץ אקסל</h2>
-
-            <div className="space-y-4 text-right">
-              <p className="text-gray-700">
+      <Modal open={showExcelInstructions} onClose={() => setShowExcelInstructions(false)} size="md">
+        <ModalHeader onClose={() => setShowExcelInstructions(false)}>הנחיות לייבוא קובץ אקסל</ModalHeader>
+        <ModalBody>
+          <div className="space-y-4 text-right">
+              <p className="text-slate-300">
                 הקובץ צריך להכיל <strong>4 עמודות</strong> בסדר הבא:
               </p>
 
-              <div className="bg-gray-50 rounded-lg p-3 border overflow-x-auto">
+              <div className="bg-white/5 border border-white/10 rounded-xl p-3 overflow-x-auto">
                 <table className="w-full text-sm border-collapse">
                   <thead>
-                    <tr className="bg-green-100">
-                      <th className="border border-gray-300 px-3 py-2 text-center font-bold text-primary">A</th>
-                      <th className="border border-gray-300 px-3 py-2 text-center font-bold text-primary">B</th>
-                      <th className="border border-gray-300 px-3 py-2 text-center font-bold text-primary">C</th>
-                      <th className="border border-gray-300 px-3 py-2 text-center font-bold text-primary">D</th>
+                    <tr className="bg-emerald-500/20">
+                      <th className="border border-white/10 px-3 py-2 text-center font-bold text-primary">A</th>
+                      <th className="border border-white/10 px-3 py-2 text-center font-bold text-primary">B</th>
+                      <th className="border border-white/10 px-3 py-2 text-center font-bold text-primary">C</th>
+                      <th className="border border-white/10 px-3 py-2 text-center font-bold text-primary">D</th>
                     </tr>
                   </thead>
                   <tbody>
-                    <tr className="bg-gray-100">
-                      <td className="border border-gray-300 px-3 py-2 text-center font-medium">שם פרטי</td>
-                      <td className="border border-gray-300 px-3 py-2 text-center font-medium">שם משפחה</td>
-                      <td className="border border-gray-300 px-3 py-2 text-center font-medium">מס׳ שולחן</td>
-                      <td className="border border-gray-300 px-3 py-2 text-center font-medium">טלפון</td>
+                    <tr className="bg-white/5">
+                      <td className="border border-white/10 px-3 py-2 text-center font-medium text-slate-300">שם פרטי</td>
+                      <td className="border border-white/10 px-3 py-2 text-center font-medium text-slate-300">שם משפחה</td>
+                      <td className="border border-white/10 px-3 py-2 text-center font-medium text-slate-300">מס׳ שולחן</td>
+                      <td className="border border-white/10 px-3 py-2 text-center font-medium text-slate-300">טלפון</td>
                     </tr>
                     <tr>
-                      <td className="border border-gray-300 px-3 py-2 text-center text-gray-600">ישראל</td>
-                      <td className="border border-gray-300 px-3 py-2 text-center text-gray-600">ישראלי</td>
-                      <td className="border border-gray-300 px-3 py-2 text-center text-gray-600">1</td>
-                      <td className="border border-gray-300 px-3 py-2 text-center text-gray-600">0501234567</td>
+                      <td className="border border-white/10 px-3 py-2 text-center text-slate-400">ישראל</td>
+                      <td className="border border-white/10 px-3 py-2 text-center text-slate-400">ישראלי</td>
+                      <td className="border border-white/10 px-3 py-2 text-center text-slate-400">1</td>
+                      <td className="border border-white/10 px-3 py-2 text-center text-slate-400">0501234567</td>
                     </tr>
                     <tr>
-                      <td className="border border-gray-300 px-3 py-2 text-center text-gray-600">שרה</td>
-                      <td className="border border-gray-300 px-3 py-2 text-center text-gray-600">כהן</td>
-                      <td className="border border-gray-300 px-3 py-2 text-center text-gray-600">2</td>
-                      <td className="border border-gray-300 px-3 py-2 text-center text-gray-600">0529876543</td>
+                      <td className="border border-white/10 px-3 py-2 text-center text-slate-400">שרה</td>
+                      <td className="border border-white/10 px-3 py-2 text-center text-slate-400">כהן</td>
+                      <td className="border border-white/10 px-3 py-2 text-center text-slate-400">2</td>
+                      <td className="border border-white/10 px-3 py-2 text-center text-slate-400">0529876543</td>
                     </tr>
                   </tbody>
                 </table>
               </div>
 
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm">
-                <p className="text-blue-800">
+              <div className="bg-indigo-500/10 border border-indigo-400/30 rounded-lg p-3 text-sm">
+                <p className="text-indigo-200">
                   <strong>שם העמודות לא משנה</strong> - רק הסדר חשוב. השורה הראשונה היא שורת כותרות.
                 </p>
               </div>
 
-              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-sm">
-                <p className="text-yellow-800">
+              <div className="bg-amber-500/10 border border-amber-400/30 rounded-lg p-3 text-sm">
+                <p className="text-amber-200">
                   <strong>שימו לב:</strong> מספר הטלפון צריך להכיל 10 ספרות (לדוגמה: 0501234567)
                 </p>
               </div>
 
-              <div className="flex justify-center gap-4 pt-4">
-                <button
-                  onClick={() => {
-                    setShowExcelInstructions(false);
-                    fileInputRef.current.click();
-                  }}
-                  className="bg-primary text-white px-6 py-3 rounded-full font-medium hover:bg-primary/90 transition-all"
-                >
-                  בחר קובץ אקסל
-                </button>
-                <button
-                  onClick={() => setShowExcelInstructions(false)}
-                  className="border border-gray-400 px-6 py-3 rounded-full font-medium hover:bg-gray-100 transition-all"
-                >
-                  ביטול
-                </button>
-              </div>
-            </div>
           </div>
-        </div>
-      )}
+        </ModalBody>
+        <ModalFooter>
+          <button
+            onClick={() => {
+              setShowExcelInstructions(false);
+              fileInputRef.current.click();
+            }}
+            className="bg-primary text-white px-6 py-3 rounded-full font-medium hover:bg-primary/90 transition-all"
+          >
+            בחר קובץ אקסל
+          </button>
+          <button
+            onClick={() => setShowExcelInstructions(false)}
+            className="border border-white/15 bg-transparent text-white hover:border-indigo-300 hover:text-indigo-200 px-6 py-3 rounded-full font-medium transition-all"
+          >
+            ביטול
+          </button>
+        </ModalFooter>
+      </Modal>
 
       {/* Excel Preview Modal */}
-      {showExcelPreview && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50 p-4">
-          <div className="relative bg-white rounded-lg p-6 w-full max-w-6xl max-h-[90vh] overflow-hidden flex flex-col">
-            <button
-              onClick={() => {
-                setShowExcelPreview(false);
-                setExcelPreviewData([]);
-                setExcelErrors([]);
-              }}
-              className="absolute top-2 left-2 text-3xl text-gray-500 hover:text-gray-700 z-10"
-            >
-              &times;
-            </button>
-
-            <h2 className="text-2xl font-bold text-center mb-4 text-primary">תצוגה מקדימה - ייבוא אורחים מאקסל</h2>
+      <Modal open={showExcelPreview} onClose={() => { setShowExcelPreview(false); setExcelPreviewData([]); setExcelErrors([]); }} size="xl">
+        <ModalHeader onClose={() => { setShowExcelPreview(false); setExcelPreviewData([]); setExcelErrors([]); }}>תצוגה מקדימה - ייבוא אורחים מאקסל</ModalHeader>
+        <ModalBody>
 
             {/* Error Summary */}
             {excelErrors.length > 0 && (
-              <div className="bg-red-50 border border-red-300 rounded-lg p-4 mb-4">
-                <h3 className="font-bold text-red-700 mb-2">נמצאו {excelErrors.length} שורות עם שגיאות:</h3>
-                <ul className="text-sm text-red-600 list-disc list-inside">
+              <div className="bg-red-500/10 border border-red-400/30 rounded-lg p-4 mb-4">
+                <h3 className="font-bold text-red-300 mb-2">נמצאו {excelErrors.length} שורות עם שגיאות:</h3>
+                <ul className="text-sm text-red-300 list-disc list-inside">
                   {excelErrors.slice(0, 5).map((err, idx) => (
                     <li key={idx}>שורה {err.row}: {err.errors.join(', ')}</li>
                   ))}
                   {excelErrors.length > 5 && <li>...ועוד {excelErrors.length - 5} שגיאות</li>}
                 </ul>
-                <p className="text-sm text-red-600 mt-2">רק שורות תקינות יישמרו למסד הנתונים.</p>
+                <p className="text-sm text-red-300 mt-2">רק שורות תקינות יישמרו למסד הנתונים.</p>
               </div>
             )}
 
             {/* Stats */}
             <div className="flex gap-4 mb-4 justify-center">
-              <div className="bg-blue-50 border border-blue-300 rounded-lg px-4 py-2">
-                <span className="font-bold text-blue-700">סה"כ שורות:</span> {excelPreviewData.length}
+              <div className="bg-indigo-500/10 border border-indigo-400/30 rounded-lg px-4 py-2 text-slate-300">
+                <span className="font-bold text-indigo-200">סה"כ שורות:</span> {excelPreviewData.length}
               </div>
-              <div className="bg-green-50 border border-green-300 rounded-lg px-4 py-2">
-                <span className="font-bold text-green-700">תקינות:</span> {excelPreviewData.filter(g => !g.errors || g.errors.length === 0).length}
+              <div className="bg-emerald-500/10 border border-emerald-400/30 rounded-lg px-4 py-2 text-slate-300">
+                <span className="font-bold text-emerald-200">תקינות:</span> {excelPreviewData.filter(g => !g.errors || g.errors.length === 0).length}
               </div>
               {excelErrors.length > 0 && (
-                <div className="bg-red-50 border border-red-300 rounded-lg px-4 py-2">
-                  <span className="font-bold text-red-700">שגיאות:</span> {excelErrors.length}
+                <div className="bg-red-500/10 border border-red-400/30 rounded-lg px-4 py-2 text-slate-300">
+                  <span className="font-bold text-red-300">שגיאות:</span> {excelErrors.length}
                 </div>
               )}
             </div>
 
             {/* Table */}
-            <div className="overflow-auto flex-1 border border-gray-300 rounded-lg">
+            <div className="overflow-auto flex-1 border border-white/10 rounded-xl">
               <table className="w-full text-right" dir="rtl">
                 <thead className="bg-primary text-white sticky top-0">
                   <tr>
-                    <th className="p-2 border-b border-gray-300">#</th>
-                    <th className="p-2 border-b border-gray-300">שם פרטי</th>
-                    <th className="p-2 border-b border-gray-300">שם משפחה</th>
-                    <th className="p-2 border-b border-gray-300">מספר שולחן</th>
-                    <th className="p-2 border-b border-gray-300">טלפון</th>
-                    <th className="p-2 border-b border-gray-300">סטטוס</th>
-                    <th className="p-2 border-b border-gray-300">פעולות</th>
+                    <th className="p-2 border-b border-white/10">#</th>
+                    <th className="p-2 border-b border-white/10">שם פרטי</th>
+                    <th className="p-2 border-b border-white/10">שם משפחה</th>
+                    <th className="p-2 border-b border-white/10">מספר שולחן</th>
+                    <th className="p-2 border-b border-white/10">טלפון</th>
+                    <th className="p-2 border-b border-white/10">סטטוס</th>
+                    <th className="p-2 border-b border-white/10">פעולות</th>
                   </tr>
                 </thead>
                 <tbody>
                   {excelPreviewData.map((guest, idx) => (
                     <tr
                       key={idx}
-                      className={`${guest.errors && guest.errors.length > 0 ? 'bg-red-50' : 'bg-white'} hover:bg-gray-50 border-b`}
+                      className={`${guest.errors && guest.errors.length > 0 ? 'bg-red-500/10' : 'bg-white/5'} hover:bg-white/10 border-b border-white/5`}
                     >
                       <td className="p-2 text-center">{idx + 1}</td>
                       <td className="p-2">
@@ -7287,7 +7372,7 @@ React.useEffect(()=>{
                           type="text"
                           value={guest.guestFirstName}
                           onChange={(e) => handleEditExcelRow(idx, 'guestFirstName', e.target.value)}
-                          className="w-full border rounded px-2 py-1"
+                          className="w-full bg-white/10 border border-white/20 text-white placeholder-slate-400 rounded-lg px-2 py-1 outline-none focus:border-indigo-400"
                         />
                       </td>
                       <td className="p-2">
@@ -7295,7 +7380,7 @@ React.useEffect(()=>{
                           type="text"
                           value={guest.guestLastName}
                           onChange={(e) => handleEditExcelRow(idx, 'guestLastName', e.target.value)}
-                          className="w-full border rounded px-2 py-1"
+                          className="w-full bg-white/10 border border-white/20 text-white placeholder-slate-400 rounded-lg px-2 py-1 outline-none focus:border-indigo-400"
                         />
                       </td>
                       <td className="p-2">
@@ -7303,7 +7388,7 @@ React.useEffect(()=>{
                           type="text"
                           value={guest.guestTable}
                           onChange={(e) => handleEditExcelRow(idx, 'guestTable', e.target.value)}
-                          className="w-full border rounded px-2 py-1"
+                          className="w-full bg-white/10 border border-white/20 text-white placeholder-slate-400 rounded-lg px-2 py-1 outline-none focus:border-indigo-400"
                         />
                       </td>
                       <td className="p-2">
@@ -7311,20 +7396,20 @@ React.useEffect(()=>{
                           type="text"
                           value={guest.guestPhone}
                           onChange={(e) => handleEditExcelRow(idx, 'guestPhone', e.target.value)}
-                          className="w-full border rounded px-2 py-1"
+                          className="w-full bg-white/10 border border-white/20 text-white placeholder-slate-400 rounded-lg px-2 py-1 outline-none focus:border-indigo-400"
                         />
                       </td>
                       <td className="p-2 text-center">
                         {guest.errors && guest.errors.length > 0 ? (
-                          <span className="text-red-600 text-xs">{guest.errors.join(', ')}</span>
+                          <span className="text-red-300 text-xs">{guest.errors.join(', ')}</span>
                         ) : (
-                          <span className="text-green-600 font-bold">✓</span>
+                          <span className="text-emerald-300 font-bold">✓</span>
                         )}
                       </td>
                       <td className="p-2 text-center">
                         <button
                           onClick={() => handleRemoveExcelRow(idx)}
-                          className="text-red-600 hover:text-red-800 font-bold"
+                          className="text-red-300 hover:text-red-200 font-bold"
                           title="מחק שורה"
                         >
                           🗑️
@@ -7342,7 +7427,7 @@ React.useEffect(()=>{
                 <button
                   onClick={() => handleSaveExcelGuests(false, true)}
                   disabled={isSavingExcelGuests || excelPreviewData.filter(g => !g.errors || g.errors.length === 0).length === 0}
-                  className="bg-green-600 text-white px-8 py-3 rounded-full font-medium hover:bg-green-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="bg-emerald-600 text-white px-8 py-3 rounded-full font-medium hover:bg-emerald-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isSavingExcelGuests ? 'שומר...' : 'שלח בוואטסאפ'}
                 </button>
@@ -7367,51 +7452,45 @@ React.useEffect(()=>{
                   setExcelPreviewData([]);
                   setExcelErrors([]);
                 }}
-                className="border border-gray-400 px-8 py-3 rounded-full font-medium hover:bg-gray-100 transition-all"
+                className="border border-white/15 bg-transparent text-white hover:border-indigo-300 hover:text-indigo-200 px-8 py-3 rounded-full font-medium transition-all"
               >
                 ביטול
               </button>
             </div>
-          </div>
-        </div>
-      )}
+        </ModalBody>
+      </Modal>
 
       {/* RSVP Yes/No Question Modal */}
-      {showRsvpQuestion && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-sm text-center space-y-6 relative">
-            <button onClick={() => setShowRsvpQuestion(false)} className="absolute top-2 left-2 text-2xl text-gray-500 hover:text-gray-700">&times;</button>
-            <h2 className="text-xl font-medium">האם אתם מגיעים לאירוע?</h2>
-            <div className="flex justify-center gap-6">
-              <button
-                className="bg-green-600 text-white px-6 py-2 rounded-full hover:bg-green-700 text-lg font-bold"
-                onClick={() => {
-                  setShowRsvpQuestion(false);
-                  setShowCountModal(true);
-                }}
-              ><span className="mr-2 text-white">✓</span> מגיעים</button>
-              <button
-                className="bg-red-600 text-white px-6 py-2 rounded-full hover:bg-red-700 text-lg font-bold"
-                onClick={() => {
-                  setRsvpConfirmed(false);
-                  setShowRsvpQuestion(false);
-                }}
-              ><span className="mr-2 text-white">✗</span> לא מגיעים</button>
-            </div>
+      <Modal open={showRsvpQuestion} onClose={() => setShowRsvpQuestion(false)} size="sm">
+        <ModalHeader onClose={() => setShowRsvpQuestion(false)}>האם אתם מגיעים לאירוע?</ModalHeader>
+        <ModalBody>
+          <div className="flex justify-center gap-6 py-2">
+            <button
+              className="bg-emerald-600 text-white px-6 py-2 rounded-full hover:bg-emerald-700 text-lg font-bold"
+              onClick={() => {
+                setShowRsvpQuestion(false);
+                setShowCountModal(true);
+              }}
+            ><span className="mr-2 text-white">✓</span> מגיעים</button>
+            <button
+              className="bg-red-600 text-white px-6 py-2 rounded-full hover:bg-red-600 text-lg font-bold"
+              onClick={() => {
+                setRsvpConfirmed(false);
+                setShowRsvpQuestion(false);
+              }}
+            ><span className="mr-2 text-white">✗</span> לא מגיעים</button>
           </div>
-        </div>
-      )}
+        </ModalBody>
+      </Modal>
       {/* Count modal */}
-      {showCountModal && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-[95vw] mx-4 my-8 text-center space-y-6 relative event-form">
-            <button onClick={() => setShowCountModal(false)} className="absolute top-2 left-2 text-2xl text-gray-500 hover:text-gray-700">&times;</button>
-            <h2 className="text-xl font-medium">כמה אורחים מגיעים?</h2>
-            {countError && (
-              <div className="bg-red-100 border-2 border-red-500 rounded-lg p-4 text-right">
+      <Drawer open={showCountModal} onClose={() => setShowCountModal(false)} size="md">
+        <DrawerHeader onClose={() => setShowCountModal(false)}>כמה אורחים מגיעים?</DrawerHeader>
+        <DrawerBody>
+          {countError && (
+              <div className="bg-red-500/10 border border-red-400/30 rounded-lg p-4 text-right">
                 <div className="flex items-center justify-center mb-2">
-                  <span className="text-red-600 text-2xl mr-2">✗</span>
-                  <p className="text-red-600 text-lg font-medium">{countError}</p>
+                  <span className="text-red-300 text-2xl mr-2">✗</span>
+                  <p className="text-red-300 text-lg font-medium">{countError}</p>
                 </div>
               </div>
             )}
@@ -7421,29 +7500,29 @@ React.useEffect(()=>{
                 <input type="number" min="0" value={adultsCount} onChange={(e)=>{
                   setAdultsCount(parseInt(e.target.value)||0);
                   if (countError) setCountError('');
-                }} className="w-full border rounded-md p-2" />
+                }} className="w-full bg-white/10 border border-white/20 text-white rounded-xl p-2 outline-none focus:border-indigo-400" />
               </div>
               <div>
                 <label className="block mb-1 font-medium">סה"כ ילדים</label>
                 <input type="number" min="0" value={childrenCount} onChange={(e)=>{
                   setChildrenCount(parseInt(e.target.value)||0);
                   if (countError) setCountError('');
-                }} className="w-full border rounded-md p-2" />
+                }} className="w-full bg-white/10 border border-white/20 text-white rounded-xl p-2 outline-none focus:border-indigo-400" />
               </div>
             </div>
 
             <h3 className="text-lg font-medium mt-4">מנות מיוחדות</h3>
             <table className="w-full text-right border">
               <thead>
-                <tr className="bg-gray-100 text-sm font-bold whitespace-nowrap">
-                  <th className="p-1 border">קטגוריה</th>
+                <tr className="bg-white/5 text-sm font-bold whitespace-nowrap text-slate-300">
+                  <th className="p-1 border border-white/10">קטגוריה</th>
                   <th className="p-1 border">סה"כ בוגרים</th>
                   <th className="p-1 border">סה"כ ילדים</th>
                 </tr>
               </thead>
               <tbody>
                 {mealCategories.map((c) => (
-                  <tr key={c.key} className="odd:bg-white even:bg-gray-50">
+                  <tr key={c.key} className="odd:bg-white/5 even:bg-white/[0.02] border-white/5">
                     <td className="p-1 border">{c.label}</td>
                     {
                       /* standard categories */
@@ -7451,22 +7530,22 @@ React.useEffect(()=>{
                     {c.key !== 'allergy' ? (
                       <>
                         <td className="p-1 border">
-                          <input type="number" min="0" value={specialMeals[c.key].adults} onChange={(e)=>updateMeal(c.key,'adults',parseInt(e.target.value)||0)} className="w-16 border rounded-md p-1" />
+                          <input type="number" min="0" value={specialMeals[c.key].adults} onChange={(e)=>updateMeal(c.key,'adults',parseInt(e.target.value)||0)} className="w-16 bg-white/10 border border-white/20 text-white rounded-lg p-1 outline-none focus:border-indigo-400" />
                         </td>
                         <td className="p-1 border">
-                          <input type="number" min="0" value={specialMeals[c.key].children} onChange={(e)=>updateMeal(c.key,'children',parseInt(e.target.value)||0)} className="w-16 border rounded-md p-1" />
+                          <input type="number" min="0" value={specialMeals[c.key].children} onChange={(e)=>updateMeal(c.key,'children',parseInt(e.target.value)||0)} className="w-16 bg-white/10 border border-white/20 text-white rounded-lg p-1 outline-none focus:border-indigo-400" />
                         </td>
                       </>
                     ) : (
                       <>
                         <td className="p-1 border">
-                          <input type="number" min="0" value={specialMeals.allergy.adults} onChange={(e)=>updateMeal('allergy','adults',parseInt(e.target.value)||0)} className="w-16 border rounded-md p-1" />
+                          <input type="number" min="0" value={specialMeals.allergy.adults} onChange={(e)=>updateMeal('allergy','adults',parseInt(e.target.value)||0)} className="w-16 bg-white/10 border border-white/20 text-white rounded-lg p-1 outline-none focus:border-indigo-400" />
                         </td>
                         <td className="p-1 border">
-                          <input type="number" min="0" value={specialMeals.allergy.children} onChange={(e)=>updateMeal('allergy','children',parseInt(e.target.value)||0)} className="w-16 border rounded-md p-1" />
+                          <input type="number" min="0" value={specialMeals.allergy.children} onChange={(e)=>updateMeal('allergy','children',parseInt(e.target.value)||0)} className="w-16 bg-white/10 border border-white/20 text-white rounded-lg p-1 outline-none focus:border-indigo-400" />
                         </td>
                         <td className="p-1 border" colSpan={1}>
-                          <input type="text" placeholder="סוג אלרגיה" value={specialMeals.allergy.description} onChange={(e)=>updateMeal('allergy','description',e.target.value)} className="w-full border rounded-md p-1" />
+                          <input type="text" placeholder="סוג אלרגיה" value={specialMeals.allergy.description} onChange={(e)=>updateMeal('allergy','description',e.target.value)} className="w-full bg-white/10 border border-white/20 text-white placeholder-slate-400 rounded-lg p-1 outline-none focus:border-indigo-400" />
                         </td>
                       </>
                     )}
@@ -7478,13 +7557,13 @@ React.useEffect(()=>{
             {/* Allergies section */}
             <h4 className="font-medium mt-4 mb-2 text-right">אלרגיות</h4>
             <div className="flex justify-end items-center mb-2 space-x-2 space-x-reverse">
-              <span className="text-lg font-medium text-gray-700">להוספת אלרגיות לחץ</span>
-              <button onClick={addAllergy} className="bg-green-600 hover:bg-green-700 text-white rounded-full w-8 h-8 text-lg flex items-center justify-center" aria-label="הוסף אלרגיה">+</button>
+              <span className="text-lg font-medium text-slate-300">להוספת אלרגיות לחץ</span>
+              <button onClick={addAllergy} className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-full w-8 h-8 text-lg flex items-center justify-center" aria-label="הוסף אלרגיה">+</button>
             </div>
             <table className="w-full text-right border">
               <thead>
-                <tr className="bg-gray-100">
-                  <th className="p-1 border">תיאור האלרגיה</th>
+                <tr className="bg-white/5 text-slate-300">
+                  <th className="p-1 border border-white/10">תיאור האלרגיה</th>
                   <th className="p-1 border">סה"כ בוגרים</th>
                   <th className="p-1 border">סה"כ ילדים</th>
                   <th className="p-1 border"></th>
@@ -7492,11 +7571,11 @@ React.useEffect(()=>{
               </thead>
               <tbody>
                 {allergies.map((a, idx)=>(
-                  <tr key={idx} className="odd:bg-white even:bg-gray-50">
-                    <td className="p-1 border"><input type="text" value={a.description} onChange={(e)=>updateAllergy(idx,'description',e.target.value)} className="w-full border rounded-md p-1"/></td>
-                    <td className="p-1 border"><input type="number" min="0" value={a.adults} onChange={(e)=>updateAllergy(idx,'adults',parseInt(e.target.value)||0)} className="w-16 border rounded-md p-1"/></td>
-                    <td className="p-1 border"><input type="number" min="0" value={a.children} onChange={(e)=>updateAllergy(idx,'children',parseInt(e.target.value)||0)} className="w-16 border rounded-md p-1"/></td>
-                    <td className="p-1 border text-center"><button onClick={()=>removeAllergy(idx)} className="text-red-600">❌</button></td>
+                  <tr key={idx} className="odd:bg-white/5 even:bg-white/[0.02]">
+                    <td className="p-1 border border-white/10"><input type="text" value={a.description} onChange={(e)=>updateAllergy(idx,'description',e.target.value)} className="w-full bg-white/10 border border-white/20 text-white rounded-lg p-1 outline-none focus:border-indigo-400"/></td>
+                    <td className="p-1 border"><input type="number" min="0" value={a.adults} onChange={(e)=>updateAllergy(idx,'adults',parseInt(e.target.value)||0)} className="w-16 bg-white/10 border border-white/20 text-white rounded-lg p-1 outline-none focus:border-indigo-400"/></td>
+                    <td className="p-1 border"><input type="number" min="0" value={a.children} onChange={(e)=>updateAllergy(idx,'children',parseInt(e.target.value)||0)} className="w-16 bg-white/10 border border-white/20 text-white rounded-lg p-1 outline-none focus:border-indigo-400"/></td>
+                    <td className="p-1 border text-center"><button onClick={()=>removeAllergy(idx)} className="text-red-300 hover:text-red-200">❌</button></td>
                   </tr>
                 ))}
               </tbody>
@@ -7574,16 +7653,15 @@ React.useEffect(()=>{
             >
               שמור
             </button>
-          </div>
-        </div>
-      )}
+        </DrawerBody>
+      </Drawer>
 
       {/* Step 5 - choose action modal */}
       {showStep5Options && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-sm text-center space-y-4 relative">
-            <button onClick={() => setShowStep5Options(false)} className="absolute top-2 left-2 text-2xl text-gray-500 hover:text-gray-700">&times;</button>
-            <h2 className="text-xl font-medium mb-4">בחר דוח</h2>
+        <Modal open={showStep5Options} onClose={() => setShowStep5Options(false)} size="sm">
+          <ModalHeader onClose={() => setShowStep5Options(false)}>בחר דוח</ModalHeader>
+          <ModalBody>
+            <div className="space-y-4">
 
             {/* Reports buttons */}
             <button
@@ -7618,7 +7696,7 @@ React.useEffect(()=>{
                   alert('שגיאה בטעינת הדוח');
                 }
               }}
-              className="w-full bg-[#FCE6AC] text-black border border-primary rounded-full px-4 py-2 font-medium ring-2 ring-primary ring-offset-2 ring-offset-[#FCE6AC] hover:bg-[#FCE6AC]/90 transition-all"
+              className="w-full bg-white/[0.06] text-slate-100 border border-white/15 rounded-full px-4 py-2 font-medium hover:bg-indigo-500/15 hover:border-indigo-400/50 transition-all"
             >
               דו"ח אורחים מגיעים
             </button>
@@ -7654,7 +7732,7 @@ React.useEffect(()=>{
                   alert('שגיאה בטעינת הדוח');
                 }
               }}
-              className="w-full bg-[#FCE6AC] text-black border border-primary rounded-full px-4 py-2 font-medium ring-2 ring-primary ring-offset-2 ring-offset-[#FCE6AC] hover:bg-[#FCE6AC]/90 transition-all"
+              className="w-full bg-white/[0.06] text-slate-100 border border-white/15 rounded-full px-4 py-2 font-medium hover:bg-indigo-500/15 hover:border-indigo-400/50 transition-all"
             >
               דו"ח אורחים לא מגיעים
             </button>
@@ -7689,57 +7767,49 @@ React.useEffect(()=>{
                   alert('שגיאה בטעינת הדוח');
                 }
               }}
-              className="w-full bg-[#FCE6AC] text-black border border-primary rounded-full px-4 py-2 font-medium ring-2 ring-primary ring-offset-2 ring-offset-[#FCE6AC] hover:bg-[#FCE6AC]/90 transition-all"
+              className="w-full bg-white/[0.06] text-slate-100 border border-white/15 rounded-full px-4 py-2 font-medium hover:bg-indigo-500/15 hover:border-indigo-400/50 transition-all"
             >
               דו"ח אורחים שטרם הגיבו
             </button>
-          </div>
-        </div>
+            </div>
+          </ModalBody>
+        </Modal>
       )}
 
       {/* Step 3 - Design chooser */}
-      {showDesignChooser && (
-        <div className="fixed inset-0 bg-black/50 z-50">
-          <div className="w-full h-full bg-white flex flex-col">
-            <div className="p-4 border-b">
-              <div className="flex items-start gap-2">
-                <h2 className="flex-1 text-2xl font-bold text-center border-b-2 border-primary pb-1 mb-4">
-                  עיצוב הזמנה.
-                </h2>
-                <button onClick={() => setShowDesignChooser(false)} className="text-3xl text-gray-500 hover:text-gray-700">&times;</button>
-              </div>
-            </div>
-            
+      <Drawer open={showDesignChooser} onClose={() => setShowDesignChooser(false)} size="xl">
+        <DrawerHeader onClose={() => setShowDesignChooser(false)}>עיצוב הזמנה</DrawerHeader>
+        <DrawerBody className="p-0 flex flex-col overflow-hidden">
             {/* Mobile tabs */}
-            <div className="flex sm:hidden border-b">
+            <div className="flex sm:hidden border-b border-white/10">
               <button
                 onClick={() => setDesignMobileTab('text')}
-                className={`flex-1 py-3 text-center font-bold text-xl transition-all ${designMobileTab === 'text' ? 'text-primary border-b-3 border-primary bg-primary/5' : 'text-gray-500'}`}
+                className={`flex-1 py-3 text-center font-bold text-base transition-all ${designMobileTab === 'text' ? 'text-indigo-300 border-b-2 border-indigo-400 bg-indigo-500/10' : 'text-slate-400'}`}
               >
                 א. עיצוב טקסט
               </button>
               <button
                 onClick={() => setDesignMobileTab('templates')}
-                className={`flex-1 py-3 text-center font-bold text-xl transition-all ${designMobileTab === 'templates' ? 'text-primary border-b-3 border-primary bg-primary/5' : 'text-gray-500'}`}
+                className={`flex-1 py-3 text-center font-bold text-base transition-all ${designMobileTab === 'templates' ? 'text-indigo-300 border-b-2 border-indigo-400 bg-indigo-500/10' : 'text-slate-400'}`}
               >
                 ב. בחירת תבנית
               </button>
             </div>
 
             {/* Main content area */}
-            <div className="flex-1 flex flex-col sm:flex-row overflow-hidden">
+            <div className="flex-1 flex flex-col sm:flex-row overflow-hidden min-h-0">
               {/* Text editing section */}
-              <div className={`${designMobileTab === 'text' ? 'flex' : 'hidden'} sm:flex flex-col sm:w-1/2 sm:border-r overflow-y-auto p-4 sm:p-6`}>
+              <div className={`${designMobileTab === 'text' ? 'flex' : 'hidden'} sm:flex flex-col sm:w-1/2 sm:border-r border-white/10 overflow-y-auto p-4 sm:p-6`}>
                 <h3 className="hidden sm:block text-xl font-semibold text-primary mb-4 text-center">א. עצב טקסט הזמנה.</h3>
                 {/* Styled Container */}
-                <div className="bg-[#FFF9E8] border-2 border-primary rounded-lg p-4 shadow-sm space-y-4">
+                <div className="bg-white/[0.055] border border-white/15 backdrop-blur-xl rounded-lg p-4 shadow-sm space-y-4 text-slate-100">
               {/* Font chooser */}
               <div className="text-right">
                 <label className="block mb-1 font-bold">אפשרות לשינוי גופן</label>
                 <select
                   value={selectedFontKey}
                   onChange={(e)=>setSelectedFontKey(e.target.value)}
-                  className="w-full border border-primary rounded-md p-2 bg-white"
+                  className="w-full bg-white/10 border border-white/20 text-white placeholder-slate-400 rounded-xl focus:border-indigo-400 p-2"
                 >
                   {fontsOptions.map(f=>(
                     <option key={f.key} value={f.key}>{f.label}</option>
@@ -7750,28 +7820,28 @@ React.useEffect(()=>{
               {/* Invitation text editor with advanced formatting */}
               <div>
                 <label className="block mb-1 font-bold text-right">אפשרות לשינוי נוסח ועיצוב ההזמנה</label>
-                <div className="border border-primary rounded-md p-2 sm:p-3 bg-white">
+                <div className="bg-white/5 border border-white/15 rounded-xl p-2 sm:p-3">
                   <div className="flex justify-center items-center mb-2">
                     <button
                       onClick={addNewLineAtTop}
-                      className="bg-green-500 text-white px-3 py-1.5 rounded text-xs sm:text-sm hover:bg-green-600 font-medium"
+                      className="bg-green-500 text-white px-3 py-1.5 rounded text-xs sm:text-sm hover:bg-emerald-600 font-medium"
                     >
                       + הוסף שורה למעלה
                     </button>
-                    <span className="text-xs sm:text-sm text-gray-600 mr-3">
+                    <span className="text-xs sm:text-sm text-slate-400 mr-3">
                       {customInvitationText.split('\n').length} שורות
                     </span>
                   </div>
                   
                   {customInvitationText.split('\n').map((line, index) => (
-                    <div key={index} className="mb-1.5 p-1.5 border border-gray-200 rounded bg-gray-50">
+                    <div key={index} className="mb-1.5 p-1.5 bg-white/5 border border-white/10 rounded-xl">
                       <textarea
                         value={line}
                         onChange={(e) => updateLineText(index, e.target.value)}
-                        className="w-full border border-gray-300 rounded p-2 text-right text-sm sm:text-base"
+                        className="w-full bg-white/10 border border-white/20 text-white placeholder-slate-400 rounded-xl focus:border-indigo-400 p-2 text-right text-sm sm:text-base"
                         style={{
                           fontSize: `${getEffectiveLineStyle(index).fontSize}px`,
-                          color: getEffectiveLineStyle(index).color || 'black',
+                          color: getDarkThemePreviewColor(getEffectiveLineStyle(index).color),
                           fontWeight: getEffectiveLineStyle(index).fontWeight || 'normal'
                         }}
                         rows={1}
@@ -7802,7 +7872,7 @@ React.useEffect(()=>{
                   <div className="flex justify-center mt-3">
                     <button
                       onClick={addNewLine}
-                      className="bg-green-500 text-white px-4 py-2 rounded text-sm hover:bg-green-600 font-medium"
+                      className="bg-green-500 text-white px-4 py-2 rounded text-sm hover:bg-emerald-600 font-medium"
                     >
                       + הוסף שורה למטה
                     </button>
@@ -7824,17 +7894,18 @@ React.useEffect(()=>{
                 </div>
                 
                 {/* Preview of formatted text */}
-                <div className="mt-3 p-2 sm:p-4 border border-gray-300 rounded bg-white">
-                  <h3 className="text-sm sm:text-lg font-bold mb-2 text-center">תצוגה מקדימה:</h3>
-                  <div className="bg-gray-50 p-2 sm:p-4 rounded border text-center">
+                <div className="mt-3 p-2 sm:p-4 bg-white/5 border border-white/10 rounded-xl">
+                  <h3 className="text-sm sm:text-lg font-bold mb-2 text-center text-slate-100">תצוגה מקדימה:</h3>
+                  <div className="bg-white/5 p-2 sm:p-4 rounded-xl border border-white/10 text-center">
                     {customInvitationText.split('\n').map((line, index) => {
                       const s = getEffectiveLineStyle(index);
                       return (
                       <div
                         key={index}
                         style={{
+                          ...invitationPreviewLineContainmentStyle,
                           fontSize: `${s.fontSize}px`,
-                          color: s.color || 'black',
+                          color: getDarkThemePreviewColor(s.color),
                           fontWeight: s.fontWeight || 'normal',
                           lineHeight: s.lineHeight || 1.5,
                           letterSpacing: `${s.letterSpacing || 0}px`,
@@ -7844,7 +7915,6 @@ React.useEffect(()=>{
                           textShadow: 'none',
                           transform: s.fontStyle === 'italic' ? 'skewX(20deg)' : s.fontStyle === 'back-slant' ? 'skewX(-20deg)' : 'none',
                           whiteSpace: 'pre-wrap',
-                          wordBreak: 'break-word',
                           marginBottom: '8px'
                         }}
                       >
@@ -7861,7 +7931,7 @@ React.useEffect(()=>{
               <div className={`${designMobileTab === 'templates' ? 'flex' : 'hidden'} sm:flex flex-col sm:w-1/2 overflow-y-auto p-4 sm:p-6`}>
                 <h3 className="hidden sm:block text-xl font-semibold text-primary mb-4 text-center">ב. לחץ לבחירת הזמנה.</h3>
                 {designImages.length === 0 ? (
-                  <p className="text-center text-gray-600 mt-10">לא נמצאו תמונות בתיקייה /public/images</p>
+                  <p className="text-center text-slate-400 mt-10">לא נמצאו תמונות בתיקייה /public/images</p>
                 ) : (
                   <div className="grid grid-cols-2 gap-3 sm:gap-6">
                     {designImages.map((src) => {
@@ -7911,8 +7981,8 @@ React.useEffect(()=>{
                           key={src}
                           className={`relative cursor-pointer hover:opacity-80 rounded-md ${
                             isSelected 
-                              ? 'ring-4 ring-green-600 ring-offset-4 ring-offset-white border-4 border-green-600' 
-                              : 'border-2 border-gray-300'
+                              ? 'ring-4 ring-emerald-400/70 ring-offset-4 ring-offset-[#12143a] border-4 border-emerald-400/70' 
+                              : 'border-2 border-white/15'
                           }`}
                           onClick={() => {
                             setLightboxSrc(src);
@@ -7956,8 +8026,8 @@ React.useEffect(()=>{
                             }
                           }}
                         >
-                          <div className="relative w-full rounded-md overflow-hidden border border-gray-200 bg-white">
-                            <div className="relative pt-[100%]">
+                          <div className="relative aspect-[4/5] w-full rounded-xl overflow-hidden border border-white/10 bg-white/5">
+                            <div className="absolute inset-0">
                               <img
                                 src={src}
                                 alt="Invitation design"
@@ -7982,6 +8052,7 @@ React.useEffect(()=>{
                                     <div
                                       key={lineIndex}
                                       style={{
+                                        ...invitationPreviewLineContainmentStyle,
                                         fontSize: `${fontSize}px`,
                                         fontFamily: selectedFontCss || 'Assistant, sans-serif',
                                         fontWeight: style.fontWeight || 'normal',
@@ -7994,7 +8065,6 @@ React.useEffect(()=>{
                                         textShadow: 'none',
                                         transform: style.fontStyle === 'italic' ? 'skewX(20deg)' : style.fontStyle === 'back-slant' ? 'skewX(-20deg)' : 'none',
                                         whiteSpace: 'pre-wrap',
-                                        wordBreak: 'break-word',
                                         marginBottom: lineIndex < (customInvitationText || invitationText || '').split('\n').length - 1 ? '0.25em' : '0',
                                       }}
                                     >
@@ -8019,16 +8089,15 @@ React.useEffect(()=>{
                 )}
               </div>
             </div>
-          </div>
-        </div>
-      )}
+        </DrawerBody>
+      </Drawer>
       {/* Lightbox for design preview */}
-      {showLightbox && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black/70 z-50">
-          <div className="relative bg-white sm:rounded-lg p-1 sm:p-4 sm:max-w-3xl w-full max-h-[92vh] sm:max-h-[88vh] sm:w-full flex flex-col mx-1 sm:mx-auto">
-            <button onClick={()=> setShowLightbox(false)} className="absolute top-2 left-2 text-2xl text-gray-500 sm:text-gray-200 hover:text-gray-800 sm:hover:text-white z-10">&times;</button>
-            <div className="relative flex-1 flex items-center justify-center overflow-hidden min-h-0">
-              <img src={lightboxSrc} alt="preview" className="max-w-full max-h-[calc(88vh-60px)] sm:max-h-[calc(85vh-70px)] object-contain rounded-md" />
+      <Modal open={showLightbox} onClose={() => setShowLightbox(false)} size="lg">
+        <ModalHeader onClose={() => setShowLightbox(false)}>תצוגה מקדימה</ModalHeader>
+        <ModalBody className="flex flex-col items-center">
+          <div className="relative w-full flex items-center justify-center overflow-hidden min-h-0">
+            <div className="relative aspect-[4/5] overflow-hidden rounded-md shadow-2xl" style={{ width: 'min(100%, 520px, calc((92vh - 170px) * 0.8))' }}>
+              <img src={lightboxSrc} alt="preview" className="absolute inset-0 h-full w-full object-cover" />
               <div className="absolute inset-0 rounded-md pointer-events-none" style={{ background: 'rgba(255,255,255,0.22)' }} aria-hidden />
               <div className="absolute inset-0 flex flex-col items-center justify-center px-4" dir="rtl">
                 {(customInvitationText || invitationText || 'דוגמת טקסט להזמנה').split('\n').map((line, lineIndex) => {
@@ -8048,6 +8117,7 @@ React.useEffect(()=>{
                     <div
                       key={lineIndex}
                       style={{
+                        ...invitationPreviewLineContainmentStyle,
                         fontSize: `${fontSize}px`,
                         fontFamily: selectedFontCss || 'Assistant, sans-serif',
                         fontWeight: style.fontWeight || 'normal',
@@ -8060,7 +8130,6 @@ React.useEffect(()=>{
                         textShadow: 'none',
                         transform: style.fontStyle === 'italic' ? 'skewX(20deg)' : style.fontStyle === 'back-slant' ? 'skewX(-20deg)' : 'none',
                         whiteSpace: 'pre-wrap',
-                        wordBreak: 'break-word',
                         marginBottom: lineIndex < (customInvitationText || invitationText || '').split('\n').length - 1 ? '0.5em' : '0',
                       }}
                     >
@@ -8070,64 +8139,54 @@ React.useEffect(()=>{
                 })}
               </div>
             </div>
-            <div className="flex justify-center mt-2 sm:mt-4 gap-3 sm:gap-4 pb-4 sm:pb-0 shrink-0">
-              {uploadingInvite ? (
-                <button disabled className="bg-gray-400 text-white px-4 sm:px-6 py-2 rounded-full cursor-not-allowed text-sm sm:text-base">מעלה...</button>
-              ) : (
-                <button onClick={() => handleChooseDesign(lightboxSrc)} className="bg-green-600 text-white px-4 sm:px-6 py-2 rounded-full hover:bg-green-700 text-sm sm:text-base font-medium">בחר עיצוב זה</button>
-              )}
-              <button onClick={() => setShowLightbox(false)} className="bg-red-500 text-white px-4 sm:px-6 py-2 rounded-full hover:bg-red-600 text-sm sm:text-base font-medium">אל תבחר</button>
             </div>
-          </div>
-        </div>
-      )}
+        </ModalBody>
+        <ModalFooter>
+          {uploadingInvite ? (
+            <button disabled className="bg-white/20 text-slate-300 px-4 sm:px-6 py-2 rounded-full cursor-not-allowed text-sm sm:text-base">מעלה...</button>
+          ) : (
+            <button onClick={() => handleChooseDesign(lightboxSrc)} className="bg-emerald-600 text-white px-4 sm:px-6 py-2 rounded-full hover:bg-emerald-700 text-sm sm:text-base font-medium">בחר עיצוב זה</button>
+          )}
+          <button onClick={() => setShowLightbox(false)} className="bg-red-500 text-white px-4 sm:px-6 py-2 rounded-full hover:bg-red-600 text-sm sm:text-base font-medium">אל תבחר</button>
+        </ModalFooter>
+      </Modal>
 
       {/* Advanced Edit Modal */}
       {showAdvancedEdit !== null && (
         <>
-          {/* Full-screen color picker */}
-          {showColorPalette ? (
-            <div className="fixed inset-0 z-[60] bg-white flex flex-col" dir="rtl">
-              <div className="p-4 border-b border-gray-200">
-                <h2 className="text-xl font-bold text-primary text-center">בחירת צבע פונט</h2>
-              </div>
-              <div className="flex-1 overflow-y-auto p-6">
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 max-w-4xl mx-auto">
-                  {colorKeys.map(color => (
-                    <button
-                      key={color}
-                      onClick={() => {
-                        updateLineStyle(showAdvancedEdit, 'color', color);
-                      }}
-                      className={`aspect-square rounded-xl border-4 transition-all hover:scale-105 ${
-                        lineStyles[showAdvancedEdit]?.color === color ? 'border-gray-800 ring-4 ring-primary/30' : 'border-gray-300'
-                      } ${colorClasses[color] || 'bg-gray-300'}`}
-                      title={color}
-                    ></button>
-                  ))}
-                </div>
-                <div className="flex justify-center mt-8">
+          {/* Color picker modal */}
+          <Modal open={showColorPalette} onClose={() => setShowColorPalette(false)} size="md">
+            <ModalHeader onClose={() => setShowColorPalette(false)}>בחירת צבע פונט</ModalHeader>
+            <ModalBody>
+              <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
+                {colorKeys.map(color => (
                   <button
-                    onClick={() => setShowColorPalette(false)}
-                    className="px-8 py-3 bg-primary text-white rounded-lg font-medium hover:bg-primary/90 transition-colors"
-                  >
-                    חזרה לעיצוב
-                  </button>
-                </div>
+                    key={color}
+                    onClick={() => {
+                      updateLineStyle(showAdvancedEdit, 'color', color);
+                      setShowColorPalette(false);
+                    }}
+                    className={`aspect-square rounded-xl border-4 transition-all hover:scale-105 ${
+                      lineStyles[showAdvancedEdit]?.color === color ? 'border-white ring-4 ring-indigo-400/50' : 'border-white/20'
+                    } ${colorClasses[color] || 'bg-white/10'}`}
+                    title={color}
+                  ></button>
+                ))}
               </div>
-            </div>
-          ) : (
-        <div className="fixed inset-0 flex items-center justify-center bg-black/70 z-50 p-4" onClick={() => setShowAdvancedEdit(null)}>
-          <div className="relative bg-white rounded-lg w-full max-w-4xl h-[92vh] max-h-[92vh] flex flex-col overflow-hidden shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <button 
-              onClick={() => setShowAdvancedEdit(null)} 
-              className="absolute top-2 left-2 text-3xl text-gray-500 hover:text-gray-700 z-10"
-            >
-              &times;
-            </button>
-            <h2 className="text-xl font-bold py-3 text-center flex-shrink-0">עיצוב מתקדם - שורה {showAdvancedEdit + 1}</h2>
-            
-            <div className="flex-1 min-h-0 overflow-y-auto px-6 pb-2">
+            </ModalBody>
+            <ModalFooter>
+              <button
+                onClick={() => setShowColorPalette(false)}
+                className="flex-1 bg-gradient-to-br from-indigo-600 to-violet-600 text-white rounded-full px-6 py-2.5 font-bold hover:opacity-90 transition-all"
+              >
+                חזרה לעיצוב
+              </button>
+            </ModalFooter>
+          </Modal>
+          {!showColorPalette && (
+        <Modal open={showAdvancedEdit !== null && !showColorPalette} onClose={() => setShowAdvancedEdit(null)} size="xl">
+          <ModalHeader onClose={() => setShowAdvancedEdit(null)}>עיצוב מתקדם - שורה {showAdvancedEdit !== null ? showAdvancedEdit + 1 : ''}</ModalHeader>
+          <ModalBody>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
               {/* Left Column */}
               <div className="space-y-3">
@@ -8137,7 +8196,7 @@ React.useEffect(()=>{
                   <button
                     type="button"
                     onClick={() => setShowColorPalette(true)}
-                    className="w-full py-2 px-4 border-2 border-gray-300 rounded-lg hover:border-primary hover:bg-primary/5 transition-colors text-center font-medium"
+                    className="w-full py-2 px-4 bg-white/10 border border-white/20 text-white rounded-xl hover:border-indigo-400 hover:bg-indigo-500/10 transition-colors text-center font-medium"
                   >
                     לחץ לבחירת צבע
                   </button>
@@ -8149,7 +8208,7 @@ React.useEffect(()=>{
                   <select
                     value={lineStyles[showAdvancedEdit]?.fontSize ?? (showAdvancedEdit === 0 ? '28' : '16')}
                     onChange={(e) => updateLineStyle(showAdvancedEdit, 'fontSize', e.target.value)}
-                    className="w-full border border-gray-300 rounded-md p-2"
+                    className="w-full bg-white/10 border border-white/20 text-white rounded-xl focus:border-indigo-400 p-2"
                   >
                     <option value="12">12px</option>
                     <option value="14">14px</option>
@@ -8171,7 +8230,7 @@ React.useEffect(()=>{
                   <select
                     value={lineStyles[showAdvancedEdit]?.fontWeight ?? (showAdvancedEdit === 0 ? 'bold' : 'normal')}
                     onChange={(e) => updateLineStyle(showAdvancedEdit, 'fontWeight', e.target.value)}
-                    className="w-full border border-gray-300 rounded-md p-2"
+                    className="w-full bg-white/10 border border-white/20 text-white rounded-xl focus:border-indigo-400 p-2"
                   >
                     <option value="normal">רגיל</option>
                     <option value="bold">מודגש</option>
@@ -8196,7 +8255,7 @@ React.useEffect(()=>{
                         const current = lineStyles[showAdvancedEdit]?.textShadow || 'none';
                         updateLineStyle(showAdvancedEdit, 'textShadow', current === 'none' ? '2px 2px 4px rgba(0,0,0,0.3)' : 'none');
                       }}
-                      className={`flex-1 p-3 border-2 rounded-lg ${lineStyles[showAdvancedEdit]?.textShadow && lineStyles[showAdvancedEdit]?.textShadow !== 'none' ? 'border-primary bg-primary/10' : 'border-gray-300'} hover:border-primary transition-colors`}
+                      className={`flex-1 p-3 border-2 rounded-lg ${lineStyles[showAdvancedEdit]?.textShadow && lineStyles[showAdvancedEdit]?.textShadow !== 'none' ? 'border-primary bg-primary/10' : 'border-white/20'} hover:border-primary transition-colors text-slate-100`}
                     >
                       <span className={`text-lg ${lineStyles[showAdvancedEdit]?.textShadow && lineStyles[showAdvancedEdit]?.textShadow !== 'none' ? 'drop-shadow-md' : ''}`}>A</span>
                       <div className="text-xs mt-1">צל</div>
@@ -8216,7 +8275,7 @@ React.useEffect(()=>{
                       <button
                         key={align.value}
                         onClick={() => updateLineStyle(showAdvancedEdit, 'textAlign', align.value)}
-                        className={`flex-1 p-3 border-2 rounded-lg ${lineStyles[showAdvancedEdit]?.textAlign === align.value ? 'border-primary bg-primary/10' : 'border-gray-300'} hover:border-primary transition-colors`}
+                        className={`flex-1 p-3 border-2 rounded-lg ${lineStyles[showAdvancedEdit]?.textAlign === align.value ? 'border-primary bg-primary/10' : 'border-white/20'} hover:border-primary transition-colors text-slate-100`}
                         title={align.label}
                       >
                         <div className="text-2xl mb-1">{align.icon}</div>
@@ -8241,7 +8300,7 @@ React.useEffect(()=>{
                     onChange={(e) => updateLineStyle(showAdvancedEdit, 'lineHeight', parseFloat(e.target.value))}
                     className="w-full"
                   />
-                  <div className="text-sm text-gray-600 text-center mt-1">
+                  <div className="text-sm text-slate-400 text-center mt-1">
                     {lineStyles[showAdvancedEdit]?.lineHeight?.toFixed(1) || '1.5'}
                   </div>
                 </div>
@@ -8258,7 +8317,7 @@ React.useEffect(()=>{
                     onChange={(e) => updateLineStyle(showAdvancedEdit, 'letterSpacing', parseFloat(e.target.value))}
                     className="w-full"
                   />
-                  <div className="text-sm text-gray-600 text-center mt-1">
+                  <div className="text-sm text-slate-400 text-center mt-1">
                     {lineStyles[showAdvancedEdit]?.letterSpacing?.toFixed(1) || '0.0'}px
                   </div>
                 </div>
@@ -8279,7 +8338,7 @@ React.useEffect(()=>{
                           const current = lineStyles[showAdvancedEdit]?.textDecoration || 'none';
                           updateLineStyle(showAdvancedEdit, 'textDecoration', current === dec.value ? 'none' : dec.value);
                         }}
-                        className={`px-4 py-2 border-2 rounded-lg ${lineStyles[showAdvancedEdit]?.textDecoration === dec.value ? 'border-primary bg-primary/10' : 'border-gray-300'} hover:border-primary transition-colors`}
+                        className={`px-4 py-2 border-2 rounded-lg ${lineStyles[showAdvancedEdit]?.textDecoration === dec.value ? 'border-primary bg-primary/10' : 'border-white/20'} hover:border-primary transition-colors text-slate-100`}
                         title={dec.label}
                       >
                         <span className={`text-lg ${dec.value === 'underline' ? 'underline' : dec.value === 'line-through' ? 'line-through' : dec.value === 'overline' ? 'overline' : ''}`}>
@@ -8297,7 +8356,7 @@ React.useEffect(()=>{
                   <div className="flex gap-2">
                     <button
                       onClick={() => updateLineStyle(showAdvancedEdit, 'fontStyle', 'normal')}
-                      className={`flex-1 p-3 border-2 rounded-lg ${(lineStyles[showAdvancedEdit]?.fontStyle || 'normal') === 'normal' ? 'border-primary bg-primary/10' : 'border-gray-300'} hover:border-primary transition-colors`}
+                      className={`flex-1 p-3 border-2 rounded-lg ${(lineStyles[showAdvancedEdit]?.fontStyle || 'normal') === 'normal' ? 'border-primary bg-primary/10' : 'border-white/20'} hover:border-primary transition-colors text-slate-100`}
                       title="ישר"
                     >
                       <span className="text-lg">I</span>
@@ -8308,7 +8367,7 @@ React.useEffect(()=>{
                         const current = lineStyles[showAdvancedEdit]?.fontStyle || 'normal';
                         updateLineStyle(showAdvancedEdit, 'fontStyle', current === 'italic' ? 'normal' : 'italic');
                       }}
-                      className={`flex-1 p-3 border-2 rounded-lg ${lineStyles[showAdvancedEdit]?.fontStyle === 'italic' ? 'border-primary bg-primary/10' : 'border-gray-300'} hover:border-primary transition-colors`}
+                      className={`flex-1 p-3 border-2 rounded-lg ${lineStyles[showAdvancedEdit]?.fontStyle === 'italic' ? 'border-primary bg-primary/10' : 'border-white/20'} hover:border-primary transition-colors text-slate-100`}
                       title="נטוי שמאלה"
                     >
                       <span className="text-lg" style={{ 
@@ -8322,7 +8381,7 @@ React.useEffect(()=>{
                         const current = lineStyles[showAdvancedEdit]?.fontStyle || 'normal';
                         updateLineStyle(showAdvancedEdit, 'fontStyle', current === 'back-slant' ? 'normal' : 'back-slant');
                       }}
-                      className={`flex-1 p-3 border-2 rounded-lg ${lineStyles[showAdvancedEdit]?.fontStyle === 'back-slant' ? 'border-primary bg-primary/10' : 'border-gray-300'} hover:border-primary transition-colors`}
+                      className={`flex-1 p-3 border-2 rounded-lg ${lineStyles[showAdvancedEdit]?.fontStyle === 'back-slant' ? 'border-primary bg-primary/10' : 'border-white/20'} hover:border-primary transition-colors text-slate-100`}
                       title="נטוי ימינה"
                     >
                       <span className="text-lg" style={{ 
@@ -8335,16 +8394,15 @@ React.useEffect(()=>{
                 </div>
               </div>
             </div>
-            </div>
 
             {/* Preview - centered at bottom, above buttons */}
-            <div className="flex flex-col items-center px-6 py-3 flex-shrink-0 border-t border-gray-200 bg-gray-50/50">
-              <label className="block mb-1 font-bold text-center text-sm">תצוגה מקדימה</label>
-              <div className="w-full max-w-xl border border-gray-300 rounded-md p-3 bg-white min-h-[70px]" style={{ textAlign: getEffectiveLineStyle(showAdvancedEdit).textAlign || 'center' }}>
+            <div className="flex flex-col items-center px-6 py-3 flex-shrink-0 border-t border-white/10 bg-white/[0.03]">
+              <label className="block mb-1 font-bold text-center text-sm text-slate-300">תצוגה מקדימה</label>
+              <div className="w-full max-w-xl bg-white/5 border border-white/10 rounded-xl p-3 min-h-[70px]" style={{ textAlign: getEffectiveLineStyle(showAdvancedEdit).textAlign || 'center' }}>
                 <div
                   style={{
                     fontSize: `${getEffectiveLineStyle(showAdvancedEdit).fontSize}px`,
-                    color: getEffectiveLineStyle(showAdvancedEdit).color || 'black',
+                    color: getDarkThemePreviewColor(getEffectiveLineStyle(showAdvancedEdit).color),
                     fontWeight: getEffectiveLineStyle(showAdvancedEdit).fontWeight || 'normal',
                     lineHeight: getEffectiveLineStyle(showAdvancedEdit).lineHeight || 1.5,
                     letterSpacing: `${getEffectiveLineStyle(showAdvancedEdit).letterSpacing || 0}px`,
@@ -8362,26 +8420,26 @@ React.useEffect(()=>{
               </div>
             </div>
 
-            <div className="flex flex-col sm:flex-row gap-3 px-6 py-4 flex-shrink-0 border-t border-gray-200">
-              <button
-                onClick={() => {
-                  const updatedStyles = { ...lineStyles };
-                  updatedStyles[showAdvancedEdit] = getDefaultStyleForRow(showAdvancedEdit);
-                  setLineStyles(updatedStyles);
-                }}
-                className="flex-1 bg-red-500 text-white border border-red-600 rounded-full px-6 py-3 font-bold hover:bg-red-600 transition-all"
-              >
-                תחזיר עיצוב שורה לעיצוב ברירת מחדל
-              </button>
-              <button
-                onClick={() => setShowAdvancedEdit(null)}
-                className="flex-1 bg-green-600 text-white border border-green-700 rounded-full px-6 py-3 font-bold hover:bg-green-700 transition-all"
-              >
-                שמור וסגור
-              </button>
-            </div>
-          </div>
-        </div>
+          </ModalBody>
+          <ModalFooter>
+            <button
+              onClick={() => {
+                const updatedStyles = { ...lineStyles };
+                updatedStyles[showAdvancedEdit] = getDefaultStyleForRow(showAdvancedEdit);
+                setLineStyles(updatedStyles);
+              }}
+              className="flex-1 bg-red-500 text-white border border-red-400/50 rounded-full px-6 py-3 font-bold hover:bg-red-600 transition-all"
+            >
+              תחזיר עיצוב שורה לעיצוב ברירת מחדל
+            </button>
+            <button
+              onClick={() => setShowAdvancedEdit(null)}
+              className="flex-1 bg-emerald-600 text-white border border-emerald-400/50 rounded-full px-6 py-3 font-bold hover:bg-emerald-700 transition-all"
+            >
+              שמור וסגור
+            </button>
+          </ModalFooter>
+        </Modal>
           )}
         </>
       )}
@@ -8395,7 +8453,7 @@ React.useEffect(()=>{
           >
             תצוגת מסך אורח
           </button>
-          <div className="ml-4 flex items-center gap-2 bg-gray-100 border border-gray-300 rounded-md px-3 py-2 text-sm">
+          <div className="ml-4 flex items-center gap-2 bg-white/5 border border-white/15 rounded-xl px-3 py-2 text-sm text-slate-300">
             <span className="select-all" title="RSVP link">{previewLink}</span>
             <button
               onClick={() => navigator.clipboard?.writeText(previewLink)}
@@ -8408,39 +8466,38 @@ React.useEffect(()=>{
       )}
 
       {/* Report Modal */}
-      {showReportModal && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50">
-          <div className="relative bg-white rounded-lg p-2 sm:p-6 w-full sm:max-w-5xl mx-1 sm:mx-auto event-form">
-            <button onClick={() => setShowReportModal(false)} className="absolute top-2 left-2 text-2xl text-gray-500 hover:text-gray-700 z-10">&times;</button>
-            <h2 className="text-base sm:text-xl font-medium mb-2 sm:mb-4 text-center pr-8">{reportTitle}</h2>
+      <Drawer open={showReportModal} onClose={() => setShowReportModal(false)} size="xl">
+        <DrawerHeader onClose={() => setShowReportModal(false)}>{reportTitle}</DrawerHeader>
+        <DrawerBody>
+          {showReportModal && (<>
             {reportGuests.length === 0 ? (
-              <p className="text-center text-gray-600">אין נתונים להצגה</p>
+              <p className="text-center text-slate-400">אין נתונים להצגה</p>
             ) : (
               <div className="max-h-[75vh] overflow-y-auto overflow-x-auto">
                 <table className="w-full text-right border border-collapse" style={{fontSize: '11px'}}>
                   <thead>
-                    <tr className="bg-gray-100">
-                      <th className="px-0.5 py-1 border whitespace-nowrap">#</th>
-                      <th className="px-0.5 py-1 border whitespace-nowrap">שם</th>
-                      <th className="px-0.5 py-1 border whitespace-nowrap">משפחה</th>
-                      <th className="px-0.5 py-1 border whitespace-nowrap">שולחן</th>
-                      <th className="px-0.5 py-1 border whitespace-nowrap">טלפון</th>
-                      <th className="px-0.5 py-1 border whitespace-nowrap">בוגרים</th>
-                      <th className="px-0.5 py-1 border whitespace-nowrap">ילדים</th>
-                      <th className="px-0.5 py-1 border whitespace-nowrap">סה"כ</th>
-                      <th className="px-0.5 py-1 border whitespace-nowrap">צמחוני</th>
-                      <th className="px-0.5 py-1 border whitespace-nowrap">טבעוני</th>
-                      <th className="px-0.5 py-1 border whitespace-nowrap">גלאט</th>
-                      <th className="px-0.5 py-1 border whitespace-nowrap">צליאקים</th>
-                      <th className="px-0.5 py-1 border whitespace-nowrap">אלרגיה</th>
-                      <th className="px-0.5 py-1 border whitespace-nowrap">הערה</th>
+                    <tr className="bg-white/5 text-slate-300">
+                      <th className="px-0.5 py-1 border border-white/10 whitespace-nowrap">#</th>
+                      <th className="px-0.5 py-1 border border-white/10 whitespace-nowrap">שם</th>
+                      <th className="px-0.5 py-1 border border-white/10 whitespace-nowrap">משפחה</th>
+                      <th className="px-0.5 py-1 border border-white/10 whitespace-nowrap">שולחן</th>
+                      <th className="px-0.5 py-1 border border-white/10 whitespace-nowrap">טלפון</th>
+                      <th className="px-0.5 py-1 border border-white/10 whitespace-nowrap">בוגרים</th>
+                      <th className="px-0.5 py-1 border border-white/10 whitespace-nowrap">ילדים</th>
+                      <th className="px-0.5 py-1 border border-white/10 whitespace-nowrap">סה"כ</th>
+                      <th className="px-0.5 py-1 border border-white/10 whitespace-nowrap">צמחוני</th>
+                      <th className="px-0.5 py-1 border border-white/10 whitespace-nowrap">טבעוני</th>
+                      <th className="px-0.5 py-1 border border-white/10 whitespace-nowrap">גלאט</th>
+                      <th className="px-0.5 py-1 border border-white/10 whitespace-nowrap">צליאקים</th>
+                      <th className="px-0.5 py-1 border border-white/10 whitespace-nowrap">אלרגיה</th>
+                      <th className="px-0.5 py-1 border border-white/10 whitespace-nowrap">הערה</th>
                     </tr>
                   </thead>
                   <tbody>
                     {reportGuests.map((g, idx) => {
                       if (g.isSummary) {
                         return (
-                          <tr key={`summary-${g.table_number}-${idx}`} className="bg-yellow-100 font-bold">
+                          <tr key={`summary-${g.table_number}-${idx}`} className="bg-amber-500/15 text-amber-100 font-bold">
                             <td className="px-0.5 py-0.5 border text-center"></td>
                             <td className="px-0.5 py-0.5 border text-right" colSpan={3}>{g.summary_label}</td>
                             <td className="px-0.5 py-0.5 border"></td>
@@ -8462,7 +8519,7 @@ React.useEffect(()=>{
                       }
                       rowNum++;
                       return (
-                        <tr key={g.id || `guest-${idx}`} className="odd:bg-white even:bg-gray-50">
+                        <tr key={g.id || `guest-${idx}`} className="odd:bg-white/5 even:bg-white/[0.02] border-white/5 text-slate-300">
                           <td className="px-0.5 py-0.5 border text-center">{rowNum}</td>
                           <td className="px-0.5 py-0.5 border whitespace-nowrap">{g.first_name}</td>
                           <td className="px-0.5 py-0.5 border whitespace-nowrap">{g.last_name}</td>
@@ -8482,7 +8539,7 @@ React.useEffect(()=>{
                     })}
                   </tbody>
                   <tfoot>
-                    <tr className="bg-gray-100 font-bold text-xs sm:text-lg">
+                    <tr className="bg-white/5 text-slate-300 font-bold text-xs sm:text-lg">
                       <td className="px-0.5 py-1 border text-center" colSpan={5}>סה״כ</td>
                       <td className="px-0.5 py-1 border text-center">{totalReportAdults}</td>
                       <td className="px-0.5 py-1 border text-center">{totalReportChildren}</td>
@@ -8502,35 +8559,28 @@ React.useEffect(()=>{
               <div className="mt-4 flex justify-center">
                 <button 
                   onClick={exportReportXlsx} 
-                  className="bg-[#FCE6AC] text-primary border border-primary rounded-full px-6 py-2 font-medium hover:bg-[#FCE6AC]/90 transition-all"
+                  className="bg-white/[0.06] text-slate-100 border border-white/15 rounded-full px-6 py-2 font-medium hover:bg-indigo-500/15 hover:border-indigo-400/50 transition-all"
                 >
                   צור קובץ אקסל - ושמור בהורדות
                 </button>
               </div>
             )}
-            <div className="flex justify-center mt-6">
-              <button onClick={() => setShowReportModal(false)} className="bg-primary text-white border border-primary rounded-full px-8 py-3 font-medium hover:bg-primary/90 transition-all">סגור</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* search button accessible inside guest modal */}
-      {showGuestListModal && (
-        <div className="fixed inset-0" />
-      )}
+          </>)}
+        </DrawerBody>
+        <DrawerFooter>
+          <button onClick={() => setShowReportModal(false)} className="bg-primary text-white border border-primary rounded-full px-8 py-3 font-medium hover:bg-primary/90 transition-all">סגור</button>
+        </DrawerFooter>
+      </Drawer>
       {/* Reports menu modal */}
-      {typeof showReportsOptions !== 'undefined' && showReportsOptions && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-sm text-center space-y-4 relative">
-            <button onClick={()=>setShowReportsOptions(false)} className="absolute top-2 left-2 text-2xl text-gray-500 hover:text-gray-700">&times;</button>
-            <h2 className="text-xl font-medium mb-2">בחר דו"ח להצגה</h2>
+      <Modal open={typeof showReportsOptions !== 'undefined' && showReportsOptions} onClose={() => setShowReportsOptions(false)} size="sm">
+        <ModalHeader onClose={() => setShowReportsOptions(false)}>בחר דו"ח להצגה</ModalHeader>
+        <ModalBody className="text-center space-y-4">
             {selectedEventForReport && (
-              <p className="text-base md:text-lg font-bold text-gray-800 mb-4 rtl text-right">
+              <p className="text-base md:text-lg font-bold text-slate-100 mb-4 rtl text-right">
                 אירוע מהעבר: {selectedEventForReport.event_type || 'אירוע'} – {selectedEventForReport._eventDate?format(selectedEventForReport._eventDate,'dd/MM/yyyy',{locale:he}):''}
               </p>
             )}
-            <button onClick={()=>{setShowReportsOptions(false);setShowApprovedReport(true);}} className="w-full bg-[#FCE6AC] text-primary border border-primary rounded-full px-4 py-2 text-lg font-medium hover:bg-[#FCE6AC]/90 transition-all">אישרו הגעה</button>
+            <button onClick={()=>{setShowReportsOptions(false);setShowApprovedReport(true);}} className="w-full bg-white/[0.06] text-slate-100 border border-white/15 rounded-full px-4 py-2 text-lg font-medium hover:bg-indigo-500/15 hover:border-indigo-400/50 transition-all">אישרו הגעה</button>
             <button onClick={async () => {
               setShowReportsOptions(false);
               try {
@@ -8635,11 +8685,11 @@ React.useEffect(()=>{
                 console.error('Load approved guests by table failed', e);
                 alert('שגיאה בטעינת הדוח');
               }
-            }} className="w-full bg-[#FCE6AC] text-primary border border-primary rounded-full px-4 py-2 text-lg font-medium hover:bg-[#FCE6AC]/90 transition-all">אישרו הגעה ממוינים לפי שולחן</button>
-            <button onClick={()=>{setShowReportsOptions(false);setShowRejectedReport(true);}} className="w-full bg-[#FCE6AC] text-primary border border-primary rounded-full px-4 py-2 text-lg font-medium hover:bg-[#FCE6AC]/90 transition-all">לא מגיעים</button>
-            <button onClick={()=>{setShowReportsOptions(false);setShowPendingReport(true);}} className="w-full bg-[#FCE6AC] text-primary border border-primary rounded-full px-4 py-2 text-lg font-medium hover:bg-[#FCE6AC]/90 transition-all">טרם הגיבו</button>
+            }} className="w-full bg-white/[0.06] text-slate-100 border border-white/15 rounded-full px-4 py-2 text-lg font-medium hover:bg-indigo-500/15 hover:border-indigo-400/50 transition-all">אישרו הגעה ממוינים לפי שולחן</button>
+            <button onClick={()=>{setShowReportsOptions(false);setShowRejectedReport(true);}} className="w-full bg-white/[0.06] text-slate-100 border border-white/15 rounded-full px-4 py-2 text-lg font-medium hover:bg-indigo-500/15 hover:border-indigo-400/50 transition-all">לא מגיעים</button>
+            <button onClick={()=>{setShowReportsOptions(false);setShowPendingReport(true);}} className="w-full bg-white/[0.06] text-slate-100 border border-white/15 rounded-full px-4 py-2 text-lg font-medium hover:bg-indigo-500/15 hover:border-indigo-400/50 transition-all">טרם הגיבו</button>
             {/* Guest status query button */}
-            <button onClick={()=>{setShowReportsOptions(false);setShowSearchGuest(true);}} className="w-full bg-[#FCE6AC] text-primary border border-primary rounded-full px-4 py-2 text-lg font-medium hover:bg-[#FCE6AC]/90 transition-all">שאילתת סטטוס אורח</button>
+            <button onClick={()=>{setShowReportsOptions(false);setShowSearchGuest(true);}} className="w-full bg-white/[0.06] text-slate-100 border border-white/15 rounded-full px-4 py-2 text-lg font-medium hover:bg-indigo-500/15 hover:border-indigo-400/50 transition-all">שאילתת סטטוס אורח</button>
             <button onClick={async ()=>{
               setShowReportsOptions(false);
               try{
@@ -8722,7 +8772,7 @@ React.useEffect(()=>{
                 alert('שגיאה בטעינת אירועי ארכיון');
                 setShowArchiveList(false);
               }
-            }} className="w-full bg-[#FCE6AC] text-primary border border-primary rounded-full px-4 py-2 text-lg font-medium hover:bg-[#FCE6AC]/90 transition-all">אירועים מהעבר</button>
+            }} className="w-full bg-white/[0.06] text-slate-100 border border-white/15 rounded-full px-4 py-2 text-lg font-medium hover:bg-indigo-500/15 hover:border-indigo-400/50 transition-all">אירועים מהעבר</button>
 
             {/* Exit archive event button */}
             {selectedEventForReport && (
@@ -8730,238 +8780,212 @@ React.useEffect(()=>{
                 setSelectedEventForReport(null);
                 // Don't reset currentEventId - it should remain as the active event
                 setShowReportsOptions(false);
-              }} className="w-full bg-primary text-[#FCE6AC] border border-primary rounded-full px-4 py-2 text-lg font-medium hover:bg-primary/90 transition-all mt-2">יציאה מאירוע עבר</button>
+              }} className="w-full bg-white/[0.06] text-slate-100 border border-white/15 rounded-full px-4 py-2 text-lg font-medium hover:bg-indigo-500/15 hover:border-indigo-400/50 transition-all mt-2">יציאה מאירוע עבר</button>
             )}
-          </div>
-        </div>
-      )}
+        </ModalBody>
+      </Modal>
 
       {/* Approved report modal */}
-      {showApprovedReport && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50">
-          <div className="relative bg-white rounded-lg p-2 sm:p-6 w-full sm:w-[90vw] mx-1 sm:mx-auto max-w-none">
-            <button onClick={()=>{setShowApprovedReport(false);setShowReportsOptions(true);}} className="absolute top-2 left-2 text-2xl text-gray-500 hover:text-gray-700 z-10">&times;</button>
-            <h2 className="text-base sm:text-xl font-medium mb-2 sm:mb-4 text-center pr-8">דוח אורחים שאישרו הגעה</h2>
-            <div className="max-h-[75vh] overflow-y-auto overflow-x-auto">
+      <Drawer open={showApprovedReport} onClose={()=>{setShowApprovedReport(false);setShowReportsOptions(true);}} size="xl">
+        <DrawerHeader onClose={()=>{setShowApprovedReport(false);setShowReportsOptions(true);}}>דוח אורחים שאישרו הגעה</DrawerHeader>
+        <DrawerBody className="overflow-x-auto">
               <table className="w-full text-right border border-collapse" style={{fontSize: '11px'}}>
                 <thead>
-                  <tr className="bg-gray-100">
-                    <th className="px-0.5 py-1 border whitespace-nowrap">#</th>
-                    <th className="px-0.5 py-1 border whitespace-nowrap">שם</th>
-                    <th className="px-0.5 py-1 border whitespace-nowrap">משפחה</th>
-                    <th className="px-0.5 py-1 border whitespace-nowrap">שולחן</th>
-                    <th className="px-0.5 py-1 border whitespace-nowrap">טלפון</th>
-                    <th className="px-0.5 py-1 border whitespace-nowrap">בוגרים</th>
-                    <th className="px-0.5 py-1 border whitespace-nowrap">ילדים</th>
-                    <th className="px-0.5 py-1 border whitespace-nowrap">סה"כ</th>
-                    <th className="px-0.5 py-1 border whitespace-nowrap">צמחוני</th>
-                    <th className="px-0.5 py-1 border whitespace-nowrap">טבעוני</th>
-                    <th className="px-0.5 py-1 border whitespace-nowrap">גלאט</th>
-                    <th className="px-0.5 py-1 border whitespace-nowrap">צליאקים</th>
-                    <th className="px-0.5 py-1 border whitespace-nowrap">אלרגיה</th>
-                    <th className="px-0.5 py-1 border whitespace-nowrap">הערה</th>
+                  <tr className="bg-white/5 text-slate-300">
+                    <th className="px-0.5 py-1 border border-white/10 whitespace-nowrap">#</th>
+                    <th className="px-0.5 py-1 border border-white/10 whitespace-nowrap">שם</th>
+                    <th className="px-0.5 py-1 border border-white/10 whitespace-nowrap">משפחה</th>
+                    <th className="px-0.5 py-1 border border-white/10 whitespace-nowrap">שולחן</th>
+                    <th className="px-0.5 py-1 border border-white/10 whitespace-nowrap">טלפון</th>
+                    <th className="px-0.5 py-1 border border-white/10 whitespace-nowrap">בוגרים</th>
+                    <th className="px-0.5 py-1 border border-white/10 whitespace-nowrap">ילדים</th>
+                    <th className="px-0.5 py-1 border border-white/10 whitespace-nowrap">סה"כ</th>
+                    <th className="px-0.5 py-1 border border-white/10 whitespace-nowrap">צמחוני</th>
+                    <th className="px-0.5 py-1 border border-white/10 whitespace-nowrap">טבעוני</th>
+                    <th className="px-0.5 py-1 border border-white/10 whitespace-nowrap">גלאט</th>
+                    <th className="px-0.5 py-1 border border-white/10 whitespace-nowrap">צליאקים</th>
+                    <th className="px-0.5 py-1 border border-white/10 whitespace-nowrap">אלרגיה</th>
+                    <th className="px-0.5 py-1 border border-white/10 whitespace-nowrap">הערה</th>
                   </tr>
                 </thead>
                 <tbody>
                   {approvedGuests.map((g,idx)=>(
-                    <tr key={idx} className="odd:bg-white even:bg-gray-50">
-                      <td className="px-0.5 py-0.5 border text-center">{idx+1}</td>
-                      <td className="px-0.5 py-0.5 border whitespace-nowrap">{g.first_name}</td>
-                      <td className="px-0.5 py-0.5 border whitespace-nowrap">{g.last_name}</td>
-                      <td className="px-0.5 py-0.5 border text-center">{g.table_number || '-'}</td>
-                      <td className="px-0.5 py-0.5 border whitespace-nowrap">{g.phone}</td>
-                      <td className="px-0.5 py-0.5 border text-center">{g.adults}</td>
-                      <td className="px-0.5 py-0.5 border text-center">{g.children}</td>
-                      <td className="px-0.5 py-0.5 border text-center">{(g.adults||0)+(g.children||0)}</td>
-                      <td className="px-0.5 py-0.5 border text-center">{g.veg_adults+g.veg_children}</td>
-                      <td className="px-0.5 py-0.5 border text-center">{g.vegan_adults+g.vegan_children}</td>
-                      <td className="px-0.5 py-0.5 border text-center">{g.glatt_adults+g.glatt_children}</td>
-                      <td className="px-0.5 py-0.5 border text-center">{(g.celiac_adults||0)+(g.celiac_children||0)}</td>
-                      <td className="px-0.5 py-0.5 border text-center">{g.allergy_adults+g.allergy_children}</td>
-                      <td className="px-0.5 py-0.5 border text-center">{g.allergy_note || ((g.allergy_adults+g.allergy_children)>0? 'אלרגיה' : '-')}</td>
+                    <tr key={idx} className="odd:bg-white/5 even:bg-white/[0.02] text-slate-300">
+                      <td className="px-0.5 py-0.5 border border-white/10 text-center">{idx+1}</td>
+                      <td className="px-0.5 py-0.5 border border-white/10 whitespace-nowrap">{g.first_name}</td>
+                      <td className="px-0.5 py-0.5 border border-white/10 whitespace-nowrap">{g.last_name}</td>
+                      <td className="px-0.5 py-0.5 border border-white/10 text-center">{g.table_number || '-'}</td>
+                      <td className="px-0.5 py-0.5 border border-white/10 whitespace-nowrap">{g.phone}</td>
+                      <td className="px-0.5 py-0.5 border border-white/10 text-center">{g.adults}</td>
+                      <td className="px-0.5 py-0.5 border border-white/10 text-center">{g.children}</td>
+                      <td className="px-0.5 py-0.5 border border-white/10 text-center">{(g.adults||0)+(g.children||0)}</td>
+                      <td className="px-0.5 py-0.5 border border-white/10 text-center">{g.veg_adults+g.veg_children}</td>
+                      <td className="px-0.5 py-0.5 border border-white/10 text-center">{g.vegan_adults+g.vegan_children}</td>
+                      <td className="px-0.5 py-0.5 border border-white/10 text-center">{g.glatt_adults+g.glatt_children}</td>
+                      <td className="px-0.5 py-0.5 border border-white/10 text-center">{(g.celiac_adults||0)+(g.celiac_children||0)}</td>
+                      <td className="px-0.5 py-0.5 border border-white/10 text-center">{g.allergy_adults+g.allergy_children}</td>
+                      <td className="px-0.5 py-0.5 border border-white/10 text-center">{g.allergy_note || ((g.allergy_adults+g.allergy_children)>0? 'אלרגיה' : '-')}</td>
                     </tr>
                   ))}
                 </tbody>
                 <tfoot>
-                  <tr className="bg-gray-200 font-bold" style={{fontSize: '11px'}}>
-                    <td className="px-0.5 py-1 border text-center" colSpan={5}>סה״כ</td>
-                    <td className="px-0.5 py-1 border text-center">{approvedGuests.reduce((s,g)=>s+g.adults,0)}</td>
-                    <td className="px-0.5 py-1 border text-center">{approvedGuests.reduce((s,g)=>s+g.children,0)}</td>
-                    <td className="px-0.5 py-1 border text-center">{approvedGuests.reduce((s,g)=>s+g.adults+g.children,0)}</td>
-                    <td className="px-0.5 py-1 border text-center">{approvedGuests.reduce((s,g)=>s+g.veg_adults+g.veg_children,0)}</td>
-                    <td className="px-0.5 py-1 border text-center">{approvedGuests.reduce((s,g)=>s+g.vegan_adults+g.vegan_children,0)}</td>
-                    <td className="px-0.5 py-1 border text-center">{approvedGuests.reduce((s,g)=>s+g.glatt_adults+g.glatt_children,0)}</td>
-                    <td className="px-0.5 py-1 border text-center">{approvedGuests.reduce((s,g)=>s+(g.celiac_adults||0)+(g.celiac_children||0),0)}</td>
-                    <td className="px-0.5 py-1 border text-center">{approvedGuests.reduce((s,g)=>s+g.allergy_adults+g.allergy_children,0)}</td>
-                    <td className="px-0.5 py-1 border text-center"></td>
+                  <tr className="bg-white/5 text-slate-300 font-bold" style={{fontSize: '11px'}}>
+                    <td className="px-0.5 py-1 border border-white/10 text-center" colSpan={5}>סה״כ</td>
+                    <td className="px-0.5 py-1 border border-white/10 text-center">{approvedGuests.reduce((s,g)=>s+g.adults,0)}</td>
+                    <td className="px-0.5 py-1 border border-white/10 text-center">{approvedGuests.reduce((s,g)=>s+g.children,0)}</td>
+                    <td className="px-0.5 py-1 border border-white/10 text-center">{approvedGuests.reduce((s,g)=>s+g.adults+g.children,0)}</td>
+                    <td className="px-0.5 py-1 border border-white/10 text-center">{approvedGuests.reduce((s,g)=>s+g.veg_adults+g.veg_children,0)}</td>
+                    <td className="px-0.5 py-1 border border-white/10 text-center">{approvedGuests.reduce((s,g)=>s+g.vegan_adults+g.vegan_children,0)}</td>
+                    <td className="px-0.5 py-1 border border-white/10 text-center">{approvedGuests.reduce((s,g)=>s+g.glatt_adults+g.glatt_children,0)}</td>
+                    <td className="px-0.5 py-1 border border-white/10 text-center">{approvedGuests.reduce((s,g)=>s+(g.celiac_adults||0)+(g.celiac_children||0),0)}</td>
+                    <td className="px-0.5 py-1 border border-white/10 text-center">{approvedGuests.reduce((s,g)=>s+g.allergy_adults+g.allergy_children,0)}</td>
+                    <td className="px-0.5 py-1 border border-white/10 text-center"></td>
                   </tr>
                 </tfoot>
               </table>
-            </div>
-+            <div className="flex justify-center mt-4">
-+              <button onClick={exportApprovedXlsx} className="bg-[#FCE6AC] text-primary border border-primary rounded-full px-6 py-2 font-medium hover:bg-[#FCE6AC]/90 transition-all">צור קובץ אקסל - ושמור בהורדות</button>
-+            </div>
-          </div>
-        </div>
-      )}
+        </DrawerBody>
+        <DrawerFooter>
+          <button onClick={exportApprovedXlsx} className="bg-white/[0.06] text-slate-100 border border-white/15 rounded-full px-6 py-2 font-medium hover:bg-indigo-500/15 hover:border-indigo-400/50 transition-all">צור קובץ אקסל - ושמור בהורדות</button>
+        </DrawerFooter>
+      </Drawer>
 
       {/* Rejected report modal */}
-      {showRejectedReport && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50">
-          <div className="relative bg-white rounded-lg p-2 sm:p-6 w-full sm:w-[90vw] mx-1 sm:mx-auto max-w-none">
-            <button onClick={()=>{setShowRejectedReport(false);setShowReportsOptions(true);}} className="absolute top-2 left-2 text-2xl text-gray-500 hover:text-gray-700 z-10">&times;</button>
-            <h2 className="text-base sm:text-xl font-medium mb-2 sm:mb-4 text-center pr-8">דוח אורחים שלא מגיעים</h2>
-            <div className="max-h-[75vh] overflow-y-auto overflow-x-auto">
-              <table className="w-full text-right border border-collapse" style={{fontSize: '11px'}}>
+      <Drawer open={showRejectedReport} onClose={()=>{setShowRejectedReport(false);setShowReportsOptions(true);}} size="xl">
+        <DrawerHeader onClose={()=>{setShowRejectedReport(false);setShowReportsOptions(true);}}>דוח אורחים שלא מגיעים</DrawerHeader>
+        <DrawerBody className="overflow-x-auto">
+              <table className="w-full text-right border border-white/10 border-collapse" style={{fontSize: '11px'}}>
                 <thead>
-                  <tr className="bg-gray-100 font-bold whitespace-nowrap">
-                    <th className="px-0.5 py-1 border">#</th>
-                    <th className="px-0.5 py-1 border">שם</th>
-                    <th className="px-0.5 py-1 border">משפחה</th>
-                    <th className="px-0.5 py-1 border">טלפון</th>
+                  <tr className="bg-white/5 text-slate-300 font-bold whitespace-nowrap">
+                    <th className="px-0.5 py-1 border border-white/10">#</th>
+                    <th className="px-0.5 py-1 border border-white/10">שם</th>
+                    <th className="px-0.5 py-1 border border-white/10">משפחה</th>
+                    <th className="px-0.5 py-1 border border-white/10">טלפון</th>
                   </tr>
                 </thead>
                 <tbody>
                   {rejectedGuests.map((g,idx)=>(
-                    <tr key={idx} className="odd:bg-white even:bg-gray-50">
-                      <td className="px-0.5 py-0.5 border text-center">{idx+1}</td>
-                      <td className="px-0.5 py-0.5 border whitespace-nowrap">{g.first_name}</td>
-                      <td className="px-0.5 py-0.5 border whitespace-nowrap">{g.last_name}</td>
-                      <td className="px-0.5 py-0.5 border whitespace-nowrap">{g.phone}</td>
+                    <tr key={idx} className="odd:bg-white/5 even:bg-white/[0.02] text-slate-300">
+                      <td className="px-0.5 py-0.5 border border-white/10 text-center">{idx+1}</td>
+                      <td className="px-0.5 py-0.5 border border-white/10 whitespace-nowrap">{g.first_name}</td>
+                      <td className="px-0.5 py-0.5 border border-white/10 whitespace-nowrap">{g.last_name}</td>
+                      <td className="px-0.5 py-0.5 border border-white/10 whitespace-nowrap">{g.phone}</td>
                     </tr>
                   ))}
                 </tbody>
                 <tfoot>
-                  <tr className="bg-gray-200 font-bold">
-                    <td className="px-0.5 py-1 border text-center" colSpan={4}>סה״כ לא מגיעים: {rejectedGuests.length}</td>
+                  <tr className="bg-white/5 text-slate-300 font-bold">
+                    <td className="px-0.5 py-1 border border-white/10 text-center" colSpan={4}>סה״כ לא מגיעים: {rejectedGuests.length}</td>
                   </tr>
                 </tfoot>
               </table>
-            </div>
-          </div>
-        </div>
-      )}
+        </DrawerBody>
+      </Drawer>
 
       {/* Pending report modal */}
-      {showPendingReport && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50">
-          <div className="relative bg-white rounded-lg p-2 sm:p-6 w-full sm:w-[90vw] mx-1 sm:mx-auto max-w-none">
-            <button onClick={()=>{setShowPendingReport(false);setShowReportsOptions(true);}} className="absolute top-2 left-2 text-2xl text-gray-500 hover:text-gray-700 z-10">&times;</button>
-            <h2 className="text-base sm:text-xl font-medium mb-2 sm:mb-4 text-center pr-8">דוח אורחים שטרם הגיבו</h2>
-            <div className="max-h-[75vh] overflow-y-auto overflow-x-auto">
-              <table className="w-full text-right border border-collapse" style={{fontSize: '11px'}}>
+      <Drawer open={showPendingReport} onClose={()=>{setShowPendingReport(false);setShowReportsOptions(true);}} size="xl">
+        <DrawerHeader onClose={()=>{setShowPendingReport(false);setShowReportsOptions(true);}}>דוח אורחים שטרם הגיבו</DrawerHeader>
+        <DrawerBody className="overflow-x-auto">
+              <table className="w-full text-right border border-white/10 border-collapse" style={{fontSize: '11px'}}>
                 <thead>
-                  <tr className="bg-gray-100 font-bold whitespace-nowrap">
-                    <th className="px-0.5 py-1 border">#</th>
-                    <th className="px-0.5 py-1 border">שם</th>
-                    <th className="px-0.5 py-1 border">משפחה</th>
-                    <th className="px-0.5 py-1 border">טלפון</th>
+                  <tr className="bg-white/5 text-slate-300 font-bold whitespace-nowrap">
+                    <th className="px-0.5 py-1 border border-white/10">#</th>
+                    <th className="px-0.5 py-1 border border-white/10">שם</th>
+                    <th className="px-0.5 py-1 border border-white/10">משפחה</th>
+                    <th className="px-0.5 py-1 border border-white/10">טלפון</th>
                   </tr>
                 </thead>
                 <tbody>
                   {pendingGuests.map((g,idx)=>(
-                    <tr key={idx} className="odd:bg-white even:bg-gray-50">
-                      <td className="px-0.5 py-0.5 border text-center">{idx+1}</td>
-                      <td className="px-0.5 py-0.5 border whitespace-nowrap">{g.first_name}</td>
-                      <td className="px-0.5 py-0.5 border whitespace-nowrap">{g.last_name}</td>
-                      <td className="px-0.5 py-0.5 border whitespace-nowrap">{g.phone}</td>
+                    <tr key={idx} className="odd:bg-white/5 even:bg-white/[0.02] text-slate-300">
+                      <td className="px-0.5 py-0.5 border border-white/10 text-center">{idx+1}</td>
+                      <td className="px-0.5 py-0.5 border border-white/10 whitespace-nowrap">{g.first_name}</td>
+                      <td className="px-0.5 py-0.5 border border-white/10 whitespace-nowrap">{g.last_name}</td>
+                      <td className="px-0.5 py-0.5 border border-white/10 whitespace-nowrap">{g.phone}</td>
                     </tr>
                   ))}
                 </tbody>
                 <tfoot>
-                  <tr className="bg-gray-200 font-bold">
-                    <td className="px-0.5 py-1 border text-center" colSpan={4}>סה״כ טרם הגיבו: {pendingGuests.length}</td>
+                  <tr className="bg-white/5 text-slate-300 font-bold">
+                    <td className="px-0.5 py-1 border border-white/10 text-center" colSpan={4}>סה״כ טרם הגיבו: {pendingGuests.length}</td>
                   </tr>
                 </tfoot>
               </table>
-            </div>
-          </div>
-        </div>
-      )}
+        </DrawerBody>
+      </Drawer>
 
       {/* Guest status query modal */}
-      {showSearchGuest && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50">
-          <div className="relative bg-white rounded-lg p-2 sm:p-6 w-full max-w-2xl mx-1 sm:mx-auto max-h-[90vh] overflow-y-auto event-form">
-            <button onClick={()=>{setShowSearchGuest(false); setShowReportsOptions(true);}} className="absolute top-2 left-2 text-2xl text-gray-500 hover:text-gray-700 z-10">&times;</button>
-            <h2 className="text-base sm:text-xl font-medium mb-2 sm:mb-4 text-center pr-8">חיפוש אורח</h2>
+      <Modal open={showSearchGuest} onClose={()=>{setShowSearchGuest(false); setShowReportsOptions(true);}} size="md">
+        <ModalHeader onClose={()=>{setShowSearchGuest(false); setShowReportsOptions(true);}}>חיפוש אורח</ModalHeader>
+        <ModalBody>
             <div className="flex justify-center gap-2 mb-4 px-1">
               <input
                 type="text"
                 placeholder="שם / משפחה / טלפון"
                 value={searchTerm}
                 onChange={(e)=>setSearchTerm(e.target.value)}
-                className="w-full border rounded-md p-2 text-sm"
+                className="w-full bg-white/10 border border-white/20 text-white placeholder-slate-400 rounded-xl focus:border-indigo-400 p-2 text-sm"
               />
               <button onClick={handleGuestSearch} className="bg-primary text-white px-3 sm:px-4 py-2 rounded-md hover:bg-primary/90 whitespace-nowrap text-sm">חפש</button>
             </div>
-            {searchError && <p className="text-center text-red-600 mb-4 text-sm">{searchError}</p>}
+            {searchError && <p className="mb-4 rounded-xl border border-red-400/30 bg-red-500/10 p-3 text-center text-sm font-semibold text-red-300">{searchError}</p>}
             {searchResults.length>0 && (
               <div className="max-h-[60vh] overflow-y-auto overflow-x-auto">
-                <table className="w-full text-right border border-collapse" style={{fontSize: '11px'}}>
+                <table className="w-full text-right border border-white/10 border-collapse" style={{fontSize: '11px'}}>
                   <thead>
-                    <tr className="bg-gray-100">
-                      <th className="px-0.5 py-1 border whitespace-nowrap">#</th>
-                      <th className="px-0.5 py-1 border whitespace-nowrap">שם</th>
-                      <th className="px-0.5 py-1 border whitespace-nowrap">משפחה</th>
-                      <th className="px-0.5 py-1 border whitespace-nowrap">טלפון</th>
-                      <th className="px-0.5 py-1 border whitespace-nowrap">סטטוס</th>
+                    <tr className="bg-white/5 text-slate-300">
+                      <th className="px-0.5 py-1 border border-white/10 whitespace-nowrap">#</th>
+                      <th className="px-0.5 py-1 border border-white/10 whitespace-nowrap">שם</th>
+                      <th className="px-0.5 py-1 border border-white/10 whitespace-nowrap">משפחה</th>
+                      <th className="px-0.5 py-1 border border-white/10 whitespace-nowrap">טלפון</th>
+                      <th className="px-0.5 py-1 border border-white/10 whitespace-nowrap">סטטוס</th>
                     </tr>
                   </thead>
                   <tbody>
                     {searchResults.map((g,idx)=>(
-                      <tr key={g.id} className="odd:bg-white even:bg-gray-50">
-                        <td className="px-0.5 py-0.5 border text-center">{idx+1}</td>
-                        <td className="px-0.5 py-0.5 border whitespace-nowrap">{g.first_name}</td>
-                        <td className="px-0.5 py-0.5 border whitespace-nowrap">{g.last_name}</td>
-                        <td className="px-0.5 py-0.5 border whitespace-nowrap">{g.phone}</td>
-                        <td className="px-0.5 py-0.5 border text-center whitespace-nowrap">{g.status==='approved'? 'מגיע' : g.status==='rejected'? 'לא מגיע' : 'טרם הגיב'}</td>
+                      <tr key={g.id} className="odd:bg-white/5 even:bg-white/[0.02] text-slate-300">
+                        <td className="px-0.5 py-0.5 border border-white/10 text-center">{idx+1}</td>
+                        <td className="px-0.5 py-0.5 border border-white/10 whitespace-nowrap">{g.first_name}</td>
+                        <td className="px-0.5 py-0.5 border border-white/10 whitespace-nowrap">{g.last_name}</td>
+                        <td className="px-0.5 py-0.5 border border-white/10 whitespace-nowrap">{g.phone}</td>
+                        <td className="px-0.5 py-0.5 border border-white/10 text-center whitespace-nowrap">{g.status==='approved'? 'מגיע' : g.status==='rejected'? 'לא מגיע' : 'טרם הגיב'}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
             )}
-            <div className="flex justify-center mt-4 sm:mt-6">
-              <button onClick={()=>{setShowSearchGuest(false); setShowReportsOptions(true);}} className="bg-primary text-white border border-primary rounded-full px-6 sm:px-8 py-2 sm:py-3 font-medium hover:bg-primary/90 transition-all text-sm sm:text-base">סגור</button>
-            </div>
-          </div>
-        </div>
-      )}
+        </ModalBody>
+        <ModalFooter>
+          <button onClick={()=>{setShowSearchGuest(false); setShowReportsOptions(true);}} className="bg-primary text-white border border-primary rounded-full px-6 sm:px-8 py-2 sm:py-3 font-medium hover:bg-primary/90 transition-all text-sm sm:text-base">סגור</button>
+        </ModalFooter>
+      </Modal>
 
       {/* Existing Event Warning Modal */}
-      {showExistingEventWarning && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50">
-          <div className="relative bg-red-50 border-4 border-red-400 rounded-lg p-6 w-full max-w-md text-center">
-            <button 
-              onClick={() => setShowExistingEventWarning(false)} 
-              className="absolute top-2 left-2 text-2xl text-red-600 hover:text-red-800" 
-              aria-label="סגור"
-            >
-              &times;
-            </button>
+      <Modal open={showExistingEventWarning} onClose={() => setShowExistingEventWarning(false)} size="sm">
+        <ModalHeader onClose={() => setShowExistingEventWarning(false)}>יש אירוע קיים במערכת!</ModalHeader>
+        <ModalBody className="text-center">
             <div className="mb-4">
               <span className="text-4xl mb-2 block">⚠️</span>
-              <h2 className="text-2xl font-bold text-red-800 mb-4">יש אירוע קיים במערכת!</h2>
-              <p className="text-lg text-red-700 mb-4">
+              <p className="text-lg text-red-400 mb-4">
                 כבר יש אירוע פעיל או בתהליך יצירה. האם אתה בטוח שברצונך ליצור אירוע חדש?
               </p>
-              <div className="bg-red-100 border-2 border-red-300 rounded-lg p-4 mb-4 text-right">
-                <h3 className="text-lg font-bold text-red-800 mb-3 text-center">הבהרות חשובות</h3>
+              <div className="bg-red-500/10 border border-red-400/30 rounded-lg p-4 mb-4 text-right">
+                <h3 className="text-lg font-bold text-slate-100 mb-3 text-center">הבהרות חשובות</h3>
                 <div className="space-y-2">
-                  <p className="text-base font-bold text-red-800">
+                  <p className="text-base font-bold text-slate-200">
                     • במערכת זו לא ניתן לנהל שני אירועים במקביל. בכל פעם ניתן לנהל אירוע אחד בלבד.
                   </p>
-                  <p className="text-base font-bold text-red-800">
+                  <p className="text-base font-bold text-slate-200">
                     • האירוע הקיים יימחק, ותוכל לפתוח אירוע חדש.
                   </p>
                 </div>
               </div>
             </div>
-            <div className="space-y-3">
+        </ModalBody>
+        <ModalFooter className="flex-col">
               <button
                 onClick={() => setShowExistingEventWarning(false)}
-                className="w-full bg-green-600 text-white border border-green-700 rounded-full px-6 py-3 font-bold hover:bg-green-700 transition-all"
+                className="w-full bg-emerald-600 text-white border border-emerald-400/50 rounded-full px-6 py-3 font-bold hover:bg-emerald-700 transition-all"
               >
                 חזור לאירוע הקיים
               </button>
@@ -8970,42 +8994,32 @@ React.useEffect(()=>{
       setShowExistingEventWarning(false);
       setShowArchiveConfirm(true);
                 }}
-                className="w-full bg-red-700 text-white border border-red-900 rounded-full px-6 py-3 font-bold hover:bg-red-800 transition-all"
+                className="w-full bg-red-600 text-white border border-red-400/50 rounded-full px-6 py-3 font-bold hover:bg-red-600 transition-all"
               >
                 מחק אירוע קיים
               </button>
-            </div>
-          </div>
-        </div>
-      )}
+        </ModalFooter>
+      </Modal>
 
       {/* Archive Confirmation Modal */}
-      {showArchiveConfirm && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50">
-          <div className="relative bg-white border-4 border-orange-400 rounded-lg p-6 w-full max-w-md text-center shadow-2xl">
-            <button 
-              onClick={() => setShowArchiveConfirm(false)} 
-              className="absolute top-2 left-2 text-2xl text-gray-500 hover:text-gray-700" 
-              aria-label="סגור"
-            >
-              &times;
-            </button>
+      <Modal open={showArchiveConfirm} onClose={() => setShowArchiveConfirm(false)} size="sm">
+        <ModalHeader onClose={() => setShowArchiveConfirm(false)}>אישור סופי נדרש</ModalHeader>
+        <ModalBody className="text-center">
             <div className="mb-6">
               <div className="text-5xl mb-4">⚠️</div>
-              <h2 className="text-2xl font-bold text-red-800 mb-4">אישור סופי נדרש</h2>
-              <div className="bg-orange-50 border-2 border-orange-200 rounded-lg p-4 mb-4 text-right">
-                <p className="text-base font-bold text-gray-800 mb-3">
+              <div className="bg-orange-500/10 border border-orange-400/30 rounded-xl p-4 mb-4 text-right">
+                <p className="text-base font-bold text-slate-100 mb-3">
                   האם אתה בטוח שברצונך למחוק אירוע קיים?
                 </p>
-                <div className="space-y-3 text-base text-gray-700">
+                <div className="space-y-3 text-base text-slate-300">
                   <div className="flex items-start gap-2">
-                    <span className="text-orange-600 font-bold text-lg">📁</span>
+                    <span className="text-orange-300 font-bold text-lg">📁</span>
                     <p className="text-right flex-1 text-base font-semibold">
                       האירוע הקיים יימחק.
                     </p>
                   </div>
                   <div className="flex items-start gap-2">
-                    <span className="text-orange-600 font-bold text-lg">✨</span>
+                    <span className="text-orange-300 font-bold text-lg">✨</span>
                     <p className="text-right flex-1 text-base font-semibold">
                       כעת תוכל ליצור אירוע חדש.
                     </p>
@@ -9013,10 +9027,11 @@ React.useEffect(()=>{
                 </div>
               </div>
             </div>
-            <div className="flex gap-3">
+        </ModalBody>
+        <ModalFooter>
               <button
                 onClick={() => setShowArchiveConfirm(false)}
-                className="flex-1 bg-green-600 text-white border border-green-700 rounded-full px-6 py-3 font-bold text-lg hover:bg-green-700 transition-all"
+                className="flex-1 bg-emerald-600 text-white border border-emerald-400/50 rounded-full px-6 py-3 font-bold text-lg hover:bg-emerald-700 transition-all"
               >
                 חזור לאירוע הקיים
               </button>
@@ -9025,80 +9040,54 @@ React.useEffect(()=>{
                   setShowArchiveConfirm(false);
                   handleNewEvent(true);
                 }}
-                className="flex-1 bg-red-700 text-white border border-red-900 rounded-full px-6 py-3 font-bold hover:bg-red-800 transition-all"
+                className="flex-1 bg-red-600 text-white border border-red-400/50 rounded-full px-6 py-3 font-bold hover:bg-red-600 transition-all"
               >
                 מחק אירוע קיים
               </button>
-            </div>
-          </div>
-        </div>
-      )}
+        </ModalFooter>
+      </Modal>
 
       {/* Archive Success Modal – מוצג מעל כל המודלים אחרי ארכוב מוצלח */}
-      {showDeletionSuccess && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-[60]">
-          <div className="relative bg-white rounded-lg p-6 w-full max-w-md text-center shadow-2xl border-4 border-green-500">
-            <button
-              onClick={() => {
-                setShowDeletionSuccess(false);
-                setSelectedFlowStep(null);
-                setShowEventTypes(false);
-              }}
-              className="absolute top-2 left-2 text-2xl text-gray-500 hover:text-gray-700"
-              aria-label="סגור"
-            >
-              &times;
-            </button>
+      <Modal open={showDeletionSuccess} onClose={() => { setShowDeletionSuccess(false); setSelectedFlowStep(null); setShowEventTypes(false); }} size="sm">
+        <ModalHeader onClose={() => { setShowDeletionSuccess(false); setSelectedFlowStep(null); setShowEventTypes(false); }}>מחיקת האירוע בוצעה בהצלחה</ModalHeader>
+        <ModalBody className="text-center">
             <div className="mb-6">
-              <div className="text-5xl mb-4 text-green-600">✅</div>
-              <h2 className="text-2xl font-bold text-green-700 mb-3">מחיקת האירוע בוצעה בהצלחה</h2>
-              <p className="text-base text-gray-700 leading-relaxed">
+              <div className="text-5xl mb-4 text-emerald-400">✅</div>
+              <p className="text-base text-slate-300 leading-relaxed">
                 האירוע הקודם נמחק בהצלחה, כעת ניתן ליצור אירוע חדש.
               </p>
             </div>
+        </ModalBody>
+        <ModalFooter>
             <button
               onClick={() => {
                 setShowDeletionSuccess(false);
                 setSelectedFlowStep(null);
                 setShowEventTypes(true);
               }}
-              className="bg-green-600 text-white border border-green-700 rounded-full px-8 py-3 font-bold text-lg hover:bg-green-700 transition-all"
+              className="bg-emerald-600 text-white border border-emerald-400/50 rounded-full px-8 py-3 font-bold text-lg hover:bg-emerald-700 transition-all"
             >
               בחר סוג אירוע חדש
             </button>
-          </div>
-        </div>
-      )}
+        </ModalFooter>
+      </Modal>
 
       {/* New Event confirmation modal */}
-      {showNewEventConfirm && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50">
-          <div className="relative bg-white rounded-lg p-6 w-full max-w-sm text-center">
-            <button onClick={()=>setShowNewEventConfirm(false)} className="absolute top-2 left-2 text-2xl text-gray-500 hover:text-gray-700" aria-label="סגור">&times;</button>
-            <h2 className="text-xl font-medium mb-6">האם אתה רוצה ליצור אירוע חדש?</h2>
+      <Modal open={showNewEventConfirm} onClose={() => setShowNewEventConfirm(false)} size="sm">
+        <ModalHeader onClose={() => setShowNewEventConfirm(false)}>האם אתה רוצה ליצור אירוע חדש?</ModalHeader>
+        <ModalFooter>
             <button
               onClick={() => { setShowNewEventConfirm(false); handleNewEvent(); }}
               className="bg-primary text-white border border-primary rounded-full px-8 py-3 font-medium hover:bg-primary/90 transition-all"
             >
               אשר ושמור
             </button>
-          </div>
-        </div>
-      )}
+        </ModalFooter>
+      </Modal>
       {/* Flow Diagram Modal */}
-      {showFlowDiagram && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50 p-2">
-          <div className="relative bg-white rounded-lg p-4 w-full max-w-6xl h-[98vh] overflow-hidden flex flex-col">
-            <button 
-              onClick={()=>setShowFlowDiagram(false)} 
-              className="absolute top-4 left-4 text-3xl text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-full w-10 h-10 flex items-center justify-center font-bold transition-all z-10" 
-              aria-label="סגור"
-            >
-              &times;
-            </button>
-            <h2 className="text-2xl md:text-3xl font-bold mb-3 text-center text-primary">תיאור תהליך יצירת אירוע ב-Meet-M</h2>
-            <p className="text-center text-gray-600 text-base mb-3">כך נראה התהליך ליצירת האירוע שלך</p>
-            <div className="border-b-2 border-primary mb-3"></div>
+      <Modal open={showFlowDiagram} onClose={() => setShowFlowDiagram(false)} size="xl">
+        <ModalHeader onClose={() => setShowFlowDiagram(false)}>תיאור תהליך יצירת אירוע ב-Meet-M</ModalHeader>
+        <ModalBody>
             
             {/* Flow Steps - Horizontal Layout */}
             <div className="w-full mx-auto flex-1 overflow-y-auto px-2">
@@ -9110,23 +9099,23 @@ React.useEffect(()=>{
                 
                 {/* Step 0.5: New Event Confirmation */}
                 <div 
-                  className="border-2 border-gray-300 rounded-lg p-4 flex items-center gap-3"
+                  className="bg-white/5 border border-white/10 rounded-xl p-4 flex items-center gap-3"
                 >
                   <div className="text-4xl flex-shrink-0">✅</div>
                   <div className="flex-1 text-right">
                     <h3 className="text-lg font-bold text-primary">פתיחת אירוע חדש</h3>
-                    <p className="text-base text-gray-600">אישור ואיפוס המערכת לאירוע חדש</p>
+                    <p className="text-base text-slate-400">אישור ואיפוס המערכת לאירוע חדש</p>
                   </div>
                 </div>
                 
                 {/* Step 0: Pricing */}
                 <div 
-                  className="border-2 border-gray-300 rounded-lg p-4 flex items-center gap-3"
+                  className="bg-white/5 border border-white/10 rounded-xl p-4 flex items-center gap-3"
                 >
                   <div className="text-4xl flex-shrink-0">💰</div>
                   <div className="flex-1 text-right">
                     <h3 className="text-lg font-bold text-primary">בחירת מסלול</h3>
-                    <p className="text-base text-gray-600">בחר את החבילה המתאימה לאירוע שלך</p>
+                    <p className="text-base text-slate-400">בחר את החבילה המתאימה לאירוע שלך</p>
                   </div>
                 </div>
               </div>
@@ -9137,34 +9126,34 @@ React.useEffect(()=>{
 
                 {/* Step 1: Event Type */}
                 <div 
-                  className="border-2 border-gray-300 rounded-lg p-4 flex items-center gap-3"
+                  className="bg-white/5 border border-white/10 rounded-xl p-4 flex items-center gap-3"
                 >
                   <div className="text-4xl flex-shrink-0">🎉</div>
                   <div className="flex-1 text-right">
                     <h3 className="text-lg font-bold text-primary">שלב 1: סוג אירוע</h3>
-                    <p className="text-base text-gray-600">חתונה, בר מצווה, יום הולדת ועוד</p>
+                    <p className="text-base text-slate-400">חתונה, בר מצווה, יום הולדת ועוד</p>
                   </div>
                 </div>
 
                 {/* Step 2: Event Details */}
                 <div 
-                  className="border-2 border-gray-300 rounded-lg p-4 flex items-center gap-3"
+                  className="bg-white/5 border border-white/10 rounded-xl p-4 flex items-center gap-3"
                 >
                   <div className="text-4xl flex-shrink-0">📝</div>
                   <div className="flex-1 text-right">
                     <h3 className="text-lg font-bold text-primary">שלב 2: פרטי האירוע</h3>
-                    <p className="text-base text-gray-600">תאריך, שעה, מקום ופרטים נוספים</p>
+                    <p className="text-base text-slate-400">תאריך, שעה, מקום ופרטים נוספים</p>
                   </div>
                 </div>
 
                 {/* Step 3: Design */}
                 <div 
-                  className="border-2 border-gray-300 rounded-lg p-4 flex items-center gap-3"
+                  className="bg-white/5 border border-white/10 rounded-xl p-4 flex items-center gap-3"
                 >
                   <div className="text-4xl flex-shrink-0">🎨</div>
                   <div className="flex-1 text-right">
                     <h3 className="text-lg font-bold text-primary">שלב 3: עיצוב הזמנה</h3>
-                    <p className="text-base text-gray-600">בחר מתוך 45 תבניות מעוצבות</p>
+                    <p className="text-base text-slate-400">בחר מתוך 45 תבניות מעוצבות</p>
                   </div>
                 </div>
               </div>
@@ -9175,23 +9164,23 @@ React.useEffect(()=>{
 
                 {/* Step 4: Send Invitations */}
                 <div 
-                  className="border-2 border-gray-300 rounded-lg p-4 flex items-center gap-3"
+                  className="bg-white/5 border border-white/10 rounded-xl p-4 flex items-center gap-3"
                 >
                   <div className="text-4xl flex-shrink-0">📱</div>
                   <div className="flex-1 text-right">
                     <h3 className="text-lg font-bold text-primary">שלב 4: שליחת הזמנות</h3>
-                    <p className="text-base text-gray-600">שליחה אוטומטית מקובץ ל SMS ו-WhatsApp</p>
+                    <p className="text-base text-slate-400">שליחה אוטומטית מקובץ ל SMS ו-WhatsApp</p>
                   </div>
                 </div>
 
                 {/* Step 5: Reports */}
                 <div 
-                  className="border-2 border-gray-300 rounded-lg p-4 flex items-center gap-3"
+                  className="bg-white/5 border border-white/10 rounded-xl p-4 flex items-center gap-3"
                 >
                   <div className="text-4xl flex-shrink-0">📊</div>
                   <div className="flex-1 text-right">
                     <h3 className="text-lg font-bold text-primary">שלב 5: דוחות בקרה</h3>
-                    <p className="text-base text-gray-600">מעקב אישורי הגעה ויצוא לאקסל</p>
+                    <p className="text-base text-slate-400">מעקב אישורי הגעה ויצוא לאקסל</p>
                   </div>
                 </div>
               </div>
@@ -9200,10 +9189,10 @@ React.useEffect(()=>{
             
             {/* Step Details Box */}
             {selectedFlowStep !== null && (
-              <div className="bg-[#FFF9E8] border-2 border-primary rounded-lg p-5 mt-3 text-right relative max-h-[35vh] overflow-y-auto">
+              <div className="bg-white/5 border border-white/10 rounded-xl p-5 mt-3 text-right relative max-h-[35vh] overflow-y-auto">
                 <button 
                   onClick={() => setSelectedFlowStep(null)} 
-                  className="absolute top-2 left-2 text-xl text-gray-500 hover:text-gray-700 font-bold transition-colors"
+                  className="absolute top-2 left-2 text-xl text-slate-400 hover:text-white font-bold transition-colors"
                   aria-label="סגור פירוט"
                 >
                   &times;
@@ -9220,20 +9209,20 @@ React.useEffect(()=>{
                 
                 {selectedFlowStep === 0 && (
                   <div className="space-y-2">
-                    <p className="text-gray-700 text-base leading-relaxed">בשלב זה תבחר את המסלול המתאים לאירוע שלך:</p>
+                    <p className="text-slate-300 text-base leading-relaxed">בשלב זה תבחר את המסלול המתאים לאירוע שלך:</p>
                     <ul className="list-disc list-inside space-y-1.5 mr-3 text-base">
                       <li><strong>מסלול א (1₪)</strong> - עד 50 הודעות</li>
                       <li><strong>מסלול ב (149₪)</strong> - מ 51 עד 200 הודעות</li>
                       <li><strong>מסלול ג (199₪)</strong> - מ 201 עד 350 הודעות</li>
                       <li><strong>מסלול ד (259₪)</strong> - מ 351 עד 500 הודעות</li>
                     </ul>
-                    <p className="text-gray-600 text-sm mt-2">המחירים הם חד פעמיים לכל אירוע</p>
+                    <p className="text-slate-400 text-sm mt-2">המחירים הם חד פעמיים לכל אירוע</p>
                   </div>
                 )}
                 
                 {selectedFlowStep === 0.5 && (
                   <div className="space-y-2">
-                    <p className="text-gray-700 text-base leading-relaxed">בשלב זה המערכת מתכוננת לאירוע חדש:</p>
+                    <p className="text-slate-300 text-base leading-relaxed">בשלב זה המערכת מתכוננת לאירוע חדש:</p>
                     <ul className="list-disc list-inside space-y-1.5 mr-3 text-base">
                       <li><strong>אישור יצירת אירוע</strong> - מודל אישור</li>
                       <li><strong>איפוס מלא</strong> - ניקוי כל הנתונים</li>
@@ -9241,52 +9230,52 @@ React.useEffect(()=>{
                       <li><strong>מחיקת עיצוב קודם</strong> - איפוס העיצוב</li>
                       <li><strong>הכנה לאירוע חדש</strong> - המערכת מוכנה</li>
                     </ul>
-                    <p className="text-gray-600 text-sm mt-2">ניתן ליצור אירוע חדש רק לאחר ארכיון האירוע הקודם</p>
+                    <p className="text-slate-400 text-sm mt-2">ניתן ליצור אירוע חדש רק לאחר ארכיון האירוע הקודם</p>
                   </div>
                 )}
                 
                 {selectedFlowStep === 1 && (
                   <div className="space-y-2">
-                    <p className="text-gray-700 text-base leading-relaxed">בשלב זה תבחר את סוג האירוע שלך מתוך 10 אפשרויות:</p>
+                    <p className="text-slate-300 text-base leading-relaxed">בשלב זה תבחר את סוג האירוע שלך מתוך 10 אפשרויות:</p>
                     <ul className="list-disc list-inside space-y-1.5 mr-3 text-base">
                       <li>חתונה, חינה, מסיבת אירוסין, הפרשת חלה - טקסים לשמחת המשפחה</li>
                       <li>בר/בת מצווה - חגיגת בגרות</li>
                       <li>ברית/בריתה - טקס ברית מילה או שמות</li>
                       <li>יום הולדת, אירוע עסקי</li>
                     </ul>
-                    <p className="text-gray-600 text-sm mt-2">בחירת סוג האירוע תתאים את השדות בשלבים הבאים</p>
+                    <p className="text-slate-400 text-sm mt-2">בחירת סוג האירוע תתאים את השדות בשלבים הבאים</p>
                   </div>
                 )}
                 
                 {selectedFlowStep === 2 && (
                   <div className="space-y-2">
-                    <p className="text-gray-700 text-base leading-relaxed">בשלב זה תמלא את כל הפרטים החשובים לאירוע:</p>
+                    <p className="text-slate-300 text-base leading-relaxed">בשלב זה תמלא את כל הפרטים החשובים לאירוע:</p>
                     <ul className="list-disc list-inside space-y-1.5 mr-3 text-base">
                       <li><strong>פרטים אישיים</strong> - שמות והורים</li>
                       <li><strong>תאריך ושעה</strong> - תאריך עתידי חובה</li>
                       <li><strong>שעת חופה</strong> - רק לחתונה</li>
                       <li><strong>מיקום</strong> - שם האולם וכתובת</li>
                     </ul>
-                    <p className="text-gray-600 text-sm mt-2">הפרטים נשמרים ויופיעו בהזמנה</p>
+                    <p className="text-slate-400 text-sm mt-2">הפרטים נשמרים ויופיעו בהזמנה</p>
                   </div>
                 )}
                 
                 {selectedFlowStep === 3 && (
                   <div className="space-y-3">
-                    <p className="text-gray-700 leading-relaxed">בשלב זה תבחר את העיצוב המושלם להזמנה שלך:</p>
+                    <p className="text-slate-300 leading-relaxed">בשלב זה תבחר את העיצוב המושלם להזמנה שלך:</p>
                     <ul className="list-disc list-inside space-y-2 mr-4">
                       <li><strong>45 תבניות מעוצבות</strong> - מגוון רחב של עיצובים לכל סוג אירוע</li>
                       <li><strong>התאמה אישית</strong> - הטקסט שלך יתווסף אוטומטית על התבנית</li>
                       <li><strong>צפייה מקדימה</strong> - ראה איך ההזמנה תיראה לפני השמירה</li>
                       <li><strong>שמירה בענן</strong> - ההזמנה נשמרת ב-Supabase Storage</li>
                     </ul>
-                    <p className="text-gray-600 text-base mt-3">תוכל לשנות את העיצוב בכל שלב של התהליך</p>
+                    <p className="text-slate-400 text-base mt-3">תוכל לשנות את העיצוב בכל שלב של התהליך</p>
                   </div>
                 )}
                 
                 {selectedFlowStep === 4 && (
                   <div className="space-y-3">
-                    <p className="text-gray-700 leading-relaxed">בשלב זה תשלח את ההזמנות לאורחים:</p>
+                    <p className="text-slate-300 leading-relaxed">בשלב זה תשלח את ההזמנות לאורחים:</p>
                     <ul className="list-disc list-inside space-y-2 mr-4">
                       <li><strong>מילוי פרטי אורח</strong> - שם פרטי, שם משפחה וטלפון</li>
                       <li><strong>שליחה בוואטסאפ</strong> - הזמנה מעוצבת + קישור RSVP ייחודי</li>
@@ -9294,13 +9283,13 @@ React.useEffect(()=>{
                       <li><strong>קישור RSVP ייחודי</strong> - כל אורח מקבל קישור אישי לאישור הגעה</li>
                       <li><strong>ניהול רשימת אורחים</strong> - צפייה, חיפוש ועריכת אורחים</li>
                     </ul>
-                    <p className="text-gray-600 text-base mt-3">ניתן לשלוח הזמנות לכמה שיותר אורחים</p>
+                    <p className="text-slate-400 text-base mt-3">ניתן לשלוח הזמנות לכמה שיותר אורחים</p>
                   </div>
                 )}
                 
                 {selectedFlowStep === 5 && (
                   <div className="space-y-3">
-                    <p className="text-gray-700 leading-relaxed">בשלב זה תעקוב אחר אישורי ההגעה:</p>
+                    <p className="text-slate-300 leading-relaxed">בשלב זה תעקוב אחר אישורי ההגעה:</p>
                     <ul className="list-disc list-inside space-y-2 mr-4">
                       <li><strong>דוח מאושרים</strong> - רשימת כל האורחים שאישרו הגעה + פרטים מלאים (מספר בוגרים, ילדים, ארוחות מיוחדות, אלרגיות)</li>
                       <li><strong>דוח דחיות</strong> - אורחים שהודיעו שלא מגיעים</li>
@@ -9308,17 +9297,17 @@ React.useEffect(()=>{
                       <li><strong>יצוא לאקסל</strong> - הורדת כל הנתונים לקובץ Excel מסודר</li>
                       <li><strong>ארכיון אירועים</strong> - גישה לדוחות בקרה של אירועים קודמים</li>
                     </ul>
-                    <p className="text-gray-600 text-base mt-3">עדכון בזמן אמת - דוחות הבקרה מתעדכנים אוטומטית</p>
+                    <p className="text-slate-400 text-base mt-3">עדכון בזמן אמת - דוחות הבקרה מתעדכנים אוטומטית</p>
                   </div>
                 )}
               </div>
             )}
 
-            {/* Action Buttons */}
-            <div className="flex gap-4 justify-center">
+        </ModalBody>
+        <ModalFooter>
               <button
                 onClick={() => setShowFlowDiagram(false)}
-                className="bg-gray-200 text-gray-700 border border-gray-300 rounded-full px-8 py-3 font-medium hover:bg-gray-300 transition-all"
+                className="border border-white/15 bg-transparent text-white hover:border-indigo-300 hover:text-indigo-200 rounded-full px-8 py-3 font-medium transition-all"
               >
                 סגור
               </button>
@@ -9360,195 +9349,106 @@ React.useEffect(()=>{
               >
                 בואו נתחיל - צור אירוע חדש! 🚀
               </button>
-            </div>
-          </div>
-        </div>
-      )}
+        </ModalFooter>
+      </Modal>
 
       {/* Pricing Plan Selection Modal */}
-      {showPricingPlan && (
-        <div className="fixed inset-0 bg-black/50 z-50 overflow-y-auto">
-          <div className="min-h-screen flex items-center justify-center p-4">
-            <div className="relative bg-white rounded-lg px-6 pb-6 pt-12 sm:p-8 sm:pt-10 w-full max-w-[98vw] my-8">
-              <button
-                onClick={closePricingPlanModal}
-                className="absolute top-4 left-4 right-auto text-2xl sm:text-3xl text-gray-500 hover:text-gray-700"
-                aria-label="סגור"
+      <Modal open={showPricingPlan} onClose={closePricingPlanModal} size="xl">
+        <ModalHeader onClose={closePricingPlanModal}>
+          <span className="hidden sm:inline">בחר את המסלול המתאים לאירוע שלך</span>
+          <span className="sm:hidden">בחר מסלול מתאים</span>
+        </ModalHeader>
+        <ModalBody>
+          {planAddOnMode && (
+            <div className="text-center text-sm font-semibold text-primary mb-3 bg-indigo-500/10 border border-indigo-400/20 rounded-xl p-2.5">
+              בחר חבילת הרחבה בתשלום כדי להוסיף עוד הודעות למכסה.
+            </div>
+          )}
+          {planSelectionError && (
+            <div className="mb-3 bg-red-500/10 border border-red-400/30 rounded-xl p-2.5 text-red-400 font-semibold text-sm text-center">
+              {planSelectionError}
+            </div>
+          )}
+
+          {/* Compact plan cards — price + range + CTA only */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
+            {[
+              { key: 'free',     id: 'א', subtitle: 'אירועים קטנים',    range: 'עד 50 הודעות',        price: '1',   recommended: false },
+              { key: 'standard', id: 'ב', subtitle: 'מתאים לרוב',       range: 'מ־51 עד 200 הודעות',  price: '149', recommended: true  },
+              { key: 'premium',  id: 'ג', subtitle: 'אירועים גדולים',   range: 'מ־201 עד 350 הודעות', price: '199', recommended: false },
+              { key: 'luxury',   id: 'ד', subtitle: 'אירועים גדולים מאוד', range: 'מ־351 עד 500 הודעות', price: '259', recommended: false },
+            ].map((plan) => (
+              <div
+                key={plan.key}
+                className={`relative flex flex-col items-center text-center rounded-2xl p-4 border transition-all ${
+                  plan.recommended
+                    ? 'bg-indigo-500/10 border-2 border-primary'
+                    : selectedPlan === plan.key
+                    ? 'bg-white/[0.07] border-2 border-primary'
+                    : 'bg-white/5 border border-white/10 hover:border-indigo-400/50'
+                }`}
               >
-                &times;
-              </button>
-              <h2 className="text-2xl md:text-3xl font-bold mb-4 text-center text-primary pl-16 pr-10">
-                <span className="hidden sm:inline">בחר את המסלול המתאים לאירוע שלך</span>
-                <span className="sm:hidden">בחר מסלול מתאים</span>
-              </h2>
-            {planAddOnMode && (
-              <div className="text-center text-sm font-semibold text-primary mb-4">
-                בחר חבילת הרחבה בתשלום כדי להוסיף עוד הודעות למכסה.
-              </div>
-            )}
-            {planSelectionError && (
-              <div className="mb-4 bg-red-50 border-2 border-red-300 rounded-lg p-3 text-red-700 font-semibold text-sm text-center">
-                {planSelectionError}
-              </div>
-            )}
-            
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-4 gap-4 sm:gap-6">
-              {/* Plan A - Up to 50 guests */}
-              <div className="border-2 border-gray-300 rounded-lg p-6 hover:border-primary transition-all hover:shadow-lg text-center">
-                <h3 className="text-xl font-bold mb-2 text-primary">מסלול א</h3>
-                <p className="text-gray-600 mb-4">מתאים לאירועים קטנים</p>
-                <div className="mb-4 text-primary">
-                  <div className="sm:hidden text-center space-y-1 text-2xl font-semibold" dir="rtl">
-                    <div>מס' הודעות: <span className="font-bold">עד 50</span></div>
-                    <div className="font-bold">מחיר: 1 ₪</div>
+                {plan.recommended && (
+                  <div className="absolute -top-2.5 right-1/2 translate-x-1/2 bg-gradient-to-br from-indigo-600 to-violet-600 text-white px-3 py-0.5 rounded-full text-xs font-bold shadow-lg whitespace-nowrap">
+                    מומלץ
                   </div>
-                  <span className="hidden sm:inline text-base md:text-xl font-bold">1 ₪</span>
+                )}
+                <h3 className="text-base font-black text-white mb-0.5">מסלול {plan.id}</h3>
+                <p className="text-xs text-slate-400 mb-2">{plan.subtitle}</p>
+                <div className="text-2xl font-black bg-gradient-to-br from-indigo-300 to-violet-300 bg-clip-text text-transparent mb-0.5">
+                  {plan.price} ₪
                 </div>
-                <div className="mb-6 text-right">
-                  <p className="text-base md:text-xl font-semibold text-primary mb-3 whitespace-nowrap tracking-wide hidden sm:block">
-                    ✓ עד 50 הודעות
-                  </p>
-                  <p className="text-gray-600 mb-2">✓ הזמנות מעוצבות מקצועית</p>
-                  <p className="text-gray-600 mb-2">✓ שליחה אוטומטית לכל האורחים</p>
-                  <p className="text-gray-600 mb-2">✓ שליחת הודעות SMS ו-WhatsApp</p>
-                  <p className="text-gray-600 mb-2">✓ שליחת תזכורת לפני אירוע</p>
-                  <p className="text-gray-600 mb-2">✓ מעקב אישורי הגעה</p>
-                  <p className="text-gray-600 mb-2">✓ הצגת דוחות בקרה מתעדכנים בזמן אמת בדף הבית</p>
-                  <p className="text-gray-600 mb-2">✓ ניהול פרטי אורחים</p>
-                  <p className="text-gray-600 mb-2">✓ ניהול העדפות מזון ואלרגיות</p>
-                  <p className="text-gray-600 mb-2">✓ דוחות בקרה מפורטים + ייצוא ל-Excel</p>
-                  <p className="text-gray-600 mb-2">✓ שמירת אירועי עבר בארכיון</p>
-                  <p className="text-gray-600 mb-2">✓ הצגת מפת אזור האירוע + ניווט לאולם</p>
-                </div>
+                <p className="text-xs text-slate-400 mb-3">{plan.range}</p>
                 <button
-                  onClick={() => planAddOnMode ? handleAddPackagePlan('free') : handleSelectPlan('free')}
-                  disabled={planAddOnMode}
-                  className={`w-full ${planAddOnMode ? 'bg-gray-300 text-gray-600 cursor-not-allowed' : selectedPlan === 'free' ? 'bg-primary text-white' : 'bg-[#FCE6AC] text-primary hover:bg-primary hover:text-white'} border border-primary rounded-full px-6 py-3 text-lg sm:text-xl font-semibold transition-all`}
+                  onClick={() => planAddOnMode ? (plan.key !== 'free' ? handleAddPackagePlan(plan.key) : null) : handleSelectPlan(plan.key)}
+                  disabled={planAddOnMode && plan.key === 'free'}
+                  className={`w-full rounded-xl py-2 text-sm font-bold transition-all ${
+                    planAddOnMode && plan.key === 'free'
+                      ? 'bg-white/10 text-slate-400 cursor-not-allowed'
+                      : planAddOnMode
+                      ? 'bg-emerald-600 text-white hover:bg-emerald-700'
+                      : selectedPlan === plan.key
+                      ? 'bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-[0_4px_14px_rgba(99,70,230,0.4)]'
+                      : 'bg-white/10 text-white border border-white/20 hover:bg-indigo-500/20 hover:border-indigo-400/50'
+                  }`}
                 >
-                  {planAddOnMode ? 'לא זמין להרחבה' : 'בחר מסלול זה'}
+                  {planAddOnMode && plan.key === 'free' ? 'לא זמין' : planAddOnMode ? `הוסף מסלול ${plan.id}` : 'בחר'}
                 </button>
               </div>
+            ))}
+          </div>
 
-              {/* Standard Plan - 51-200 guests */}
-              <div className="border-2 border-primary rounded-lg p-6 hover:shadow-xl transition-all text-center relative bg-[#FFF9E8]">
-                <div className="absolute top-0 right-1/2 transform translate-x-1/2 -translate-y-1/2 bg-primary text-white px-4 py-1 rounded-full text-sm font-medium">
-                  מומלץ
+          {/* Shared features — shown once */}
+          <div className="bg-white/[0.03] border border-white/[0.08] rounded-2xl p-4" dir="rtl">
+            <p className="text-xs font-bold text-slate-400 mb-3 text-center tracking-wider uppercase">כל המסלולים כוללים</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1.5 text-sm text-slate-300">
+              {[
+                'הזמנות מעוצבות מקצועית',
+                'שליחה אוטומטית לכל האורחים',
+                'SMS ו-WhatsApp',
+                'תזכורת לפני האירוע',
+                'מעקב אישורי הגעה',
+                'דוחות בזמן אמת',
+                'ניהול פרטי אורחים',
+                'ניהול העדפות מזון ואלרגיות',
+                'דוחות מפורטים + ייצוא Excel',
+                'שמירת ארכיון אירועים',
+                'מפת אזור האירוע + ניווט',
+              ].map((f) => (
+                <div key={f} className="flex items-center gap-2">
+                  <span className="text-indigo-400 font-bold shrink-0">✓</span>
+                  <span>{f}</span>
                 </div>
-                <h3 className="text-xl font-bold mb-2 text-primary">מסלול ב</h3>
-                <p className="text-gray-600 mb-4">מתאים לרוב האירועים</p>
-                <div className="mb-4 text-primary">
-                  <div className="sm:hidden text-center space-y-1 text-2xl font-semibold" dir="rtl">
-                    <div>מס' הודעות: <span className="font-bold">מ־51 עד 200</span></div>
-                    <div className="font-bold">מחיר: 149 ₪</div>
-                  </div>
-                  <span className="hidden sm:inline text-base md:text-xl font-bold">149 ₪</span>
-                </div>
-                <div className="mb-6 text-right">
-                  <p className="text-base md:text-xl font-semibold text-primary mb-3 whitespace-nowrap tracking-wide hidden sm:block">
-                    ✓ מ־51 עד 200 הודעות
-                  </p>
-                  <p className="text-gray-600 mb-2">✓ הזמנות מעוצבות מקצועית</p>
-                  <p className="text-gray-600 mb-2">✓ שליחה אוטומטית לכל האורחים</p>
-                  <p className="text-gray-600 mb-2">✓ שליחת הודעות SMS ו-WhatsApp</p>
-                  <p className="text-gray-600 mb-2">✓ שליחת תזכורת לפני אירוע</p>
-                  <p className="text-gray-600 mb-2">✓ מעקב אישורי הגעה</p>
-                  <p className="text-gray-600 mb-2">✓ הצגת דוחות בקרה מתעדכנים בזמן אמת בדף הבית</p>
-                  <p className="text-gray-600 mb-2">✓ ניהול פרטי אורחים</p>
-                  <p className="text-gray-600 mb-2">✓ ניהול העדפות מזון ואלרגיות</p>
-                  <p className="text-gray-600 mb-2">✓ דוחות בקרה מפורטים + ייצוא ל-Excel</p>
-                  <p className="text-gray-600 mb-2">✓ שמירת אירועי עבר בארכיון</p>
-                  <p className="text-gray-600 mb-2">✓ הצגת מפת אזור האירוע + ניווט לאולם</p>
-                </div>
-                <button
-                  onClick={() => planAddOnMode ? handleAddPackagePlan('standard') : handleSelectPlan('standard')}
-                  className={`w-full ${planAddOnMode ? 'bg-green-600 text-white hover:bg-green-700' : selectedPlan === 'standard' ? 'bg-primary text-white' : 'bg-[#FCE6AC] text-primary hover:bg-primary hover:text-white'} border border-primary rounded-full px-6 py-3 text-lg sm:text-xl font-semibold transition-all`}
-                >
-                  {planAddOnMode ? 'הוסף חבילת מסלול ב' : 'בחר מסלול זה'}
-                </button>
-              </div>
-
-              {/* Premium Plan - 201-350 guests */}
-              <div className="border-2 border-gray-300 rounded-lg p-6 hover:border-primary transition-all hover:shadow-lg text-center">
-                <h3 className="text-xl font-bold mb-2 text-primary">מסלול ג</h3>
-                <p className="text-gray-600 mb-4">לאירועים גדולים</p>
-                <div className="mb-4 text-primary">
-                  <div className="sm:hidden text-center space-y-1 text-2xl font-semibold" dir="rtl">
-                    <div>מס' הודעות: <span className="font-bold">מ־201 עד 350</span></div>
-                    <div className="font-bold">מחיר: 199 ₪</div>
-                  </div>
-                  <span className="hidden sm:inline text-base md:text-xl font-bold">199 ₪</span>
-                </div>
-                <div className="mb-6 text-right">
-                  <p className="text-base md:text-xl font-semibold text-primary mb-3 whitespace-nowrap tracking-wide hidden sm:block">
-                    ✓ מ־201 עד 350 הודעות
-                  </p>
-                  <p className="text-gray-600 mb-2">✓ הזמנות מעוצבות מקצועית</p>
-                  <p className="text-gray-600 mb-2">✓ שליחה אוטומטית לכל האורחים</p>
-                  <p className="text-gray-600 mb-2">✓ שליחת הודעות SMS ו-WhatsApp</p>
-                  <p className="text-gray-600 mb-2">✓ שליחת תזכורת לפני אירוע</p>
-                  <p className="text-gray-600 mb-2">✓ מעקב אישורי הגעה</p>
-                  <p className="text-gray-600 mb-2">✓ הצגת דוחות בקרה מתעדכנים בזמן אמת בדף הבית</p>
-                  <p className="text-gray-600 mb-2">✓ ניהול פרטי אורחים</p>
-                  <p className="text-gray-600 mb-2">✓ ניהול העדפות מזון ואלרגיות</p>
-                  <p className="text-gray-600 mb-2">✓ דוחות בקרה מפורטים + ייצוא ל-Excel</p>
-                  <p className="text-gray-600 mb-2">✓ שמירת אירועי עבר בארכיון</p>
-                  <p className="text-gray-600 mb-2">✓ הצגת מפת אזור האירוע + ניווט לאולם</p>
-                </div>
-                <button
-                  onClick={() => planAddOnMode ? handleAddPackagePlan('premium') : handleSelectPlan('premium')}
-                  className={`w-full ${planAddOnMode ? 'bg-green-600 text-white hover:bg-green-700' : selectedPlan === 'premium' ? 'bg-primary text-white' : 'bg-[#FCE6AC] text-primary hover:bg-primary hover:text-white'} border border-primary rounded-full px-6 py-3 text-lg sm:text-xl font-semibold transition-all`}
-                >
-                  {planAddOnMode ? 'הוסף חבילת מסלול ג' : 'בחר מסלול זה'}
-                </button>
-              </div>
-
-              {/* Luxury Plan - 351-500 guests */}
-              <div className="border-2 border-gray-300 rounded-lg p-6 hover:border-primary transition-all hover:shadow-lg text-center">
-                <h3 className="text-xl font-bold mb-2 text-primary">מסלול ד</h3>
-                <p className="text-gray-600 mb-4">לאירועים גדולים מאוד</p>
-                <div className="mb-4 text-primary">
-                  <div className="sm:hidden text-center space-y-1 text-2xl font-semibold" dir="rtl">
-                    <div>מס' הודעות: <span className="font-bold">מ־351 עד 500</span></div>
-                    <div className="font-bold">מחיר: 259 ₪</div>
-                  </div>
-                  <span className="hidden sm:inline text-base md:text-xl font-bold">259 ₪</span>
-                </div>
-                <div className="mb-6 text-right">
-                  <p className="text-base md:text-xl font-semibold text-primary mb-3 whitespace-nowrap tracking-wide hidden sm:block">
-                    ✓ מ־351 עד 500 הודעות
-                  </p>
-                  <p className="text-gray-600 mb-2">✓ הזמנות מעוצבות מקצועית</p>
-                  <p className="text-gray-600 mb-2">✓ שליחה אוטומטית לכל האורחים</p>
-                  <p className="text-gray-600 mb-2">✓ שליחת הודעות SMS ו-WhatsApp</p>
-                  <p className="text-gray-600 mb-2">✓ שליחת תזכורת לפני אירוע</p>
-                  <p className="text-gray-600 mb-2">✓ מעקב אישורי הגעה</p>
-                  <p className="text-gray-600 mb-2">✓ הצגת דוחות בקרה מתעדכנים בזמן אמת בדף הבית</p>
-                  <p className="text-gray-600 mb-2">✓ ניהול פרטי אורחים</p>
-                  <p className="text-gray-600 mb-2">✓ ניהול העדפות מזון ואלרגיות</p>
-                  <p className="text-gray-600 mb-2">✓ דוחות בקרה מפורטים + ייצוא ל-Excel</p>
-                  <p className="text-gray-600 mb-2">✓ שמירת אירועי עבר בארכיון</p>
-                  <p className="text-gray-600 mb-2">✓ הצגת מפת אזור האירוע + ניווט לאולם</p>
-                </div>
-                <button
-                  onClick={() => planAddOnMode ? handleAddPackagePlan('luxury') : handleSelectPlan('luxury')}
-                  className={`w-full ${planAddOnMode ? 'bg-green-600 text-white hover:bg-green-700' : selectedPlan === 'luxury' ? 'bg-primary text-white' : 'bg-[#FCE6AC] text-primary hover:bg-primary hover:text-white'} border border-primary rounded-full px-6 py-3 text-lg sm:text-xl font-semibold transition-all`}
-                >
-                  {planAddOnMode ? 'הוסף חבילת מסלול ד' : 'בחר מסלול זה'}
-                </button>
-              </div>
-            </div>
-
-            <div className="mt-6 space-y-2">
-              <p className="text-center text-gray-500 text-base">* המחירים הם חד פעמיים לאירוע</p>
-              <div className="bg-blue-50 border-2 border-blue-200 rounded-lg p-4 text-center">
-                <p className="text-blue-800 font-bold text-lg mb-1">💡 צריך יותר מ-500 הודעות?</p>
-                <p className="text-blue-700 text-base">ניתן לרכוש חבילות הרחבה של 100 הודעות נוספות ב-100 ₪ בלבד!</p>
-              </div>
-            </div>
+              ))}
             </div>
           </div>
-        </div>
-      )}
+
+          <div className="mt-3 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-slate-400">
+            <span>* המחירים הם חד פעמיים לאירוע</span>
+            <span className="text-indigo-300 font-semibold">💡 הרחבה: 100 הודעות נוספות ב-100 ₪</span>
+          </div>
+        </ModalBody>
+      </Modal>
 
       {/* Tranzila Payment Modal */}
       <TranzilaPayment
@@ -9561,16 +9461,15 @@ React.useEffect(()=>{
       />
 
       {/* Payment Result Modal - Success or Error */}
-      {showPaymentResultModal && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black/60 z-[60]">
-          <div className="relative bg-white rounded-2xl p-8 md:p-12 w-full max-w-lg mx-4 shadow-2xl text-center">
+      <Modal open={showPaymentResultModal} onClose={() => setShowPaymentResultModal(false)} size="sm">
+        <ModalBody className="text-center py-8">
             {paymentResultType === 'success' ? (
               <>
                 <div className="text-6xl md:text-7xl mb-6">✅</div>
-                <h2 className="text-2xl md:text-3xl font-bold text-green-600 mb-4">
+                <h2 className="text-2xl md:text-3xl font-bold text-emerald-300 mb-4">
                   התשלום בוצע בהצלחה!
                 </h2>
-                <p className="text-lg md:text-xl text-gray-700 mb-8">
+                <p className="text-lg md:text-xl text-slate-300 mb-8">
                   {paymentResultMessage}
                 </p>
                 <button
@@ -9587,7 +9486,7 @@ React.useEffect(()=>{
                       setShowGuestForm(true);
                     }
                   }}
-                  className="w-full bg-green-600 hover:bg-green-700 text-white font-bold text-lg md:text-xl py-4 px-8 rounded-full transition-all shadow-lg transform hover:scale-105"
+                  className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-lg md:text-xl py-4 px-8 rounded-full transition-all shadow-lg transform hover:scale-105"
                 >
                   המשך
                 </button>
@@ -9595,10 +9494,10 @@ React.useEffect(()=>{
             ) : (
               <>
                 <div className="text-6xl md:text-7xl mb-6">❌</div>
-                <h2 className="text-2xl md:text-3xl font-bold text-red-600 mb-4">
+                <h2 className="text-2xl md:text-3xl font-bold text-red-400 mb-4">
                   התשלום נכשל
                 </h2>
-                <p className="text-lg md:text-xl text-gray-700 mb-8">
+                <p className="text-lg md:text-xl text-slate-300 mb-8">
                   {paymentResultMessage}
                 </p>
                 <button
@@ -9626,44 +9525,40 @@ React.useEffect(()=>{
                       }
                     }
                   }}
-                  className="w-full bg-red-600 hover:bg-red-700 text-white font-bold text-lg md:text-xl py-4 px-8 rounded-full transition-all shadow-lg transform hover:scale-105"
+                  className="w-full bg-red-600 hover:bg-red-600 text-white font-bold text-lg md:text-xl py-4 px-8 rounded-full transition-all shadow-lg transform hover:scale-105"
                 >
                   {paymentFailureWasAddon ? 'נסה שוב' : 'חזור למסך תשלומים'}
                 </button>
               </>
             )}
-          </div>
-        </div>
-      )}
+        </ModalBody>
+      </Modal>
 
       {/* Invitation Send Loading Modal */}
-      {isSendingInvitation && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black/60 z-[60]">
-          <div className="relative bg-white rounded-2xl p-8 md:p-12 w-full max-w-lg mx-4 shadow-2xl text-center">
+      <Modal open={isSendingInvitation} onClose={() => {}} size="sm">
+        <ModalBody className="text-center py-8">
             <div className="text-6xl md:text-7xl mb-6 animate-spin">⏳</div>
             <h2 className="text-2xl md:text-3xl font-bold text-primary mb-4">
               שולח הזמנה...
             </h2>
-            <p className="text-lg md:text-xl text-gray-700">
+            <p className="text-lg md:text-xl text-slate-300">
               אנא המתן, ההזמנה נשלחת כעת
             </p>
-          </div>
-        </div>
-      )}
+        </ModalBody>
+      </Modal>
 
       {/* Invitation Send Result Modal */}
-      {showInvitationResultModal && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black/60 z-[60]">
-          <div className="relative bg-white rounded-2xl p-8 md:p-12 w-full max-w-lg mx-4 shadow-2xl text-center">
+      <Modal open={showInvitationResultModal} onClose={() => setShowInvitationResultModal(false)} size="sm">
+        <ModalBody className="text-center py-8">
             {invitationResult.type === 'success' ? (
               <>
                 <div className="text-6xl md:text-7xl mb-6">✅</div>
-                <h2 className="text-2xl md:text-3xl font-bold text-green-600 mb-4">
+                <h2 className="text-2xl md:text-3xl font-bold text-emerald-300 mb-4">
                   {invitationResult.message?.includes('קבוצת הוואטסאפ')
                     ? 'עדכון הקבוצה הצליח!'
                     : 'השליחה הצליחה!'}
                 </h2>
-                <p className="text-lg md:text-xl text-gray-700 mb-8 whitespace-pre-line">
+                <p className="text-lg md:text-xl text-slate-300 mb-8 whitespace-pre-line">
                   {invitationResult.message}
                 </p>
                 <button
@@ -9679,7 +9574,7 @@ React.useEffect(()=>{
                     setGuestErrors({});
                     setGuestErrorMsg('');
                   }}
-                  className="w-full bg-green-600 hover:bg-green-700 text-white font-bold text-lg md:text-xl py-4 px-8 rounded-full transition-all shadow-lg transform hover:scale-105"
+                  className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-lg md:text-xl py-4 px-8 rounded-full transition-all shadow-lg transform hover:scale-105"
                 >
                   המשך
                 </button>
@@ -9689,10 +9584,10 @@ React.useEffect(()=>{
                 <div className="text-6xl md:text-7xl mb-6">
                   {invitationResult.type === 'warning' ? '⚠️' : '❌'}
                 </div>
-                <h2 className={`text-2xl md:text-3xl font-bold mb-4 ${invitationResult.type === 'warning' ? 'text-yellow-600' : 'text-red-600'}`}>
+                <h2 className={`text-2xl md:text-3xl font-bold mb-4 ${invitationResult.type === 'warning' ? 'text-amber-300' : 'text-red-400'}`}>
                   {invitationResult.type === 'warning' ? 'העדכון הסתיים עם כשלים' : 'השליחה נכשלה'}
                 </h2>
-                <p className="text-lg md:text-xl text-gray-700 mb-8 whitespace-pre-line text-right">
+                <p className="text-lg md:text-xl text-slate-300 mb-8 whitespace-pre-line text-right">
                   {invitationResult.message}
                 </p>
                 <button
@@ -9709,33 +9604,30 @@ React.useEffect(()=>{
                       setPlanAddOnMode(true);
                     }
                   }}
-                  className="w-full bg-red-600 hover:bg-red-700 text-white font-bold text-lg md:text-xl py-4 px-8 rounded-full transition-all shadow-lg transform hover:scale-105"
+                  className="w-full bg-red-600 hover:bg-red-600 text-white font-bold text-lg md:text-xl py-4 px-8 rounded-full transition-all shadow-lg transform hover:scale-105"
                 >
                   המשך
                 </button>
               </>
             )}
-          </div>
-        </div>
-      )}
+        </ModalBody>
+      </Modal>
 
       {/* Archive events list modal */}
-      {showArchiveList && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50">
-          <div className="relative bg-white rounded-lg p-6 w-full max-w-sm text-center space-y-4">
-            <button onClick={()=>{setShowArchiveList(false);setShowReportsOptions(true);}} className="absolute top-2 left-2 text-2xl text-gray-500 hover:text-gray-700">&times;</button>
-            <h2 className="text-xl font-medium mb-4">אירועים מהעבר (ארכיון)</h2>
+      <Drawer open={showArchiveList} onClose={()=>{setShowArchiveList(false);setShowReportsOptions(true);}} size="xl">
+        <DrawerHeader onClose={()=>{setShowArchiveList(false);setShowReportsOptions(true);}}>אירועים מהעבר (ארכיון)</DrawerHeader>
+        <DrawerBody className="text-center space-y-4">
             {archiveLoading ? (
-              <p className="text-gray-600">טוען אירועים...</p>
+              <p className="text-slate-400">טוען אירועים...</p>
             ) : archiveEvents.length===0 ? (
-              <p className="text-gray-600">אין אירועים בארכיון.</p>
+              <p className="text-slate-400">אין אירועים בארכיון.</p>
             ):(
-              <ul className="space-y-3 max-h-[60vh] overflow-y-auto px-2">
+              <ul className="space-y-3 px-2">
                 {archiveEvents.map(ev=>{
                   const dateObj=ev._eventDate;
                   const date=dateObj?format(dateObj,'dd/MM/yyyy',{locale:he}):'-';
                   return (
-                    <li key={ev.id} className="border-2 border-primary rounded-lg p-4 bg-gradient-to-br from-[#FCE6AC] to-[#FFF9E8] hover:from-[#F9D978] hover:to-[#FCE6AC] cursor-pointer flex flex-col items-center justify-center text-center shadow-md hover:shadow-lg transition-all transform hover:scale-105" onClick={()=>{
+                    <li key={ev.id} className="border border-white/15 rounded-lg p-4 bg-white/[0.055] hover:bg-indigo-500/15 hover:border-indigo-400/50 cursor-pointer flex flex-col items-center justify-center text-center shadow-md hover:shadow-lg transition-all transform hover:scale-105" onClick={()=>{
                       // IMPORTANT: Don't set currentEventId for archive events - this would reset the active event!
                       // Only use selectedEventForReport for viewing reports from archive
                       setShowArchiveList(false);
@@ -9743,27 +9635,27 @@ React.useEffect(()=>{
                       setShowReportsOptions(true);
                     }}>
                       <span className="font-bold text-lg text-primary mb-1">{ev.event_type||'אירוע'}</span>
-                      <span className="text-sm font-medium text-gray-700">{date}</span>
+                      <span className="text-sm font-medium text-slate-300">{date}</span>
                     </li>
                   );
                 })}
               </ul>
             )}
-          </div>
-        </div>
-      )}
+        </DrawerBody>
+      </Drawer>
 
-      {showActiveError && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50">
-          <div className="relative bg-white rounded-lg p-6 w-full max-w-sm text-center rtl">
-            <button onClick={()=>setShowActiveError(false)} className="absolute top-2 left-2 text-2xl text-gray-500 hover:text-gray-700">&times;</button>
+      <Modal open={showActiveError} onClose={() => setShowActiveError(false)} size="sm">
+        <ModalBody className="text-center rtl">
             <p className="text-lg font-medium text-primary mb-6">כבר קיים אירוע פעיל.<br/>ניתן ליצור אירוע חדש רק לאחר שהאירוע יעבור לארכיון.</p>
+        </ModalBody>
+        <ModalFooter>
             <button onClick={()=>setShowActiveError(false)} className="bg-primary text-white rounded-full px-8 py-2 font-medium hover:bg-primary/90 transition-all">סגור</button>
-          </div>
-        </div>
-      )}
+        </ModalFooter>
+      </Modal>
     </>
   );
 });
 
 export default StepButtons;
+
+

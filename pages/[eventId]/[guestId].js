@@ -318,22 +318,35 @@ export default function GuestPage({ initialData, initialError }) {
     }
   };
 
-  if (loading) return <p className="p-6 text-center">טוען...</p>;
-  if (error) return <p className="p-6 text-center text-red-600">{error}</p>;
+  if (loading) return (
+    <div className="min-h-screen flex items-center justify-center bg-[linear-gradient(160deg,#0d0f2b_0%,#130f35_52%,#1a0f40_100%)]">
+      <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-400" />
+    </div>
+  );
+  if (error) return (
+    <div className="min-h-screen flex items-center justify-center bg-[linear-gradient(160deg,#0d0f2b_0%,#130f35_52%,#1a0f40_100%)] p-6" dir="rtl">
+      <div className="rounded-2xl border border-red-400/30 bg-red-500/10 backdrop-blur-xl p-8 max-w-md w-full text-center">
+        <p className="text-red-400 text-lg font-medium">{error}</p>
+      </div>
+    </div>
+  );
 
   if (saved) {
     const isApproved = saved === 'approved';
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 p-6 text-center space-y-6">
-        <h1 className={`text-3xl sm:text-4xl font-bold ${isApproved ? 'text-green-700' : 'text-red-700'}`}>
+      <div className="min-h-screen flex flex-col items-center justify-center bg-[linear-gradient(160deg,#0d0f2b_0%,#130f35_52%,#1a0f40_100%)] p-6 text-center space-y-6" dir="rtl">
+        <div className={`flex h-16 w-16 items-center justify-center rounded-2xl mx-auto ${isApproved ? 'bg-emerald-500/20 border border-emerald-400/30' : 'bg-red-500/20 border border-red-400/30'}`}>
+          <span className="text-3xl">{isApproved ? '✓' : '✗'}</span>
+        </div>
+        <h1 className={`text-3xl sm:text-4xl font-black text-white`}>
           {isApproved ? 'תודה רבה!' : 'תודה על העדכון!'}
         </h1>
-        <p className="text-xl sm:text-2xl text-gray-700">
+        <p className={`text-lg sm:text-xl ${isApproved ? 'text-emerald-300' : 'text-slate-400'}`}>
           {isApproved ? 'אישור ההגעה נשלח בהצלחה' : '😔 מצטערים שלא תוכל/י להגיע הפעם – מקווים לראותך בקרוב'}
         </p>
         {isApproved && guest?.table_number && (
-          <div className="text-2xl font-extrabold text-primary bg-[#FCE6AC] border border-primary rounded-full px-6 py-3 inline-block mt-4">
-            שים לב מקומך באולם : שולחן מספר {guest.table_number}
+          <div className="inline-flex items-center gap-2 rounded-full border border-indigo-400/40 bg-indigo-500/20 px-6 py-3 text-xl font-black text-indigo-200 mt-4">
+            שולחן מספר {guest.table_number}
           </div>
         )}
       </div>
@@ -357,12 +370,12 @@ export default function GuestPage({ initialData, initialError }) {
   });
 
   return (
-    <div className="min-h-screen bg-gray-100 flex flex-col items-center justify-between py-4">
+    <div className="min-h-screen bg-[linear-gradient(160deg,#0d0f2b_0%,#130f35_52%,#1a0f40_100%)] flex flex-col items-center justify-between py-4 text-slate-100" dir="rtl">
       {invitationUrl && (
         <div className="relative w-full max-w-4xl max-h-[60vh] flex items-center justify-center mb-6 overflow-hidden">
           <button
             onClick={() => router.push('/')}
-            className="absolute top-[1px] left-[1px] z-30 w-9 h-9 flex items-center justify-center text-xl font-bold text-gray-600 hover:text-gray-800 bg-white/90 rounded-full shadow-md border border-gray-200"
+            className="absolute top-2 left-2 z-30 w-9 h-9 flex items-center justify-center text-xl font-bold text-slate-400 hover:text-white bg-black/50 hover:bg-black/70 rounded-full transition-colors border border-white/15"
             aria-label="סגור הזמנה"
           >
             ×
@@ -385,100 +398,103 @@ export default function GuestPage({ initialData, initialError }) {
                   }, 1000);
                 }}
               />
+              {/* Text Overlay - constrained to the invitation image frame */}
+              {invitationTextLines && invitationTextLines.length > 0 ? (
+                <div 
+                  className="absolute inset-0 flex flex-col justify-center items-center p-6 pointer-events-none z-20"
+                  dir="rtl"
+                >
+                  {invitationTextLines.map((line, idx) => {
+                    if (!line || !line.trim()) return null;
+                    const style = lineStyles[idx] || {};
+                    const defaultFontSize = 24;
+                    const baseFontSize = style.fontSize ? parseInt(style.fontSize) : defaultFontSize;
+                    // שורה ראשונה (שמות) מודגשת מאוד כברירת מחדל; תאריך (שורה 3) מודגש
+                    const fontSize = idx === 0 && !style.fontSize ? 28 : baseFontSize;
+                    const fontWeight = idx === 0 ? 'bold' : (idx === 3 ? (style.fontWeight || 'bold') : (style.fontWeight || 'normal'));
+                    const lineHeight = style.lineHeight ? parseFloat(style.lineHeight) : 1.4;
+                    
+                    // Clean font CSS
+                    let cleanFontCSS = fontCSS ? fontCSS.replace(/['"]/g, '') : 'Assistant, sans-serif';
+                    
+                    // Get text color
+                    let textColor = style.color || '#000000';
+                    if (!textColor.startsWith('#')) {
+                      const colorMap = {
+                        'black': '#000000', 'red': '#FF0000', 'blue': '#0000FF', 'green': '#008000',
+                        'purple': '#800080', 'orange': '#FFA500', 'brown': '#A52A2A', 'gold': '#FFD700',
+                        'pink': '#FFC0CB', 'cyan': '#00FFFF', 'indigo': '#4B0082', 'teal': '#008080'
+                      };
+                      textColor = colorMap[textColor.toLowerCase()] || '#000000';
+                    }
+
+                    // Debug log for first line with styles
+                    if (idx === 0 && style.color) {
+                      console.log(`🎨 Rendering line ${idx} with style:`, {
+                        color: textColor,
+                        style: style,
+                        lineStyles: lineStyles
+                      });
+                    }
+
+                    return (
+                      <div
+                        key={`line-${idx}-${textColor}-${style.fontSize || 'default'}`}
+                        style={{
+                          fontSize: `${fontSize}px`,
+                          fontFamily: cleanFontCSS,
+                          fontWeight: fontWeight,
+                          color: textColor,
+                          lineHeight: `${lineHeight}`,
+                          letterSpacing: style.letterSpacing ? `${style.letterSpacing}px` : '0',
+                          textAlign: style.textAlign || 'center',
+                          textDecoration: style.textDecoration || 'none',
+                          fontStyle: style.fontStyle || 'normal',
+                          // Enhanced text shadow for better readability
+                          textShadow: style.textShadow && style.textShadow !== 'none' 
+                            ? '2px 2px 4px rgba(0, 0, 0, 0.3)' 
+                            : '0 2px 6px rgba(0, 0, 0, 0.35)',
+                          transform: style.transform || 'none',
+                          whiteSpace: 'pre-wrap',
+                          wordBreak: 'break-word',
+                          marginBottom: idx < invitationTextLines.length - 1 ? '0.5em' : '0',
+                          position: 'relative',
+                          zIndex: 20,
+                          padding: '4px 10px',
+                          borderRadius: '8px',
+                          background: 'linear-gradient(135deg, rgba(255,255,255,0.25), rgba(255,255,255,0.05))',
+                          backdropFilter: 'blur(1.2px)',
+                          boxShadow: '0 6px 18px rgba(0,0,0,0.12)',
+                          width: '100%',
+                          maxWidth: '88%',
+                          minWidth: 0,
+                          boxSizing: 'border-box',
+                          overflowWrap: 'anywhere',
+                          wordWrap: 'break-word',
+                          textAlign: 'center'
+                        }}
+                      >
+                        {line.trim()}
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
+                  <div className="text-red-400 text-sm font-bold bg-black/60 backdrop-blur-sm p-3 rounded-lg border border-red-400/30">
+                    ⚠️ אין טקסט להצגה
+                  </div>
+                </div>
+              )}
             </div>
           </div>
-          
-          {/* Text Overlay - displayed on top of image */}
-          {invitationTextLines && invitationTextLines.length > 0 ? (
-            <div 
-              className="absolute inset-0 flex flex-col justify-center items-center p-6 pointer-events-none z-20"
-              dir="rtl"
-            >
-              {invitationTextLines.map((line, idx) => {
-                if (!line || !line.trim()) return null;
-                const style = lineStyles[idx] || {};
-                const defaultFontSize = 24;
-                const baseFontSize = style.fontSize ? parseInt(style.fontSize) : defaultFontSize;
-                // שורה ראשונה (שמות) מודגשת מאוד כברירת מחדל; תאריך (שורה 3) מודגש
-                const fontSize = idx === 0 && !style.fontSize ? 28 : baseFontSize;
-                const fontWeight = idx === 0 ? 'bold' : (idx === 3 ? (style.fontWeight || 'bold') : (style.fontWeight || 'normal'));
-                const lineHeight = style.lineHeight ? parseFloat(style.lineHeight) : 1.4;
-                
-                // Clean font CSS
-                let cleanFontCSS = fontCSS ? fontCSS.replace(/['"]/g, '') : 'Assistant, sans-serif';
-                
-                // Get text color
-                let textColor = style.color || '#000000';
-                if (!textColor.startsWith('#')) {
-                  const colorMap = {
-                    'black': '#000000', 'red': '#FF0000', 'blue': '#0000FF', 'green': '#008000',
-                    'purple': '#800080', 'orange': '#FFA500', 'brown': '#A52A2A', 'gold': '#FFD700',
-                    'pink': '#FFC0CB', 'cyan': '#00FFFF', 'indigo': '#4B0082', 'teal': '#008080'
-                  };
-                  textColor = colorMap[textColor.toLowerCase()] || '#000000';
-                }
-
-                // Debug log for first line with styles
-                if (idx === 0 && style.color) {
-                  console.log(`🎨 Rendering line ${idx} with style:`, {
-                    color: textColor,
-                    style: style,
-                    lineStyles: lineStyles
-                  });
-                }
-
-                return (
-                  <div
-                    key={`line-${idx}-${textColor}-${style.fontSize || 'default'}`}
-                    style={{
-                      fontSize: `${fontSize}px`,
-                      fontFamily: cleanFontCSS,
-                      fontWeight: fontWeight,
-                      color: textColor,
-                      lineHeight: `${lineHeight}`,
-                      letterSpacing: style.letterSpacing ? `${style.letterSpacing}px` : '0',
-                      textAlign: style.textAlign || 'center',
-                      textDecoration: style.textDecoration || 'none',
-                      fontStyle: style.fontStyle || 'normal',
-                      // Enhanced text shadow for better readability
-                      textShadow: style.textShadow && style.textShadow !== 'none' 
-                        ? '2px 2px 4px rgba(0, 0, 0, 0.3)' 
-                        : '0 2px 6px rgba(0, 0, 0, 0.35)',
-                      transform: style.transform || 'none',
-                      whiteSpace: 'pre-wrap',
-                      wordBreak: 'break-word',
-                      marginBottom: idx < invitationTextLines.length - 1 ? '0.5em' : '0',
-                      position: 'relative',
-                      zIndex: 20,
-                      padding: '4px 10px',
-                      borderRadius: '8px',
-                      background: 'linear-gradient(135deg, rgba(255,255,255,0.25), rgba(255,255,255,0.05))',
-                      backdropFilter: 'blur(1.2px)',
-                      boxShadow: '0 6px 18px rgba(0,0,0,0.12)',
-                      maxWidth: '85%',
-                      wordWrap: 'break-word',
-                      textAlign: 'center'
-                    }}
-                  >
-                    {line.trim()}
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
-              <div className="text-red-500 text-lg font-bold bg-white/80 p-4 rounded">
-                ⚠️ אין טקסט להצגה - בדוק את הקונסול
-              </div>
-            </div>
-          )}
         </div>
       )}
 
-      <div className="w-full max-w-xl rounded-lg bg-white px-3 pb-1 pt-0 shadow-sm text-right text-sm mt-1 flex-shrink-0">
-        <h1 className="mb-4 text-2xl font-bold text-primary">אישור הגעה</h1>
+      <div className="w-full max-w-xl rounded-2xl border border-white/15 bg-white/[0.055] backdrop-blur-xl shadow-[0_4px_32px_rgba(0,0,0,0.3)] px-5 pb-5 pt-4 text-right text-sm mt-1 flex-shrink-0">
+        <h1 className="mb-3 text-2xl font-black text-white">אישור הגעה</h1>
 
-        <p className="mb-1 text-base font-medium">
+        <p className="mb-3 text-base text-slate-300">
           {attending === null && (
             <>היי {guest.first_name}, נשמח לדעת אם את/ה מגיע/ה לאירוע שלנו.</>
           )}
@@ -492,43 +508,41 @@ export default function GuestPage({ initialData, initialError }) {
 
         {attending === null ? (
           <div className="flex justify-center gap-4 mt-2 flex-nowrap">
-            {/* Green "מגיעים" button on the right (first in markup for RTL) */}
             <button
-              className="rounded-full bg-green-600 text-white border border-green-700 px-20 py-2 text-base font-medium hover:bg-green-700 flex items-center justify-center gap-2 flex-row-reverse whitespace-nowrap"
+              className="rounded-full bg-gradient-to-br from-emerald-600 to-green-600 text-white border border-emerald-500/40 px-8 py-3 text-base font-bold hover:-translate-y-0.5 transition-transform shadow-[0_5px_18px_rgba(52,211,153,0.3)] flex items-center justify-center gap-2 flex-row-reverse whitespace-nowrap"
               onClick={() => {
                 setAttending(true);
                 setShowDetailsModal(true);
               }}
             >
-              <span className="text-white text-2xl">✓</span>
+              <span className="text-xl">✓</span>
               <span>מגיעים</span>
             </button>
 
-            {/* Red "לא מגיעים" button on the left */}
             <button
-              className="rounded-full bg-red-600 text-white border border-red-700 px-16 py-2 text-base font-medium hover:bg-red-700 flex items-center justify-center gap-2 flex-row-reverse"
+              className="rounded-full bg-white/10 text-slate-200 border border-white/20 px-8 py-3 text-base font-medium hover:bg-white/15 transition-colors flex items-center justify-center gap-2 flex-row-reverse"
               onClick={() => {
                 setAttending(false);
                 saveStatus(false);
               }}
             >
-              <span className="text-white text-2xl">✗</span>
+              <span className="text-xl">✗</span>
               <span>לא מגיעים</span>
             </button>
           </div>
         ) : attending === false ? (
-          <p className="text-center text-gray-600">תודה על העדכון!</p>
+          <p className="text-center text-slate-400">תודה על העדכון!</p>
         ) : null}
       </div>
 
       {(wazeUrl || guest?.hall_address) && (
-        <div className="flex justify-center mb-3 gap-3 flex-wrap">
+        <div className="flex justify-center my-3 gap-3 flex-wrap">
           {wazeUrl && (
             <a
               href={wazeUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 rounded-full bg-blue-600 text-white px-5 py-2 text-lg font-medium shadow hover:bg-blue-700 transition-colors"
+              className="inline-flex items-center gap-2 rounded-full border border-indigo-400/40 bg-indigo-500/20 text-indigo-200 px-5 py-2.5 text-sm font-semibold hover:bg-indigo-500/30 transition-colors"
             >
               <span role="img" aria-label="Waze">🧭</span>
               ניווט לאולם ב-Waze
@@ -538,7 +552,7 @@ export default function GuestPage({ initialData, initialError }) {
           <button
             type="button"
             onClick={() => setShowMap(true)}
-            className="inline-flex items-center gap-2 rounded-full bg-emerald-600 text-white px-5 py-2 text-lg font-medium shadow hover:bg-emerald-700 transition-colors"
+            className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 text-slate-200 px-5 py-2.5 text-sm font-semibold hover:bg-white/15 transition-colors"
           >
             <span role="img" aria-label="מפת האזור">🗺️</span>
             מפת איזור האירוע
@@ -548,8 +562,8 @@ export default function GuestPage({ initialData, initialError }) {
 
       {guest?.table_number && (
         <div className="mt-2 mb-2 text-center">
-          <div className="inline-block text-2xl font-extrabold text-primary bg-[#FCE6AC] border border-primary rounded-full px-6 py-3">
-            שים לב מקומך באולם : שולחן מספר {guest.table_number}
+          <div className="inline-flex items-center gap-2 rounded-full border border-indigo-400/40 bg-indigo-500/20 px-6 py-3 text-xl font-black text-indigo-200">
+            שולחן מספר {guest.table_number}
           </div>
         </div>
       )}
@@ -560,27 +574,27 @@ export default function GuestPage({ initialData, initialError }) {
 
       {/* Embedded Map Modal */}
       {showMap && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50 p-4">
-          <div className="relative bg-white rounded-lg w-full max-w-4xl h-[80vh] flex flex-col">
-            <button 
-              onClick={() => setShowMap(false)} 
-              className="absolute top-4 left-4 text-3xl text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-full w-10 h-10 flex items-center justify-center font-bold transition-all z-10" 
+        <div className="fixed inset-0 flex items-center justify-center bg-black/70 backdrop-blur-sm z-50 p-4">
+          <div className="relative rounded-2xl border border-white/15 bg-[#12143a] w-full max-w-4xl h-[80vh] flex flex-col shadow-[0_4px_48px_rgba(0,0,0,0.5)]">
+            <button
+              onClick={() => setShowMap(false)}
+              className="absolute top-4 left-4 text-2xl text-slate-400 hover:text-white bg-white/10 hover:bg-white/15 rounded-full w-10 h-10 flex items-center justify-center transition-all z-10"
               aria-label="סגור"
             >
               &times;
             </button>
-            
-            <div className="p-4 border-b">
-              <h2 className="text-xl font-bold text-center text-primary">מפת הגעה לאולם</h2>
+
+            <div className="p-4 border-b border-white/10">
+              <h2 className="text-xl font-bold text-center text-white">מפת הגעה לאולם</h2>
               {guest?.hall_name && (
-                <p className="text-center text-gray-600 mt-1">{guest.hall_name}</p>
+                <p className="text-center text-slate-400 mt-1 text-sm">{guest.hall_name}</p>
               )}
               {guest?.hall_address && (
-                <p className="text-center text-gray-500 text-sm mt-1">{guest.hall_address}</p>
+                <p className="text-center text-slate-500 text-xs mt-1">{guest.hall_address}</p>
               )}
             </div>
-            
-            <div className="flex-1 relative bg-gray-100 overflow-hidden rounded-b-lg">
+
+            <div className="flex-1 relative overflow-hidden rounded-b-xl">
               <iframe
                 title="מפת הגעה לאולם"
                 src={googleMapsEmbedUrl}
@@ -590,18 +604,18 @@ export default function GuestPage({ initialData, initialError }) {
                 referrerPolicy="no-referrer-when-downgrade"
               />
             </div>
-            
-            <div className="p-4 border-t bg-gray-50 flex flex-col sm:flex-row gap-3 justify-center">
+
+            <div className="p-4 border-t border-white/10 flex flex-col sm:flex-row gap-3 justify-center">
               <button
                 onClick={() => window.open(googleMapsLink, '_blank')}
-                className="bg-blue-600 text-white px-8 py-3 rounded-full hover:bg-blue-700 transition-colors flex items-center gap-2 justify-center"
+                className="inline-flex items-center gap-2 justify-center rounded-full bg-gradient-to-br from-indigo-600 to-violet-600 text-white px-8 py-2.5 text-sm font-bold shadow-[0_5px_18px_rgba(99,70,230,0.35)] hover:-translate-y-0.5 transition-transform"
               >
                 <span role="img" aria-label="מפת גוגל">📍</span>
                 פתח בגוגל מפות
               </button>
               <button
                 onClick={() => setShowMap(false)}
-                className="bg-gray-600 text-white px-8 py-3 rounded-full hover:bg-gray-700 transition-colors"
+                className="rounded-full border border-white/15 bg-white/10 text-slate-200 px-8 py-2.5 text-sm font-medium hover:bg-white/15 transition-colors"
               >
                 סגור
               </button>
@@ -612,15 +626,13 @@ export default function GuestPage({ initialData, initialError }) {
 
       {/* Details Modal - opens when clicking "מגיעים" */}
       {showDetailsModal && (
-        <div className="fixed inset-0 bg-black/50 z-50 overflow-y-auto">
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 overflow-y-auto">
           <div className="min-h-screen flex items-center justify-center p-2 sm:p-4">
-            <div className="relative bg-white rounded-lg w-full max-w-6xl my-4 flex flex-col max-h-[95vh]">
+            <div className="relative rounded-2xl border border-white/15 bg-[#12143a] w-full max-w-6xl my-4 flex flex-col max-h-[95vh] shadow-[0_4px_48px_rgba(0,0,0,0.5)] text-slate-100">
               <button
                 onClick={() => {
-                  // Reset attending state when closing modal, so user can choose again
                   setAttending(null);
                   setShowDetailsModal(false);
-                  // Reset form fields to default values
                   setAdults(1);
                   setChildren(0);
                   setSpecialMeals({
@@ -632,39 +644,34 @@ export default function GuestPage({ initialData, initialError }) {
                   setAllergies([{ description: '', adults: 0, children: 0 }]);
                   setFormError('');
                 }}
-                className="absolute top-2 left-2 text-2xl text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-full w-10 h-10 flex items-center justify-center font-bold transition-all z-10 touch-manipulation"
+                className="absolute top-3 left-3 text-2xl text-slate-400 hover:text-white bg-white/10 hover:bg-white/15 rounded-full w-10 h-10 flex items-center justify-center transition-all z-10 touch-manipulation"
                 aria-label="סגור"
               >
                 &times;
               </button>
 
-              <div className="p-3 sm:p-4 border-b flex-shrink-0">
-                <h2 className="text-xl sm:text-2xl font-bold text-center text-primary">פירוט אישור הגעה</h2>
-                <p className="text-center text-gray-600 text-sm sm:text-base mt-1">מעולה! אנא עדכן/י את מספר המשתתפים (בוגרים וילדים) שיגיעו יחד איתך.</p>
+              <div className="p-4 border-b border-white/10 flex-shrink-0">
+                <h2 className="text-xl sm:text-2xl font-black text-center text-white">פירוט אישור הגעה</h2>
+                <p className="text-center text-slate-400 text-sm mt-1">מעולה! אנא עדכן/י את מספר המשתתפים שיגיעו יחד איתך.</p>
               </div>
 
-              <div className="flex-1 p-3 sm:p-4 overflow-y-auto">
-                {/* Error message - displayed at top of modal */}
+              <div className="flex-1 p-3 sm:p-4 overflow-y-auto space-y-4">
                 {formError && (
-                  <div className="bg-red-100 border-2 border-red-500 rounded-lg p-3 sm:p-4 mb-3 sm:mb-4 text-right">
-                    <div className="flex items-center justify-center">
-                      <span className="text-red-600 text-xl sm:text-2xl mr-2">✗</span>
-                      <p className="text-red-600 text-sm sm:text-lg font-medium">{formError}</p>
-                    </div>
+                  <div className="rounded-xl border border-red-400/30 bg-red-500/10 p-3 sm:p-4 text-right">
+                    <p className="text-red-400 text-sm font-medium text-center">{formError}</p>
                   </div>
                 )}
 
-                {/* participant counts - prominent section */}
-                <div className="bg-blue-50 border-2 border-blue-200 rounded-lg p-3 sm:p-4 mb-3 sm:mb-4">
-                  <h3 className="text-lg sm:text-xl font-bold text-blue-800 mb-2 text-center">מספר משתתפים</h3>
+                <div className="rounded-xl border border-indigo-400/20 bg-indigo-500/10 p-3 sm:p-4">
+                  <h3 className="text-base sm:text-lg font-bold text-indigo-200 mb-3 text-center">מספר משתתפים</h3>
                   <div className="grid grid-cols-2 gap-3 sm:gap-4">
                     <div>
-                      <label className="mb-1 block font-bold text-base sm:text-lg text-blue-900">סה"כ בוגרים</label>
+                      <label className="mb-1 block font-semibold text-sm text-slate-300">סה"כ בוגרים</label>
                       <input
                         type="text"
                         inputMode="numeric"
                         pattern="[0-9]*"
-                        className="w-full rounded-md border-2 border-blue-300 p-2 sm:p-3 text-lg sm:text-xl text-center font-semibold focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                        className="w-full rounded-lg border border-white/20 bg-white/10 text-white placeholder-slate-500 p-2 sm:p-3 text-lg sm:text-xl text-center font-semibold focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400 outline-none"
                         value={String(adults)}
                         onChange={(e) => {
                           const v = e.target.value.replace(/[^0-9]/g, '');
@@ -674,12 +681,12 @@ export default function GuestPage({ initialData, initialError }) {
                       />
                     </div>
                     <div>
-                      <label className="mb-1 block font-bold text-base sm:text-lg text-blue-900">סה"כ ילדים</label>
+                      <label className="mb-1 block font-semibold text-sm text-slate-300">סה"כ ילדים</label>
                       <input
                         type="text"
                         inputMode="numeric"
                         pattern="[0-9]*"
-                        className="w-full rounded-md border-2 border-blue-300 p-2 sm:p-3 text-lg sm:text-xl text-center font-semibold focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                        className="w-full rounded-lg border border-white/20 bg-white/10 text-white placeholder-slate-500 p-2 sm:p-3 text-lg sm:text-xl text-center font-semibold focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400 outline-none"
                         value={String(children)}
                         onChange={(e) => {
                           const v = e.target.value.replace(/[^0-9]/g, '');
@@ -691,152 +698,142 @@ export default function GuestPage({ initialData, initialError }) {
                   </div>
                 </div>
 
-                {/* special meals */}
-                <h2 className="mb-2 text-lg sm:text-xl font-bold">מנות מיוחדות</h2>
-                <div className="overflow-x-auto mb-3 sm:mb-4">
-                  <table className="w-full text-right border min-w-[300px]">
-                    <thead>
-                      <tr className="bg-gray-50">
-                        <th className="border p-2 text-sm sm:text-base">קטגוריה</th>
-                        <th className="border p-2 text-sm sm:text-base w-20 sm:w-24">בוגרים</th>
-                        <th className="border p-2 text-sm sm:text-base w-20 sm:w-24">ילדים</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {mealCategories.map((c) => (
-                        <tr key={c.key} className="odd:bg-white even:bg-gray-50">
-                          <td className="border p-2 font-medium text-sm sm:text-lg">{c.label}</td>
-                          <td className="border p-2">
-                            <input
-                              type="text"
-                              inputMode="numeric"
-                              pattern="[0-9]*"
-                              className="w-full rounded-md border p-1.5 text-sm sm:text-base text-center max-w-[60px] sm:max-w-[80px] mx-auto"
-                              value={String(specialMeals[c.key].adults)}
-                              onChange={(e) => {
-                                const v = e.target.value.replace(/[^0-9]/g, '');
-                                updateMeal(c.key, 'adults', v === '' ? 0 : Math.min(99, parseInt(v, 10)));
-                              }}
-                            />
-                          </td>
-                          <td className="border p-2">
-                            <input
-                              type="text"
-                              inputMode="numeric"
-                              pattern="[0-9]*"
-                              className="w-full rounded-md border p-1.5 text-sm sm:text-base text-center max-w-[60px] sm:max-w-[80px] mx-auto"
-                              value={String(specialMeals[c.key].children)}
-                              onChange={(e) => {
-                                const v = e.target.value.replace(/[^0-9]/g, '');
-                                updateMeal(c.key, 'children', v === '' ? 0 : Math.min(99, parseInt(v, 10)));
-                              }}
-                            />
-                          </td>
+                <div>
+                  <h2 className="mb-2 text-base sm:text-lg font-bold text-slate-100">מנות מיוחדות</h2>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-right min-w-[300px] border-collapse">
+                      <thead>
+                        <tr className="border-b border-white/10">
+                          <th className="py-2 px-3 text-xs font-semibold text-slate-400">קטגוריה</th>
+                          <th className="py-2 px-3 text-xs font-semibold text-slate-400 w-20 sm:w-24">בוגרים</th>
+                          <th className="py-2 px-3 text-xs font-semibold text-slate-400 w-20 sm:w-24">ילדים</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody>
+                        {mealCategories.map((c) => (
+                          <tr key={c.key} className="border-b border-white/5 last:border-0">
+                            <td className="py-2 px-3 font-medium text-sm sm:text-base text-slate-200">{c.label}</td>
+                            <td className="py-2 px-3">
+                              <input
+                                type="text"
+                                inputMode="numeric"
+                                pattern="[0-9]*"
+                                className="w-full rounded-lg border border-white/20 bg-white/10 text-white p-1.5 text-sm text-center max-w-[60px] sm:max-w-[80px] mx-auto focus:border-indigo-400 outline-none"
+                                value={String(specialMeals[c.key].adults)}
+                                onChange={(e) => {
+                                  const v = e.target.value.replace(/[^0-9]/g, '');
+                                  updateMeal(c.key, 'adults', v === '' ? 0 : Math.min(99, parseInt(v, 10)));
+                                }}
+                              />
+                            </td>
+                            <td className="py-2 px-3">
+                              <input
+                                type="text"
+                                inputMode="numeric"
+                                pattern="[0-9]*"
+                                className="w-full rounded-lg border border-white/20 bg-white/10 text-white p-1.5 text-sm text-center max-w-[60px] sm:max-w-[80px] mx-auto focus:border-indigo-400 outline-none"
+                                value={String(specialMeals[c.key].children)}
+                                onChange={(e) => {
+                                  const v = e.target.value.replace(/[^0-9]/g, '');
+                                  updateMeal(c.key, 'children', v === '' ? 0 : Math.min(99, parseInt(v, 10)));
+                                }}
+                              />
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
 
-                {/* allergies */}
-                <div className="mb-2 flex items-center justify-between">
-                  <h3 className="text-base sm:text-lg font-bold">אלרגיות נוספות</h3>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs sm:text-sm">להוספת אלרגיה לחץ</span>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      addAllergy();
-                    }}
-                    onTouchEnd={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      addAllergy();
-                    }}
-                    className="flex h-10 w-10 items-center justify-center rounded-full bg-green-600 text-white hover:bg-green-700 active:bg-green-800 text-xl font-bold touch-manipulation"
-                    style={{ WebkitTapHighlightColor: 'transparent' }}
-                  >
-                    +
-                  </button>
-                </div>
-              </div>
-                <div className="overflow-x-auto mb-4">
-                  <table className="w-full text-right border min-w-[300px]">
-                    <thead className="sticky top-0 bg-gray-100 z-10">
-                      <tr>
-                        <th className="border p-2 text-sm sm:text-base">תיאור</th>
-                        <th className="border p-2 text-sm sm:text-base w-16 sm:w-20">בוגרים</th>
-                        <th className="border p-2 text-sm sm:text-base w-16 sm:w-20">ילדים</th>
-                        <th className="border p-2 text-sm sm:text-base w-10 sm:w-12"></th>
-                      </tr>
-                    </thead>
-                  <tbody>
-                    {allergies.map((a, idx) => (
-                      <tr key={idx} className="odd:bg-white even:bg-gray-50">
-                        <td className="border p-2">
-                          <input
-                            type="text"
-                            className="w-full rounded-md border p-1.5 text-sm md:text-lg"
-                            value={a.description}
-                            onChange={(e) => updateAllergy(idx, 'description', e.target.value)}
-                            placeholder="תיאור האלרגיה"
-                          />
-                        </td>
-                        <td className="border p-2 text-center">
-                          <input
-                            type="text"
-                            inputMode="numeric"
-                            pattern="[0-9]*"
-                            className="w-full rounded-md border p-1.5 text-sm md:text-base text-center max-w-[60px] md:max-w-[80px] mx-auto"
-                            value={String(a.adults)}
-                            onChange={(e) => {
-                              const v = e.target.value.replace(/[^0-9]/g, '');
-                              updateAllergy(idx, 'adults', v === '' ? 0 : Math.min(99, parseInt(v, 10)));
-                            }}
-                          />
-                        </td>
-                        <td className="border p-2 text-center">
-                          <input
-                            type="text"
-                            inputMode="numeric"
-                            pattern="[0-9]*"
-                            className="w-full rounded-md border p-1.5 text-sm md:text-base text-center max-w-[60px] md:max-w-[80px] mx-auto"
-                            value={String(a.children)}
-                            onChange={(e) => {
-                              const v = e.target.value.replace(/[^0-9]/g, '');
-                              updateAllergy(idx, 'children', v === '' ? 0 : Math.min(99, parseInt(v, 10)));
-                            }}
-                          />
-                        </td>
-                        <td className="border p-2 text-center">
-                          <button
-                            type="button"
-                            onClick={() => removeAllergy(idx)}
-                            className="text-red-600 text-lg hover:text-red-800 touch-manipulation p-1"
-                          >
-                            ❌
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                    </tbody>
-                  </table>
+                <div>
+                  <div className="mb-2 flex items-center justify-between">
+                    <h3 className="text-base sm:text-lg font-bold text-slate-100">אלרגיות נוספות</h3>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs sm:text-sm text-slate-400">להוספת אלרגיה לחץ</span>
+                      <button
+                        type="button"
+                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); addAllergy(); }}
+                        onTouchEnd={(e) => { e.preventDefault(); e.stopPropagation(); addAllergy(); }}
+                        className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-indigo-600 to-violet-600 text-white text-xl font-bold touch-manipulation hover:-translate-y-0.5 transition-transform"
+                        style={{ WebkitTapHighlightColor: 'transparent' }}
+                      >
+                        +
+                      </button>
+                    </div>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-right min-w-[300px] border-collapse">
+                      <thead>
+                        <tr className="border-b border-white/10">
+                          <th className="py-2 px-3 text-xs font-semibold text-slate-400">תיאור</th>
+                          <th className="py-2 px-3 text-xs font-semibold text-slate-400 w-16 sm:w-20">בוגרים</th>
+                          <th className="py-2 px-3 text-xs font-semibold text-slate-400 w-16 sm:w-20">ילדים</th>
+                          <th className="py-2 px-3 w-10 sm:w-12"></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {allergies.map((a, idx) => (
+                          <tr key={idx} className="border-b border-white/5 last:border-0">
+                            <td className="py-2 px-3">
+                              <input
+                                type="text"
+                                className="w-full rounded-lg border border-white/20 bg-white/10 text-white placeholder-slate-500 p-1.5 text-sm focus:border-indigo-400 outline-none"
+                                value={a.description}
+                                onChange={(e) => updateAllergy(idx, 'description', e.target.value)}
+                                placeholder="תיאור האלרגיה"
+                              />
+                            </td>
+                            <td className="py-2 px-3 text-center">
+                              <input
+                                type="text"
+                                inputMode="numeric"
+                                pattern="[0-9]*"
+                                className="w-full rounded-lg border border-white/20 bg-white/10 text-white p-1.5 text-sm text-center max-w-[60px] md:max-w-[80px] mx-auto focus:border-indigo-400 outline-none"
+                                value={String(a.adults)}
+                                onChange={(e) => {
+                                  const v = e.target.value.replace(/[^0-9]/g, '');
+                                  updateAllergy(idx, 'adults', v === '' ? 0 : Math.min(99, parseInt(v, 10)));
+                                }}
+                              />
+                            </td>
+                            <td className="py-2 px-3 text-center">
+                              <input
+                                type="text"
+                                inputMode="numeric"
+                                pattern="[0-9]*"
+                                className="w-full rounded-lg border border-white/20 bg-white/10 text-white p-1.5 text-sm text-center max-w-[60px] md:max-w-[80px] mx-auto focus:border-indigo-400 outline-none"
+                                value={String(a.children)}
+                                onChange={(e) => {
+                                  const v = e.target.value.replace(/[^0-9]/g, '');
+                                  updateAllergy(idx, 'children', v === '' ? 0 : Math.min(99, parseInt(v, 10)));
+                                }}
+                              />
+                            </td>
+                            <td className="py-2 px-3 text-center">
+                              <button
+                                type="button"
+                                onClick={() => removeAllergy(idx)}
+                                className="text-slate-400 hover:text-red-400 text-lg touch-manipulation p-1 transition-colors"
+                              >
+                                ✕
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               </div>
 
-              <div className="p-3 sm:p-4 border-t bg-gray-50 flex flex-col sm:flex-row justify-center gap-3 sm:gap-6 flex-shrink-0">
+              <div className="p-3 sm:p-4 border-t border-white/10 flex flex-col sm:flex-row justify-center gap-3 sm:gap-4 flex-shrink-0">
                 <button
                   type="button"
-                  className="rounded-full bg-green-600 px-12 sm:px-16 py-3 sm:py-4 font-medium text-white hover:bg-green-700 active:bg-green-800 transition-colors text-lg sm:text-xl touch-manipulation"
+                  className="rounded-full bg-gradient-to-br from-emerald-600 to-green-600 px-12 sm:px-16 py-3 font-bold text-white hover:-translate-y-0.5 active:translate-y-0 transition-transform text-base sm:text-lg shadow-[0_5px_18px_rgba(52,211,153,0.3)] touch-manipulation"
                   onClick={async () => {
                     const success = await handleSave();
-                    // Only close modal if save was successful (no errors)
-                    if (success) {
-                      setShowDetailsModal(false);
-                    }
-                    // If there's an error, the modal stays open and shows the error message
+                    if (success) setShowDetailsModal(false);
                   }}
                 >
                   שלח אישור
@@ -844,10 +841,8 @@ export default function GuestPage({ initialData, initialError }) {
                 <button
                   type="button"
                   onClick={() => {
-                    // Reset attending state when canceling, so user can choose again
                     setAttending(null);
                     setShowDetailsModal(false);
-                    // Reset form fields to default values
                     setAdults(1);
                     setChildren(0);
                     setSpecialMeals({
@@ -859,7 +854,7 @@ export default function GuestPage({ initialData, initialError }) {
                     setAllergies([{ description: '', adults: 0, children: 0 }]);
                     setFormError('');
                   }}
-                  className="bg-red-600 text-white px-10 sm:px-12 py-3 sm:py-4 rounded-full hover:bg-red-700 active:bg-red-800 transition-colors font-medium text-lg sm:text-xl touch-manipulation"
+                  className="rounded-full border border-white/15 bg-white/10 text-slate-200 px-10 sm:px-12 py-3 font-medium text-base sm:text-lg hover:bg-white/15 transition-colors touch-manipulation"
                 >
                   ביטול
                 </button>

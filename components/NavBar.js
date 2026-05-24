@@ -3,12 +3,41 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabaseClient';
 
 const navLinks = [
-  { name: 'ראשי', href: '/' },
-  { name: 'חבילות ומחירים', onShowPricing: true },
-  { name: 'דוחו"ת בקרה', onShowReports: true },
-  { name: 'אודות', isButton: true },
+  { name: 'בית', href: '/' },
+  { name: 'פיצ׳רים', isButton: true },
+  { name: 'מחירים', onShowPricing: true },
+  { name: 'דוחות בקרה', onShowReports: true },
   { name: 'צור קשר', href: '/contact' },
 ];
+
+const LogoMark = () => (
+  <svg width="40" height="26" viewBox="0 0 44 28" fill="none" aria-hidden="true">
+    <path
+      d="M2 26 L12 3 L22 19 L32 3 L42 26"
+      stroke="#818cf8"
+      strokeWidth="3.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
+
+const MenuIcon = ({ open }) => (
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+    {open ? (
+      <>
+        <path d="M18 6 6 18" strokeLinecap="round" />
+        <path d="m6 6 12 12" strokeLinecap="round" />
+      </>
+    ) : (
+      <>
+        <path d="M4 7h16" strokeLinecap="round" />
+        <path d="M4 12h16" strokeLinecap="round" />
+        <path d="M4 17h16" strokeLinecap="round" />
+      </>
+    )}
+  </svg>
+);
 
 export default function NavBar({ onAuthClick = null, onAboutClick, onShowPricing, onShowReports }) {
   const [session, setSession] = useState(null);
@@ -23,148 +52,127 @@ export default function NavBar({ onAuthClick = null, onAboutClick, onShowPricing
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, newSession) => {
       setSession(newSession);
-      // Do NOT reload on SIGNED_IN - Supabase fires it on token refresh, tab refocus, and when
-      // Google Pay sheet opens on mobile (document loses focus). Reload would interrupt payment.
-      // Session propagates via setSession; verify-email page handles its own router.replace.
     });
 
     return () => subscription.unsubscribe();
   }, []);
 
+  const runLinkAction = (link) => {
+    if (link.isButton) {
+      if (onAboutClick) onAboutClick();
+      else if (typeof window !== 'undefined') window.location.href = '/?open=features';
+    }
+    if (link.onShowPricing) {
+      if (onShowPricing) onShowPricing();
+      else if (typeof window !== 'undefined') window.location.href = '/?open=pricing';
+    }
+    if (link.onShowReports) {
+      if (onShowReports) onShowReports();
+      else if (typeof window !== 'undefined') window.location.href = '/?open=reports';
+    }
+    setMobileMenuOpen(false);
+  };
+
+  const openAuth = (mode) => {
+    if (onAuthClick) {
+      onAuthClick(mode);
+      return;
+    }
+    window.location.href = '/';
+  };
+
+  const linkClass =
+    'relative text-sm font-medium text-slate-400 transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0d0f2b]';
+
   return (
-    <nav className="w-full bg-white border-b border-gray-100">
-      <div className="container mx-auto flex items-center justify-between py-4 px-3 sm:px-4 md:px-6">
-        {/* Logo + Hamburger - Right side in RTL */}
-        <div className="flex items-center gap-1 min-w-0">
-          <Link href="/" className="flex items-center" passHref>
-            <span className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-800 tracking-tight max-[430px]:hidden">
-              Meet-M
-            </span>
-            <span className="hidden max-[430px]:inline text-xl font-bold text-gray-800 tracking-tight">M</span>
+    <nav className="relative z-40 border-b border-white/15 px-4 py-4 text-slate-100 sm:px-6 lg:px-12">
+      <div className="mx-auto flex max-w-6xl items-center justify-between gap-4">
+        <div className="flex min-w-0 items-center gap-3">
+          <Link href="/" className="flex items-center gap-2 text-2xl font-black text-white">
+            <span>Meet-M</span>
+            <LogoMark />
           </Link>
           <button
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="lg:hidden p-2 rounded-lg min-w-[44px] min-h-[44px] flex items-center justify-center text-gray-600 hover:bg-gray-100"
+            type="button"
+            onClick={() => setMobileMenuOpen((open) => !open)}
+            className="flex h-11 w-11 items-center justify-center rounded-lg border border-white/15 text-slate-200 transition-colors hover:border-indigo-300 lg:hidden"
             aria-label="תפריט"
+            aria-expanded={mobileMenuOpen}
           >
-            <span className="text-2xl">{mobileMenuOpen ? '✕' : '☰'}</span>
+            <MenuIcon open={mobileMenuOpen} />
           </button>
         </div>
 
-        {/* Nav Links - Center (desktop) */}
-        <div className="hidden lg:flex items-center gap-8">
+        <div className="hidden items-center gap-8 lg:flex">
           {navLinks.map((link) =>
-            link.isButton ? (
-              <button
-                key={link.name}
-                onClick={onAboutClick}
-                className="text-gray-700 hover:text-primary transition-colors text-base font-semibold"
-              >
-                {link.name}
-              </button>
-            ) : link.onShowPricing ? (
-              <button
-                key={link.name}
-                onClick={() => typeof onShowPricing === 'function' && onShowPricing()}
-                className="text-gray-700 hover:text-primary transition-colors text-base font-semibold"
-              >
-                {link.name}
-              </button>
-            ) : link.onShowReports ? (
-              <button
-                key={link.name}
-                onClick={() => typeof onShowReports === 'function' && onShowReports()}
-                className="text-gray-700 hover:text-primary transition-colors text-base font-semibold"
-              >
-                {link.name}
-              </button>
-            ) : (
-              <Link
-                key={link.name}
-                href={link.href}
-                className="text-gray-700 hover:text-primary transition-colors text-base font-semibold"
-              >
+            link.href ? (
+              <Link key={link.name} href={link.href} className={`${linkClass} ${link.href === '/' ? 'text-white after:absolute after:-bottom-2 after:right-1/2 after:h-1 after:w-1 after:translate-x-1/2 after:rounded-full after:bg-indigo-300' : ''}`}>
                 {link.name}
               </Link>
+            ) : (
+              <button key={link.name} type="button" onClick={() => runLinkAction(link)} className={linkClass}>
+                {link.name}
+              </button>
             )
           )}
         </div>
 
-        {/* Auth Buttons - Left side in RTL */}
-        <div className="flex flex-row items-center gap-1 sm:gap-3 shrink-0">
+        <div className="flex shrink-0 items-center gap-2">
           {session ? (
-            <div className="flex flex-col items-start sm:flex-row sm:items-center gap-0.5 sm:gap-3">
+            <div className="flex items-center gap-2">
               <button
+                type="button"
                 onClick={() => supabase.auth.signOut()}
-                className="text-primary font-semibold border-2 border-primary rounded-lg px-3 py-1.5 sm:px-5 sm:py-2.5 hover:bg-primary hover:text-white transition-colors text-sm sm:text-base"
+                className="rounded-lg border border-white/15 px-4 py-2 text-sm font-semibold text-white transition-colors hover:border-indigo-300"
               >
-                התנתק
+                התנתקות
               </button>
-              <span className="text-[11px] sm:text-sm text-gray-500 sm:text-gray-600 truncate max-w-[140px] sm:max-w-[120px] md:max-w-[180px]">
-                {session.user?.email}
-              </span>
+              <span className="hidden max-w-[180px] truncate text-xs text-slate-400 sm:inline">{session.user?.email}</span>
             </div>
           ) : (
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-1 sm:gap-3">
+            <>
               <button
-                onClick={() => onAuthClick ? onAuthClick('sign_in') : (window.location.href = '/')}
-                className="text-primary font-semibold border-2 border-primary rounded-lg px-3 py-1.5 sm:px-5 sm:py-2.5 hover:bg-primary/5 transition-colors text-sm sm:text-base whitespace-nowrap"
+                type="button"
+                onClick={() => openAuth('sign_in')}
+                className="rounded-lg border border-white/15 px-4 py-2 text-sm font-semibold text-white transition-colors hover:border-indigo-300"
               >
-                כניסה
+                התחברות
               </button>
               <button
-                onClick={() => onAuthClick ? onAuthClick('sign_up') : (window.location.href = '/')}
-                className="bg-primary text-white font-semibold rounded-lg px-3 py-1.5 sm:px-6 sm:py-2.5 hover:bg-primary/90 transition-colors text-sm sm:text-base whitespace-nowrap shadow-sm"
+                type="button"
+                onClick={() => openAuth('sign_up')}
+                className="rounded-lg bg-gradient-to-br from-indigo-600 to-violet-600 px-4 py-2 text-sm font-bold text-white shadow-[0_8px_24px_rgba(99,70,230,0.3)] transition-transform hover:-translate-y-0.5"
               >
-                <span className="sm:hidden">הרשמה</span>
-                <span className="hidden sm:inline">הרשמה בחינם</span>
+                התנסות בחינם
               </button>
-            </div>
+            </>
           )}
         </div>
       </div>
 
-      {/* Mobile menu dropdown */}
       {mobileMenuOpen && (
-        <div className="lg:hidden border-t border-gray-100 bg-white">
-          <div className="container mx-auto py-3 px-4 flex flex-col gap-1">
-            {navLinks.map((link) =>
-              link.isButton ? (
-                <button
-                  key={link.name}
-                  onClick={() => { onAboutClick?.(); setMobileMenuOpen(false); }}
-                  className="text-right py-3 px-4 text-gray-700 hover:bg-primary/10 rounded-lg min-h-[44px] flex items-center justify-end"
-                >
-                  {link.name}
-                </button>
-              ) : link.onShowPricing ? (
-                <button
-                  key={link.name}
-                  onClick={() => { onShowPricing?.(); setMobileMenuOpen(false); }}
-                  className="text-right py-3 px-4 text-gray-700 hover:bg-primary/10 rounded-lg min-h-[44px] flex items-center justify-end"
-                >
-                  {link.name}
-                </button>
-              ) : link.onShowReports ? (
-                <button
-                  key={link.name}
-                  onClick={() => { onShowReports?.(); setMobileMenuOpen(false); }}
-                  className="text-right py-3 px-4 text-gray-700 hover:bg-primary/10 rounded-lg min-h-[44px] flex items-center justify-end"
-                >
-                  {link.name}
-                </button>
-              ) : (
-                <Link
-                  key={link.name}
-                  href={link.href}
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="text-right py-3 px-4 text-gray-700 hover:bg-primary/10 rounded-lg min-h-[44px] flex items-center justify-end"
-                >
-                  {link.name}
-                </Link>
-              )
-            )}
-          </div>
+        <div className="mx-auto mt-4 max-w-6xl rounded-lg border border-white/15 bg-[#12143a]/95 p-2 shadow-2xl backdrop-blur-xl lg:hidden">
+          {navLinks.map((link) =>
+            link.href ? (
+              <Link
+                key={link.name}
+                href={link.href}
+                onClick={() => setMobileMenuOpen(false)}
+                className="flex min-h-[44px] items-center justify-end rounded-md px-4 py-3 text-sm font-semibold text-slate-200 transition-colors hover:bg-white/10"
+              >
+                {link.name}
+              </Link>
+            ) : (
+              <button
+                key={link.name}
+                type="button"
+                onClick={() => runLinkAction(link)}
+                className="flex min-h-[44px] w-full items-center justify-end rounded-md px-4 py-3 text-sm font-semibold text-slate-200 transition-colors hover:bg-white/10"
+              >
+                {link.name}
+              </button>
+            )
+          )}
         </div>
       )}
     </nav>

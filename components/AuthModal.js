@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import { supabase } from '../lib/supabaseClient';
+import Modal, { ModalHeader, ModalBody, ModalFooter } from './Modal';
 
 const EyeIcon = ({ isOpen }) => (
   <svg
@@ -39,7 +40,7 @@ const VisibilityToggle = ({ isVisible, onToggle, label }) => (
     type="button"
     onClick={onToggle}
     aria-label={isVisible ? `הסתר ${label}` : `הצג ${label}`}
-    className="absolute inset-y-0 -left-10 flex items-center text-gray-500 hover:text-gray-700 focus:outline-none"
+    className="absolute inset-y-0 -left-10 flex items-center text-slate-400 hover:text-slate-200 focus:outline-none"
   >
     <EyeIcon isOpen={isVisible} />
   </button>
@@ -77,17 +78,17 @@ export default function AuthModal({ initialMode = 'sign_in', open = false, onClo
     e.preventDefault();
     setLoading(true);
     setErrorMsg('');
-    
+
     try {
       const emailInput = e.target.email.value;
       const emailNormalized = emailInput.trim().toLowerCase();
       const password = e.target.password.value;
       const confirmPassword = e.target.confirmPassword.value;
-      
+
       if (password !== confirmPassword) {
         throw new Error('הסיסמאות אינן תואמות');
       }
-      
+
       try {
         const checkResponse = await fetch('/api/auth/check-email', {
           method: 'POST',
@@ -115,7 +116,7 @@ export default function AuthModal({ initialMode = 'sign_in', open = false, onClo
       } catch (checkError) {
         console.warn('signUp: email pre-check threw error', checkError);
       }
-      
+
       // Use current origin so redirect matches where user is (localhost for dev, meet-m.co.il for prod)
       const siteUrl = typeof window !== 'undefined'
         ? window.location.origin
@@ -133,9 +134,9 @@ export default function AuthModal({ initialMode = 'sign_in', open = false, onClo
           emailRedirectTo: redirectUrl
         }
       });
-      
+
       if (error) throw error;
-      
+
       setEmailVerificationNotice({
         show: true,
         email: emailInput,
@@ -353,118 +354,124 @@ export default function AuthModal({ initialMode = 'sign_in', open = false, onClo
 
   if (open && existingEmailNotice.show) {
     return (
-      <div className="fixed inset-0 flex items-center justify-center bg-black/70 z-[200] px-6">
-        <div className="bg-white border-4 border-purple-400 rounded-3xl shadow-2xl w-full max-w-sm text-center px-6 py-10 space-y-6">
-          <div className="text-3xl font-extrabold text-purple-700">
-            האימייל כבר רשום
+      <Modal size="sm" open={open} onClose={onClose}>
+        <ModalBody>
+          <div className="text-center space-y-6 py-4" dir="rtl">
+            <div className="text-3xl font-extrabold text-indigo-300">
+              האימייל כבר רשום
+            </div>
+            <div className="text-base font-semibold leading-relaxed text-slate-300">
+              הכתובת {existingEmailNotice.email.trim()} כבר קיימת במערכת. ניתן להמשיך לכניסה או לחזור לדף הבית.
+            </div>
           </div>
-          <div className="text-base font-semibold leading-relaxed text-purple-800">
-            הכתובת {existingEmailNotice.email.trim()} כבר קיימת במערכת. ניתן להמשיך לכניסה או לחזור לדף הבית.
-          </div>
-          <div className="flex flex-col gap-3">
-            <button
-              type="button"
-              onClick={() => {
-                setExistingEmailNotice({ show: false, email: '' });
-                onClose();
-                router.push('/').catch(() => {});
-              }}
-              className="w-full border-2 border-purple-500 text-purple-600 hover:bg-purple-500 hover:text-white font-semibold py-2 rounded-full transition-colors"
-            >
-              חזרה לדף הבית
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setExistingEmailNotice({ show: false, email: '' });
-                setView('sign_in');
-                setSignInEmail(existingEmailNotice.email.trim());
-                setSignInPassword('');
-                setSignInError({ code: '', message: '' });
-              }}
-              className="w-full border-2 border-purple-600 bg-purple-600 text-white hover:bg-purple-700 font-semibold py-2 rounded-full transition-colors"
-            >
-              כניסה למערכת
-            </button>
-          </div>
-        </div>
-      </div>
+        </ModalBody>
+        <ModalFooter className="flex-col">
+          <button
+            type="button"
+            onClick={() => {
+              setExistingEmailNotice({ show: false, email: '' });
+              onClose();
+              router.push('/').catch(() => {});
+            }}
+            className="w-full border border-white/15 bg-transparent text-white hover:border-indigo-300 hover:text-indigo-200 font-semibold py-2 rounded-xl transition-colors"
+          >
+            חזרה לדף הבית
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setExistingEmailNotice({ show: false, email: '' });
+              setView('sign_in');
+              setSignInEmail(existingEmailNotice.email.trim());
+              setSignInPassword('');
+              setSignInError({ code: '', message: '' });
+            }}
+            className="w-full bg-gradient-to-br from-indigo-600 to-violet-600 shadow-[0_5px_22px_rgba(99,70,230,0.45)] text-white font-bold rounded-xl py-2 hover:opacity-90 transition-opacity"
+          >
+            כניסה למערכת
+          </button>
+        </ModalFooter>
+      </Modal>
     );
   }
 
   if (open && successMsg) {
     return (
-      <div className="fixed inset-0 flex items-center justify-center bg-black/70 z-[200] px-6">
-        <div className="bg-white border-4 border-green-400 rounded-3xl shadow-2xl w-full max-w-sm text-center px-6 py-10 space-y-6" dir="rtl">
-          <div className="text-3xl font-extrabold text-green-600">ההרשמה בוצעה בהצלחה!</div>
-          <div className="text-base font-semibold leading-relaxed text-green-700">
-            {successMsg}
+      <Modal size="sm" open={open} onClose={onClose}>
+        <ModalBody>
+          <div className="text-center space-y-6 py-4" dir="rtl">
+            <div className="text-3xl font-extrabold text-emerald-300">ההרשמה בוצעה בהצלחה!</div>
+            <div className="text-base font-semibold leading-relaxed text-slate-300">
+              {successMsg}
+            </div>
           </div>
-          <div className="flex flex-col gap-3">
-            <button
-              type="button"
-              onClick={() => {
-                setSuccessMsg('');
-                onClose();
-                if (typeof window !== 'undefined') {
-                  localStorage.setItem('pendingCreateEvent', 'true');
-                }
-              }}
-              className="w-full border-2 border-green-500 text-green-600 hover:bg-green-500 hover:text-white font-semibold py-2 rounded-full transition-colors"
-            >
-              התחלת יצירת אירוע
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setSuccessMsg('');
-                onClose();
-              }}
-              className="w-full border-2 border-gray-300 text-gray-700 hover:bg-gray-200 font-semibold py-2 rounded-full transition-colors"
-            >
-              חזרה למסך הראשי
-            </button>
-          </div>
-        </div>
-      </div>
+        </ModalBody>
+        <ModalFooter className="flex-col">
+          <button
+            type="button"
+            onClick={() => {
+              setSuccessMsg('');
+              onClose();
+              if (typeof window !== 'undefined') {
+                localStorage.setItem('pendingCreateEvent', 'true');
+              }
+            }}
+            className="w-full bg-gradient-to-br from-indigo-600 to-violet-600 shadow-[0_5px_22px_rgba(99,70,230,0.45)] text-white font-bold rounded-xl py-2 hover:opacity-90 transition-opacity"
+          >
+            התחלת יצירת אירוע
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setSuccessMsg('');
+              onClose();
+            }}
+            className="w-full border border-white/15 bg-transparent text-white hover:border-indigo-300 hover:text-indigo-200 font-semibold rounded-xl py-2 transition-colors"
+          >
+            חזרה למסך הראשי
+          </button>
+        </ModalFooter>
+      </Modal>
     );
   }
 
   if (open && emailVerificationNotice.show) {
     return (
-      <div className="fixed inset-0 flex items-center justify-center bg-black/70 z-[200] px-6">
-        <div className="bg-white border-4 border-green-400 rounded-3xl shadow-2xl w-full max-w-sm text-center px-6 py-10 space-y-6" dir="rtl">
-          <div className="text-3xl font-extrabold text-green-600">
-            עוד צעד קטן!
+      <Modal size="sm" open={open} onClose={onClose}>
+        <ModalBody>
+          <div className="text-center space-y-6 py-4" dir="rtl">
+            <div className="text-3xl font-extrabold text-emerald-300">
+              עוד צעד קטן!
+            </div>
+            <div className="text-base font-semibold leading-relaxed text-slate-300">
+              שלחנו קישור אימות לכתובת <strong className="text-slate-100">{emailVerificationNotice.email}</strong>.
+              אשר את הקישור במייל כדי להשלים את ההרשמה ואז חזור לכאן.
+            </div>
           </div>
-          <div className="text-base font-semibold leading-relaxed text-green-700">
-            שלחנו קישור אימות לכתובת <strong>{emailVerificationNotice.email}</strong>.
-            אשר את הקישור במייל כדי להשלים את ההרשמה ואז חזור לכאן.
-          </div>
-          <div className="flex flex-col gap-3">
-            <button
-              type="button"
-              onClick={() => {
-                setEmailVerificationNotice({ show: false, email: '' });
-                onClose();
-              }}
-              className="w-full border-2 border-green-600 bg-green-600 text-white hover:bg-green-700 font-semibold py-2 rounded-full transition-colors"
-            >
-              הבנתי – אאשר את המייל
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setEmailVerificationNotice({ show: false, email: '' });
-                setView('sign_in');
-              }}
-              className="w-full border-2 border-gray-300 text-gray-700 hover:bg-gray-200 font-semibold py-2 rounded-full transition-colors"
-            >
-              חזרה למסך הכניסה
-            </button>
-          </div>
-        </div>
-      </div>
+        </ModalBody>
+        <ModalFooter className="flex-col">
+          <button
+            type="button"
+            onClick={() => {
+              setEmailVerificationNotice({ show: false, email: '' });
+              onClose();
+            }}
+            className="w-full bg-gradient-to-br from-indigo-600 to-violet-600 shadow-[0_5px_22px_rgba(99,70,230,0.45)] text-white font-bold rounded-xl py-2 hover:opacity-90 transition-opacity"
+          >
+            הבנתי – אאשר את המייל
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setEmailVerificationNotice({ show: false, email: '' });
+              setView('sign_in');
+            }}
+            className="w-full border border-white/15 bg-transparent text-white hover:border-indigo-300 hover:text-indigo-200 font-semibold rounded-xl py-2 transition-colors"
+          >
+            חזרה למסך הכניסה
+          </button>
+        </ModalFooter>
+      </Modal>
     );
   }
 
@@ -479,33 +486,24 @@ export default function AuthModal({ initialMode = 'sign_in', open = false, onClo
       : 'שגיאה בהתחברות';
 
     return (
-      <div className="fixed inset-0 flex items-center justify-center bg-black/70 z-[200] px-6">
-        <div
-          className={`bg-white border-4 rounded-3xl shadow-2xl w-full max-w-sm text-center px-6 py-10 space-y-6 ${
-            isUserNotFound ? 'border-orange-400' : 'border-red-400'
-          }`}
-        >
+      <Modal size="sm" open={open} onClose={onClose}>
+        <ModalHeader>{overlayTitle}</ModalHeader>
+        <ModalBody>
           <div
-            className={`text-3xl font-extrabold ${
-              isUserNotFound ? 'text-orange-600' : 'text-red-600'
-            }`}
-          >
-            {overlayTitle}
-          </div>
-          <div
-            className={`text-base font-semibold leading-relaxed ${
-              isUserNotFound ? 'text-orange-700' : 'text-red-700'
+            className={`text-center py-4 text-base font-semibold leading-relaxed ${
+              isUserNotFound ? 'text-amber-300/80' : 'text-red-400/80'
             }`}
           >
             {signInError.message}
           </div>
-
+        </ModalBody>
+        <ModalFooter className="flex-col">
           {isInvalidPassword ? (
-            <div className="flex flex-col gap-3">
+            <>
               <button
                 type="button"
                 onClick={() => setSignInError({ code: '', message: '' })}
-                className="w-full border-2 border-red-600 text-red-600 hover:bg-red-600 hover:text-white font-semibold py-2 rounded-full transition-colors"
+                className="w-full bg-gradient-to-br from-red-600 to-rose-600 text-white font-bold rounded-xl py-2 hover:opacity-90 transition-opacity"
               >
                 נסה שוב
               </button>
@@ -517,13 +515,13 @@ export default function AuthModal({ initialMode = 'sign_in', open = false, onClo
                     setSignInError({ code: '', message: '' });
                   }
                 }}
-                className="w-full border-2 border-purple-600 text-purple-600 hover:bg-purple-600 hover:text-white font-semibold py-2 rounded-full transition-colors"
+                className="w-full border border-white/15 bg-transparent text-white hover:border-indigo-300 hover:text-indigo-200 font-semibold rounded-xl py-2 transition-colors"
               >
                 שלח אימייל לאיפוס סיסמה
               </button>
-            </div>
+            </>
           ) : isUserNotFound ? (
-            <div className="flex flex-col gap-3">
+            <>
               <button
                 type="button"
                 onClick={() => {
@@ -531,7 +529,7 @@ export default function AuthModal({ initialMode = 'sign_in', open = false, onClo
                   setSignInPassword('');
                   setSignInError({ code: '', message: '' });
                 }}
-                className="w-full border-2 border-orange-400 text-orange-600 hover:bg-orange-400 hover:text-white font-semibold py-2 rounded-full transition-colors"
+                className="w-full border border-amber-400/30 bg-transparent text-amber-300 hover:bg-amber-400/10 font-semibold rounded-xl py-2 transition-colors"
               >
                 נסה מייל אחר
               </button>
@@ -541,57 +539,48 @@ export default function AuthModal({ initialMode = 'sign_in', open = false, onClo
                   setView('sign_up');
                   setSignInError({ code: '', message: '' });
                 }}
-                className="w-full border-2 border-orange-500 text-white bg-orange-500 hover:bg-orange-600 font-semibold py-2 rounded-full transition-colors"
+                className="w-full bg-gradient-to-br from-indigo-600 to-violet-600 shadow-[0_5px_22px_rgba(99,70,230,0.45)] text-white font-bold rounded-xl py-2 hover:opacity-90 transition-opacity"
               >
                 בצע הרשמה
               </button>
-            </div>
+            </>
           ) : (
             <button
               type="button"
               onClick={() => setSignInError({ code: '', message: '' })}
-              className="w-full border-2 border-red-600 text-red-600 hover:bg-red-600 hover:text-white font-semibold py-2 rounded-full transition-colors"
+              className="w-full bg-gradient-to-br from-red-600 to-rose-600 text-white font-bold rounded-xl py-2 hover:opacity-90 transition-opacity"
             >
               חזרה למסך הכניסה
             </button>
           )}
-        </div>
-      </div>
+        </ModalFooter>
+      </Modal>
     );
   }
 
   return (
-    open && (
-      <div className="fixed inset-0 flex items-center justify-center z-[100]">
-        <div className="relative bg-white rounded-2xl p-8 w-full max-w-md shadow-2xl">
-          {/* Close Button */}
-          <button
-            onClick={onClose}
-            aria-label="סגור"
-            className="absolute top-6 left-4 text-2xl text-gray-500 hover:text-gray-700 focus:outline-none leading-none w-8 h-8 flex items-center justify-center sm:top-2 sm:text-3xl"
-          >
-            &times;
-          </button>
+    <Modal size="md" open={open} onClose={onClose}>
+      <ModalHeader onClose={onClose}>
+        {view === 'sign_up' ? 'הרשמה' : 'כניסה'}
+      </ModalHeader>
 
-          {/* Heading (single-purpose screen - no mode toggle) */}
-          <div className="text-center mb-6">
-            <div className="text-4xl font-extrabold text-gray-900 tracking-tight">
-              {view === 'sign_up' ? 'הרשמה' : 'כניסה'}
+      <ModalBody>
+        <div dir="rtl">
+          {view === 'sign_up' && (
+            <div className="text-center mb-6">
+              <div className="mt-1 text-base text-slate-400">פתחו חשבון חדש והתחילו להזמין בקלות</div>
             </div>
-            {view === 'sign_up' && (
-              <div className="mt-1 text-base text-gray-500">פתחו חשבון חדש והתחילו להזמין בקלות</div>
-            )}
-          </div>
+          )}
           {successMsg && (
-            <p className="text-green-600 text-center mb-4 font-medium">{successMsg}</p>
+            <p className="text-emerald-300 text-center mb-4 font-medium">{successMsg}</p>
           )}
 
-          <div className="border-2 border-purple-200 rounded-2xl p-6 bg-white/95 shadow-lg">
+          <div className="border border-white/15 rounded-2xl p-6 bg-white/[0.03] shadow-sm">
             {view === 'sign_up' ? (
               <form key={formKey} onSubmit={handleSignUp} className="space-y-4" autoComplete="off">
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-lg font-bold text-gray-800 mb-2">
+                    <label className="block text-base font-medium text-slate-300 mb-2">
                       שם פרטי *
                     </label>
                     <input
@@ -600,12 +589,12 @@ export default function AuthModal({ initialMode = 'sign_in', open = false, onClo
                       value={firstName}
                       onChange={(e) => setFirstName(e.target.value)}
                       required
-                      className="w-full h-12 rounded-xl border-2 border-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-lg px-3 shadow-sm font-medium"
+                      className="w-full h-12 rounded-xl bg-white/10 border border-white/20 text-white placeholder-slate-400 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400/40 text-base px-3 font-medium outline-none"
                       placeholder="הכנס שם פרטי"
                     />
                   </div>
                   <div>
-                    <label className="block text-lg font-bold text-gray-800 mb-2">
+                    <label className="block text-base font-medium text-slate-300 mb-2">
                       שם משפחה *
                     </label>
                     <input
@@ -614,14 +603,14 @@ export default function AuthModal({ initialMode = 'sign_in', open = false, onClo
                       value={lastName}
                       onChange={(e) => setLastName(e.target.value)}
                       required
-                      className="w-full h-12 rounded-xl border-2 border-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-lg px-3 shadow-sm font-medium"
+                      className="w-full h-12 rounded-xl bg-white/10 border border-white/20 text-white placeholder-slate-400 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400/40 text-base px-3 font-medium outline-none"
                       placeholder="הכנס שם משפחה"
                     />
                   </div>
                 </div>
-                
+
                 <div>
-                  <label className="block text-lg font-bold text-gray-800 mb-2">
+                  <label className="block text-base font-medium text-slate-300 mb-2">
                     אימייל *
                   </label>
                   <input
@@ -631,13 +620,13 @@ export default function AuthModal({ initialMode = 'sign_in', open = false, onClo
                     autoComplete="off"
                     readOnly
                     onFocus={(e) => e.target.removeAttribute('readOnly')}
-                    className="w-full h-12 rounded-xl border-2 border-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-lg px-3 shadow-sm font-medium"
+                    className="w-full h-12 rounded-xl bg-white/10 border border-white/20 text-white placeholder-slate-400 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400/40 text-base px-3 font-medium outline-none"
                     placeholder="הכנס כתובת אימייל"
                   />
                 </div>
-                
+
                 <div>
-                  <label className="block text-lg font-bold text-gray-800 mb-2">
+                  <label className="block text-base font-medium text-slate-300 mb-2">
                     מספר נייד
                   </label>
                   <input
@@ -645,13 +634,13 @@ export default function AuthModal({ initialMode = 'sign_in', open = false, onClo
                     name="phone"
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
-                    className="w-full h-12 rounded-xl border-2 border-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-lg px-3 shadow-sm font-medium"
+                    className="w-full h-12 rounded-xl bg-white/10 border border-white/20 text-white placeholder-slate-400 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400/40 text-base px-3 font-medium outline-none"
                     placeholder="הכנס מספר נייד"
                   />
                 </div>
-                
+
                 <div>
-                  <label className="block text-lg font-bold text-gray-800 mb-2">
+                  <label className="block text-base font-medium text-slate-300 mb-2">
                     סיסמה *
                   </label>
                   <div className="relative">
@@ -662,7 +651,7 @@ export default function AuthModal({ initialMode = 'sign_in', open = false, onClo
                       autoComplete="new-password"
                       readOnly
                       onFocus={(e) => e.target.removeAttribute('readOnly')}
-                      className="w-full h-12 rounded-xl border-2 border-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-lg px-3 shadow-sm font-medium"
+                      className="w-full h-12 rounded-xl bg-white/10 border border-white/20 text-white placeholder-slate-400 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400/40 text-base px-3 font-medium outline-none"
                       placeholder="הכנס סיסמה"
                     />
                     <VisibilityToggle
@@ -672,9 +661,9 @@ export default function AuthModal({ initialMode = 'sign_in', open = false, onClo
                     />
                   </div>
                 </div>
-                
+
                 <div>
-                  <label className="block text-lg font-bold text-gray-800 mb-2">
+                  <label className="block text-base font-medium text-slate-300 mb-2">
                     אימות סיסמה *
                   </label>
                   <div className="relative">
@@ -685,7 +674,7 @@ export default function AuthModal({ initialMode = 'sign_in', open = false, onClo
                       autoComplete="new-password"
                       readOnly
                       onFocus={(e) => e.target.removeAttribute('readOnly')}
-                      className="w-full h-12 rounded-xl border-2 border-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-lg px-3 shadow-sm font-medium"
+                      className="w-full h-12 rounded-xl bg-white/10 border border-white/20 text-white placeholder-slate-400 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400/40 text-base px-3 font-medium outline-none"
                       placeholder="הכנס שוב את הסיסמה"
                     />
                     <VisibilityToggle
@@ -695,32 +684,32 @@ export default function AuthModal({ initialMode = 'sign_in', open = false, onClo
                     />
                   </div>
                 </div>
-                
+
                 {errorMsg && (
-                  <div className="text-red-600 text-base font-medium">{errorMsg}</div>
+                  <div className="bg-red-500/10 border border-red-400/30 text-red-400 rounded-xl px-4 py-2 text-base font-medium">{errorMsg}</div>
                 )}
-                
+
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full h-12 rounded-xl bg-purple-600 hover:bg-purple-700 disabled:bg-purple-400 text-white font-semibold shadow-sm text-base"
+                  className="w-full h-12 rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 shadow-[0_5px_22px_rgba(99,70,230,0.45)] text-white font-bold disabled:opacity-50 text-base transition-opacity hover:opacity-90"
                 >
                   {loading ? 'מעבד...' : 'לחץ להודעת אימות לאימייל'}
                 </button>
               </form>
             ) : (
               <>
-                <div className="rounded-2xl border-2 border-gray-400 p-5 bg-white shadow-sm">
+                <div className="rounded-2xl border border-white/15 p-5 bg-white/[0.03]">
                   <form onSubmit={handleSignIn} className="space-y-4" autoComplete="off">
                     <div>
-                      <label className="block text-lg font-bold text-gray-800 mb-2">
+                      <label className="block text-base font-medium text-slate-300 mb-2">
                         אימייל
                       </label>
                       <input
                         type="email"
                         value={signInEmail}
                         onChange={(e) => setSignInEmail(e.target.value)}
-                        className="w-full h-12 rounded-xl border-2 border-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-lg px-3 shadow-sm font-medium"
+                        className="w-full h-12 rounded-xl bg-white/10 border border-white/20 text-white placeholder-slate-400 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400/40 text-base px-3 font-medium outline-none"
                         placeholder="הכנס אימייל"
                         autoComplete="email"
                         required
@@ -728,7 +717,7 @@ export default function AuthModal({ initialMode = 'sign_in', open = false, onClo
                     </div>
 
                     <div>
-                      <label className="block text-lg font-bold text-gray-800 mb-2">
+                      <label className="block text-base font-medium text-slate-300 mb-2">
                         סיסמה
                       </label>
                       <div className="relative">
@@ -736,7 +725,7 @@ export default function AuthModal({ initialMode = 'sign_in', open = false, onClo
                           type={showSignInPassword ? 'text' : 'password'}
                           value={signInPassword}
                           onChange={(e) => setSignInPassword(e.target.value)}
-                          className="w-full h-12 rounded-xl border-2 border-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-lg px-3 shadow-sm font-medium"
+                          className="w-full h-12 rounded-xl bg-white/10 border border-white/20 text-white placeholder-slate-400 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400/40 text-base px-3 font-medium outline-none"
                           placeholder="הכנס סיסמה"
                           autoComplete="current-password"
                           required
@@ -749,46 +738,8 @@ export default function AuthModal({ initialMode = 'sign_in', open = false, onClo
                       </div>
                     </div>
 
-                    {signInError.code && signInError.code !== 'user_not_found' && (
-                      <div className="fixed inset-0 flex items-center justify-center bg-black/70 z-[200] px-6">
-                        <div className="bg-white border-4 border-red-400 rounded-2xl shadow-2xl max-w-sm w-full text-center px-6 py-8 space-y-5">
-                          <div className="text-3xl font-extrabold text-red-600">
-                            {signInError.code === 'invalid_password' ? 'סיסמה שגויה' : 'שגיאה בהתחברות'}
-                          </div>
-                          <div className="text-base font-semibold text-red-700">
-                            {signInError.message}
-                          </div>
-                          {signInError.code === 'invalid_password' ? (
-                            <div className="flex flex-col gap-3">
-                              <button
-                                type="button"
-                                onClick={() => setSignInError({ code: '', message: '' })}
-                                className="w-full border-2 border-red-600 text-red-600 hover:bg-red-600 hover:text-white font-semibold py-2 rounded-full transition-colors"
-                              >
-                                נסה שוב
-                              </button>
-                              <button
-                                type="button"
-                                onClick={handlePasswordReset}
-                                className="w-full border-2 border-purple-600 text-purple-600 hover:bg-purple-600 hover:text-white font-semibold py-2 rounded-full transition-colors"
-                              >
-                                שלח אימייל לאיפוס סיסמה
-                              </button>
-                            </div>
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={() => setSignInError({ code: '', message: '' })}
-                              className="w-full border-2 border-red-600 text-red-600 hover:bg-red-600 hover:text-white font-semibold py-2 rounded-full transition-colors"
-                            >
-                              סגור
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                    {passwordResetSent && !signInError.code && (
-                      <div className="text-green-600 text-base font-medium">
+                    {passwordResetSent && (
+                      <div className="bg-emerald-500/20 border border-emerald-400/30 text-emerald-300 rounded-xl px-4 py-2 text-base font-medium">
                         שלחנו אליך אימייל לאיפוס הסיסמה
                       </div>
                     )}
@@ -797,7 +748,7 @@ export default function AuthModal({ initialMode = 'sign_in', open = false, onClo
                       <button
                         type="button"
                         onClick={handlePasswordReset}
-                        className="text-purple-700 hover:text-purple-800 text-base text-left"
+                        className="text-indigo-300 hover:text-indigo-200 text-base text-left"
                       >
                         שכחת סיסמה?
                       </button>
@@ -806,18 +757,17 @@ export default function AuthModal({ initialMode = 'sign_in', open = false, onClo
                     <button
                       type="submit"
                       disabled={signInLoading}
-                      className="w-full h-12 rounded-xl border-4 border-purple-600 text-purple-600 hover:bg-purple-600 hover:text-white disabled:border-purple-400 disabled:text-purple-400 font-semibold shadow-sm text-base transition-colors"
+                      className="w-full h-12 rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 shadow-[0_5px_22px_rgba(99,70,230,0.45)] text-white font-bold disabled:opacity-50 text-base transition-opacity hover:opacity-90"
                     >
                       {signInLoading ? 'מתחבר...' : 'התחבר'}
                     </button>
                   </form>
                 </div>
-
               </>
             )}
           </div>
         </div>
-      </div>
-    )
+      </ModalBody>
+    </Modal>
   );
 }

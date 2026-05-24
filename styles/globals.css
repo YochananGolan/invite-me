@@ -60,20 +60,18 @@ body.payment-modal-open [class*="userway"] {
 
 /* Event details form modal styling */
 .event-form {
-  background-color: #FFF9E8; /* light warm background similar to homepage accent */
-  border: 2px solid #D1B45B; /* primary accent border */
+  background-color: rgba(255, 255, 255, 0.055);
+  border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: 0.75rem; /* rounded-lg */
-  /* Create two additional border lines using inset box-shadows */
   box-shadow:
-    0 10px 25px rgba(0,0,0,0.1), /* drop shadow */
-    inset 0 0 0 4px #FFEEC0,      /* inner light border */
-    inset 0 0 0 8px #D1B45B;      /* second inner border (primary color) */
+    0 10px 25px rgba(0,0,0,0.28),
+    inset 0 1px 0 rgba(255,255,255,0.08);
 }
 
 /* Custom scrollbar for color palette */
 .color-palette-scroll {
   scrollbar-width: thin;
-  scrollbar-color: #d1d5db #f3f4f6;
+  scrollbar-color: rgba(129, 140, 248, 0.7) rgba(255, 255, 255, 0.08);
 }
 
 .color-palette-scroll::-webkit-scrollbar {
@@ -81,17 +79,17 @@ body.payment-modal-open [class*="userway"] {
 }
 
 .color-palette-scroll::-webkit-scrollbar-track {
-  background: #f3f4f6;
+  background: rgba(255, 255, 255, 0.08);
   border-radius: 3px;
 }
 
 .color-palette-scroll::-webkit-scrollbar-thumb {
-  background: #d1d5db;
+  background: rgba(129, 140, 248, 0.7);
   border-radius: 3px;
 }
 
 .color-palette-scroll::-webkit-scrollbar-thumb:hover {
-  background: #9ca3af;
+  background: rgba(165, 180, 252, 0.9);
 }
 
 /* Loading spinner animation */
@@ -101,6 +99,49 @@ body.payment-modal-open [class*="userway"] {
   }
   to {
     transform: rotate(360deg);
+  }
+}
+
+@keyframes hero-progress-fill {
+  0%,
+  12% {
+    transform: scaleX(0.08);
+  }
+  62%,
+  100% {
+    transform: scaleX(1);
+  }
+}
+
+@keyframes hero-chart-line {
+  0%,
+  12% {
+    stroke-dasharray: 260;
+    stroke-dashoffset: 260;
+  }
+  62%,
+  100% {
+    stroke-dasharray: 260;
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes hero-chart-area {
+  0%,
+  24% {
+    opacity: 0;
+  }
+  70%,
+  100% {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-\[hero-progress-fill_4\.8s_ease-in-out_infinite\],
+  .animate-\[hero-chart-line_4\.8s_ease-in-out_infinite\],
+  .animate-\[hero-chart-area_4\.8s_ease-in-out_infinite\] {
+    animation: none !important;
   }
 }
 
@@ -136,7 +177,7 @@ body.payment-modal-open [class*="userway"] {
 }
 
 /* Force center alignment for all invitation preview lines - override any RTL or custom styles */
-.bg-gray-50.p-4.rounded.border div[style*="fontSize"] {
+.bg-white\/5.p-4.rounded-xl.border div[style*="fontSize"] {
   text-align: center !important;
   direction: rtl !important;
 }

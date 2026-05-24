@@ -1,3 +1,5 @@
+import Modal, { ModalHeader, ModalBody, ModalFooter } from './Modal';
+
 const PLANS = [
   { id: 'א', range: 'עד 50 הודעות', price: 1, desc: 'מתאים לאירועים קטנים' },
   { id: 'ב', range: 'מ־51 עד 200 הודעות', price: 149, desc: 'מתאים לרוב האירועים' },
@@ -7,8 +9,6 @@ const PLANS = [
 ];
 
 export default function PricingTableModal({ isOpen, onClose }) {
-  if (!isOpen) return null;
-
   const handleClose = () => {
     onClose();
     if (typeof window !== 'undefined') {
@@ -17,69 +17,57 @@ export default function PricingTableModal({ isOpen, onClose }) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 overflow-y-auto" dir="rtl">
-      <div className="min-h-screen flex items-center justify-center p-4">
-        <div className="relative bg-white rounded-xl shadow-xl px-6 pb-6 pt-12 sm:px-8 sm:pb-8 sm:pt-10 w-full max-w-2xl">
-          <button
-            onClick={handleClose}
-            className="absolute top-4 left-4 right-auto text-2xl sm:text-3xl text-gray-500 hover:text-gray-700 leading-none"
-            aria-label="סגור"
-          >
-            &times;
-          </button>
+    <Modal size="lg" open={isOpen} onClose={handleClose}>
+      <ModalHeader onClose={handleClose}>חבילות ומחירים</ModalHeader>
 
-          <h2 className="text-2xl font-bold text-center text-primary mb-6 pl-14 pr-10 sm:px-0">
-            חבילות ומחירים
-          </h2>
-
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse">
-              <thead>
-                <tr className="border-b-2 border-primary bg-primary/5">
-                  <th className="text-right py-3 px-4 font-bold text-primary">מסלול</th>
-                  <th className="text-right py-3 px-4 font-bold text-primary">מספר הודעות</th>
-                  <th className="text-right py-3 px-4 font-bold text-primary">מחיר</th>
+      <ModalBody>
+        <div className="overflow-x-auto" dir="rtl">
+          <table className="w-full border-collapse">
+            <thead>
+              <tr className="border-b-2 border-indigo-400/30 bg-indigo-500/10">
+                <th className="text-right py-2 px-3 font-bold text-indigo-300">מסלול</th>
+                <th className="text-right py-2 px-3 font-bold text-indigo-300">מספר הודעות</th>
+                <th className="text-right py-2 px-3 font-bold text-indigo-300">מחיר</th>
+              </tr>
+            </thead>
+            <tbody>
+              {PLANS.map((plan) => (
+                <tr
+                  key={plan.id}
+                  className={`border-b border-white/10 hover:bg-white/[0.04] transition-colors ${
+                    plan.recommended ? 'border-indigo-500/50 bg-indigo-500/10' : ''
+                  }`}
+                >
+                  <td className="py-2 px-3">
+                    <div className="flex flex-col gap-1">
+                      <span className="font-semibold text-indigo-300">מסלול {plan.id}</span>
+                      <span className="text-sm text-slate-400">{plan.desc}</span>
+                    </div>
+                  </td>
+                  <td className="py-2 px-3 text-slate-300">{plan.range}</td>
+                  <td className="py-2 px-3 font-bold text-indigo-300">{plan.price} ₪</td>
                 </tr>
-              </thead>
-              <tbody>
-                {PLANS.map((plan) => (
-                  <tr
-                    key={plan.id}
-                    className={`border-b border-gray-200 hover:bg-gray-50 ${
-                      plan.recommended ? 'bg-amber-50' : ''
-                    }`}
-                  >
-                    <td className="py-3 px-4">
-                      <div className="flex flex-col gap-1">
-                        <span className="font-semibold text-primary">מסלול {plan.id}</span>
-                        <span className="text-sm text-gray-500">{plan.desc}</span>
-                      </div>
-                    </td>
-                    <td className="py-3 px-4 text-gray-700">{plan.range}</td>
-                    <td className="py-3 px-4 font-bold text-primary">{plan.price} ₪</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          <p className="text-center text-gray-500 text-sm mt-4">
-            * המחירים הם חד פעמיים לכל אירוע
-          </p>
-          <p className="text-center text-blue-700 text-sm mt-2">
-            💡 ניתן לרכוש חבילות הרחבה של 100 הודעות נוספות ב־100 ₪
-          </p>
-
-          <div className="mt-6 flex justify-center">
-            <button
-              onClick={onClose}
-              className="bg-primary text-white px-8 py-3 rounded-full font-medium hover:bg-primary/90 transition-colors"
-            >
-              סגור
-            </button>
-          </div>
+              ))}
+            </tbody>
+          </table>
         </div>
-      </div>
-    </div>
+
+        <p className="text-center text-slate-400 text-sm mt-4">
+          * המחירים הם חד פעמיים לכל אירוע
+        </p>
+        <p className="text-center text-indigo-300 text-sm mt-2">
+          💡 ניתן לרכוש חבילות הרחבה של 100 הודעות נוספות ב־100 ₪
+        </p>
+      </ModalBody>
+
+      <ModalFooter className="justify-center">
+        <button
+          onClick={onClose}
+          className="bg-gradient-to-br from-indigo-600 to-violet-600 shadow-[0_5px_22px_rgba(99,70,230,0.45)] text-white font-bold rounded-xl px-8 py-3 hover:opacity-90 transition-opacity"
+        >
+          סגור
+        </button>
+      </ModalFooter>
+    </Modal>
   );
 }
