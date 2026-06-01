@@ -69,7 +69,7 @@ const ReportIcon = () => (
 );
 
 const CardHeader = ({ title, children }) => (
-  <div className="flex items-center justify-between border-b border-white/10 px-3 py-2 text-[11px] font-bold text-slate-100">
+  <div className="flex items-center justify-between border-b border-white/10 px-3 py-2 text-[11px] font-bold text-slate-100" dir="rtl">
     <span className="truncate">{title}</span>
     <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-gradient-to-br from-indigo-600 to-violet-600">
       {children}
@@ -167,17 +167,17 @@ const StatsCard = () => (
         <path d="M16 3.13a4 4 0 0 1 0 7.75" />
       </svg>
     </CardHeader>
-    <div className="grid grid-cols-[minmax(0,1fr)_4rem] items-center gap-2 px-3 py-3">
-      <div className="flex min-w-0 flex-col gap-1">
+    <div className="flex items-center gap-3 px-3 py-3" dir="rtl">
+      <div className="flex min-w-0 flex-1 flex-col gap-1.5">
         {[
           ['#34d399', 'אישרו הגעה', '192 (59%)'],
           ['#fbbf24', 'טרם הגיבו', '98 (30%)'],
           ['#f87171', 'לא מגיעים', '36 (11%)'],
         ].map(([color, label, value]) => (
           <div key={label} className="flex items-center gap-1.5 text-[10px] text-slate-400">
-            <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: color }} />
+            <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: color }} />
             <span className="min-w-0 flex-1 truncate">{label}</span>
-            <span className="shrink-0 text-left font-bold tabular-nums text-slate-100">{value}</span>
+            <span className="shrink-0 font-bold tabular-nums text-slate-100">{value}</span>
           </div>
         ))}
       </div>
@@ -218,7 +218,7 @@ const MessagesCard = () => (
             {icon}
           </span>
           <span className="text-xs font-semibold">{name}</span>
-          <span className="mr-auto text-[10px] text-slate-400">{count}</span>
+          <span className="ml-auto text-[10px] text-slate-400">{count}</span>
           <span className="text-[10px] font-bold text-emerald-300">נשלח</span>
         </div>
         <div className="h-1 overflow-hidden rounded bg-white/10">
