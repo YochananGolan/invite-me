@@ -1834,12 +1834,16 @@ const handleOpenAddonModal = React.useCallback(() => {
 
   const [selectedDesign, setSelectedDesign] = useState(null);
   const fontsOptions = [
-    { key: 'gloria', label: 'Gloria Hallelujah', css: "'Gloria Hallelujah', cursive" },
-    { key: 'assistant', label: 'Assistant', css: "'Assistant', sans-serif" },
-    { key: 'mplus', label: 'M PLUS 1p', css: "'M PLUS 1p', sans-serif" },
-    { key: 'secular', label: 'Secular One', css: "'Secular One', sans-serif" },
-    { key: 'ojuju', label: 'Ojuju', css: "'Ojuju', sans-serif" },
-    { key: 'macondo', label: 'Macondo', css: "'Macondo', cursive" },
+    { key: 'assistant', label: 'Assistant',          css: "'Assistant', sans-serif" },
+    { key: 'heebo',     label: 'Heebo',               css: "'Heebo', sans-serif" },
+    { key: 'secular',   label: 'Secular One',         css: "'Secular One', sans-serif" },
+    { key: 'rubik',     label: 'Rubik',               css: "'Rubik', sans-serif" },
+    { key: 'noto',      label: 'Noto Sans Hebrew',    css: "'Noto Sans Hebrew', sans-serif" },
+    { key: 'frank',     label: 'Frank Ruhl Libre',    css: "'Frank Ruhl Libre', serif" },
+    { key: 'varela',    label: 'Varela Round',        css: "'Varela Round', sans-serif" },
+    { key: 'alef',      label: 'Alef',                css: "'Alef', sans-serif" },
+    { key: 'suez',      label: 'Suez One',            css: "'Suez One', serif" },
+    { key: 'amatic',    label: 'Amatic SC — כתב יד', css: "'Amatic SC', cursive" },
   ];
   const [selectedFontKey, setSelectedFontKey] = useState('assistant');
   const selectedFontCss = fontsOptions.find(f=>f.key===selectedFontKey)?.css;
