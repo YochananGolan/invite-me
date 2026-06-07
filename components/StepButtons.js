@@ -6962,9 +6962,9 @@ React.useEffect(()=>{
         </ModalFooter>
       </Modal>
 
-      <Drawer open={showEventDetails} onClose={() => setShowEventDetails(false)} size="xl">
-        <DrawerHeader onClose={() => setShowEventDetails(false)}>{`פרטי האירוע - ${selectedEventType}`}</DrawerHeader>
-        <DrawerBody scroll className="px-6 py-5">
+      <Modal open={showEventDetails} onClose={() => setShowEventDetails(false)} size="xl">
+        <ModalHeader onClose={() => setShowEventDetails(false)}>{`פרטי האירוע - ${selectedEventType}`}</ModalHeader>
+        <ModalBody>
           <div dir="rtl">
           {eventDetailsSubmitAttempted && errorMsg && <p className="text-red-400 text-sm text-center mb-3 bg-red-500/10 border border-red-400/30 rounded-xl p-2.5">{errorMsg}</p>}
           <form dir="rtl" className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -7103,13 +7103,13 @@ React.useEffect(()=>{
               </div>
           </form>
           </div>
-        </DrawerBody>
-        <DrawerFooter className="px-6 py-4 justify-center">
+        </ModalBody>
+        <ModalFooter className="justify-center">
           <button type="button" onClick={handleSaveDetails} className="w-full bg-gradient-to-br from-indigo-600 to-violet-600 shadow-[0_5px_22px_rgba(99,70,230,0.45)] text-white font-bold rounded-xl py-3 text-base hover:opacity-90 transition-opacity">
             שמור וסגור
           </button>
-        </DrawerFooter>
-      </Drawer>
+        </ModalFooter>
+      </Modal>
 
       {/* Hidden file input for Excel upload */}
       <input
@@ -7120,9 +7120,9 @@ React.useEffect(()=>{
         style={{ display: 'none' }}
       />
 
-      <Drawer open={showGuestForm} onClose={() => setShowGuestForm(false)} size="md">
-        <DrawerHeader onClose={() => setShowGuestForm(false)}>שליחת הזמנות</DrawerHeader>
-        <DrawerBody>
+      <Modal open={showGuestForm} onClose={() => setShowGuestForm(false)} size="md">
+        <ModalHeader onClose={() => setShowGuestForm(false)}>שליחת הזמנות</ModalHeader>
+        <ModalBody>
           <div className="flex flex-col gap-3 mb-6">
             <button
               type="button"
@@ -7153,8 +7153,8 @@ React.useEffect(()=>{
               <input type="tel" placeholder="טלפון" value={guestData.guestPhone} onChange={(e) => setGuestData({ ...guestData, guestPhone: e.target.value })} className={`w-full bg-white/10 border border-white/20 text-white placeholder-slate-400 rounded-xl focus:border-indigo-400 p-2 pr-12 sm:pr-2 outline-none ${visibleGuestErrors.guestPhone ? 'border-red-400 ring-2 ring-red-400/20' : ''}`} />
             </div>
           </form>
-        </DrawerBody>
-        <DrawerFooter>
+        </ModalBody>
+        <ModalFooter>
           <div className="flex flex-col sm:flex-row justify-center gap-3 w-full" dir="rtl">
             <button type="button" onClick={handleSendInvitation} className="order-1 bg-emerald-600 text-white border border-emerald-400/50 rounded-full px-8 py-3 font-medium hover:bg-emerald-700 transition-all">
               שלח הזמנה בוואטסאפ
@@ -7163,8 +7163,8 @@ React.useEffect(()=>{
               שלח הזמנה ב-SMS
             </button>
           </div>
-        </DrawerFooter>
-      </Drawer>
+        </ModalFooter>
+      </Modal>
 
       <Modal open={showWhatsAppGroupModal} onClose={() => !isWhatsAppGroupSubmitting && setShowWhatsAppGroupModal(false)} size="md">
         <ModalHeader onClose={() => !isWhatsAppGroupSubmitting && setShowWhatsAppGroupModal(false)}>קבוצת וואטסאפ לאירוע</ModalHeader>
