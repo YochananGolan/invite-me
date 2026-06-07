@@ -671,8 +671,8 @@ export default forwardRef(function HeroSection({ onStart, onPressCreateEvent, se
 
   return (
     <section className="relative z-10 overflow-visible px-4 pb-10 pt-12 text-slate-100 sm:px-6 lg:px-12 lg:pb-14 lg:pt-16">
-      <div className={`mx-auto grid max-w-6xl items-center gap-10 lg:min-h-[calc(100vh-86px)] lg:gap-12 ${shouldShowActiveReports ? 'lg:grid-cols-[1.04fr_0.96fr]' : 'lg:grid-cols-[0.96fr_1.04fr]'}`}>
-        <div className={`flex flex-col items-center gap-6 text-center lg:items-start lg:text-right ${shouldShowActiveReports ? 'lg:order-2' : 'lg:order-1'}`}>
+      <div className={`mx-auto grid max-w-6xl items-center gap-10 lg:min-h-[calc(100vh-86px)] lg:gap-12 ${shouldShowActiveReports ? 'lg:grid-cols-[0.96fr_1.04fr]' : 'lg:grid-cols-[0.96fr_1.04fr]'}`}>
+        <div className={`flex flex-col items-center gap-6 text-center lg:items-start lg:text-right ${shouldShowActiveReports ? 'lg:order-1' : 'lg:order-1'}`}>
           <div className="inline-flex items-center gap-2 rounded-full border border-indigo-300/35 bg-indigo-500/10 px-4 py-2 text-xs font-semibold text-indigo-200">
             <svg width="11" height="11" viewBox="0 0 12 12" fill="#c4b9ff" aria-hidden="true">
               <path d="M6 0l1.5 4.5H12L8.25 7.5 9.75 12 6 9.25 2.25 12l1.5-4.5L0 4.5h4.5z" />
@@ -734,7 +734,7 @@ export default forwardRef(function HeroSection({ onStart, onPressCreateEvent, se
           </div>
         </div>
 
-        <div className={shouldShowActiveReports ? 'lg:order-1' : 'lg:order-2'}>
+        <div className={shouldShowActiveReports ? 'lg:order-2' : 'lg:order-2'}>
           {shouldShowActiveReports ? <ActiveEventReportsDashboard summary={activeReportSummary} /> : <ProductCards />}
         </div>
       </div>
