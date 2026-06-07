@@ -6478,7 +6478,7 @@ React.useEffect(()=>{
       {/* Error message is now displayed in HeroSection instead */}
       {/* Status and Summary Tables */}
       <div className="w-full px-4 mb-0 mt-4 pb-16">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-[1600px] mx-auto">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-[1400px] mx-auto">
           
           {/* First Column - Event Status */}
           <div className="w-full flex flex-col gap-6">
@@ -6492,10 +6492,10 @@ React.useEffect(()=>{
               </div>
             )}
             {currentEventId ? (
-              <div className="bg-white/[0.055] border border-white/15 backdrop-blur-xl rounded-2xl p-3 sm:p-4 text-center shadow-[0_8px_40px_rgba(0,0,0,0.35)] ring-2 ring-indigo-400/30 w-full">
+              <div className="bg-white/[0.055] border border-white/15 backdrop-blur-xl rounded-2xl p-4 sm:p-6 text-center shadow-[0_8px_40px_rgba(0,0,0,0.35)] ring-2 ring-indigo-400/30 w-full">
                 <div className="flex items-center justify-center gap-2 mb-2">
                   <span className="text-2xl">✅</span>
-                  <h3 className="text-lg font-bold text-emerald-300">יש אירוע פעיל במערכת</h3>
+                  <h3 className="text-xl font-bold text-emerald-300">יש אירוע פעיל במערכת</h3>
                 </div>
                 <p className="text-slate-300">
                   <strong>סוג האירוע:</strong> {selectedEventType || 'לא מוגדר'}
@@ -6578,10 +6578,10 @@ React.useEffect(()=>{
               </div>
             )}
             {(planForDisplay || currentEventId) && (
-              <div className="bg-white/[0.055] border border-white/15 backdrop-blur-xl rounded-2xl p-3 sm:p-4 text-center shadow-[0_8px_40px_rgba(0,0,0,0.35)] ring-2 ring-amber-400/30 w-full" style={{ minHeight: 'min(280px, 50vh)' }}>
+              <div className="bg-white/[0.055] border border-white/15 backdrop-blur-xl rounded-2xl p-4 sm:p-6 text-center shadow-[0_8px_40px_rgba(0,0,0,0.35)] ring-2 ring-amber-400/30 w-full" style={{ minHeight: 'min(280px, 50vh)' }}>
                 <div className="flex items-center justify-center gap-2 mb-2">
                   <span className="text-2xl">💰</span>
-                  <h3 className="text-lg font-bold text-amber-300">מסלול פעיל</h3>
+                  <h3 className="text-xl font-bold text-amber-300">מסלול פעיל</h3>
                 </div>
                 {/* Display Tranzila Terminal Info */}
                 {tranzilaTerminalInfo && (
@@ -6662,10 +6662,10 @@ React.useEffect(()=>{
           {/* Second Column - Guest Summary + Table Report */}
           {currentEventId && (
             <div className="w-full flex flex-col gap-6">
-              <div className="bg-white/[0.055] border border-white/15 backdrop-blur-xl rounded-2xl p-3 sm:p-4 text-center shadow-[0_8px_40px_rgba(0,0,0,0.35)] ring-2 ring-indigo-400/30 w-full">
+              <div className="bg-white/[0.055] border border-white/15 backdrop-blur-xl rounded-2xl p-4 sm:p-6 text-center shadow-[0_8px_40px_rgba(0,0,0,0.35)] ring-2 ring-indigo-400/30 w-full">
                 <div className="flex items-center justify-center gap-2 mb-2">
                   <span className="text-xl">👥</span>
-                  <h3 className="text-base font-bold text-indigo-300">סיכום כל האורחים המוזמנים</h3>
+                  <h3 className="text-lg font-bold text-indigo-300">סיכום כל האורחים המוזמנים</h3>
                 </div>
                 <div className="mt-1">
                   <div className="bg-white/5 border border-white/10 rounded-xl p-3">
@@ -6720,54 +6720,54 @@ React.useEffect(()=>{
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-3 text-base">
-                    <div className="min-w-0 bg-white/5 border border-white/10 rounded-xl p-2 text-right">
-                      <div className="text-sm font-semibold text-emerald-300">מבוגרים</div>
-                      <div className={`${previewMetricValueClass} text-2xl font-bold text-emerald-200`}>{guestSummary.adults}</div>
+                    <div className="min-w-0 bg-white/5 border border-white/10 rounded-xl p-3 text-right">
+                      <div className="text-base font-semibold text-emerald-300">מבוגרים</div>
+                      <div className={`${previewMetricValueClass} text-3xl font-bold text-emerald-200`}>{guestSummary.adults}</div>
                     </div>
-                    <div className="min-w-0 bg-white/5 border border-white/10 rounded-xl p-2 text-right">
-                      <div className="text-sm font-semibold text-orange-400">ילדים</div>
-                      <div className={`${previewMetricValueClass} text-2xl font-bold text-orange-300`}>{guestSummary.children}</div>
+                    <div className="min-w-0 bg-white/5 border border-white/10 rounded-xl p-3 text-right">
+                      <div className="text-base font-semibold text-orange-400">ילדים</div>
+                      <div className={`${previewMetricValueClass} text-3xl font-bold text-orange-300`}>{guestSummary.children}</div>
                     </div>
-                    <div className="min-w-0 bg-white/5 border border-white/10 rounded-xl p-2 text-right">
-                      <div className="text-sm font-semibold text-indigo-300">סה"כ</div>
-                      <div className={`${previewMetricValueClass} text-2xl font-bold text-indigo-200`}>{guestSummary.adults + guestSummary.children}</div>
+                    <div className="min-w-0 bg-white/5 border border-white/10 rounded-xl p-3 text-right">
+                      <div className="text-base font-semibold text-indigo-300">סה"כ</div>
+                      <div className={`${previewMetricValueClass} text-3xl font-bold text-indigo-200`}>{guestSummary.adults + guestSummary.children}</div>
                     </div>
                   </div>
                 </div>
               </div>
 
               {tableSummary.length > 0 && (
-                <div className="bg-white/[0.055] border border-white/15 backdrop-blur-xl rounded-2xl p-3 text-center shadow-[0_8px_40px_rgba(0,0,0,0.35)] ring-2 ring-orange-400/30 w-full flex flex-col">
+                <div className="bg-white/[0.055] border border-white/15 backdrop-blur-xl rounded-2xl p-4 sm:p-6 text-center shadow-[0_8px_40px_rgba(0,0,0,0.35)] ring-2 ring-orange-400/30 w-full flex flex-col">
                   <div className="flex items-center justify-center gap-3 mb-3 flex-shrink-0">
                     <span className="text-2xl">📊</span>
-                    <h3 className="text-lg font-extrabold text-orange-300 tracking-wide">דוח סיכום שולחנות</h3>
+                    <h3 className="text-xl font-extrabold text-orange-300 tracking-wide">דוח סיכום שולחנות</h3>
                   </div>
                   <div className="mt-3 overflow-x-auto flex-grow">
-                    <table className="w-full text-right border text-sm min-w-full">
+                    <table className="w-full text-right border text-base min-w-full">
                       <thead>
                         <tr className="bg-white/5">
-                          <th className="p-2 border border-white/10 font-bold text-center text-orange-300">מס. שולחן</th>
-                          <th className="p-2 border border-white/10 font-bold text-center text-emerald-300">בוגרים</th>
-                          <th className="p-2 border border-white/10 font-bold text-center text-violet-300">ילדים</th>
-                          <th className="p-2 border border-white/10 font-bold text-center text-indigo-300">סה"כ</th>
+                          <th className="p-3 border border-white/10 font-bold text-center text-orange-300">מס. שולחן</th>
+                          <th className="p-3 border border-white/10 font-bold text-center text-emerald-300">בוגרים</th>
+                          <th className="p-3 border border-white/10 font-bold text-center text-violet-300">ילדים</th>
+                          <th className="p-3 border border-white/10 font-bold text-center text-indigo-300">סה"כ</th>
                         </tr>
                       </thead>
                       <tbody>
                         {tableSummary.map((row, idx) => (
                           <tr key={`table-${row.table_number}-${idx}`} className={idx % 2 === 0 ? 'bg-white/5' : 'bg-amber-500/10'}>
-                            <td className="p-2 border border-white/10 text-center font-semibold text-orange-200 text-xl"><span className={previewTableNumberClass}>{row.table_number}</span></td>
-                            <td className="p-2 border border-white/10 text-center font-semibold text-emerald-200 text-xl"><span className={previewTableNumberClass}>{row.adults}</span></td>
-                            <td className="p-2 border border-white/10 text-center font-semibold text-violet-200 text-xl"><span className={previewTableNumberClass}>{row.children}</span></td>
-                            <td className="p-2 border border-white/10 text-center font-bold text-indigo-200 text-2xl"><span className={previewTableNumberClass}>{row.total}</span></td>
+                            <td className="p-3 border border-white/10 text-center font-semibold text-orange-200 text-2xl"><span className={previewTableNumberClass}>{row.table_number}</span></td>
+                            <td className="p-3 border border-white/10 text-center font-semibold text-emerald-200 text-2xl"><span className={previewTableNumberClass}>{row.adults}</span></td>
+                            <td className="p-3 border border-white/10 text-center font-semibold text-violet-200 text-2xl"><span className={previewTableNumberClass}>{row.children}</span></td>
+                            <td className="p-3 border border-white/10 text-center font-bold text-indigo-200 text-3xl"><span className={previewTableNumberClass}>{row.total}</span></td>
                           </tr>
                         ))}
                       </tbody>
                       <tfoot>
                         <tr className="bg-orange-500/15 font-bold">
-                          <td className="p-2 border border-white/10 text-center text-orange-200 text-xl">סה"כ</td>
-                          <td className="p-2 border border-white/10 text-center text-emerald-200 text-xl"><span className={previewTableNumberClass}>{tableSummary.reduce((sum, r) => sum + r.adults, 0)}</span></td>
-                          <td className="p-2 border border-white/10 text-center text-violet-200 text-xl"><span className={previewTableNumberClass}>{tableSummary.reduce((sum, r) => sum + r.children, 0)}</span></td>
-                          <td className="p-2 border border-white/10 text-center text-indigo-200 text-2xl"><span className={previewTableNumberClass}>{tableSummary.reduce((sum, r) => sum + r.total, 0)}</span></td>
+                          <td className="p-3 border border-white/10 text-center text-orange-200 text-2xl">סה"כ</td>
+                          <td className="p-3 border border-white/10 text-center text-emerald-200 text-2xl"><span className={previewTableNumberClass}>{tableSummary.reduce((sum, r) => sum + r.adults, 0)}</span></td>
+                          <td className="p-3 border border-white/10 text-center text-violet-200 text-2xl"><span className={previewTableNumberClass}>{tableSummary.reduce((sum, r) => sum + r.children, 0)}</span></td>
+                          <td className="p-3 border border-white/10 text-center text-indigo-200 text-3xl"><span className={previewTableNumberClass}>{tableSummary.reduce((sum, r) => sum + r.total, 0)}</span></td>
                         </tr>
                       </tfoot>
                     </table>
@@ -6780,10 +6780,10 @@ React.useEffect(()=>{
           {/* Third Column - Guest Status Summary */}
           {currentEventId && (
             <div className="w-full flex flex-col gap-6">
-              <div className="bg-white/[0.055] border border-white/15 backdrop-blur-xl rounded-2xl p-3 sm:p-4 text-center shadow-[0_8px_40px_rgba(0,0,0,0.35)] ring-2 ring-violet-400/30 w-full">
+              <div className="bg-white/[0.055] border border-white/15 backdrop-blur-xl rounded-2xl p-4 sm:p-6 text-center shadow-[0_8px_40px_rgba(0,0,0,0.35)] ring-2 ring-violet-400/30 w-full">
                 <div className="flex items-center justify-center gap-2 mb-2">
                   <span className="text-xl">📊</span>
-                  <h3 className="text-base font-bold text-violet-300">סטטוס אישורי הגעה</h3>
+                  <h3 className="text-lg font-bold text-violet-300">סטטוס אישורי הגעה</h3>
                 </div>
                 <div className="bg-white/5 border border-white/10 rounded-xl p-3 mt-3">
                     {!shouldShowCharts ? (
@@ -6833,17 +6833,17 @@ React.useEffect(()=>{
                   )}
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-3 text-base">
-                  <div className="min-w-0 bg-white/5 border border-white/10 rounded-xl p-2 text-right">
-                    <div className="text-sm font-semibold text-emerald-300">אישרו הגעה</div>
-                    <div className={`${previewMetricValueClass} text-2xl font-bold text-emerald-300`}>{guestStatusSummary.approved}</div>
+                  <div className="min-w-0 bg-white/5 border border-white/10 rounded-xl p-3 text-right">
+                    <div className="text-base font-semibold text-emerald-300">אישרו הגעה</div>
+                    <div className={`${previewMetricValueClass} text-3xl font-bold text-emerald-300`}>{guestStatusSummary.approved}</div>
                   </div>
-                  <div className="min-w-0 bg-white/5 border border-white/10 rounded-xl p-2 text-right">
-                    <div className="text-sm font-semibold text-amber-300">טרם הגיבו</div>
-                    <div className={`${previewMetricValueClass} text-2xl font-bold text-amber-300`}>{guestStatusSummary.pending}</div>
+                  <div className="min-w-0 bg-white/5 border border-white/10 rounded-xl p-3 text-right">
+                    <div className="text-base font-semibold text-amber-300">טרם הגיבו</div>
+                    <div className={`${previewMetricValueClass} text-3xl font-bold text-amber-300`}>{guestStatusSummary.pending}</div>
                   </div>
-                  <div className="min-w-0 bg-white/5 border border-white/10 rounded-xl p-2 text-right">
-                    <div className="text-sm font-semibold text-rose-400">לא אישרו</div>
-                    <div className={`${previewMetricValueClass} text-2xl font-bold text-rose-400`}>{guestStatusSummary.rejected}</div>
+                  <div className="min-w-0 bg-white/5 border border-white/10 rounded-xl p-3 text-right">
+                    <div className="text-base font-semibold text-rose-400">לא אישרו</div>
+                    <div className={`${previewMetricValueClass} text-3xl font-bold text-rose-400`}>{guestStatusSummary.rejected}</div>
                   </div>
                 </div>
                 {!hasStatusData && (
@@ -6851,10 +6851,10 @@ React.useEffect(()=>{
                 )}
               </div>
               {(planForDisplay || currentEventId) && messageCapacityChartModel && (
-                  <div className="bg-white/[0.055] border border-white/15 backdrop-blur-xl rounded-2xl p-3 sm:p-4 text-center shadow-[0_8px_40px_rgba(0,0,0,0.35)] ring-2 ring-amber-400/30 w-full">
+                  <div className="bg-white/[0.055] border border-white/15 backdrop-blur-xl rounded-2xl p-4 sm:p-6 text-center shadow-[0_8px_40px_rgba(0,0,0,0.35)] ring-2 ring-amber-400/30 w-full">
                     <div className="flex items-center justify-center gap-2 mb-2">
                       <span className="text-xl">📈</span>
-                      <h3 className="text-base font-bold text-amber-300">יתרת הודעות</h3>
+                      <h3 className="text-lg font-bold text-amber-300">יתרת הודעות</h3>
                     </div>
 
                     <div className="bg-white/5 border border-white/10 rounded-xl p-3">
@@ -6899,19 +6899,19 @@ React.useEffect(()=>{
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-3 text-base">
-                      <div className="min-w-0 bg-white/5 border border-white/10 rounded-xl p-2 text-right">
-                        <div className="text-sm font-semibold text-amber-300">מגבלת הודעות</div>
-                        <div className={`${previewMetricValueClass} text-2xl font-bold text-amber-200`}>{messageCapacityChartModel.messageLimit}</div>
+                      <div className="min-w-0 bg-white/5 border border-white/10 rounded-xl p-3 text-right">
+                        <div className="text-base font-semibold text-amber-300">מגבלת הודעות</div>
+                        <div className={`${previewMetricValueClass} text-3xl font-bold text-amber-200`}>{messageCapacityChartModel.messageLimit}</div>
                       </div>
-                      <div className="min-w-0 bg-white/5 border border-white/10 rounded-xl p-2 text-right">
-                            <div className="text-sm font-semibold text-indigo-300">הודעות שנשלחו</div>
-                        <div className={`${previewMetricValueClass} text-2xl font-bold text-indigo-200`}>{messageCapacityChartModel.messagesSent}</div>
+                      <div className="min-w-0 bg-white/5 border border-white/10 rounded-xl p-3 text-right">
+                        <div className="text-base font-semibold text-indigo-300">הודעות שנשלחו</div>
+                        <div className={`${previewMetricValueClass} text-3xl font-bold text-indigo-200`}>{messageCapacityChartModel.messagesSent}</div>
                       </div>
-                      <div className={`min-w-0 bg-white/5 rounded-xl border ${messageCapacityChartModel.overMessages > 0 ? 'border-red-400/30' : 'border-emerald-400/30'} p-2 text-right`}>
-                        <div className={`text-sm font-semibold ${messageCapacityChartModel.overMessages > 0 ? 'text-red-400' : 'text-emerald-300'}`}>
+                      <div className={`min-w-0 bg-white/5 rounded-xl border ${messageCapacityChartModel.overMessages > 0 ? 'border-red-400/30' : 'border-emerald-400/30'} p-3 text-right`}>
+                        <div className={`text-base font-semibold ${messageCapacityChartModel.overMessages > 0 ? 'text-red-400' : 'text-emerald-300'}`}>
                           {messageCapacityChartModel.overMessages > 0 ? 'חריגה' : 'יתרה'}
                         </div>
-                        <div className={`${previewMetricValueClass} text-2xl font-bold ${messageCapacityChartModel.overMessages > 0 ? 'text-red-300' : 'text-emerald-200'}`}>
+                        <div className={`${previewMetricValueClass} text-3xl font-bold ${messageCapacityChartModel.overMessages > 0 ? 'text-red-300' : 'text-emerald-200'}`}>
                           {messageCapacityChartModel.overMessages > 0 ? `-${messageCapacityChartModel.overMessages}` : messageCapacityChartModel.remainingMessages}
                         </div>
                       </div>
