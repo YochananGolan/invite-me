@@ -135,6 +135,7 @@ export default function Home({ session }) {
               onPressReports={handleShowReports}
               onShowFeatures={handleShowFeatures}
               isLoggedIn={!!session}
+              session={session}
             />
           </div>
           <div id="pricing" className="scroll-mt-20 scroll-mb-28 bg-[linear-gradient(160deg,#0d0f2b_0%,#130f35_52%,#1a0f40_100%)] px-4 pt-0 pb-36 text-slate-100 sm:pb-24">

@@ -1,4 +1,5 @@
 import { forwardRef, useEffect, useState } from 'react';
+import { supabase } from '../lib/supabaseClient';
 
 const useTypewriter = (text, speed = 42, pauseDuration = 2600) => {
   const [displayedText, setDisplayedText] = useState('');
@@ -82,6 +83,188 @@ const GlassCard = ({ className = '', children }) => (
     className={`overflow-hidden rounded-2xl border border-white/15 bg-white/[0.055] text-slate-100 shadow-[0_8px_40px_rgba(0,0,0,0.35)] backdrop-blur-xl ring-2 ring-indigo-400/30 ${className}`}
   >
     {children}
+  </div>
+);
+
+const toNonNegativeNumber = (value) => {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) && numeric > 0 ? numeric : 0;
+};
+
+const getPercent = (value, total) => {
+  if (!total) return 0;
+  return Math.min(100, Math.max(0, Math.round((value / total) * 100)));
+};
+
+const parseEventDetails = (details) => {
+  if (!details) return {};
+  if (typeof details === 'string') {
+    try {
+      return JSON.parse(details);
+    } catch (_) {
+      return {};
+    }
+  }
+  return details;
+};
+
+const isPastEvent = (eventRecord) => {
+  const details = parseEventDetails(eventRecord?.event_details);
+  const dateValue = details.end_datetime || details.date || details.start_datetime;
+  if (!dateValue) return false;
+
+  const eventDate = new Date(dateValue);
+  if (Number.isNaN(eventDate.getTime())) return false;
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  eventDate.setHours(0, 0, 0, 0);
+
+  return eventDate < today;
+};
+
+const buildActiveReportSummary = (eventRecord, guests = []) => {
+  // Mirror StepButtons.js: count adults/children for approved guests only,
+  // so hero numbers match the bottom control-reports exactly.
+  const stats = guests.reduce(
+    (acc, guest) => {
+      if (guest.status === 'approved') {
+        acc.adults += toNonNegativeNumber(guest.adults);
+        acc.children += toNonNegativeNumber(guest.children);
+        acc.approved += 1;
+      } else if (guest.status === 'rejected') {
+        acc.rejected += 1;
+      } else {
+        acc.pending += 1;
+      }
+      return acc;
+    },
+    { adults: 0, children: 0, approved: 0, rejected: 0, pending: 0 }
+  );
+
+  const invitationLimit = toNonNegativeNumber(eventRecord?.allowed_guests);
+  const invitationsSent = toNonNegativeNumber(eventRecord?.messages_sent_count);
+  const invitationsRemaining = Math.max(0, invitationLimit - invitationsSent);
+  const totalRsvp = stats.approved + stats.rejected + stats.pending;
+
+  return {
+    ...stats,
+    totalGuests: stats.adults + stats.children,
+    totalRsvp,
+    invitationLimit,
+    invitationsSent,
+    invitationsRemaining,
+    hasReportData: guests.length > 0,
+  };
+};
+
+const MiniMetric = ({ label, value, tone = 'text-slate-100' }) => (
+  <div className="min-w-0 rounded-lg border border-white/10 bg-white/[0.045] px-3 py-3 text-center">
+    <div className={`truncate text-2xl font-black leading-none tabular-nums ${tone}`}>{value}</div>
+    <div className="mt-1 truncate text-xs font-semibold text-slate-400">{label}</div>
+  </div>
+);
+
+const RsvpBar = ({ color, label, value, total }) => {
+  const percent = getPercent(value, total);
+
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center gap-2 text-xs">
+        <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: color }} />
+        <span className="min-w-0 flex-1 truncate font-semibold text-slate-300">{label}</span>
+        <span className="shrink-0 font-bold tabular-nums text-slate-100">{value}</span>
+        <span className="w-9 shrink-0 text-left text-[11px] font-semibold tabular-nums text-slate-500">{percent}%</span>
+      </div>
+      <div className="h-1.5 overflow-hidden rounded-full bg-white/10">
+        <div className="h-full rounded-full" style={{ width: `${percent}%`, backgroundColor: color }} />
+      </div>
+    </div>
+  );
+};
+
+const InvitationBalanceCard = ({ summary }) => {
+  const usedPercent = getPercent(summary.invitationsSent, summary.invitationLimit);
+
+  return (
+    <GlassCard>
+      <CardHeader title="יתרת הזמנות לשליחה">
+        <ReportIcon />
+      </CardHeader>
+      <div className="space-y-4 p-4" dir="rtl">
+        <div className="grid grid-cols-3 gap-2">
+          <MiniMetric label="נותרו" value={summary.invitationsRemaining} tone="text-emerald-300" />
+          <MiniMetric label="נשלחו" value={summary.invitationsSent} tone="text-indigo-200" />
+          <MiniMetric label="מגבלה" value={summary.invitationLimit} tone="text-slate-100" />
+        </div>
+        <div>
+          <div className="mb-2 flex items-center justify-between text-xs font-semibold text-slate-400">
+            <span>ניצול מסלול</span>
+            <span className="tabular-nums text-slate-200">{usedPercent}%</span>
+          </div>
+          <div className="h-2.5 overflow-hidden rounded-full bg-white/10">
+            <div
+              className="h-full rounded-full bg-gradient-to-l from-emerald-300 via-indigo-400 to-violet-500"
+              style={{ width: `${usedPercent}%` }}
+            />
+          </div>
+        </div>
+      </div>
+    </GlassCard>
+  );
+};
+
+const ActiveEventReportsDashboard = ({ summary }) => (
+  <div className="mx-auto w-full max-w-[540px] space-y-4 lg:mx-0" dir="rtl">
+    <GlassCard className="bg-white/[0.07]">
+      <div className="flex items-center justify-between gap-3 border-b border-white/10 px-4 py-3">
+        <div>
+          <p className="text-xs font-bold text-indigo-200">דוחות בקרה מרכזיים</p>
+          <h2 className="mt-1 text-xl font-black text-white">תמונת מצב לאירוע</h2>
+        </div>
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-600 to-violet-600 shadow-[0_10px_28px_rgba(99,70,230,0.35)]">
+          <ReportIcon />
+        </div>
+      </div>
+      <div className="p-4">
+        <div className="mb-3 flex items-end justify-between gap-3">
+          <div>
+            <div className="text-xs font-semibold text-slate-400">סה"כ אורחים</div>
+            <div className="mt-1 text-5xl font-black leading-none tabular-nums text-white">{summary.totalGuests}</div>
+          </div>
+          <div className="text-left text-xs font-semibold text-slate-500">מבוסס על דוחות קיימים</div>
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          <MiniMetric label="מבוגרים" value={summary.adults} tone="text-emerald-300" />
+          <MiniMetric label="ילדים" value={summary.children} tone="text-orange-300" />
+        </div>
+      </div>
+    </GlassCard>
+
+    <GlassCard>
+      <CardHeader title="סטטוס אישורי הגעה">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" aria-hidden="true">
+          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+          <circle cx="9" cy="7" r="4" />
+          <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+          <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+        </svg>
+      </CardHeader>
+      <div className="space-y-4 p-4" dir="rtl">
+        <div className="grid grid-cols-3 gap-2">
+          <MiniMetric label="מגיעים" value={summary.approved} tone="text-emerald-300" />
+          <MiniMetric label="טרם השיבו" value={summary.pending} tone="text-amber-300" />
+          <MiniMetric label="לא מגיעים" value={summary.rejected} tone="text-rose-300" />
+        </div>
+        <div className="space-y-3">
+          <RsvpBar color="#34d399" label="מגיעים" value={summary.approved} total={summary.totalRsvp} />
+          <RsvpBar color="#fbbf24" label="טרם השיבו" value={summary.pending} total={summary.totalRsvp} />
+          <RsvpBar color="#fb7185" label="לא מגיעים" value={summary.rejected} total={summary.totalRsvp} />
+        </div>
+      </div>
+    </GlassCard>
+
+    <InvitationBalanceCard summary={summary} />
   </div>
 );
 
@@ -389,7 +572,11 @@ const ProductCards = () => (
   </>
 );
 
-export default forwardRef(function HeroSection({ onStart, onPressCreateEvent }, ref) {
+export default forwardRef(function HeroSection({ onStart, onPressCreateEvent, session }, ref) {
+  const [activeReportSummary, setActiveReportSummary] = useState(null);
+  const [activeEventId, setActiveEventId] = useState(null);
+  const [reportRefreshKey, setReportRefreshKey] = useState(0);
+
   const handleCreateNewEvent = (event) => {
     event?.preventDefault?.();
     if (typeof onPressCreateEvent === 'function') {
@@ -399,10 +586,93 @@ export default forwardRef(function HeroSection({ onStart, onPressCreateEvent }, 
     onStart?.();
   };
 
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadActiveReportSummary = async () => {
+      const userId = session?.user?.id;
+
+      if (!userId) {
+        setActiveReportSummary(null);
+        setActiveEventId(null);
+        return;
+      }
+
+      try {
+        const { data: eventRecord, error: eventError } = await supabase
+          .from('events')
+          .select('id, event_details, status, allowed_guests, messages_sent_count')
+          .eq('user_id', userId)
+          .or('status.neq.archived,status.is.null')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (eventError) throw eventError;
+
+        if (!eventRecord || isPastEvent(eventRecord)) {
+          if (!cancelled) {
+            setActiveReportSummary(null);
+            setActiveEventId(null);
+          }
+          return;
+        }
+
+        const { data: guests, error: guestsError } = await supabase
+          .from('invited_guests')
+          .select('status, adults, children')
+          .eq('event_id', eventRecord.id);
+
+        if (guestsError) throw guestsError;
+
+        if (!cancelled) {
+          setActiveReportSummary(buildActiveReportSummary(eventRecord, guests || []));
+          setActiveEventId(eventRecord.id);
+        }
+      } catch (error) {
+        console.error('Failed to load active hero report summary', error);
+        if (!cancelled) {
+          setActiveReportSummary(null);
+          setActiveEventId(null);
+        }
+      }
+    };
+
+    loadActiveReportSummary();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [session?.user?.id, reportRefreshKey]);
+
+  useEffect(() => {
+    if (!activeEventId) return undefined;
+
+    const channel = supabase.channel(`hero-report-summary-${activeEventId}`);
+    channel
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'events', filter: `id=eq.${activeEventId}` },
+        () => setReportRefreshKey((key) => key + 1)
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'invited_guests', filter: `event_id=eq.${activeEventId}` },
+        () => setReportRefreshKey((key) => key + 1)
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [activeEventId]);
+
+  const shouldShowActiveReports = Boolean(activeReportSummary && activeReportSummary.hasReportData);
+
   return (
     <section className="relative z-10 overflow-visible px-4 pb-10 pt-12 text-slate-100 sm:px-6 lg:px-12 lg:pb-14 lg:pt-16">
-      <div className="mx-auto grid max-w-6xl items-center gap-10 lg:min-h-[calc(100vh-86px)] lg:grid-cols-[0.96fr_1.04fr] lg:gap-12">
-        <div className="flex flex-col items-center gap-6 text-center lg:items-start lg:text-right">
+      <div className={`mx-auto grid max-w-6xl items-center gap-10 lg:min-h-[calc(100vh-86px)] lg:gap-12 ${shouldShowActiveReports ? 'lg:grid-cols-[1.04fr_0.96fr]' : 'lg:grid-cols-[0.96fr_1.04fr]'}`}>
+        <div className={`flex flex-col items-center gap-6 text-center lg:items-start lg:text-right ${shouldShowActiveReports ? 'lg:order-2' : 'lg:order-1'}`}>
           <div className="inline-flex items-center gap-2 rounded-full border border-indigo-300/35 bg-indigo-500/10 px-4 py-2 text-xs font-semibold text-indigo-200">
             <svg width="11" height="11" viewBox="0 0 12 12" fill="#c4b9ff" aria-hidden="true">
               <path d="M6 0l1.5 4.5H12L8.25 7.5 9.75 12 6 9.25 2.25 12l1.5-4.5L0 4.5h4.5z" />
@@ -464,7 +734,9 @@ export default forwardRef(function HeroSection({ onStart, onPressCreateEvent }, 
           </div>
         </div>
 
-        <ProductCards />
+        <div className={shouldShowActiveReports ? 'lg:order-1' : 'lg:order-2'}>
+          {shouldShowActiveReports ? <ActiveEventReportsDashboard summary={activeReportSummary} /> : <ProductCards />}
+        </div>
       </div>
     </section>
   );
