@@ -691,7 +691,7 @@ export default function GuestPage({ initialData, initialError }) {
                 </div>
 
                 <div>
-                  <h2 className="mb-2 text-base sm:text-lg font-bold text-slate-100">מנות מיוחדות</h2>
+                  <h2 className="mb-2 text-xl sm:text-2xl font-bold text-slate-100 text-center">מנות מיוחדות</h2>
                   <div className="overflow-x-auto">
                     <table className="w-full text-right min-w-[300px] border-collapse">
                       <thead>
