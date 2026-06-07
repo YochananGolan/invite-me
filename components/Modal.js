@@ -34,8 +34,8 @@ export default function Modal({ open, onClose, size = 'md', children, className 
         onClick={(e) => e.stopPropagation()}
       >
         {/* glow accents */}
-        <div className="pointer-events-none absolute -top-32 -right-24 h-64 w-64 rounded-full bg-indigo-600/20 blur-3xl" />
-        <div className="pointer-events-none absolute -bottom-32 -left-24 h-64 w-64 rounded-full bg-violet-600/15 blur-3xl" />
+        <div className="hidden sm:block pointer-events-none absolute -top-32 -right-24 h-64 w-64 rounded-full bg-indigo-600/20 blur-3xl" />
+        <div className="hidden sm:block pointer-events-none absolute -bottom-32 -left-24 h-64 w-64 rounded-full bg-violet-600/15 blur-3xl" />
         {children}
       </div>
     </div>
@@ -44,7 +44,7 @@ export default function Modal({ open, onClose, size = 'md', children, className 
 
 export function ModalHeader({ children, subtitle, onClose }) {
   return (
-    <div className="relative flex items-start justify-between px-7 pt-6 pb-5 border-b border-white/[0.08] shrink-0">
+    <div className="relative z-10 flex items-start justify-between px-7 pt-6 pb-5 border-b border-white/[0.08] shrink-0">
       <div className="flex-1 text-right">
         <div className="text-xl sm:text-2xl font-black text-white leading-tight">{children}</div>
         {subtitle && <p className="mt-1 text-sm text-slate-400">{subtitle}</p>}
