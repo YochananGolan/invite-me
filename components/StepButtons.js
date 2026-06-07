@@ -1160,8 +1160,8 @@ const shouldShowWhatsAppGroupUpdateButton = Boolean(currentEventId && (hasWhatsA
     const remainingMessages = Math.max(0, remainingMessagesRaw);
     const overMessages = remainingMessagesRaw < 0 ? Math.abs(remainingMessagesRaw) : 0;
     const capacityChartData = [
-      { key: 'limit', name: isMobileView ? 'מגבלה' : 'מגבלת הודעות', value: messageLimit, color: '#facc15' },
-      { key: 'sent', name: isMobileView ? 'נשלחו' : 'הודעות שנשלחו', value: messagesSent, color: '#7c3aed' },
+      { key: 'limit', name: 'מגבלה', value: messageLimit, color: '#facc15' },
+      { key: 'sent', name: 'נשלחו', value: messagesSent, color: '#7c3aed' },
       {
         key: overMessages > 0 ? 'over' : 'remaining',
         name: overMessages > 0 ? 'חריגה' : 'יתרה',
@@ -6683,7 +6683,7 @@ React.useEffect(()=>{
                               dataKey="name"
                               stroke="#cbd5e1"
                               tick={{
-                                fontSize: isMobileView ? 12 : 16,
+                                fontSize: isMobileView ? 11 : 13,
                                 fontWeight: 600,
                                 fill: isMobileView ? '#FDE68A' : '#cbd5e1',
                               }}
@@ -6696,7 +6696,7 @@ React.useEffect(()=>{
                               }}
                               tickLine={false}
                               axisLine={false}
-                              tickMargin={isMobileView ? 12 : 16}
+                              tickMargin={isMobileView ? 8 : 10}
                             />
                             <YAxis hide />
                             <Tooltip content={() => null} active={false} cursor={false} />
@@ -6871,11 +6871,11 @@ React.useEffect(()=>{
                               <XAxis
                                 dataKey="name"
                                 stroke="#cbd5e1"
-                                tick={{ fontSize: isMobileView ? 12 : 16, fontWeight: 600, fill: isMobileView ? '#FDE68A' : '#cbd5e1' }}
+                                tick={{ fontSize: isMobileView ? 11 : 13, fontWeight: 600, fill: isMobileView ? '#FDE68A' : '#cbd5e1' }}
                                 interval={0}
                                 tickLine={false}
                                 axisLine={false}
-                                tickMargin={isMobileView ? 12 : 16}
+                                tickMargin={isMobileView ? 8 : 10}
                               />
                               <YAxis hide />
                               <Tooltip content={() => null} active={false} cursor={false} />
