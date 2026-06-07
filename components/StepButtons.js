@@ -7948,7 +7948,7 @@ React.useEffect(()=>{
                 style={{ width: '100%', maxWidth: 480, aspectRatio: '3/4' }}
               >
                 {selectedDesign ? (
-                  <img src={selectedDesign} alt="תבנית נבחרת" className="absolute inset-0 w-full h-full object-cover" />
+                  <img src={selectedDesign} alt="תבנית נבחרת" className="absolute inset-0 w-full h-full object-cover object-top" />
                 ) : (
                   <div className="absolute inset-0 bg-gradient-to-br from-[#f0e8ff] to-[#fdf6ee]" />
                 )}
@@ -8056,7 +8056,7 @@ React.useEffect(()=>{
                         }}
                       >
                         <div className="relative aspect-[3/4] w-full bg-white/5">
-                          <img src={src} alt="Invitation design" className="absolute inset-0 w-full h-full object-cover" />
+                          <img src={src} alt="Invitation design" className="absolute inset-0 w-full h-full object-cover object-top" />
                           <div className="absolute inset-0 pointer-events-none" style={{ background: 'rgba(255,255,255,0.15)' }} />
                           <div className="absolute inset-0 flex flex-col items-center justify-center px-2 overflow-hidden" dir="rtl">
                             {(customInvitationText || invitationText || '').split('\n').map((line, lineIndex) => {
