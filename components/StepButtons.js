@@ -7120,9 +7120,52 @@ React.useEffect(()=>{
         style={{ display: 'none' }}
       />
 
-      <Modal open={showGuestForm} onClose={() => setShowGuestForm(false)} size="md">
+      <Modal open={showGuestForm} onClose={() => setShowGuestForm(false)} size="lg">
         <ModalHeader onClose={() => setShowGuestForm(false)}>שליחת הזמנות</ModalHeader>
         <ModalBody>
+          {/* Invite card preview */}
+          {(selectedDesign || invitationText) && (
+            <div className="mb-5 flex justify-center">
+              <div className="relative w-full max-w-[220px]" dir="rtl">
+                <div className="relative w-full pt-[125%] rounded-xl shadow-xl overflow-hidden border border-white/15">
+                  {selectedDesign ? (
+                    <img src={selectedDesign} alt="הזמנה" className="absolute inset-0 w-full h-full object-cover object-top" />
+                  ) : (
+                    <div className="absolute inset-0 bg-gradient-to-br from-[#f0e8ff] to-[#fdf6ee]" />
+                  )}
+                  {invitationText && (
+                    <div className="absolute inset-0 flex flex-col justify-center items-center p-3 pointer-events-none z-10" dir="rtl">
+                      {invitationText.split('\n').map((line, idx) => {
+                        if (!line.trim()) return <div key={idx} style={{ height: '0.3em' }} />;
+                        const style = lineStyles[idx] || {};
+                        const baseFontSize = idx === 0 ? 28 : 16;
+                        const fontSize = Math.round((parseInt(style.fontSize) || baseFontSize) * 0.45);
+                        const fontFamily = selectedFontCss ? selectedFontCss.replace(/['"]/g, '') : 'Assistant, sans-serif';
+                        return (
+                          <div
+                            key={idx}
+                            style={{
+                              fontSize,
+                              fontWeight: style.fontWeight || (idx === 0 ? 'bold' : 'normal'),
+                              textAlign: style.textAlign || 'center',
+                              color: style.color || '#000000',
+                              fontFamily,
+                              lineHeight: 1.3,
+                              width: '100%',
+                            }}
+                          >
+                            {line}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+                <p className="text-center text-xs text-slate-500 mt-1.5">תצוגה מקדימה של ההזמנה</p>
+              </div>
+            </div>
+          )}
+
           <div className="flex flex-col gap-3 mb-6">
             <button
               type="button"
