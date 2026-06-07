@@ -7264,9 +7264,9 @@ React.useEffect(()=>{
       </Modal>
 
       {/* RSVP Confirmation Modal */}
-      <Drawer open={showGuestListModal} onClose={() => setShowGuestListModal(false)} size="xl">
-        <DrawerHeader onClose={() => setShowGuestListModal(false)}>דו"חות אישורי הגעה</DrawerHeader>
-        <DrawerBody>
+      <Modal open={showGuestListModal} onClose={() => setShowGuestListModal(false)} size="xl">
+        <ModalHeader onClose={() => setShowGuestListModal(false)}>דו"חות אישורי הגעה</ModalHeader>
+        <ModalBody>
           {/* filter buttons */}
           <div className="flex justify-center gap-2 mb-4">
             {['approved','rejected','pending'].map(key=> (
@@ -7278,11 +7278,11 @@ React.useEffect(()=>{
           <div>
             {/* הטבלה הוסרה לפי דרישה */}
           </div>
-        </DrawerBody>
-        <DrawerFooter>
+        </ModalBody>
+        <ModalFooter>
           <button onClick={() => setShowGuestListModal(false)} className="bg-primary text-white border border-primary rounded-full px-8 py-3 font-medium hover:bg-primary/90 transition-all">סגור</button>
-        </DrawerFooter>
-      </Drawer>
+        </ModalFooter>
+      </Modal>
 
       {/* Delete confirmation modal */}
       <Modal open={deleteIdx !== null} onClose={cancelDelete} size="sm">
@@ -8483,9 +8483,9 @@ React.useEffect(()=>{
       )}
 
       {/* Report Modal */}
-      <Drawer open={showReportModal} onClose={() => setShowReportModal(false)} size="xl">
-        <DrawerHeader onClose={() => setShowReportModal(false)}>{reportTitle}</DrawerHeader>
-        <DrawerBody>
+      <Modal open={showReportModal} onClose={() => setShowReportModal(false)} size="xl">
+        <ModalHeader onClose={() => setShowReportModal(false)}>{reportTitle}</ModalHeader>
+        <ModalBody>
           {showReportModal && (<>
             {reportGuests.length === 0 ? (
               <p className="text-center text-slate-400">אין נתונים להצגה</p>
@@ -8583,13 +8583,13 @@ React.useEffect(()=>{
               </div>
             )}
           </>)}
-        </DrawerBody>
-        <DrawerFooter>
+        </ModalBody>
+        <ModalFooter>
           <button onClick={() => setShowReportModal(false)} className="bg-primary text-white border border-primary rounded-full px-8 py-3 font-medium hover:bg-primary/90 transition-all">סגור</button>
-        </DrawerFooter>
-      </Drawer>
+        </ModalFooter>
+      </Modal>
       {/* Reports menu modal */}
-      <Modal open={typeof showReportsOptions !== 'undefined' && showReportsOptions} onClose={() => setShowReportsOptions(false)} size="sm">
+      <Modal open={typeof showReportsOptions !== 'undefined' && showReportsOptions} onClose={() => setShowReportsOptions(false)} size="lg">
         <ModalHeader onClose={() => setShowReportsOptions(false)}>בחר דו"ח להצגה</ModalHeader>
         <ModalBody className="text-center space-y-4">
             {selectedEventForReport && (
@@ -8803,7 +8803,7 @@ React.useEffect(()=>{
       </Modal>
 
       {/* Approved report modal */}
-      <Modal open={showApprovedReport} onClose={()=>{setShowApprovedReport(false);setShowReportsOptions(true);}} size="xl">
+      <Modal open={showApprovedReport} onClose={()=>{setShowApprovedReport(false);setShowReportsOptions(true);}} size="full">
         <ModalHeader onClose={()=>{setShowApprovedReport(false);setShowReportsOptions(true);}}>דוח אורחים שאישרו הגעה</ModalHeader>
         <ModalBody className="overflow-x-auto">
               <table className="w-full text-right border border-collapse" style={{fontSize: '11px'}}>
@@ -8867,7 +8867,7 @@ React.useEffect(()=>{
       </Modal>
 
       {/* Rejected report modal */}
-      <Modal open={showRejectedReport} onClose={()=>{setShowRejectedReport(false);setShowReportsOptions(true);}} size="xl">
+      <Modal open={showRejectedReport} onClose={()=>{setShowRejectedReport(false);setShowReportsOptions(true);}} size="full">
         <ModalHeader onClose={()=>{setShowRejectedReport(false);setShowReportsOptions(true);}}>דוח אורחים שלא מגיעים</ModalHeader>
         <ModalBody className="overflow-x-auto">
               <table className="w-full text-right border border-white/10 border-collapse" style={{fontSize: '11px'}}>
@@ -8899,7 +8899,7 @@ React.useEffect(()=>{
       </Modal>
 
       {/* Pending report modal */}
-      <Modal open={showPendingReport} onClose={()=>{setShowPendingReport(false);setShowReportsOptions(true);}} size="xl">
+      <Modal open={showPendingReport} onClose={()=>{setShowPendingReport(false);setShowReportsOptions(true);}} size="full">
         <ModalHeader onClose={()=>{setShowPendingReport(false);setShowReportsOptions(true);}}>דוח אורחים שטרם הגיבו</ModalHeader>
         <ModalBody className="overflow-x-auto">
               <table className="w-full text-right border border-white/10 border-collapse" style={{fontSize: '11px'}}>
@@ -8931,7 +8931,7 @@ React.useEffect(()=>{
       </Modal>
 
       {/* Guest status query modal */}
-      <Modal open={showSearchGuest} onClose={()=>{setShowSearchGuest(false); setShowReportsOptions(true);}} size="md">
+      <Modal open={showSearchGuest} onClose={()=>{setShowSearchGuest(false); setShowReportsOptions(true);}} size="lg">
         <ModalHeader onClose={()=>{setShowSearchGuest(false); setShowReportsOptions(true);}}>חיפוש אורח</ModalHeader>
         <ModalBody>
             <div className="flex justify-center gap-2 mb-4 px-1">
@@ -9631,9 +9631,9 @@ React.useEffect(()=>{
       </Modal>
 
       {/* Archive events list modal */}
-      <Drawer open={showArchiveList} onClose={()=>{setShowArchiveList(false);setShowReportsOptions(true);}} size="xl">
-        <DrawerHeader onClose={()=>{setShowArchiveList(false);setShowReportsOptions(true);}}>אירועים מהעבר (ארכיון)</DrawerHeader>
-        <DrawerBody className="text-center space-y-4">
+      <Modal open={showArchiveList} onClose={()=>{setShowArchiveList(false);setShowReportsOptions(true);}} size="xl">
+        <ModalHeader onClose={()=>{setShowArchiveList(false);setShowReportsOptions(true);}}>אירועים מהעבר (ארכיון)</ModalHeader>
+        <ModalBody className="text-center space-y-4">
             {archiveLoading ? (
               <p className="text-slate-400">טוען אירועים...</p>
             ) : archiveEvents.length===0 ? (
@@ -9658,8 +9658,8 @@ React.useEffect(()=>{
                 })}
               </ul>
             )}
-        </DrawerBody>
-      </Drawer>
+        </ModalBody>
+      </Modal>
 
       <Modal open={showActiveError} onClose={() => setShowActiveError(false)} size="sm">
         <ModalBody className="text-center rtl">
