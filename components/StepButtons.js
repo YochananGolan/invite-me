@@ -1262,7 +1262,7 @@ const handleOpenAddonModal = React.useCallback(() => {
   const [showStep5Options, setShowStep5Options] = useState(false);
   const [showRsvpQuestion, setShowRsvpQuestion] = useState(false);
   const [showDesignChooser, setShowDesignChooser] = useState(false);
-  const [designMobileTab, setDesignMobileTab] = useState('templates');
+  const [designMobileTab, setDesignMobileTab] = useState('text');
   const [showCountModal, setShowCountModal] = useState(false);
   const [adultsCount, setAdultsCount] = useState(1);
   const [childrenCount, setChildrenCount] = useState(0);
