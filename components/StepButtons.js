@@ -7873,7 +7873,7 @@ React.useEffect(()=>{
                 <select
                   value={selectedFontKey}
                   onChange={(e) => setSelectedFontKey(e.target.value)}
-                  className="w-full bg-white/10 border border-white/20 text-white rounded-xl focus:border-indigo-400 p-2 text-sm"
+                  className="w-full bg-[#1a1d4a] border border-white/30 text-slate-100 rounded-xl focus:border-indigo-400 p-2 text-sm"
                 >
                   {fontsOptions.map(f => (
                     <option key={f.key} value={f.key}>{f.label}</option>
