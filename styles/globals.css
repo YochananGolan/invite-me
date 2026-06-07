@@ -38,6 +38,10 @@ body.payment-modal-open [class*="userway"] {
   pointer-events: none !important;
 }
 
+body.payment-modal-open {
+  overflow: hidden;
+}
+
 /* Mobile-first: safe area for notched phones */
 @supports (padding: max(0px)) {
   body {
