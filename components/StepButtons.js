@@ -8225,7 +8225,7 @@ React.useEffect(()=>{
                   <select
                     value={lineStyles[showAdvancedEdit]?.fontSize ?? (showAdvancedEdit === 0 ? '28' : '16')}
                     onChange={(e) => updateLineStyle(showAdvancedEdit, 'fontSize', e.target.value)}
-                    className="w-full bg-white/10 border border-white/20 text-white rounded-xl focus:border-indigo-400 p-2"
+                    className="w-full bg-[#1a1d4a] border border-white/30 text-slate-100 rounded-xl focus:border-indigo-400 p-2"
                   >
                     <option value="12">12px</option>
                     <option value="14">14px</option>
@@ -8247,7 +8247,7 @@ React.useEffect(()=>{
                   <select
                     value={lineStyles[showAdvancedEdit]?.fontWeight ?? (showAdvancedEdit === 0 ? 'bold' : 'normal')}
                     onChange={(e) => updateLineStyle(showAdvancedEdit, 'fontWeight', e.target.value)}
-                    className="w-full bg-white/10 border border-white/20 text-white rounded-xl focus:border-indigo-400 p-2"
+                    className="w-full bg-[#1a1d4a] border border-white/30 text-slate-100 rounded-xl focus:border-indigo-400 p-2"
                   >
                     <option value="normal">רגיל</option>
                     <option value="bold">מודגש</option>
@@ -8272,7 +8272,7 @@ React.useEffect(()=>{
                         const current = lineStyles[showAdvancedEdit]?.textShadow || 'none';
                         updateLineStyle(showAdvancedEdit, 'textShadow', current === 'none' ? '2px 2px 4px rgba(0,0,0,0.3)' : 'none');
                       }}
-                      className={`flex-1 p-3 border-2 rounded-lg ${lineStyles[showAdvancedEdit]?.textShadow && lineStyles[showAdvancedEdit]?.textShadow !== 'none' ? 'border-primary bg-primary/10' : 'border-white/20'} hover:border-primary transition-colors text-slate-100`}
+                      className={`flex-1 p-3 border-2 rounded-lg ${lineStyles[showAdvancedEdit]?.textShadow && lineStyles[showAdvancedEdit]?.textShadow !== 'none' ? 'border-indigo-500 bg-indigo-600 text-white' : 'border-white/20 bg-white/5 text-slate-300'} hover:border-indigo-400 transition-colors`}
                     >
                       <span className={`text-lg ${lineStyles[showAdvancedEdit]?.textShadow && lineStyles[showAdvancedEdit]?.textShadow !== 'none' ? 'drop-shadow-md' : ''}`}>A</span>
                       <div className="text-xs mt-1">צל</div>
@@ -8292,7 +8292,7 @@ React.useEffect(()=>{
                       <button
                         key={align.value}
                         onClick={() => updateLineStyle(showAdvancedEdit, 'textAlign', align.value)}
-                        className={`flex-1 p-3 border-2 rounded-lg ${lineStyles[showAdvancedEdit]?.textAlign === align.value ? 'border-primary bg-primary/10' : 'border-white/20'} hover:border-primary transition-colors text-slate-100`}
+                        className={`flex-1 p-3 border-2 rounded-lg ${lineStyles[showAdvancedEdit]?.textAlign === align.value ? 'border-indigo-500 bg-indigo-600 text-white' : 'border-white/20 bg-white/5 text-slate-300'} hover:border-indigo-400 transition-colors`}
                         title={align.label}
                       >
                         <div className="text-2xl mb-1">{align.icon}</div>
@@ -8355,7 +8355,7 @@ React.useEffect(()=>{
                           const current = lineStyles[showAdvancedEdit]?.textDecoration || 'none';
                           updateLineStyle(showAdvancedEdit, 'textDecoration', current === dec.value ? 'none' : dec.value);
                         }}
-                        className={`px-4 py-2 border-2 rounded-lg ${lineStyles[showAdvancedEdit]?.textDecoration === dec.value ? 'border-primary bg-primary/10' : 'border-white/20'} hover:border-primary transition-colors text-slate-100`}
+                        className={`px-4 py-2 border-2 rounded-lg ${lineStyles[showAdvancedEdit]?.textDecoration === dec.value ? 'border-indigo-500 bg-indigo-600 text-white' : 'border-white/20 bg-white/5 text-slate-300'} hover:border-indigo-400 transition-colors`}
                         title={dec.label}
                       >
                         <span className={`text-lg ${dec.value === 'underline' ? 'underline' : dec.value === 'line-through' ? 'line-through' : dec.value === 'overline' ? 'overline' : ''}`}>
@@ -8373,7 +8373,7 @@ React.useEffect(()=>{
                   <div className="flex gap-2">
                     <button
                       onClick={() => updateLineStyle(showAdvancedEdit, 'fontStyle', 'normal')}
-                      className={`flex-1 p-3 border-2 rounded-lg ${(lineStyles[showAdvancedEdit]?.fontStyle || 'normal') === 'normal' ? 'border-primary bg-primary/10' : 'border-white/20'} hover:border-primary transition-colors text-slate-100`}
+                      className={`flex-1 p-3 border-2 rounded-lg ${(lineStyles[showAdvancedEdit]?.fontStyle || 'normal') === 'normal' ? 'border-indigo-500 bg-indigo-600 text-white' : 'border-white/20 bg-white/5 text-slate-300'} hover:border-indigo-400 transition-colors`}
                       title="ישר"
                     >
                       <span className="text-lg">I</span>
@@ -8384,7 +8384,7 @@ React.useEffect(()=>{
                         const current = lineStyles[showAdvancedEdit]?.fontStyle || 'normal';
                         updateLineStyle(showAdvancedEdit, 'fontStyle', current === 'italic' ? 'normal' : 'italic');
                       }}
-                      className={`flex-1 p-3 border-2 rounded-lg ${lineStyles[showAdvancedEdit]?.fontStyle === 'italic' ? 'border-primary bg-primary/10' : 'border-white/20'} hover:border-primary transition-colors text-slate-100`}
+                      className={`flex-1 p-3 border-2 rounded-lg ${lineStyles[showAdvancedEdit]?.fontStyle === 'italic' ? 'border-indigo-500 bg-indigo-600 text-white' : 'border-white/20 bg-white/5 text-slate-300'} hover:border-indigo-400 transition-colors`}
                       title="נטוי שמאלה"
                     >
                       <span className="text-lg" style={{ 
@@ -8398,7 +8398,7 @@ React.useEffect(()=>{
                         const current = lineStyles[showAdvancedEdit]?.fontStyle || 'normal';
                         updateLineStyle(showAdvancedEdit, 'fontStyle', current === 'back-slant' ? 'normal' : 'back-slant');
                       }}
-                      className={`flex-1 p-3 border-2 rounded-lg ${lineStyles[showAdvancedEdit]?.fontStyle === 'back-slant' ? 'border-primary bg-primary/10' : 'border-white/20'} hover:border-primary transition-colors text-slate-100`}
+                      className={`flex-1 p-3 border-2 rounded-lg ${lineStyles[showAdvancedEdit]?.fontStyle === 'back-slant' ? 'border-indigo-500 bg-indigo-600 text-white' : 'border-white/20 bg-white/5 text-slate-300'} hover:border-indigo-400 transition-colors`}
                       title="נטוי ימינה"
                     >
                       <span className="text-lg" style={{ 
