@@ -8756,9 +8756,9 @@ React.useEffect(()=>{
       </Modal>
 
       {/* Approved report modal */}
-      <Drawer open={showApprovedReport} onClose={()=>{setShowApprovedReport(false);setShowReportsOptions(true);}} size="xl">
-        <DrawerHeader onClose={()=>{setShowApprovedReport(false);setShowReportsOptions(true);}}>דוח אורחים שאישרו הגעה</DrawerHeader>
-        <DrawerBody className="overflow-x-auto">
+      <Modal open={showApprovedReport} onClose={()=>{setShowApprovedReport(false);setShowReportsOptions(true);}} size="xl">
+        <ModalHeader onClose={()=>{setShowApprovedReport(false);setShowReportsOptions(true);}}>דוח אורחים שאישרו הגעה</ModalHeader>
+        <ModalBody className="overflow-x-auto">
               <table className="w-full text-right border border-collapse" style={{fontSize: '11px'}}>
                 <thead>
                   <tr className="bg-white/5 text-slate-300">
@@ -8813,16 +8813,16 @@ React.useEffect(()=>{
                   </tr>
                 </tfoot>
               </table>
-        </DrawerBody>
-        <DrawerFooter>
+        </ModalBody>
+        <ModalFooter>
           <button onClick={exportApprovedXlsx} className="bg-white/[0.06] text-slate-100 border border-white/15 rounded-full px-6 py-2 font-medium hover:bg-indigo-500/15 hover:border-indigo-400/50 transition-all">צור קובץ אקסל - ושמור בהורדות</button>
-        </DrawerFooter>
-      </Drawer>
+        </ModalFooter>
+      </Modal>
 
       {/* Rejected report modal */}
-      <Drawer open={showRejectedReport} onClose={()=>{setShowRejectedReport(false);setShowReportsOptions(true);}} size="xl">
-        <DrawerHeader onClose={()=>{setShowRejectedReport(false);setShowReportsOptions(true);}}>דוח אורחים שלא מגיעים</DrawerHeader>
-        <DrawerBody className="overflow-x-auto">
+      <Modal open={showRejectedReport} onClose={()=>{setShowRejectedReport(false);setShowReportsOptions(true);}} size="xl">
+        <ModalHeader onClose={()=>{setShowRejectedReport(false);setShowReportsOptions(true);}}>דוח אורחים שלא מגיעים</ModalHeader>
+        <ModalBody className="overflow-x-auto">
               <table className="w-full text-right border border-white/10 border-collapse" style={{fontSize: '11px'}}>
                 <thead>
                   <tr className="bg-white/5 text-slate-300 font-bold whitespace-nowrap">
@@ -8848,13 +8848,13 @@ React.useEffect(()=>{
                   </tr>
                 </tfoot>
               </table>
-        </DrawerBody>
-      </Drawer>
+        </ModalBody>
+      </Modal>
 
       {/* Pending report modal */}
-      <Drawer open={showPendingReport} onClose={()=>{setShowPendingReport(false);setShowReportsOptions(true);}} size="xl">
-        <DrawerHeader onClose={()=>{setShowPendingReport(false);setShowReportsOptions(true);}}>דוח אורחים שטרם הגיבו</DrawerHeader>
-        <DrawerBody className="overflow-x-auto">
+      <Modal open={showPendingReport} onClose={()=>{setShowPendingReport(false);setShowReportsOptions(true);}} size="xl">
+        <ModalHeader onClose={()=>{setShowPendingReport(false);setShowReportsOptions(true);}}>דוח אורחים שטרם הגיבו</ModalHeader>
+        <ModalBody className="overflow-x-auto">
               <table className="w-full text-right border border-white/10 border-collapse" style={{fontSize: '11px'}}>
                 <thead>
                   <tr className="bg-white/5 text-slate-300 font-bold whitespace-nowrap">
@@ -8880,8 +8880,8 @@ React.useEffect(()=>{
                   </tr>
                 </tfoot>
               </table>
-        </DrawerBody>
-      </Drawer>
+        </ModalBody>
+      </Modal>
 
       {/* Guest status query modal */}
       <Modal open={showSearchGuest} onClose={()=>{setShowSearchGuest(false); setShowReportsOptions(true);}} size="md">
