@@ -435,28 +435,22 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick, trig
     );
   }, [guestSummaryChartData]);
   const renderStatusSliceLabel = React.useCallback((props) => {
-    const { value, cx, cy, midAngle, innerRadius, outerRadius, index } = props;
+    const { value, cx, cy, midAngle, innerRadius, outerRadius } = props;
     const numericValue = Number(value);
     if (!Number.isFinite(numericValue) || numericValue <= 0) return null;
-    const slice = statusChartData?.[index];
-    if (!slice) return null;
-    const total = statusTotal;
-    const isOnlySlice = total > 0 && numericValue === total;
-    const labelRadius = isOnlySlice
-      ? innerRadius + (outerRadius - innerRadius) / 2
-      : outerRadius + 14;
-    const x = isOnlySlice ? cx : cx + labelRadius * Math.cos(-midAngle * RADIAN);
-    const y = isOnlySlice ? cy : cy + labelRadius * Math.sin(-midAngle * RADIAN);
+    // Always render label at mid-radius inside the slice — no external labels, no clipping
+    const labelRadius = innerRadius + (outerRadius - innerRadius) / 2;
+    const x = cx + labelRadius * Math.cos(-midAngle * RADIAN);
+    const y = cy + labelRadius * Math.sin(-midAngle * RADIAN);
     return (
       <text
         x={x}
         y={y}
-        fill="#e2e8f0"
+        fill="#ffffff"
         textAnchor="middle"
         dominantBaseline="central"
         fontWeight="700"
-        fontSize={isOnlySlice ? 14 : 13}
-        {...getContainedStatusSliceLabelProps(numericValue, innerRadius, isOnlySlice)}
+        fontSize={13}
       >
         {numericValue}
       </text>
@@ -6803,7 +6797,7 @@ React.useEffect(()=>{
                             paddingAngle={statusChartDataNonZero.length > 1 ? 2 : 0}
                             isAnimationActive={false}
                             label={renderStatusSliceLabel}
-                            labelLine={{ stroke: '#94a3b8', strokeWidth: 1 }}
+                            labelLine={false}
                           >
                             {statusChartDataNonZero.map((item) => (
                               <Cell key={item.key} fill={item.color} />
@@ -6836,16 +6830,16 @@ React.useEffect(()=>{
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-3 text-base">
                   <div className="min-w-0 bg-white/5 border border-white/10 rounded-xl p-2 text-right">
-                    <div className="text-sm font-semibold text-emerald-400">אישרו הגעה</div>
+                    <div className="text-sm font-semibold text-emerald-300">אישרו הגעה</div>
                     <div className={`${previewMetricValueClass} text-2xl font-bold text-emerald-300`}>{guestStatusSummary.approved}</div>
                   </div>
                   <div className="min-w-0 bg-white/5 border border-white/10 rounded-xl p-2 text-right">
                     <div className="text-sm font-semibold text-amber-300">טרם הגיבו</div>
-                    <div className={`${previewMetricValueClass} text-2xl font-bold text-amber-200`}>{guestStatusSummary.pending}</div>
+                    <div className={`${previewMetricValueClass} text-2xl font-bold text-amber-300`}>{guestStatusSummary.pending}</div>
                   </div>
                   <div className="min-w-0 bg-white/5 border border-white/10 rounded-xl p-2 text-right">
-                    <div className="text-sm font-semibold text-red-400">לא אישרו</div>
-                    <div className={`${previewMetricValueClass} text-2xl font-bold text-red-300`}>{guestStatusSummary.rejected}</div>
+                    <div className="text-sm font-semibold text-rose-400">לא אישרו</div>
+                    <div className={`${previewMetricValueClass} text-2xl font-bold text-rose-400`}>{guestStatusSummary.rejected}</div>
                   </div>
                 </div>
                 {!hasStatusData && (
