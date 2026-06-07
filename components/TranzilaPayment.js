@@ -154,12 +154,11 @@ export default function TranzilaPayment({
 
         const data = event.data;
 
-        // Origin validation – allow our own domain and trusted Tranzila domains (for Google Pay callbacks).
-        // Tranzila may emit intermediate statuses; we react only when the payload clearly indicates success or failure.
+        // Origin validation: Tranzila may emit intermediate wallet statuses during Google Pay.
+        // Only our same-origin callback pages are allowed to finalize success/failure.
         const isOwnOrigin = typeof window !== 'undefined' && event.origin === window.location.origin;
         const isTrustedTranzilaOrigin =
           typeof event.origin === 'string' && /(?:^https?:\/\/)?([^/]+\.)?tranzila\.com$/i.test(event.origin);
-        const isTrustedOrigin = isOwnOrigin || isTrustedTranzilaOrigin;
 
         // Handle string messages (from API callbacks) - only from our success/failure pages
         if (typeof data === 'string') {
@@ -181,7 +180,7 @@ export default function TranzilaPayment({
               parsed?.reason ||
               (normalizedResponse && normalizedResponse !== '000' && normalizedResponse !== '0');
 
-            if (isTrustedOrigin && parsedSuccess) {
+            if (isOwnOrigin && parsedSuccess) {
               if (failureTimeoutRef.current) {
                 clearTimeout(failureTimeoutRef.current);
                 failureTimeoutRef.current = null;
@@ -190,11 +189,14 @@ export default function TranzilaPayment({
               onCloseRef.current && onCloseRef.current();
               return;
             }
-            if (isTrustedOrigin && !parsedSuccess && parsedFailure) {
+            if (isOwnOrigin && !parsedSuccess && parsedFailure) {
               if (failureTimeoutRef.current) clearTimeout(failureTimeoutRef.current);
               failureTimeoutRef.current = null;
               onFailureRef.current && onFailureRef.current(parsed);
               return;
+            }
+            if (isTrustedTranzilaOrigin && (parsedSuccess || parsedFailure)) {
+              console.debug('Ignoring intermediate Tranzila payment message', parsed);
             }
           } catch (e) {
             return;
@@ -241,7 +243,7 @@ export default function TranzilaPayment({
                          data.Response === '0' ||
                          (data.transactionData && (data.transactionData.Response === '000' || data.transactionData.Response === 0));
 
-        if (isSuccess && isTrustedOrigin) {
+        if (isSuccess && isOwnOrigin) {
           if (failureTimeoutRef.current) {
             clearTimeout(failureTimeoutRef.current);
             failureTimeoutRef.current = null;
@@ -265,12 +267,17 @@ export default function TranzilaPayment({
           normalizedResponse && normalizedResponse !== '000' && normalizedResponse !== '0';
         const hasFailureSignal = Boolean(data?.error || data?.reason || isFailureResponse);
 
-        if (isTrustedOrigin && !isSuccess && hasFailureSignal) {
+        if (isOwnOrigin && !isSuccess && hasFailureSignal) {
           if (failureTimeoutRef.current) clearTimeout(failureTimeoutRef.current);
           failureTimeoutRef.current = null;
           console.log('Payment failed, calling onFailure with:', data);
           const errorData = data.transactionData || data;
           onFailureRef.current && onFailureRef.current(errorData);
+          return;
+        }
+
+        if (isTrustedTranzilaOrigin && (isSuccess || hasFailureSignal)) {
+          console.debug('Ignoring intermediate Tranzila payment status', data);
           return;
         }
 
@@ -479,7 +486,7 @@ export default function TranzilaPayment({
 
   // Get terminal name from env or use a default
   const terminalName = process.env.NEXT_PUBLIC_TRANZILA_TERMINAL || 'jira';
-  const isTestTerminal = /(?:^test|test$|demo|jira)/i.test(terminalName);
+  const isTestTerminal = terminalName === 'jira' || terminalName === 'demo';
   const googlePayEnabled =
     !isTestTerminal &&
     process.env.NEXT_PUBLIC_DISABLE_GOOGLE_PAY !== '1' &&
@@ -517,9 +524,9 @@ export default function TranzilaPayment({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4">
-      <div className="relative bg-[#12143a] border border-white/15 w-full h-[100dvh] sm:h-auto sm:rounded-2xl sm:max-w-4xl sm:max-h-[95vh] overflow-hidden shadow-[0_4px_32px_rgba(0,0,0,0.3)] flex flex-col">
+      <div className="payment-modal-shell relative bg-[#12143a] border border-white/15 w-full h-[100dvh] sm:h-auto sm:rounded-2xl sm:max-w-4xl sm:max-h-[calc(100dvh-2rem)] overflow-hidden shadow-[0_4px_32px_rgba(0,0,0,0.3)] flex flex-col">
         {/* Header - single compact line on mobile */}
-        <div className="bg-gradient-to-r from-primary to-primary/80 text-white px-3 py-1.5 sm:p-6 flex justify-between items-center flex-shrink-0">
+        <div className="bg-gradient-to-r from-indigo-700 to-violet-700 text-white px-3 py-2 sm:p-6 flex justify-between items-center flex-shrink-0">
           <p className="text-sm sm:text-2xl font-bold">
             <span className="sm:hidden">תשלום - {planName} - {amount} ₪</span>
             <span className="hidden sm:inline">תשלום מאובטח</span>
@@ -537,7 +544,7 @@ export default function TranzilaPayment({
         </div>
 
         {/* Payment Form Container */}
-        <div className="p-0 sm:p-6 flex-1 min-h-0 flex flex-col overflow-hidden">
+        <div className="payment-modal-scroll p-2 sm:p-6 flex-1 min-h-0 flex flex-col overflow-y-auto">
           <div className="hidden sm:block mb-4 bg-indigo-500/10 border border-indigo-400/20 rounded-2xl p-4 text-right">
             <div className="flex items-start">
               <span className="text-indigo-300 text-xl ml-3">🔒</span>
@@ -551,11 +558,11 @@ export default function TranzilaPayment({
           </div>
 
           {(handshakeMode === 'legacy' || isTestTerminal) && (
-            <div className="mb-4 bg-amber-500/10 border border-amber-400/30 rounded-2xl p-4 text-right">
+            <div className="mb-2 sm:mb-4 bg-amber-500/10 border border-amber-400/30 rounded-xl sm:rounded-2xl px-3 py-2 sm:p-4 text-right flex-shrink-0">
               <p className="font-semibold text-amber-300 mb-1">
                 {isTestTerminal ? 'מסוף תשלומים במצב בדיקות' : 'מצב תשלום להרצה'}
               </p>
-              <p className="text-sm text-slate-300">
+              <p className="text-xs sm:text-sm text-slate-300">
                 {isTestTerminal
                   ? 'המסוף מחובר במצב בדיקות של Tranzila. השתמש במספרי כרטיס בדיקה של Tranzila בלבד – העסקה לא תחייב בפועל, וארנקים דיגיטליים (Google Pay / Apple Pay) מושבתים כדי למנוע תקלות.'
                   : 'התשלום פועל במצב בדיקות עם מסוף Tranzila לדוגמה. כדי לאפשר סליקה אמיתית, הגדר ערכי TRANZILA_TERMINAL ו-TRANZILA_TERMINAL_PASSWORD בקובץ ‎.env.local ולאחר מכן הפעל מחדש את השרת.'}
@@ -628,12 +635,12 @@ export default function TranzilaPayment({
           </form>
 
           {/* Amount banner - always visible, especially for Google Pay where Tranzila may not show it */}
-          <div className="mb-3 py-2 px-4 bg-indigo-500/10 border border-indigo-400/20 rounded-2xl text-center">
-            <p className="text-lg font-black text-white">סכום לתשלום: {amount} ₪</p>
-            <p className="text-sm text-slate-400">{planName}</p>
+          <div className="mb-2 sm:mb-3 py-1.5 sm:py-2 px-3 sm:px-4 bg-indigo-500/10 border border-indigo-400/20 rounded-xl sm:rounded-2xl text-center flex-shrink-0">
+            <p className="text-base sm:text-lg font-black text-white">סכום לתשלום: {amount} ₪</p>
+            <p className="text-xs sm:text-sm text-slate-400">{planName}</p>
           </div>
           {/* Iframe container - no border/padding on mobile to maximize space */}
-          <div className="relative bg-white/5 rounded-xl border border-white/10 flex-1 min-h-0 sm:flex-none sm:h-[600px]">
+          <div className="relative bg-white/5 rounded-xl border border-white/10 flex-1 min-h-[520px] sm:flex-none sm:h-[clamp(520px,62vh,640px)]">
             {(isHandshakeLoading || isIframeLoading) && !handshakeError && (
               <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#12143a] z-10">
                 <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-indigo-500 mb-4"></div>
