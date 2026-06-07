@@ -544,18 +544,7 @@ export default function TranzilaPayment({
         </div>
 
         {/* Payment Form Container */}
-        <div className="payment-modal-scroll p-2 sm:p-6 flex-1 min-h-0 flex flex-col overflow-y-auto">
-          <div className="hidden sm:block mb-4 bg-indigo-500/10 border border-indigo-400/20 rounded-2xl p-4 text-right">
-            <div className="flex items-start">
-              <span className="text-indigo-300 text-xl ml-3">🔒</span>
-              <div>
-                <p className="font-semibold text-indigo-300 mb-1">תשלום מאובטח</p>
-                <p className="text-sm text-slate-300">
-                  התשלום מתבצע דרך מערכת Tranzila המאובטחת. פרטי האשראי שלך מוצפנים ומועברים ישירות לחברת סליקה ללא שמירה במערכת שלנו.
-                </p>
-              </div>
-            </div>
-          </div>
+        <div className="payment-modal-scroll p-2 sm:p-3 flex-1 min-h-0 flex flex-col overflow-y-auto">
 
           {(handshakeMode === 'legacy' || isTestTerminal) && (
             <div className="mb-2 sm:mb-4 bg-amber-500/10 border border-amber-400/30 rounded-xl sm:rounded-2xl px-3 py-2 sm:p-4 text-right flex-shrink-0">
@@ -640,7 +629,7 @@ export default function TranzilaPayment({
             <p className="text-xs sm:text-sm text-slate-400">{planName}</p>
           </div>
           {/* Iframe container - no border/padding on mobile to maximize space */}
-          <div className="relative bg-white/5 rounded-xl border border-white/10 flex-1 min-h-[520px] sm:flex-none sm:h-[clamp(520px,62vh,640px)]">
+          <div className="relative bg-white/5 rounded-xl border border-white/10 flex-1 min-h-[520px] sm:flex-none sm:h-[clamp(520px,70vh,780px)]">
             {(isHandshakeLoading || isIframeLoading) && !handshakeError && (
               <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#12143a] z-10">
                 <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-indigo-500 mb-4"></div>
@@ -690,47 +679,6 @@ export default function TranzilaPayment({
             />
           </div>
 
-          {/* Payment methods info - hidden on mobile to maximize iframe space */}
-          <div className="hidden sm:block mt-4 bg-white/[0.055] border border-white/15 backdrop-blur-xl rounded-2xl p-4 flex-shrink-0">
-            <p className="text-center font-semibold text-slate-100 mb-3">אפשרויות תשלום זמינות:</p>
-            <div className="flex flex-wrap justify-center gap-4 items-center">
-              <div className="flex items-center gap-2">
-                <span className="text-2xl">💳</span>
-                <span className="text-sm text-slate-300">כרטיס אשראי</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-2xl">📱</span>
-                <span className="text-sm text-slate-300">Bit</span>
-              </div>
-              {googlePayEnabled && (
-              <div className="flex items-center gap-2">
-                <span className="text-2xl">🟢</span>
-                <span className="text-sm text-slate-300">Google Pay</span>
-                {typeof window !== 'undefined' && window.location.protocol === 'http:' && (
-                  <span className="text-xs text-amber-400 mr-1">(זמין רק ב-HTTPS)</span>
-                )}
-              </div>
-              )}
-              {applePayEnabled && (
-              <div className="flex items-center gap-2">
-                <span className="text-2xl">&#63743;</span>
-                <span className="text-sm text-slate-300">Apple Pay</span>
-              </div>
-              )}
-            </div>
-            {googlePayEnabled &&
-             typeof window !== 'undefined' && window.location.protocol === 'http:' && (
-              <p className="text-center text-xs text-amber-400 mt-2">
-                ⚠️ Google Pay זמין רק באתרים מאובטחים (HTTPS). באתר ייצור Google Pay יופיע אוטומטית.
-              </p>
-            )}
-          </div>
-
-          {/* Additional info - hidden on mobile */}
-          <div className="hidden sm:block mt-4 text-center text-sm text-slate-400 flex-shrink-0">
-            <p>💳 מקבלים את כל סוגי כרטיסי האשראי</p>
-            <p className="mt-1">🔐 אבטחה מלאה בתקן PCI-DSS</p>
-          </div>
         </div>
       </div>
     </div>
