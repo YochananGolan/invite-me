@@ -6776,23 +6776,20 @@ React.useEffect(()=>{
                         </tr>
                       </thead>
                       <tbody>
-                        {tableSummary.map((row, idx) => (
+                        {tableSummary.map((row, idx) => {
+                          const digits = (v) => String(v).length;
+                          const cellSize = (v) => digits(v) >= 4 ? 'text-sm' : digits(v) === 3 ? 'text-base sm:text-xl' : 'text-lg sm:text-2xl';
+                          const totalSize = (v) => digits(v) >= 4 ? 'text-sm' : digits(v) === 3 ? 'text-base sm:text-2xl' : 'text-xl sm:text-3xl';
+                          return (
                           <tr key={`table-${row.table_number}-${idx}`} className={idx % 2 === 0 ? 'bg-white/5' : 'bg-amber-500/10'}>
-                            <td className="p-1.5 sm:p-3 border border-white/10 text-center font-semibold text-orange-200 text-base sm:text-2xl"><span className={previewTableNumberClass}>{row.table_number}</span></td>
-                            <td className="p-1.5 sm:p-3 border border-white/10 text-center font-semibold text-emerald-200 text-base sm:text-2xl"><span className={previewTableNumberClass}>{row.adults}</span></td>
-                            <td className="p-1.5 sm:p-3 border border-white/10 text-center font-semibold text-violet-200 text-base sm:text-2xl"><span className={previewTableNumberClass}>{row.children}</span></td>
-                            <td className="p-1.5 sm:p-3 border border-white/10 text-center font-bold text-indigo-200 text-xl sm:text-3xl"><span className={previewTableNumberClass}>{row.total}</span></td>
+                            <td className={`p-1.5 sm:p-3 border border-white/10 text-center font-semibold text-orange-200 ${cellSize(row.table_number)}`}><span className={previewTableNumberClass}>{row.table_number}</span></td>
+                            <td className={`p-1.5 sm:p-3 border border-white/10 text-center font-semibold text-emerald-200 ${cellSize(row.adults)}`}><span className={previewTableNumberClass}>{row.adults}</span></td>
+                            <td className={`p-1.5 sm:p-3 border border-white/10 text-center font-semibold text-violet-200 ${cellSize(row.children)}`}><span className={previewTableNumberClass}>{row.children}</span></td>
+                            <td className={`p-1.5 sm:p-3 border border-white/10 text-center font-bold text-indigo-200 ${totalSize(row.total)}`}><span className={previewTableNumberClass}>{row.total}</span></td>
                           </tr>
-                        ))}
+                          );
+                        })}
                       </tbody>
-                      <tfoot>
-                        <tr className="bg-orange-500/15 font-bold">
-                          <td className="p-1.5 sm:p-3 border border-white/10 text-center text-orange-200 text-base sm:text-2xl">סה"כ</td>
-                          <td className="p-1.5 sm:p-3 border border-white/10 text-center text-emerald-200 text-base sm:text-2xl"><span className={previewTableNumberClass}>{tableSummary.reduce((sum, r) => sum + r.adults, 0)}</span></td>
-                          <td className="p-1.5 sm:p-3 border border-white/10 text-center text-violet-200 text-base sm:text-2xl"><span className={previewTableNumberClass}>{tableSummary.reduce((sum, r) => sum + r.children, 0)}</span></td>
-                          <td className="p-1.5 sm:p-3 border border-white/10 text-center text-indigo-200 text-xl sm:text-3xl"><span className={previewTableNumberClass}>{tableSummary.reduce((sum, r) => sum + r.total, 0)}</span></td>
-                        </tr>
-                      </tfoot>
                     </table>
                   </div>
                 </div>
