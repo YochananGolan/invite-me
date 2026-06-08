@@ -7865,11 +7865,11 @@ React.useEffect(()=>{
 
             {/* ── Col 1: Text editor ── */}
             <div className={`${designMobileTab === 'text' ? 'flex' : 'hidden'} sm:flex flex-col w-full sm:w-[25%] border-b sm:border-b-0 sm:border-l border-white/10 overflow-y-auto p-4 gap-4`}>
-              <h3 className="text-sm font-bold text-slate-300 text-center sm:text-right">א. עצב טקסט הזמנה</h3>
+              <h3 className="text-base font-bold text-slate-200 text-center sm:text-right">א. עצב טקסט הזמנה</h3>
 
               {/* Font chooser */}
               <div className="text-right">
-                <label className="block mb-1 text-xs font-semibold text-slate-400">גופן</label>
+                <label className="block mb-1 text-sm font-semibold text-slate-300">גופן</label>
                 <select
                   value={selectedFontKey}
                   onChange={(e) => setSelectedFontKey(e.target.value)}
@@ -7884,10 +7884,10 @@ React.useEffect(()=>{
               {/* Line editor */}
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs text-slate-400">{customInvitationText.split('\n').length} שורות</span>
+                  <span className="text-sm text-slate-400">{customInvitationText.split('\n').length} שורות</span>
                   <button
                     onClick={addNewLineAtTop}
-                    className="bg-emerald-600 hover:bg-emerald-500 text-white px-2.5 py-1 rounded-lg text-xs font-medium"
+                    className="bg-emerald-600 hover:bg-emerald-500 text-white px-2.5 py-1 rounded-lg text-sm font-medium"
                   >+ שורה למעלה</button>
                 </div>
 
@@ -7908,11 +7908,11 @@ React.useEffect(()=>{
                       <div className="flex items-center justify-end gap-1 mt-1">
                         <button
                           onClick={(e) => { e.stopPropagation(); setShowAdvancedEdit(index); }}
-                          className="px-2 py-0.5 bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white rounded text-xs font-medium"
+                          className="px-2 py-0.5 bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white rounded text-sm font-medium"
                         >✨ עיצוב</button>
                         <button
                           onClick={() => deleteLine(index)}
-                          className="px-2 py-0.5 bg-red-500/70 hover:bg-red-500 rounded text-xs text-white font-medium"
+                          className="px-2 py-0.5 bg-red-500/70 hover:bg-red-500 rounded text-sm text-white font-medium"
                         >🗑️</button>
                       </div>
                     </div>
@@ -7930,11 +7930,11 @@ React.useEffect(()=>{
                         setLineStyles({ 0: { ...defaultFirstLineStyle } });
                       }
                     }}
-                    className="text-xs underline text-slate-400 hover:text-slate-200"
+                    className="text-sm underline text-slate-400 hover:text-slate-200"
                   >ברירת מחדל</button>
                   <button
                     onClick={addNewLine}
-                    className="bg-emerald-600 hover:bg-emerald-500 text-white px-2.5 py-1 rounded-lg text-xs font-medium"
+                    className="bg-emerald-600 hover:bg-emerald-500 text-white px-2.5 py-1 rounded-lg text-sm font-medium"
                   >+ שורה למטה</button>
                 </div>
               </div>
