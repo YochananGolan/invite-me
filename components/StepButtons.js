@@ -9380,20 +9380,20 @@ React.useEffect(()=>{
           <span className="hidden sm:inline">בחר את המסלול המתאים לאירוע שלך</span>
           <span className="sm:hidden">בחר מסלול מתאים</span>
         </ModalHeader>
-        <ModalBody className="flex flex-col h-full p-4 sm:p-6">
+        <ModalBody>
           {planAddOnMode && (
-            <div className="text-center text-base font-semibold text-primary mb-4 bg-indigo-500/10 border border-indigo-400/20 rounded-xl p-3 flex-shrink-0">
+            <div className="text-center text-sm font-semibold text-primary mb-3 bg-indigo-500/10 border border-indigo-400/20 rounded-xl p-2.5">
               בחר חבילת הרחבה בתשלום כדי להוסיף עוד הודעות למכסה.
             </div>
           )}
           {pricingActionAttempted && planSelectionError && (
-            <div className="mb-4 bg-red-500/10 border border-red-400/30 rounded-xl p-3 text-red-400 font-semibold text-base text-center flex-shrink-0">
+            <div className="mb-3 bg-red-500/10 border border-red-400/30 rounded-xl p-2.5 text-red-400 font-semibold text-sm text-center">
               {planSelectionError}
             </div>
           )}
 
-          {/* Plan cards — fill all available height */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 flex-1 min-h-0">
+          {/* Plan cards */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-8 mb-6">
             {[
               { key: 'free',     id: 'א', subtitle: 'אירועים קטנים',    range: 'עד 50 הודעות',        price: '1',   recommended: false },
               { key: 'standard', id: 'ב', subtitle: 'מתאים לרוב',       range: 'מ־51 עד 200 הודעות',  price: '149', recommended: true  },
@@ -9402,7 +9402,7 @@ React.useEffect(()=>{
             ].map((plan) => (
               <div
                 key={plan.key}
-                className={`relative flex flex-col items-center justify-between text-center rounded-2xl p-6 sm:p-10 border transition-all h-full ${
+                className={`relative flex flex-col items-center text-center rounded-2xl p-6 border transition-all ${
                   plan.recommended
                     ? 'bg-indigo-500/10 border-2 border-primary'
                     : selectedPlan === plan.key
@@ -9415,18 +9415,16 @@ React.useEffect(()=>{
                     מומלץ
                   </div>
                 )}
-                <div className="flex flex-col items-center">
-                  <h3 className="text-2xl sm:text-3xl font-black text-white mb-2 sm:mb-3">מסלול {plan.id}</h3>
-                  <p className="text-base sm:text-lg text-slate-400 mb-4 sm:mb-6">{plan.subtitle}</p>
-                  <div className="text-5xl sm:text-7xl font-black bg-gradient-to-br from-indigo-300 to-violet-300 bg-clip-text text-transparent mb-2 sm:mb-3">
-                    {plan.price} ₪
-                  </div>
-                  <p className="text-base sm:text-lg text-slate-400">{plan.range}</p>
+                <h3 className="text-xl font-black text-white mb-1">מסלול {plan.id}</h3>
+                <p className="text-sm text-slate-400 mb-3">{plan.subtitle}</p>
+                <div className="text-4xl font-black bg-gradient-to-br from-indigo-300 to-violet-300 bg-clip-text text-transparent mb-1">
+                  {plan.price} ₪
                 </div>
+                <p className="text-sm text-slate-400 mb-4">{plan.range}</p>
                 <button
                   onClick={() => planAddOnMode ? (plan.key !== 'free' ? handleAddPackagePlan(plan.key) : null) : handleSelectPlan(plan.key)}
                   disabled={planAddOnMode && plan.key === 'free'}
-                  className={`w-full rounded-xl py-4 sm:py-5 text-lg sm:text-xl font-bold transition-all mt-4 sm:mt-8 ${
+                  className={`w-full rounded-xl py-3 text-base font-bold transition-all ${
                     planAddOnMode && plan.key === 'free'
                       ? 'bg-white/10 text-slate-400 cursor-not-allowed'
                       : planAddOnMode
@@ -9442,7 +9440,32 @@ React.useEffect(()=>{
             ))}
           </div>
 
-          <div className="mt-4 flex flex-col sm:flex-row items-center justify-between gap-2 text-sm text-slate-400 flex-shrink-0">
+          {/* Shared features */}
+          <div className="bg-white/[0.03] border border-white/[0.08] rounded-2xl p-6" dir="rtl">
+            <p className="text-sm font-bold text-slate-400 mb-4 text-center tracking-wider uppercase">כל המסלולים כוללים</p>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-2.5 text-sm text-slate-300">
+              {[
+                'הזמנות מעוצבות מקצועית',
+                'שליחה אוטומטית לכל האורחים',
+                'SMS ו-WhatsApp',
+                'תזכורת לפני האירוע',
+                'מעקב אישורי הגעה',
+                'דוחות בזמן אמת',
+                'ניהול פרטי אורחים',
+                'ניהול העדפות מזון ואלרגיות',
+                'דוחות מפורטים + ייצוא Excel',
+                'שמירת ארכיון אירועים',
+                'מפת אזור האירוע + ניווט',
+              ].map((f) => (
+                <div key={f} className="flex items-center gap-2">
+                  <span className="text-indigo-400 font-bold shrink-0">✓</span>
+                  <span>{f}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="mt-4 flex flex-col sm:flex-row items-center justify-between gap-2 text-sm text-slate-400">
             <span>* המחירים הם חד פעמיים לאירוע</span>
             <span className="text-indigo-300 font-semibold">💡 הרחבה: 100 הודעות נוספות ב-100 ₪</span>
           </div>
