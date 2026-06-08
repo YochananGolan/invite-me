@@ -7470,6 +7470,7 @@ React.useEffect(()=>{
                           onClick={() => handleRemoveExcelRow(idx)}
                           className="text-red-300 hover:text-red-200 font-bold"
                           title="מחק שורה"
+                          aria-label="מחק שורה"
                         >
                           🗑️
                         </button>
@@ -7634,7 +7635,7 @@ React.useEffect(()=>{
                     <td className="p-1 border border-white/10"><input type="text" value={a.description} onChange={(e)=>updateAllergy(idx,'description',e.target.value)} className="w-full bg-white/10 border border-white/20 text-white rounded-lg p-1 outline-none focus:border-indigo-400"/></td>
                     <td className="p-1 border"><input type="number" min="0" value={a.adults} onChange={(e)=>updateAllergy(idx,'adults',parseInt(e.target.value)||0)} className="w-16 bg-white/10 border border-white/20 text-white rounded-lg p-1 outline-none focus:border-indigo-400"/></td>
                     <td className="p-1 border"><input type="number" min="0" value={a.children} onChange={(e)=>updateAllergy(idx,'children',parseInt(e.target.value)||0)} className="w-16 bg-white/10 border border-white/20 text-white rounded-lg p-1 outline-none focus:border-indigo-400"/></td>
-                    <td className="p-1 border text-center"><button onClick={()=>removeAllergy(idx)} className="text-red-300 hover:text-red-200">❌</button></td>
+                    <td className="p-1 border text-center"><button onClick={()=>removeAllergy(idx)} className="text-red-300 hover:text-red-200" aria-label="הסר אלרגיה">❌</button></td>
                   </tr>
                 ))}
               </tbody>
@@ -7913,6 +7914,7 @@ React.useEffect(()=>{
                         <button
                           onClick={() => deleteLine(index)}
                           className="px-2 py-0.5 bg-red-500/70 hover:bg-red-500 rounded text-sm text-white font-medium"
+                          aria-label="מחק שורה"
                         >🗑️</button>
                       </div>
                     </div>
