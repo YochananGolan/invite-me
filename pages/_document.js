@@ -10,7 +10,7 @@ export default function Document() {
         />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
-        <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;600;700&family=Heebo:wght@400;500;600;700&family=Secular+One&family=Rubik:wght@400;500;700&family=Noto+Sans+Hebrew:wght@400;600;700&family=Frank+Ruhl+Libre:wght@400;500;700&family=Varela+Round&family=Alef:wght@400;700&family=Suez+One&family=Gveret+Levin+AlefAlefAlef&display=swap" rel="stylesheet" />
+        <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;600;700&family=Heebo:wght@400;500;600;700&family=Secular+One&family=Rubik:wght@400;500;700&family=Noto+Sans+Hebrew:wght@400;600;700&family=Frank+Ruhl+Libre:wght@400;500;700&family=Varela+Round&family=Alef:wght@400;700&family=Suez+One&family=Gveret+Levin&display=swap" rel="stylesheet" />
         <script src="https://cdn.userway.org/widget.js" data-account="qK2or1KFZX" data-position="2"></script>
       </Head>
       <body>

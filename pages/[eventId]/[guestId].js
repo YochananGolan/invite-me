@@ -415,7 +415,7 @@ export default function GuestPage({ initialData, initialError }) {
                     const fontWeight = style.fontWeight || 'normal';
                     const lineHeight = style.lineHeight ? parseFloat(style.lineHeight) : 1.4;
 
-                    let cleanFontCSS = fontCSS ? fontCSS.replace(/['"]/g, '') : 'Assistant, sans-serif';
+                    let cleanFontCSS = fontCSS || 'Assistant, sans-serif';
 
                     let textColor = style.color || '#000000';
                     if (!textColor.startsWith('#')) {
