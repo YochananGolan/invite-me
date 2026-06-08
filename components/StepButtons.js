@@ -1843,7 +1843,7 @@ const handleOpenAddonModal = React.useCallback(() => {
     { key: 'varela',    label: 'Varela Round',        css: "'Varela Round', sans-serif" },
     { key: 'alef',      label: 'Alef',                css: "'Alef', sans-serif" },
     { key: 'suez',      label: 'Suez One',            css: "'Suez One', serif" },
-    { key: 'amatic',    label: 'Amatic SC — כתב יד', css: "'Amatic SC', cursive" },
+    { key: 'gveret',    label: 'Gveret Levin — כתב יד', css: "'Gveret Levin AlefAlefAlef', cursive" },
   ];
   const [selectedFontKey, setSelectedFontKey] = useState('assistant');
   const selectedFontCss = fontsOptions.find(f=>f.key===selectedFontKey)?.css;
