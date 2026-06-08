@@ -6500,25 +6500,7 @@ React.useEffect(()=>{
 
       {/* Error message is now displayed in HeroSection instead */}
       {/* Status and Summary Tables */}
-      <style>{`
-        @media (max-width: 639px) {
-          .reports-landscape {
-            transform: rotate(90deg);
-            transform-origin: center center;
-            width: 100vh;
-            height: 100vw;
-            margin-left: calc((100vw - 100vh) / 2);
-            margin-right: calc((100vw - 100vh) / 2);
-            overflow-y: auto;
-          }
-          .reports-landscape-wrapper {
-            height: 100vw;
-            overflow: hidden;
-          }
-        }
-      `}</style>
-      <div ref={reportsSectionRef} className="reports-landscape-wrapper w-full mt-4 pb-4">
-        <div className="reports-landscape px-4 pb-16">
+      <div ref={reportsSectionRef} className="w-full px-4 mb-0 mt-4 pb-16">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 w-full">
           
           {/* First Column - Event Status */}
@@ -6960,7 +6942,6 @@ React.useEffect(()=>{
           )}
 
 
-        </div>
         </div>
       </div>
 
