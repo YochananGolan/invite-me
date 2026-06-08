@@ -9376,6 +9376,7 @@ React.useEffect(()=>{
           <span className="sm:hidden">בחר מסלול מתאים</span>
         </ModalHeader>
         <ModalBody>
+          <div className="max-w-4xl mx-auto">
           {planAddOnMode && (
             <div className="text-center text-sm font-semibold text-primary mb-3 bg-indigo-500/10 border border-indigo-400/20 rounded-xl p-2.5">
               בחר חבילת הרחבה בתשלום כדי להוסיף עוד הודעות למכסה.
@@ -9438,7 +9439,7 @@ React.useEffect(()=>{
           {/* Shared features — shown once */}
           <div className="bg-white/[0.03] border border-white/[0.08] rounded-2xl p-6" dir="rtl">
             <p className="text-sm font-bold text-slate-400 mb-4 text-center tracking-wider uppercase">כל המסלולים כוללים</p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2.5 text-base text-slate-300">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-2.5 text-sm text-slate-300">
               {[
                 'הזמנות מעוצבות מקצועית',
                 'שליחה אוטומטית לכל האורחים',
@@ -9463,6 +9464,7 @@ React.useEffect(()=>{
           <div className="mt-4 flex flex-col sm:flex-row items-center justify-between gap-2 text-sm text-slate-400">
             <span>* המחירים הם חד פעמיים לאירוע</span>
             <span className="text-indigo-300 font-semibold">💡 הרחבה: 100 הודעות נוספות ב-100 ₪</span>
+          </div>
           </div>
         </ModalBody>
       </Modal>
