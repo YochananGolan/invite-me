@@ -153,11 +153,13 @@ const buildActiveReportSummary = (eventRecord, guests = []) => {
   const invitationsSent = Math.max(toNonNegativeNumber(eventRecord?.messages_sent_count), totalInvited);
   const invitationsRemaining = Math.max(0, invitationLimit - invitationsSent);
   const totalRsvp = stats.approved + stats.rejected + stats.pending;
+  const notYetReplied = Math.max(0, invitationsSent - stats.approved - stats.rejected);
 
   return {
     ...stats,
+    pending: notYetReplied,
     totalGuests: stats.adults + stats.children,
-    totalRsvp,
+    totalRsvp: stats.approved + stats.rejected + notYetReplied,
     invitationLimit,
     invitationsSent,
     invitationsRemaining,
