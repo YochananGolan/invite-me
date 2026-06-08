@@ -142,7 +142,15 @@ const buildActiveReportSummary = (eventRecord, guests = []) => {
     { adults: 0, children: 0, approved: 0, rejected: 0, pending: 0 }
   );
 
-  const invitationLimit = toNonNegativeNumber(eventRecord?.allowed_guests);
+  const planBaseLimits = {
+    free: 50, basic: 50, standard: 200, premium: 350,
+    luxury: 500, elite: 650, supreme: 1000,
+  };
+  const planBase = planBaseLimits[eventRecord?.selected_plan] ?? null;
+  const addonCount = toNonNegativeNumber(eventRecord?.additional_packages);
+  const invitationLimit = planBase !== null
+    ? planBase + addonCount * 100
+    : toNonNegativeNumber(eventRecord?.allowed_guests);
   const invitationsSent = toNonNegativeNumber(eventRecord?.messages_sent_count);
   const invitationsRemaining = Math.max(0, invitationLimit - invitationsSent);
   const totalRsvp = stats.approved + stats.rejected + stats.pending;
@@ -601,7 +609,7 @@ export default forwardRef(function HeroSection({ onStart, onPressCreateEvent, se
       try {
         const { data: eventRecord, error: eventError } = await supabase
           .from('events')
-          .select('id, event_details, status, allowed_guests, messages_sent_count')
+          .select('id, event_details, status, allowed_guests, messages_sent_count, selected_plan, additional_packages')
           .eq('user_id', userId)
           .or('status.neq.archived,status.is.null')
           .order('created_at', { ascending: false })
