@@ -6329,8 +6329,8 @@ React.useEffect(()=>{
           setStepBarTransform('translate3d(0, 0, 0)');
         }}
       >
-        <div className="flex flex-col gap-1.5 sm:hidden px-1">
-          <div className="grid grid-cols-3 gap-1.5">
+        <div className="flex flex-col gap-2 sm:hidden px-2">
+          <div className="grid grid-cols-3 gap-2">
             {steps.slice(1, 4).map((step, idx) => {
               const realIdx = idx + 1;
               const isFinished = finishedSteps.includes(realIdx) || (realIdx === 3 && finishedSteps.includes(2));
@@ -6353,7 +6353,7 @@ React.useEffect(()=>{
                     else if (realIdx === 2) { setShowEventDetails(true); setStepErrorMsg(''); }
                     else if (realIdx === 3) { setShowDesignChooser(true); setStepErrorMsg(''); }
                   }}
-                  className={`flex items-center justify-center gap-1.5 rounded-xl py-2.5 px-2 text-center transition-all ${
+                  className={`flex flex-col items-center justify-center gap-1 rounded-xl py-3 px-1 text-center transition-all ${
                     isFinished
                       ? 'bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-[0_4px_14px_rgba(99,70,230,0.45)]'
                       : isDesign
@@ -6362,12 +6362,12 @@ React.useEffect(()=>{
                   }`}
                 >
                   <span className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-xs font-bold shrink-0 ${isFinished ? 'bg-white/25 text-white' : 'bg-indigo-500/30 text-indigo-200'}`}>{realIdx}</span>
-                  <span className="text-sm font-bold leading-tight">{stepsMobile[realIdx]}</span>
+                  <span className="text-xs font-bold leading-tight text-center">{stepsMobile[realIdx]}</span>
                 </button>
               );
             })}
           </div>
-          <div className={`grid ${shouldShowWhatsAppGroupUpdateButton ? 'grid-cols-3' : 'grid-cols-2'} gap-1.5`}>
+          <div className={`grid ${shouldShowWhatsAppGroupUpdateButton ? 'grid-cols-3' : 'grid-cols-2'} gap-2`}>
             {steps.slice(4).map((step, idx) => {
               const realIdx = idx + 4;
               const isFinished = finishedSteps.includes(realIdx);
@@ -6391,14 +6391,14 @@ React.useEffect(()=>{
                       setShowReportsOptions(true); setShowGuestListModal(false); setStepErrorMsg('');
                     }
                   }}
-                  className={`flex items-center justify-center gap-1.5 rounded-xl py-2.5 px-2 text-center transition-all ${
+                  className={`flex flex-col items-center justify-center gap-1 rounded-xl py-3 px-1 text-center transition-all ${
                     isFinished
                       ? 'bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-[0_4px_14px_rgba(99,70,230,0.45)]'
                       : 'bg-white/[0.06] text-slate-100 border border-white/15 hover:bg-white/[0.10] hover:border-indigo-400/40'
                   }`}
                 >
                   <span className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-xs font-bold shrink-0 ${isFinished ? 'bg-white/25 text-white' : 'bg-indigo-500/30 text-indigo-200'}`}>{realIdx}</span>
-                  <span className="text-sm font-bold leading-tight">{stepsMobile[realIdx]}</span>
+                  <span className="text-xs font-bold leading-tight text-center">{stepsMobile[realIdx]}</span>
                 </button>
               );
             })}
@@ -6411,9 +6411,9 @@ React.useEffect(()=>{
                   e.stopPropagation();
                   openWhatsAppGroupModal();
                 }}
-                className="flex items-center justify-center gap-1.5 rounded-xl py-2.5 px-2 text-center transition-all bg-emerald-500/15 text-emerald-200 border border-emerald-400/40 shadow-[0_2px_10px_rgba(16,185,129,0.25)]"
+                className="flex flex-col items-center justify-center gap-1 rounded-xl py-3 px-1 text-center transition-all bg-emerald-500/15 text-emerald-200 border border-emerald-400/40 shadow-[0_2px_10px_rgba(16,185,129,0.25)]"
               >
-                <span className="text-sm font-bold leading-tight">צור/עדכן קבוצת וואטסאפ</span>
+                <span className="text-xs font-bold leading-tight text-center">צור/עדכן קבוצת וואטסאפ</span>
               </button>
             )}
           </div>
