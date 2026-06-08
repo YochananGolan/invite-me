@@ -447,6 +447,9 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick, trig
         x={x}
         y={y}
         fill="#ffffff"
+        stroke="#000000"
+        strokeWidth="3"
+        paintOrder="stroke"
         textAnchor="middle"
         dominantBaseline="central"
         fontWeight="700"
@@ -6353,7 +6356,7 @@ React.useEffect(()=>{
                     else if (realIdx === 2) { setShowEventDetails(true); setStepErrorMsg(''); }
                     else if (realIdx === 3) { setShowDesignChooser(true); setStepErrorMsg(''); }
                   }}
-                  className={`flex flex-col items-center justify-center gap-1 rounded-xl py-3 px-1 text-center transition-all ${
+                  className={`flex flex-col items-center justify-center gap-1.5 rounded-xl py-4 px-2 text-center transition-all ${
                     isFinished
                       ? 'bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-[0_4px_14px_rgba(99,70,230,0.45)]'
                       : isDesign
@@ -6361,8 +6364,8 @@ React.useEffect(()=>{
                         : 'bg-white/[0.06] text-slate-100 border border-white/15 hover:bg-white/[0.10] hover:border-indigo-400/40'
                   }`}
                 >
-                  <span className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-xs font-bold shrink-0 ${isFinished ? 'bg-white/25 text-white' : 'bg-indigo-500/30 text-indigo-200'}`}>{realIdx}</span>
-                  <span className="text-xs font-bold leading-tight text-center">{stepsMobile[realIdx]}</span>
+                  <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-sm font-bold shrink-0 ${isFinished ? 'bg-white/25 text-white' : 'bg-indigo-500/30 text-indigo-200'}`}>{realIdx}</span>
+                  <span className="text-sm font-bold leading-tight text-center">{stepsMobile[realIdx]}</span>
                 </button>
               );
             })}
@@ -6391,14 +6394,14 @@ React.useEffect(()=>{
                       setShowReportsOptions(true); setShowGuestListModal(false); setStepErrorMsg('');
                     }
                   }}
-                  className={`flex flex-col items-center justify-center gap-1 rounded-xl py-3 px-1 text-center transition-all ${
+                  className={`flex flex-col items-center justify-center gap-1.5 rounded-xl py-4 px-2 text-center transition-all ${
                     isFinished
                       ? 'bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-[0_4px_14px_rgba(99,70,230,0.45)]'
                       : 'bg-white/[0.06] text-slate-100 border border-white/15 hover:bg-white/[0.10] hover:border-indigo-400/40'
                   }`}
                 >
-                  <span className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-xs font-bold shrink-0 ${isFinished ? 'bg-white/25 text-white' : 'bg-indigo-500/30 text-indigo-200'}`}>{realIdx}</span>
-                  <span className="text-xs font-bold leading-tight text-center">{stepsMobile[realIdx]}</span>
+                  <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-sm font-bold shrink-0 ${isFinished ? 'bg-white/25 text-white' : 'bg-indigo-500/30 text-indigo-200'}`}>{realIdx}</span>
+                  <span className="text-sm font-bold leading-tight text-center">{stepsMobile[realIdx]}</span>
                 </button>
               );
             })}
@@ -6411,9 +6414,9 @@ React.useEffect(()=>{
                   e.stopPropagation();
                   openWhatsAppGroupModal();
                 }}
-                className="flex flex-col items-center justify-center gap-1 rounded-xl py-3 px-1 text-center transition-all bg-emerald-500/15 text-emerald-200 border border-emerald-400/40 shadow-[0_2px_10px_rgba(16,185,129,0.25)]"
+                className="flex flex-col items-center justify-center gap-1.5 rounded-xl py-4 px-2 text-center transition-all bg-emerald-500/15 text-emerald-200 border border-emerald-400/40 shadow-[0_2px_10px_rgba(16,185,129,0.25)]"
               >
-                <span className="text-xs font-bold leading-tight text-center">צור/עדכן קבוצת וואטסאפ</span>
+                <span className="text-sm font-bold leading-tight text-center">צור/עדכן קבוצת וואטסאפ</span>
               </button>
             )}
           </div>
@@ -6746,28 +6749,28 @@ React.useEffect(()=>{
                     <table className="w-full text-right border text-base min-w-full">
                       <thead>
                         <tr className="bg-white/5">
-                          <th className="p-3 border border-white/10 font-bold text-center text-orange-300">מס. שולחן</th>
-                          <th className="p-3 border border-white/10 font-bold text-center text-emerald-300">בוגרים</th>
-                          <th className="p-3 border border-white/10 font-bold text-center text-violet-300">ילדים</th>
-                          <th className="p-3 border border-white/10 font-bold text-center text-indigo-300">סה"כ</th>
+                          <th className="p-2 sm:p-3 border border-white/10 font-bold text-center text-orange-300">מס. שולחן</th>
+                          <th className="p-2 sm:p-3 border border-white/10 font-bold text-center text-emerald-300">בוגרים</th>
+                          <th className="p-2 sm:p-3 border border-white/10 font-bold text-center text-violet-300">ילדים</th>
+                          <th className="p-2 sm:p-3 border border-white/10 font-bold text-center text-indigo-300">סה"כ</th>
                         </tr>
                       </thead>
                       <tbody>
                         {tableSummary.map((row, idx) => (
                           <tr key={`table-${row.table_number}-${idx}`} className={idx % 2 === 0 ? 'bg-white/5' : 'bg-amber-500/10'}>
-                            <td className="p-3 border border-white/10 text-center font-semibold text-orange-200 text-2xl"><span className={previewTableNumberClass}>{row.table_number}</span></td>
-                            <td className="p-3 border border-white/10 text-center font-semibold text-emerald-200 text-2xl"><span className={previewTableNumberClass}>{row.adults}</span></td>
-                            <td className="p-3 border border-white/10 text-center font-semibold text-violet-200 text-2xl"><span className={previewTableNumberClass}>{row.children}</span></td>
-                            <td className="p-3 border border-white/10 text-center font-bold text-indigo-200 text-3xl"><span className={previewTableNumberClass}>{row.total}</span></td>
+                            <td className="p-1.5 sm:p-3 border border-white/10 text-center font-semibold text-orange-200 text-base sm:text-2xl"><span className={previewTableNumberClass}>{row.table_number}</span></td>
+                            <td className="p-1.5 sm:p-3 border border-white/10 text-center font-semibold text-emerald-200 text-base sm:text-2xl"><span className={previewTableNumberClass}>{row.adults}</span></td>
+                            <td className="p-1.5 sm:p-3 border border-white/10 text-center font-semibold text-violet-200 text-base sm:text-2xl"><span className={previewTableNumberClass}>{row.children}</span></td>
+                            <td className="p-1.5 sm:p-3 border border-white/10 text-center font-bold text-indigo-200 text-xl sm:text-3xl"><span className={previewTableNumberClass}>{row.total}</span></td>
                           </tr>
                         ))}
                       </tbody>
                       <tfoot>
                         <tr className="bg-orange-500/15 font-bold">
-                          <td className="p-3 border border-white/10 text-center text-orange-200 text-2xl">סה"כ</td>
-                          <td className="p-3 border border-white/10 text-center text-emerald-200 text-2xl"><span className={previewTableNumberClass}>{tableSummary.reduce((sum, r) => sum + r.adults, 0)}</span></td>
-                          <td className="p-3 border border-white/10 text-center text-violet-200 text-2xl"><span className={previewTableNumberClass}>{tableSummary.reduce((sum, r) => sum + r.children, 0)}</span></td>
-                          <td className="p-3 border border-white/10 text-center text-indigo-200 text-3xl"><span className={previewTableNumberClass}>{tableSummary.reduce((sum, r) => sum + r.total, 0)}</span></td>
+                          <td className="p-1.5 sm:p-3 border border-white/10 text-center text-orange-200 text-base sm:text-2xl">סה"כ</td>
+                          <td className="p-1.5 sm:p-3 border border-white/10 text-center text-emerald-200 text-base sm:text-2xl"><span className={previewTableNumberClass}>{tableSummary.reduce((sum, r) => sum + r.adults, 0)}</span></td>
+                          <td className="p-1.5 sm:p-3 border border-white/10 text-center text-violet-200 text-base sm:text-2xl"><span className={previewTableNumberClass}>{tableSummary.reduce((sum, r) => sum + r.children, 0)}</span></td>
+                          <td className="p-1.5 sm:p-3 border border-white/10 text-center text-indigo-200 text-xl sm:text-3xl"><span className={previewTableNumberClass}>{tableSummary.reduce((sum, r) => sum + r.total, 0)}</span></td>
                         </tr>
                       </tfoot>
                     </table>
@@ -8485,7 +8488,7 @@ React.useEffect(()=>{
       )}
 
       {/* Report Modal */}
-      <Modal open={showReportModal} onClose={() => setShowReportModal(false)} size="xl">
+      <Modal open={showReportModal} onClose={() => setShowReportModal(false)} size="full">
         <ModalHeader onClose={() => setShowReportModal(false)}>{reportTitle}</ModalHeader>
         <ModalBody>
           {showReportModal && (<>
@@ -9372,26 +9375,25 @@ React.useEffect(()=>{
       </Modal>
 
       {/* Pricing Plan Selection Modal */}
-      <Modal open={showPricingPlan} onClose={closePricingPlanModal} size="full">
+      <Modal open={showPricingPlan} onClose={closePricingPlanModal} size="screen">
         <ModalHeader onClose={closePricingPlanModal}>
           <span className="hidden sm:inline">בחר את המסלול המתאים לאירוע שלך</span>
           <span className="sm:hidden">בחר מסלול מתאים</span>
         </ModalHeader>
-        <ModalBody>
-          <div className="max-w-4xl mx-auto">
+        <ModalBody className="flex flex-col h-full p-4 sm:p-6">
           {planAddOnMode && (
-            <div className="text-center text-sm font-semibold text-primary mb-3 bg-indigo-500/10 border border-indigo-400/20 rounded-xl p-2.5">
+            <div className="text-center text-base font-semibold text-primary mb-4 bg-indigo-500/10 border border-indigo-400/20 rounded-xl p-3 flex-shrink-0">
               בחר חבילת הרחבה בתשלום כדי להוסיף עוד הודעות למכסה.
             </div>
           )}
           {pricingActionAttempted && planSelectionError && (
-            <div className="mb-3 bg-red-500/10 border border-red-400/30 rounded-xl p-2.5 text-red-400 font-semibold text-sm text-center">
+            <div className="mb-4 bg-red-500/10 border border-red-400/30 rounded-xl p-3 text-red-400 font-semibold text-base text-center flex-shrink-0">
               {planSelectionError}
             </div>
           )}
 
-          {/* Compact plan cards — price + range + CTA only */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-5 mb-6">
+          {/* Plan cards — fill all available height */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 flex-1 min-h-0">
             {[
               { key: 'free',     id: 'א', subtitle: 'אירועים קטנים',    range: 'עד 50 הודעות',        price: '1',   recommended: false },
               { key: 'standard', id: 'ב', subtitle: 'מתאים לרוב',       range: 'מ־51 עד 200 הודעות',  price: '149', recommended: true  },
@@ -9400,7 +9402,7 @@ React.useEffect(()=>{
             ].map((plan) => (
               <div
                 key={plan.key}
-                className={`relative flex flex-col items-center text-center rounded-2xl p-6 border transition-all ${
+                className={`relative flex flex-col items-center justify-between text-center rounded-2xl p-6 sm:p-10 border transition-all h-full ${
                   plan.recommended
                     ? 'bg-indigo-500/10 border-2 border-primary'
                     : selectedPlan === plan.key
@@ -9409,20 +9411,22 @@ React.useEffect(()=>{
                 }`}
               >
                 {plan.recommended && (
-                  <div className="absolute -top-2.5 right-1/2 translate-x-1/2 bg-gradient-to-br from-indigo-600 to-violet-600 text-white px-3 py-0.5 rounded-full text-xs font-bold shadow-lg whitespace-nowrap">
+                  <div className="absolute -top-3 right-1/2 translate-x-1/2 bg-gradient-to-br from-indigo-600 to-violet-600 text-white px-4 py-1 rounded-full text-sm font-bold shadow-lg whitespace-nowrap">
                     מומלץ
                   </div>
                 )}
-                <h3 className="text-xl font-black text-white mb-1">מסלול {plan.id}</h3>
-                <p className="text-sm text-slate-400 mb-3">{plan.subtitle}</p>
-                <div className="text-4xl font-black bg-gradient-to-br from-indigo-300 to-violet-300 bg-clip-text text-transparent mb-1">
-                  {plan.price} ₪
+                <div className="flex flex-col items-center">
+                  <h3 className="text-2xl sm:text-3xl font-black text-white mb-2 sm:mb-3">מסלול {plan.id}</h3>
+                  <p className="text-base sm:text-lg text-slate-400 mb-4 sm:mb-6">{plan.subtitle}</p>
+                  <div className="text-5xl sm:text-7xl font-black bg-gradient-to-br from-indigo-300 to-violet-300 bg-clip-text text-transparent mb-2 sm:mb-3">
+                    {plan.price} ₪
+                  </div>
+                  <p className="text-base sm:text-lg text-slate-400">{plan.range}</p>
                 </div>
-                <p className="text-sm text-slate-400 mb-4">{plan.range}</p>
                 <button
                   onClick={() => planAddOnMode ? (plan.key !== 'free' ? handleAddPackagePlan(plan.key) : null) : handleSelectPlan(plan.key)}
                   disabled={planAddOnMode && plan.key === 'free'}
-                  className={`w-full rounded-xl py-3 text-base font-bold transition-all ${
+                  className={`w-full rounded-xl py-4 sm:py-5 text-lg sm:text-xl font-bold transition-all mt-4 sm:mt-8 ${
                     planAddOnMode && plan.key === 'free'
                       ? 'bg-white/10 text-slate-400 cursor-not-allowed'
                       : planAddOnMode
@@ -9438,35 +9442,9 @@ React.useEffect(()=>{
             ))}
           </div>
 
-          {/* Shared features — shown once */}
-          <div className="bg-white/[0.03] border border-white/[0.08] rounded-2xl p-6" dir="rtl">
-            <p className="text-sm font-bold text-slate-400 mb-4 text-center tracking-wider uppercase">כל המסלולים כוללים</p>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-2.5 text-sm text-slate-300">
-              {[
-                'הזמנות מעוצבות מקצועית',
-                'שליחה אוטומטית לכל האורחים',
-                'SMS ו-WhatsApp',
-                'תזכורת לפני האירוע',
-                'מעקב אישורי הגעה',
-                'דוחות בזמן אמת',
-                'ניהול פרטי אורחים',
-                'ניהול העדפות מזון ואלרגיות',
-                'דוחות מפורטים + ייצוא Excel',
-                'שמירת ארכיון אירועים',
-                'מפת אזור האירוע + ניווט',
-              ].map((f) => (
-                <div key={f} className="flex items-center gap-2">
-                  <span className="text-indigo-400 font-bold shrink-0">✓</span>
-                  <span>{f}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="mt-4 flex flex-col sm:flex-row items-center justify-between gap-2 text-sm text-slate-400">
+          <div className="mt-4 flex flex-col sm:flex-row items-center justify-between gap-2 text-sm text-slate-400 flex-shrink-0">
             <span>* המחירים הם חד פעמיים לאירוע</span>
             <span className="text-indigo-300 font-semibold">💡 הרחבה: 100 הודעות נוספות ב-100 ₪</span>
-          </div>
           </div>
         </ModalBody>
       </Modal>

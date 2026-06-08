@@ -6,6 +6,7 @@ const SIZES = {
   lg: 'max-w-2xl',
   xl: 'max-w-4xl',
   full: 'max-w-[98vw]',
+  screen: 'max-w-full w-full',
 };
 
 export default function Modal({ open, onClose, size = 'md', children, className = '' }) {
@@ -26,11 +27,11 @@ export default function Modal({ open, onClose, size = 'md', children, className 
   return (
     <div
       dir="rtl"
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-[#0a0b1e]/75 backdrop-blur-sm p-0 sm:p-4"
+      className={`fixed inset-0 z-50 flex ${size === 'screen' ? 'items-stretch' : 'items-end sm:items-center'} justify-center bg-[#0a0b1e]/75 backdrop-blur-sm p-0 ${size === 'screen' ? '' : 'sm:p-4'}`}
       onClick={(e) => { if (e.target === e.currentTarget) onClose?.(); }}
     >
       <div
-        className={`relative bg-gradient-to-b from-[#1a1d4a]/95 to-[#12143a]/95 backdrop-blur-2xl border border-white/[0.12] rounded-t-3xl sm:rounded-3xl overflow-hidden shadow-[0_24px_64px_-12px_rgba(0,0,0,0.6),inset_0_1px_0_rgba(255,255,255,0.08)] w-full ${SIZES[size]} ${size === 'full' ? 'max-h-[96vh]' : 'max-h-[92vh] sm:max-h-[85vh]'} flex flex-col ${className}`}
+        className={`relative bg-gradient-to-b from-[#1a1d4a]/95 to-[#12143a]/95 backdrop-blur-2xl border border-white/[0.12] overflow-hidden shadow-[0_24px_64px_-12px_rgba(0,0,0,0.6),inset_0_1px_0_rgba(255,255,255,0.08)] w-full ${SIZES[size]} ${size === 'screen' ? 'h-full max-h-full rounded-none' : size === 'full' ? 'rounded-t-3xl sm:rounded-3xl max-h-[96vh]' : 'rounded-t-3xl sm:rounded-3xl max-h-[92vh] sm:max-h-[85vh]'} flex flex-col ${className}`}
         onClick={(e) => e.stopPropagation()}
       >
         {/* glow accents */}
@@ -65,8 +66,9 @@ export function ModalHeader({ children, subtitle, onClose }) {
 }
 
 export function ModalBody({ children, className = '' }) {
+  const hasCustomPadding = /\bp-\d|px-\d|py-\d/.test(className);
   return (
-    <div className={`relative overflow-y-auto flex-1 px-7 py-6 ${className}`}>
+    <div className={`relative overflow-y-auto flex-1 ${hasCustomPadding ? '' : 'px-7 py-6'} ${className}`}>
       {children}
     </div>
   );

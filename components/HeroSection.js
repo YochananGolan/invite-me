@@ -149,7 +149,8 @@ const buildActiveReportSummary = (eventRecord, guests = []) => {
   const planBase = planBaseLimits[eventRecord?.selected_plan] ?? 50; // default 50 matches getPlanBaseLimit's default
   const addonCount = toNonNegativeNumber(eventRecord?.additional_packages);
   const invitationLimit = planBase + addonCount * 100;
-  const invitationsSent = toNonNegativeNumber(eventRecord?.messages_sent_count);
+  const totalInvited = guests.length;
+  const invitationsSent = Math.max(toNonNegativeNumber(eventRecord?.messages_sent_count), totalInvited);
   const invitationsRemaining = Math.max(0, invitationLimit - invitationsSent);
   const totalRsvp = stats.approved + stats.rejected + stats.pending;
 
