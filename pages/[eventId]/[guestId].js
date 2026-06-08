@@ -372,7 +372,7 @@ export default function GuestPage({ initialData, initialError }) {
   return (
     <div className="min-h-screen bg-[linear-gradient(160deg,#0d0f2b_0%,#130f35_52%,#1a0f40_100%)] flex flex-col items-center justify-between py-4 text-slate-100" dir="rtl">
       {invitationUrl && (
-        <div className="relative w-full max-w-4xl max-h-[60vh] flex items-center justify-center mb-6 overflow-hidden">
+        <div className="relative w-full max-w-4xl flex items-center justify-center mb-6">
           <button
             onClick={() => router.push('/')}
             className="absolute top-2 left-2 z-30 w-9 h-9 flex items-center justify-center text-xl font-bold text-slate-400 hover:text-white bg-black/50 hover:bg-black/70 rounded-full transition-colors border border-white/15"
