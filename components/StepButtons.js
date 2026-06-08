@@ -9370,7 +9370,7 @@ React.useEffect(()=>{
       </Modal>
 
       {/* Pricing Plan Selection Modal */}
-      <Modal open={showPricingPlan} onClose={closePricingPlanModal} size="xl">
+      <Modal open={showPricingPlan} onClose={closePricingPlanModal} size="full">
         <ModalHeader onClose={closePricingPlanModal}>
           <span className="hidden sm:inline">בחר את המסלול המתאים לאירוע שלך</span>
           <span className="sm:hidden">בחר מסלול מתאים</span>
@@ -9388,7 +9388,7 @@ React.useEffect(()=>{
           )}
 
           {/* Compact plan cards — price + range + CTA only */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-5 mb-6">
             {[
               { key: 'free',     id: 'א', subtitle: 'אירועים קטנים',    range: 'עד 50 הודעות',        price: '1',   recommended: false },
               { key: 'standard', id: 'ב', subtitle: 'מתאים לרוב',       range: 'מ־51 עד 200 הודעות',  price: '149', recommended: true  },
@@ -9397,7 +9397,7 @@ React.useEffect(()=>{
             ].map((plan) => (
               <div
                 key={plan.key}
-                className={`relative flex flex-col items-center text-center rounded-2xl p-4 border transition-all ${
+                className={`relative flex flex-col items-center text-center rounded-2xl p-6 border transition-all ${
                   plan.recommended
                     ? 'bg-indigo-500/10 border-2 border-primary'
                     : selectedPlan === plan.key
@@ -9410,16 +9410,16 @@ React.useEffect(()=>{
                     מומלץ
                   </div>
                 )}
-                <h3 className="text-base font-black text-white mb-0.5">מסלול {plan.id}</h3>
-                <p className="text-xs text-slate-400 mb-2">{plan.subtitle}</p>
-                <div className="text-2xl font-black bg-gradient-to-br from-indigo-300 to-violet-300 bg-clip-text text-transparent mb-0.5">
+                <h3 className="text-xl font-black text-white mb-1">מסלול {plan.id}</h3>
+                <p className="text-sm text-slate-400 mb-3">{plan.subtitle}</p>
+                <div className="text-4xl font-black bg-gradient-to-br from-indigo-300 to-violet-300 bg-clip-text text-transparent mb-1">
                   {plan.price} ₪
                 </div>
-                <p className="text-xs text-slate-400 mb-3">{plan.range}</p>
+                <p className="text-sm text-slate-400 mb-4">{plan.range}</p>
                 <button
                   onClick={() => planAddOnMode ? (plan.key !== 'free' ? handleAddPackagePlan(plan.key) : null) : handleSelectPlan(plan.key)}
                   disabled={planAddOnMode && plan.key === 'free'}
-                  className={`w-full rounded-xl py-2 text-sm font-bold transition-all ${
+                  className={`w-full rounded-xl py-3 text-base font-bold transition-all ${
                     planAddOnMode && plan.key === 'free'
                       ? 'bg-white/10 text-slate-400 cursor-not-allowed'
                       : planAddOnMode
@@ -9436,9 +9436,9 @@ React.useEffect(()=>{
           </div>
 
           {/* Shared features — shown once */}
-          <div className="bg-white/[0.03] border border-white/[0.08] rounded-2xl p-4" dir="rtl">
-            <p className="text-xs font-bold text-slate-400 mb-3 text-center tracking-wider uppercase">כל המסלולים כוללים</p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1.5 text-sm text-slate-300">
+          <div className="bg-white/[0.03] border border-white/[0.08] rounded-2xl p-6" dir="rtl">
+            <p className="text-sm font-bold text-slate-400 mb-4 text-center tracking-wider uppercase">כל המסלולים כוללים</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2.5 text-base text-slate-300">
               {[
                 'הזמנות מעוצבות מקצועית',
                 'שליחה אוטומטית לכל האורחים',
@@ -9460,7 +9460,7 @@ React.useEffect(()=>{
             </div>
           </div>
 
-          <div className="mt-3 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-slate-400">
+          <div className="mt-4 flex flex-col sm:flex-row items-center justify-between gap-2 text-sm text-slate-400">
             <span>* המחירים הם חד פעמיים לאירוע</span>
             <span className="text-indigo-300 font-semibold">💡 הרחבה: 100 הודעות נוספות ב-100 ₪</span>
           </div>
