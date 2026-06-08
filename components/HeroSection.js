@@ -161,7 +161,7 @@ const buildActiveReportSummary = (eventRecord, guests = []) => {
     invitationLimit,
     invitationsSent,
     invitationsRemaining,
-    hasReportData: guests.length > 0,
+    hasReportData: true,
   };
 };
 
