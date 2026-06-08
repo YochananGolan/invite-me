@@ -8505,7 +8505,7 @@ React.useEffect(()=>{
       )}
 
       {/* Report Modal */}
-      <Modal open={showReportModal} onClose={() => setShowReportModal(false)} size="full">
+      <Modal open={showReportModal} onClose={() => setShowReportModal(false)} size="full" landscape>
         <ModalHeader onClose={() => setShowReportModal(false)}>{reportTitle}</ModalHeader>
         <ModalBody>
           {showReportModal && (<>
@@ -8825,7 +8825,7 @@ React.useEffect(()=>{
       </Modal>
 
       {/* Approved report modal */}
-      <Modal open={showApprovedReport} onClose={()=>{setShowApprovedReport(false);setShowReportsOptions(true);}} size="full">
+      <Modal open={showApprovedReport} onClose={()=>{setShowApprovedReport(false);setShowReportsOptions(true);}} size="full" landscape>
         <ModalHeader onClose={()=>{setShowApprovedReport(false);setShowReportsOptions(true);}}>דוח אורחים שאישרו הגעה</ModalHeader>
         <ModalBody className="overflow-x-auto">
               <table className="w-full text-right border border-collapse" style={{fontSize: '11px'}}>
@@ -8889,7 +8889,7 @@ React.useEffect(()=>{
       </Modal>
 
       {/* Rejected report modal */}
-      <Modal open={showRejectedReport} onClose={()=>{setShowRejectedReport(false);setShowReportsOptions(true);}} size="full">
+      <Modal open={showRejectedReport} onClose={()=>{setShowRejectedReport(false);setShowReportsOptions(true);}} size="full" landscape>
         <ModalHeader onClose={()=>{setShowRejectedReport(false);setShowReportsOptions(true);}}>דוח אורחים שלא מגיעים</ModalHeader>
         <ModalBody className="overflow-x-auto">
               <table className="w-full text-right border border-white/10 border-collapse" style={{fontSize: '11px'}}>
@@ -8921,7 +8921,7 @@ React.useEffect(()=>{
       </Modal>
 
       {/* Pending report modal */}
-      <Modal open={showPendingReport} onClose={()=>{setShowPendingReport(false);setShowReportsOptions(true);}} size="full">
+      <Modal open={showPendingReport} onClose={()=>{setShowPendingReport(false);setShowReportsOptions(true);}} size="full" landscape>
         <ModalHeader onClose={()=>{setShowPendingReport(false);setShowReportsOptions(true);}}>דוח אורחים שטרם הגיבו</ModalHeader>
         <ModalBody className="overflow-x-auto">
               <table className="w-full text-right border border-white/10 border-collapse" style={{fontSize: '11px'}}>
@@ -8953,7 +8953,7 @@ React.useEffect(()=>{
       </Modal>
 
       {/* Guest status query modal */}
-      <Modal open={showSearchGuest} onClose={()=>{setShowSearchGuest(false); setShowReportsOptions(true);}} size="lg">
+      <Modal open={showSearchGuest} onClose={()=>{setShowSearchGuest(false); setShowReportsOptions(true);}} size="lg" landscape>
         <ModalHeader onClose={()=>{setShowSearchGuest(false); setShowReportsOptions(true);}}>חיפוש אורח</ModalHeader>
         <ModalBody>
             <div className="flex justify-center gap-2 mb-4 px-1">
@@ -9655,7 +9655,7 @@ React.useEffect(()=>{
       </Modal>
 
       {/* Archive events list modal */}
-      <Modal open={showArchiveList} onClose={()=>{setShowArchiveList(false);setShowReportsOptions(true);}} size="xl">
+      <Modal open={showArchiveList} onClose={()=>{setShowArchiveList(false);setShowReportsOptions(true);}} size="xl" landscape>
         <ModalHeader onClose={()=>{setShowArchiveList(false);setShowReportsOptions(true);}}>אירועים מהעבר (ארכיון)</ModalHeader>
         <ModalBody className="text-center space-y-4">
             {archiveLoading ? (

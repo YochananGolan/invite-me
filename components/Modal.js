@@ -9,7 +9,7 @@ const SIZES = {
   screen: 'max-w-full w-full',
 };
 
-export default function Modal({ open, onClose, size = 'md', children, className = '' }) {
+export default function Modal({ open, onClose, size = 'md', children, className = '', landscape = false }) {
   useEffect(() => {
     if (!open) return;
     const prev = document.body.style.overflow;
@@ -24,6 +24,9 @@ export default function Modal({ open, onClose, size = 'md', children, className 
 
   if (!open) return null;
 
+  const isMobilePortrait = typeof window !== 'undefined' && window.innerWidth < 640;
+  const applyLandscape = landscape && isMobilePortrait;
+
   return (
     <div
       dir="rtl"
@@ -32,6 +35,19 @@ export default function Modal({ open, onClose, size = 'md', children, className 
     >
       <div
         className={`relative bg-gradient-to-b from-[#1a1d4a]/95 to-[#12143a]/95 backdrop-blur-2xl border border-white/[0.12] overflow-hidden shadow-[0_24px_64px_-12px_rgba(0,0,0,0.6),inset_0_1px_0_rgba(255,255,255,0.08)] w-full ${SIZES[size]} ${size === 'screen' ? 'h-full max-h-full rounded-none' : size === 'full' ? 'rounded-t-3xl sm:rounded-3xl max-h-[96vh]' : 'rounded-t-3xl sm:rounded-3xl max-h-[92vh] sm:max-h-[85vh]'} flex flex-col ${className}`}
+        style={applyLandscape ? {
+          transform: 'rotate(90deg)',
+          transformOrigin: 'center center',
+          width: '100vh',
+          height: '100vw',
+          maxWidth: '100vh',
+          maxHeight: '100vw',
+          position: 'fixed',
+          top: '50%',
+          left: '50%',
+          marginTop: '-50vw',
+          marginLeft: '-50vh',
+        } : undefined}
         onClick={(e) => e.stopPropagation()}
       >
         {/* glow accents */}
