@@ -576,6 +576,26 @@ const [hasWhatsAppGroup, setHasWhatsAppGroup] = useState(false);
   const [stepBarHeight, setStepBarHeight] = useState(null);
   const stepBarAnchorRef = useRef(null);
   const stepBarRef = useRef(null);
+  const reportsSectionRef = useRef(null);
+
+  useEffect(() => {
+    const el = reportsSectionRef.current;
+    if (!el || typeof window === 'undefined') return;
+    const isMobile = window.innerWidth < 640;
+    if (!isMobile) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          screen.orientation?.lock?.('landscape').catch(() => {});
+        } else {
+          screen.orientation?.unlock?.();
+        }
+      },
+      { threshold: 0.2 }
+    );
+    observer.observe(el);
+    return () => { observer.disconnect(); screen.orientation?.unlock?.(); };
+  }, []);
 
   useEffect(() => {
     if (!hasSession) {
@@ -6480,7 +6500,7 @@ React.useEffect(()=>{
 
       {/* Error message is now displayed in HeroSection instead */}
       {/* Status and Summary Tables */}
-      <div className="w-full px-4 mb-0 mt-4 pb-16">
+      <div ref={reportsSectionRef} className="w-full px-4 mb-0 mt-4 pb-16">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 w-full">
           
           {/* First Column - Event Status */}
