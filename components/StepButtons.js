@@ -6478,7 +6478,7 @@ React.useEffect(()=>{
       {/* Error message is now displayed in HeroSection instead */}
       {/* Status and Summary Tables */}
       <div className="w-full px-4 mb-0 mt-4 pb-16">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-[1400px] mx-auto">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 w-full">
           
           {/* First Column - Event Status */}
           <div className="w-full flex flex-col gap-6">
