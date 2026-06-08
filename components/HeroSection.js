@@ -1,6 +1,30 @@
 import { forwardRef, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabaseClient';
 
+function normalizePhoneNumber(phone = '') {
+  return String(phone).replace(/\D/g, '').replace(/^0/, '972');
+}
+function getGuestIdentityKey(guest = {}) {
+  const phone = guest.phone ?? '';
+  const normalized = normalizePhoneNumber(phone);
+  if (normalized) return `phone:${normalized}`;
+  const first = String(guest.first_name ?? '').trim().toLowerCase();
+  const last = String(guest.last_name ?? '').trim().toLowerCase();
+  return `name:${first}|${last}`;
+}
+function dedupeGuestsByIdentity(guests = []) {
+  const byIdentity = new Map();
+  for (const guest of guests) {
+    const key = getGuestIdentityKey(guest);
+    const current = byIdentity.get(key);
+    if (!current) { byIdentity.set(key, guest); continue; }
+    const cur = current.status === 'approved' || current.status === 'rejected' ? current.status : 'pending';
+    const nxt = guest.status === 'approved' || guest.status === 'rejected' ? guest.status : 'pending';
+    if (cur === 'pending' && nxt !== 'pending') byIdentity.set(key, guest);
+  }
+  return Array.from(byIdentity.values());
+}
+
 const useTypewriter = (text, speed = 42, pauseDuration = 2600) => {
   const [displayedText, setDisplayedText] = useState('');
 
@@ -124,9 +148,7 @@ const isPastEvent = (eventRecord) => {
 };
 
 const buildActiveReportSummary = (eventRecord, guests = []) => {
-  // Mirror StepButtons.js: count adults/children for approved guests only,
-  // so hero numbers match the bottom control-reports exactly.
-  const stats = guests.reduce(
+  const stats = dedupeGuestsByIdentity(guests).reduce(
     (acc, guest) => {
       if (guest.status === 'approved') {
         acc.adults += toNonNegativeNumber(guest.adults);
@@ -627,7 +649,7 @@ export default forwardRef(function HeroSection({ onStart, onPressCreateEvent, se
 
         const { data: guests, error: guestsError } = await supabase
           .from('invited_guests')
-          .select('status, adults, children')
+          .select('status, adults, children, phone, first_name, last_name')
           .eq('event_id', eventRecord.id);
 
         if (guestsError) throw guestsError;
