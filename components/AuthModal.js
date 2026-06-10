@@ -238,7 +238,7 @@ export default function AuthModal({ initialMode = 'sign_in', open = false, onClo
         } else if (errMsg.includes('email not confirmed')) {
           setSignInError({
             code: 'email_not_confirmed',
-            message: 'האימייל קיים אבל טרם אומת. בדוק את תיבת הדואר שלך.',
+            message: 'האימייל קיים אבל טרם אומת. בדוק את תיבת הדואר שלך. אם מייל האימות מ-Supabase לא מופיע, בדוק בכל המיילים (All Mail).',
           });
         } else {
           setSignInError({
@@ -446,6 +446,7 @@ export default function AuthModal({ initialMode = 'sign_in', open = false, onClo
             <div className="text-base font-semibold leading-relaxed text-slate-300">
               שלחנו קישור אימות לכתובת <strong className="text-slate-100">{emailVerificationNotice.email}</strong>.
               אשר את הקישור במייל כדי להשלים את ההרשמה ואז חזור לכאן.
+              אם לא קיבלת מייל אימות מ-Supabase, בדוק בכל המיילים (All Mail).
             </div>
           </div>
         </ModalBody>
