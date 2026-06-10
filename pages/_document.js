@@ -61,8 +61,18 @@ export default function Document() {
               el.style.setProperty('left', left + 'px', 'important');
               el.style.setProperty('right', 'auto', 'important');
               el.style.setProperty('bottom', 'auto', 'important');
+              el.style.setProperty('transform', 'none', 'important');
               el.style.setProperty('touch-action', 'none', 'important');
               el.style.setProperty('cursor', 'grab', 'important');
+            }
+
+            function getWidgetElements() {
+              var root = document.querySelector('.uwy');
+              var handle = document.querySelector('.uwy .userway_buttons_wrapper') ||
+                document.getElementById('userwayAccessibilityIcon') ||
+                root;
+
+              return { root: root, handle: handle };
             }
 
             function setupDrag(el) {
@@ -138,18 +148,21 @@ export default function Document() {
             function positionWidget() {
               if (dragState) return;
 
-              var el = document.querySelector('.uwy');
-              if (!el) return;
-              applyPosition(el, getSavedPosition() || getDefaultPosition());
-              setupDrag(el);
+              var elements = getWidgetElements();
+              if (!elements.root || !elements.handle) return;
+
+              elements.root.style.setProperty('position', 'fixed', 'important');
+              elements.root.style.setProperty('z-index', '2147483647', 'important');
+              applyPosition(elements.handle, getSavedPosition() || getDefaultPosition());
+              setupDrag(elements.handle);
             }
 
             setInterval(positionWidget, 1000);
             window.addEventListener('resize', function() {
-              var el = document.querySelector('.uwy');
-              if (el) {
-                var rect = el.getBoundingClientRect();
-                applyPosition(el, { top: rect.top, left: rect.left });
+              var elements = getWidgetElements();
+              if (elements.handle) {
+                var rect = elements.handle.getBoundingClientRect();
+                applyPosition(elements.handle, { top: rect.top, left: rect.left });
               }
             });
           })();
