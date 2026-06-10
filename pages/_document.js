@@ -17,22 +17,142 @@ export default function Document() {
         <Main />
         <NextScript />
         <script dangerouslySetInnerHTML={{ __html: `
-          setInterval(function() {
-            var el = document.querySelector('.uwy');
-            if (!el) return;
-            var isMobile = window.innerWidth < 640;
-            if (isMobile) {
-              el.style.setProperty('top', '16px', 'important');
-              el.style.setProperty('bottom', 'auto', 'important');
-              el.style.setProperty('right', '16px', 'important');
-              el.style.setProperty('left', 'auto', 'important');
-            } else {
-              el.style.setProperty('top', '68px', 'important');
-              el.style.setProperty('bottom', 'auto', 'important');
-              el.style.setProperty('right', '16px', 'important');
-              el.style.setProperty('left', 'auto', 'important');
+          (function() {
+            var storageKey = 'meetm:userway-position';
+            var dragState = null;
+            var didDrag = false;
+
+            function clamp(value, min, max) {
+              return Math.min(Math.max(value, min), max);
             }
-          }, 1000);
+
+            function getDefaultPosition() {
+              return {
+                top: window.innerWidth < 640 ? 16 : 68,
+                left: window.innerWidth - 16 - 56
+              };
+            }
+
+            function getSavedPosition() {
+              try {
+                return JSON.parse(window.localStorage.getItem(storageKey) || 'null');
+              } catch (error) {
+                return null;
+              }
+            }
+
+            function savePosition(position) {
+              try {
+                window.localStorage.setItem(storageKey, JSON.stringify(position));
+              } catch (error) {
+                // Ignore storage errors so the accessibility widget still works.
+              }
+            }
+
+            function applyPosition(el, position) {
+              var rect = el.getBoundingClientRect();
+              var width = rect.width || 56;
+              var height = rect.height || 56;
+              var top = clamp(position.top, 8, window.innerHeight - height - 8);
+              var left = clamp(position.left, 8, window.innerWidth - width - 8);
+
+              el.style.setProperty('position', 'fixed', 'important');
+              el.style.setProperty('top', top + 'px', 'important');
+              el.style.setProperty('left', left + 'px', 'important');
+              el.style.setProperty('right', 'auto', 'important');
+              el.style.setProperty('bottom', 'auto', 'important');
+              el.style.setProperty('touch-action', 'none', 'important');
+              el.style.setProperty('cursor', 'grab', 'important');
+            }
+
+            function setupDrag(el) {
+              if (el.dataset.meetmDraggable === 'true') return;
+              el.dataset.meetmDraggable = 'true';
+
+              el.addEventListener('pointerdown', function(event) {
+                if (event.button !== undefined && event.button !== 0) return;
+
+                var rect = el.getBoundingClientRect();
+                didDrag = false;
+                dragState = {
+                  pointerId: event.pointerId,
+                  offsetX: event.clientX - rect.left,
+                  offsetY: event.clientY - rect.top
+                };
+                el.style.setProperty('cursor', 'grabbing', 'important');
+                if (el.setPointerCapture) {
+                  try {
+                    el.setPointerCapture(event.pointerId);
+                  } catch (error) {}
+                }
+              }, true);
+
+              el.addEventListener('pointermove', function(event) {
+                if (!dragState || dragState.pointerId !== event.pointerId) return;
+
+                event.preventDefault();
+                var rect = el.getBoundingClientRect();
+                var nextPosition = {
+                  top: event.clientY - dragState.offsetY,
+                  left: event.clientX - dragState.offsetX
+                };
+                if (Math.abs(nextPosition.top - rect.top) > 3 || Math.abs(nextPosition.left - rect.left) > 3) {
+                  didDrag = true;
+                }
+                applyPosition(el, nextPosition);
+              }, true);
+
+              el.addEventListener('pointerup', function(event) {
+                if (!dragState || dragState.pointerId !== event.pointerId) return;
+
+                var rect = el.getBoundingClientRect();
+                savePosition({ top: rect.top, left: rect.left });
+                dragState = null;
+                el.style.setProperty('cursor', 'grab', 'important');
+                if (el.releasePointerCapture) {
+                  try {
+                    el.releasePointerCapture(event.pointerId);
+                  } catch (error) {}
+                }
+                if (didDrag) {
+                  window.setTimeout(function() {
+                    didDrag = false;
+                  }, 0);
+                }
+              }, true);
+
+              el.addEventListener('pointercancel', function() {
+                dragState = null;
+                didDrag = false;
+                el.style.setProperty('cursor', 'grab', 'important');
+              }, true);
+
+              el.addEventListener('click', function(event) {
+                if (!didDrag) return;
+                event.preventDefault();
+                event.stopPropagation();
+                didDrag = false;
+              }, true);
+            }
+
+            function positionWidget() {
+              if (dragState) return;
+
+              var el = document.querySelector('.uwy');
+              if (!el) return;
+              applyPosition(el, getSavedPosition() || getDefaultPosition());
+              setupDrag(el);
+            }
+
+            setInterval(positionWidget, 1000);
+            window.addEventListener('resize', function() {
+              var el = document.querySelector('.uwy');
+              if (el) {
+                var rect = el.getBoundingClientRect();
+                applyPosition(el, { top: rect.top, left: rect.left });
+              }
+            });
+          })();
         `}} />
       </body>
     </Html>
