@@ -3470,37 +3470,6 @@ React.useEffect(() => {
     exportFn();
   };
 
-  const shouldShowMobileExcelExportButton =
-    showReportModal ||
-    showApprovedReport ||
-    showRejectedReport ||
-    showPendingReport;
-
-  React.useEffect(() => {
-    if (!shouldShowMobileExcelExportButton || typeof document === 'undefined') return;
-
-    const showNotice = (event) => {
-      const target = event.target;
-      if (!target?.closest?.('[data-mobile-excel-export-notice="true"]')) return;
-      if (!isMobileDevice() && !isTouchLikeEvent(event)) return;
-      event.preventDefault();
-      event.stopPropagation();
-      setShowMobileExcelExportNotice(true);
-    };
-
-    document.addEventListener('touchstart', showNotice, { capture: true, passive: false });
-    document.addEventListener('pointerdown', showNotice, { capture: true });
-    document.addEventListener('mousedown', showNotice, { capture: true });
-    document.addEventListener('click', showNotice, { capture: true });
-
-    return () => {
-      document.removeEventListener('touchstart', showNotice, { capture: true });
-      document.removeEventListener('pointerdown', showNotice, { capture: true });
-      document.removeEventListener('mousedown', showNotice, { capture: true });
-      document.removeEventListener('click', showNotice, { capture: true });
-    };
-  }, [shouldShowMobileExcelExportButton]);
-
   const handleExcelImport = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -8800,7 +8769,7 @@ React.useEffect(()=>{
                 </div>
               </>
             )}
-            <div className="mt-4 flex justify-center">
+            <div className="mt-4 flex justify-center sm:hidden">
               <button
                 type="button"
                 data-mobile-excel-export-notice="true"
@@ -9090,7 +9059,7 @@ React.useEffect(()=>{
                   </tr>
                 </tfoot>
               </table>
-              <div className="mt-4 flex justify-center">
+              <div className="mt-4 flex justify-center sm:hidden">
                 <button
                   type="button"
                   data-mobile-excel-export-notice="true"
@@ -9106,7 +9075,6 @@ React.useEffect(()=>{
         <ModalFooter className="hidden sm:flex">
           <button
             type="button"
-            data-mobile-excel-export-notice="true"
             onClick={(event) => handleReportExcelExportClick(event, exportApprovedXlsx)}
             className="bg-white/[0.06] text-slate-100 border border-white/15 rounded-full px-6 py-2 font-medium hover:bg-indigo-500/15 hover:border-indigo-400/50 transition-all"
           >
@@ -9144,7 +9112,7 @@ React.useEffect(()=>{
                   </tr>
                 </tfoot>
               </table>
-              <div className="mt-4 flex justify-center">
+              <div className="mt-4 flex justify-center sm:hidden">
                 <button
                   type="button"
                   data-mobile-excel-export-notice="true"
@@ -9188,7 +9156,7 @@ React.useEffect(()=>{
                   </tr>
                 </tfoot>
               </table>
-              <div className="mt-4 flex justify-center">
+              <div className="mt-4 flex justify-center sm:hidden">
                 <button
                   type="button"
                   data-mobile-excel-export-notice="true"
