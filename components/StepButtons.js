@@ -606,6 +606,7 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick, trig
   // Excel import preview modal
 const [showExcelPreview, setShowExcelPreview] = useState(false);
 const [showExcelInstructions, setShowExcelInstructions] = useState(false);
+const [showMobileExcelNotice, setShowMobileExcelNotice] = useState(false);
 const [excelPreviewData, setExcelPreviewData] = useState([]);
 const [excelErrors, setExcelErrors] = useState([]);
 const [isSavingExcelGuests, setIsSavingExcelGuests] = useState(false);
@@ -3403,6 +3404,32 @@ React.useEffect(() => {
   };
 
   const fileInputRef = useRef();
+
+  const isMobileDevice = () => {
+    if (typeof window === 'undefined') return false;
+    return window.matchMedia?.('(max-width: 768px)').matches ||
+      /Android|iPhone|iPad|iPod|Mobile/i.test(window.navigator?.userAgent || '');
+  };
+
+  const openExcelImport = () => {
+    if (isMobileDevice()) {
+      setShowMobileExcelNotice(true);
+      return;
+    }
+
+    setShowExcelInstructions(true);
+  };
+
+  const chooseExcelFile = () => {
+    if (isMobileDevice()) {
+      setShowExcelInstructions(false);
+      setShowMobileExcelNotice(true);
+      return;
+    }
+
+    setShowExcelInstructions(false);
+    fileInputRef.current?.click();
+  };
 
   const handleExcelImport = (e) => {
     const file = e.target.files[0];
@@ -7278,7 +7305,7 @@ React.useEffect(()=>{
           <div className="flex flex-col gap-3 mb-6">
             <button
               type="button"
-              onClick={() => setShowExcelInstructions(true)}
+              onClick={openExcelImport}
               className="w-full text-primary font-medium border-2 border-primary rounded-lg px-4 py-3 hover:bg-primary hover:text-white transition-colors"
             >
               ייבוא קובץ אורחים - אקסל
@@ -7401,6 +7428,23 @@ React.useEffect(()=>{
         </ModalFooter>
       </Modal>
 
+      <Modal open={showMobileExcelNotice} onClose={() => setShowMobileExcelNotice(false)} size="sm">
+        <ModalHeader onClose={() => setShowMobileExcelNotice(false)}>ייבוא קובץ אורחים</ModalHeader>
+        <ModalBody>
+          <p className="text-center text-slate-200 text-lg font-semibold leading-relaxed">
+            רק במחשב ניתן לקרוא לקובץ אורחים שהוכן מראש באקסל
+          </p>
+        </ModalBody>
+        <ModalFooter>
+          <button
+            onClick={() => setShowMobileExcelNotice(false)}
+            className="w-full bg-gradient-to-br from-indigo-600 to-violet-600 text-white px-6 py-3 rounded-full font-bold hover:opacity-90 transition-all"
+          >
+            הבנתי
+          </button>
+        </ModalFooter>
+      </Modal>
+
       {/* Excel Instructions Modal */}
       <Modal open={showExcelInstructions} onClose={() => setShowExcelInstructions(false)} size="md">
         <ModalHeader onClose={() => setShowExcelInstructions(false)}>הנחיות לייבוא קובץ אקסל</ModalHeader>
@@ -7459,10 +7503,7 @@ React.useEffect(()=>{
         </ModalBody>
         <ModalFooter>
           <button
-            onClick={() => {
-              setShowExcelInstructions(false);
-              fileInputRef.current.click();
-            }}
+            onClick={chooseExcelFile}
             className="bg-primary text-white px-6 py-3 rounded-full font-medium hover:bg-primary/90 transition-all"
           >
             בחר קובץ אקסל
