@@ -3448,7 +3448,7 @@ React.useEffect(() => {
   };
 
   const shouldShowMobileExcelExportButton =
-    (showReportModal && reportGuests.length > 0 && reportTitle === 'אורחים מגיעים ממוינים לפי שולחן') ||
+    (showReportModal && reportGuests.length > 0) ||
     (showApprovedReport && approvedGuests.length > 0);
 
   React.useEffect(() => {
@@ -8707,8 +8707,20 @@ React.useEffect(()=>{
             {reportGuests.length === 0 ? (
               <p className="text-center text-slate-400">אין נתונים להצגה</p>
             ) : (
-              <div className="max-h-[75vh] overflow-y-auto overflow-x-auto">
-                <table className="w-full text-right border border-collapse" style={{fontSize: '11px'}}>
+              <>
+                <div className="mb-4 flex justify-center">
+                  <button
+                    type="button"
+                    onClick={exportReportXlsx}
+                    onTouchEnd={showMobileExcelExportMessage}
+                    onPointerUp={showMobileExcelExportMessage}
+                    className="relative z-50 pointer-events-auto touch-manipulation bg-white/[0.10] text-slate-100 border border-white/25 rounded-full px-6 py-2 font-bold hover:bg-indigo-500/15 hover:border-indigo-400/50 transition-all"
+                  >
+                    צור קובץ אקסל - ושמור בהורדות
+                  </button>
+                </div>
+                <div className="max-h-[75vh] overflow-y-auto overflow-x-auto">
+                  <table className="w-full text-right border border-collapse" style={{fontSize: '11px'}}>
                   <thead>
                     <tr className="bg-white/5 text-slate-300">
                       <th className="px-0.5 py-1 border border-white/10 whitespace-nowrap">#</th>
@@ -8787,9 +8799,10 @@ React.useEffect(()=>{
                     </tr>
                   </tfoot>
                 </table>
-              </div>
+                </div>
+              </>
             )}
-            {reportGuests.length > 0 && reportTitle === 'אורחים מגיעים ממוינים לפי שולחן' && (
+            {reportGuests.length > 0 && (
               <div className="mt-4 flex justify-center">
                 <button 
                   type="button"
@@ -9026,6 +9039,19 @@ React.useEffect(()=>{
       <Modal open={showApprovedReport} onClose={()=>{setShowApprovedReport(false);setShowReportsOptions(true);}} size="full" landscape>
         <ModalHeader onClose={()=>{setShowApprovedReport(false);setShowReportsOptions(true);}}>דוח אורחים שאישרו הגעה</ModalHeader>
         <ModalBody className="overflow-x-auto">
+              {approvedGuests.length > 0 && (
+                <div className="mb-4 flex justify-center">
+                  <button
+                    type="button"
+                    onClick={exportApprovedXlsx}
+                    onTouchEnd={showMobileExcelExportMessage}
+                    onPointerUp={showMobileExcelExportMessage}
+                    className="relative z-50 pointer-events-auto touch-manipulation bg-white/[0.10] text-slate-100 border border-white/25 rounded-full px-6 py-2 font-bold hover:bg-indigo-500/15 hover:border-indigo-400/50 transition-all"
+                  >
+                    צור קובץ אקסל - ושמור בהורדות
+                  </button>
+                </div>
+              )}
               <table className="w-full text-right border border-collapse" style={{fontSize: '11px'}}>
                 <thead>
                   <tr className="bg-white/5 text-slate-300">
