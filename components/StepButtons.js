@@ -3476,25 +3476,26 @@ React.useEffect(() => {
 
   React.useEffect(() => {
     if (!shouldShowMobileExcelExportButton || typeof document === 'undefined') return;
-    const button = document.getElementById('meetm-mobile-excel-export-button');
-    if (!button) return;
 
     const showNotice = (event) => {
+      const target = event.target;
+      if (!target?.closest?.('[data-mobile-excel-export-notice="true"]')) return;
+      if (!isMobileDevice() && !isTouchLikeEvent(event)) return;
       event.preventDefault();
       event.stopPropagation();
       setShowMobileExcelExportNotice(true);
     };
 
-    button.addEventListener('touchstart', showNotice, { capture: true, passive: false });
-    button.addEventListener('pointerdown', showNotice, { capture: true });
-    button.addEventListener('mousedown', showNotice, { capture: true });
-    button.addEventListener('click', showNotice, { capture: true });
+    document.addEventListener('touchstart', showNotice, { capture: true, passive: false });
+    document.addEventListener('pointerdown', showNotice, { capture: true });
+    document.addEventListener('mousedown', showNotice, { capture: true });
+    document.addEventListener('click', showNotice, { capture: true });
 
     return () => {
-      button.removeEventListener('touchstart', showNotice, { capture: true });
-      button.removeEventListener('pointerdown', showNotice, { capture: true });
-      button.removeEventListener('mousedown', showNotice, { capture: true });
-      button.removeEventListener('click', showNotice, { capture: true });
+      document.removeEventListener('touchstart', showNotice, { capture: true });
+      document.removeEventListener('pointerdown', showNotice, { capture: true });
+      document.removeEventListener('mousedown', showNotice, { capture: true });
+      document.removeEventListener('click', showNotice, { capture: true });
     };
   }, [shouldShowMobileExcelExportButton]);
 
@@ -8717,6 +8718,7 @@ React.useEffect(()=>{
                 <div className="mb-4 flex justify-center">
                   <button
                     type="button"
+                    data-mobile-excel-export-notice="true"
                     onClick={(event) => handleReportExcelExportClick(event, exportReportXlsx)}
                     onTouchStart={showMobileExcelExportMessage}
                     onPointerDown={showMobileExcelExportMessage}
@@ -8812,6 +8814,7 @@ React.useEffect(()=>{
               <div className="mt-4 flex justify-center">
                 <button 
                   type="button"
+                  data-mobile-excel-export-notice="true"
                   onClick={(event) => handleReportExcelExportClick(event, exportReportXlsx)}
                   onTouchStart={showMobileExcelExportMessage}
                   onPointerDown={showMobileExcelExportMessage}
@@ -9049,6 +9052,7 @@ React.useEffect(()=>{
                 <div className="mb-4 flex justify-center">
                   <button
                     type="button"
+                    data-mobile-excel-export-notice="true"
                     onClick={(event) => handleReportExcelExportClick(event, exportApprovedXlsx)}
                     onTouchStart={showMobileExcelExportMessage}
                     onPointerDown={showMobileExcelExportMessage}
@@ -9115,6 +9119,7 @@ React.useEffect(()=>{
               <div className="mt-4 flex justify-center">
                 <button
                   type="button"
+                  data-mobile-excel-export-notice="true"
                   onClick={(event) => handleReportExcelExportClick(event, exportApprovedXlsx)}
                   onTouchStart={showMobileExcelExportMessage}
                   onPointerDown={showMobileExcelExportMessage}
@@ -9127,6 +9132,7 @@ React.useEffect(()=>{
         <ModalFooter className="hidden sm:flex">
           <button
             type="button"
+            data-mobile-excel-export-notice="true"
             onClick={(event) => handleReportExcelExportClick(event, exportApprovedXlsx)}
             className="bg-white/[0.06] text-slate-100 border border-white/15 rounded-full px-6 py-2 font-medium hover:bg-indigo-500/15 hover:border-indigo-400/50 transition-all"
           >
@@ -9134,36 +9140,6 @@ React.useEffect(()=>{
           </button>
         </ModalFooter>
       </Modal>
-
-      {shouldShowMobileExcelExportButton && (
-        <button
-          id="meetm-mobile-excel-export-button"
-          type="button"
-          onClickCapture={(event) => {
-            event.preventDefault();
-            event.stopPropagation();
-            setShowMobileExcelExportNotice(true);
-          }}
-          onMouseDownCapture={(event) => {
-            event.preventDefault();
-            event.stopPropagation();
-            setShowMobileExcelExportNotice(true);
-          }}
-          onTouchStartCapture={showMobileExcelExportMessage}
-          onPointerDownCapture={showMobileExcelExportMessage}
-          className="fixed pointer-events-auto touch-manipulation bg-violet-700 text-white border border-white/40 rounded-full px-6 py-3 font-bold shadow-2xl"
-          style={{
-            left: '1rem',
-            right: '1rem',
-            top: 'calc(env(safe-area-inset-top, 0px) + 4.5rem)',
-            zIndex: 2147483647,
-            WebkitTapHighlightColor: 'transparent',
-            transform: 'translateZ(0)',
-          }}
-        >
-          צור קובץ אקסל - ושמור בהורדות
-        </button>
-      )}
 
       {/* Rejected report modal */}
       <Modal open={showRejectedReport} onClose={()=>{setShowRejectedReport(false);setShowReportsOptions(true);}} size="full" landscape>
@@ -9970,6 +9946,37 @@ React.useEffect(()=>{
             <button onClick={()=>setShowActiveError(false)} className="bg-primary text-white rounded-full px-8 py-2 font-medium hover:bg-primary/90 transition-all">סגור</button>
         </ModalFooter>
       </Modal>
+
+      {shouldShowMobileExcelExportButton && (
+        <button
+          id="meetm-mobile-excel-export-button"
+          type="button"
+          data-mobile-excel-export-notice="true"
+          onClickCapture={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            setShowMobileExcelExportNotice(true);
+          }}
+          onMouseDownCapture={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            setShowMobileExcelExportNotice(true);
+          }}
+          onTouchStartCapture={showMobileExcelExportMessage}
+          onPointerDownCapture={showMobileExcelExportMessage}
+          className="fixed pointer-events-auto touch-manipulation bg-violet-700 text-white border border-white/40 rounded-full px-6 py-3 font-bold shadow-2xl"
+          style={{
+            left: '1rem',
+            right: '1rem',
+            top: 'calc(env(safe-area-inset-top, 0px) + 4.5rem)',
+            zIndex: 2147483646,
+            WebkitTapHighlightColor: 'transparent',
+            transform: 'translateZ(0)',
+          }}
+        >
+          צור קובץ אקסל - ושמור בהורדות
+        </button>
+      )}
 
       {showMobileExcelExportNotice && (
         <div
