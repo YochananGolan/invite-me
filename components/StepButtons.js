@@ -219,6 +219,38 @@ function shouldRespectCarryPlanAfterManualDelete() {
   }
 }
 
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+async function resolveCurrentUserForSync() {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user?.id) return user;
+  } catch (err) {
+    console.warn('[StepButtons] getUser failed while resolving sync user', err);
+  }
+
+  try {
+    const { data: { session: authSession } } = await supabase.auth.getSession();
+    if (authSession?.user?.id) return authSession.user;
+  } catch (err) {
+    console.warn('[StepButtons] getSession failed while resolving sync user', err);
+  }
+
+  try {
+    if (typeof window === 'undefined') return null;
+    const storedUserId = localStorage.getItem('user_id');
+    if (!storedUserId || !UUID_PATTERN.test(storedUserId)) return null;
+
+    return {
+      id: storedUserId,
+      email: localStorage.getItem('user_email') || '',
+    };
+  } catch (err) {
+    console.warn('[StepButtons] localStorage user lookup failed', err);
+    return null;
+  }
+}
+
 const hasMeaningfulFormValue = (key, value) => {
   if (value === null || value === undefined) return false;
   if (typeof value === 'string') {
@@ -268,7 +300,7 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick, trig
     let hasSession = !!sessionRef.current;
     const run = async () => {
       if (!hasSession) {
-        const { data: { user } } = await supabase.auth.getUser();
+        const user = await resolveCurrentUserForSync();
         hasSession = !!user;
       }
       if (!hasSession) {
@@ -474,6 +506,23 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick, trig
       return next;
     });
   };
+
+  const syncFinishedStepsFromEvent = useCallback((eventType, details = {}) => {
+    const progress = parseNonNegativeInt(details?.progress_step);
+    const hasDetails = details && Object.entries(details).some(([key, value]) => hasMeaningfulFormValue(key, value));
+    const restoredSteps = new Set();
+
+    if (eventType) restoredSteps.add(0);
+    if (hasDetails || progress >= 2) restoredSteps.add(1);
+    if (details?.template_src || progress >= 3) restoredSteps.add(2);
+    if (!restoredSteps.size) return;
+
+    setFinishedSteps((prev) => {
+      const merged = Array.from(new Set([...(prev || []), ...restoredSteps])).sort((a, b) => a - b);
+      try { localStorage.setItem('finishedSteps', JSON.stringify(merged)); } catch (e) {}
+      return merged;
+    });
+  }, []);
 
   // Reports menu visibility
   const [showReportsOptions, setShowReportsOptions] = useState(false);
@@ -822,7 +871,7 @@ const [userPlanSettings, setUserPlanSettings] = useState({ plan: null, addonCoun
 const userPlanSettingsHydratedRef = useRef(false);
 const persistUserPlanSettings = React.useCallback(async (planCode, addonCount) => {
   try {
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await resolveCurrentUserForSync();
     if (!user) return;
     const safePlan = planCode || null;
     const parsedAddon = Number(addonCount);
@@ -873,13 +922,8 @@ const loadUserPlanSettings = React.useCallback(async () => {
     selectionSourceRef.current = 'persistent';
   };
   try {
-    const { data: { user } } = await supabase.auth.getUser();
-    const { data: { session: authSession } } = await supabase.auth.getSession();
-    const userId =
-      user?.id ??
-      authSession?.user?.id ??
-      sessionRef.current?.user?.id ??
-      null;
+    const user = await resolveCurrentUserForSync();
+    const userId = user?.id ?? sessionRef.current?.user?.id ?? null;
     if (!userId) {
       setUserPlanSettings((prev) => {
         if (prev && prev.plan === null && (prev.addonCount ?? 0) === 0) {
@@ -1512,7 +1556,7 @@ const handleOpenAddonModal = React.useCallback(() => {
     // Attempt to save guest to Supabase (optional – will work only if table exists)
     let newGuestRecord = null;
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = await resolveCurrentUserForSync();
       if (!user) {
         setGuestErrorMsg('יש להתחבר כדי לשלוח הזמנות');
         return;
@@ -1675,7 +1719,7 @@ const handleOpenAddonModal = React.useCallback(() => {
 
     try {
       // create guest in DB (similar to WA function but without opening WA)
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = await resolveCurrentUserForSync();
       if (!user) {
         setIsSendingInvitation(false);
         setInvitationResult({ 
@@ -2075,7 +2119,7 @@ const handleOpenAddonModal = React.useCallback(() => {
   React.useEffect(()=>{
     (async () => {
       try {
-        const { data: { user } } = await supabase.auth.getUser();
+        const user = await resolveCurrentUserForSync();
         if (!user) return;
         const { data, error } = await supabase
           .from('events')
@@ -2161,6 +2205,7 @@ const handleOpenAddonModal = React.useCallback(() => {
         const capFromRow = parseNonNegativeInt(data?.allowed_guests);
         setEventAllowedGuests(capFromRow > 0 ? capFromRow : null);
         setSelectedEventType(data.event_type || '');
+        syncFinishedStepsFromEvent(data.event_type || '', details || {});
         setFormData((prev)=>({ ...prev, ...(details || {}) }));
         if (details && Object.keys(details).length) {
           setEventDetailsCompleted(true);
@@ -2171,7 +2216,7 @@ const handleOpenAddonModal = React.useCallback(() => {
         console.error('Failed to restore latest event details', err);
       }
     })();
-  }, [eventRefreshKey, resetCapacityWarningGuests]);
+  }, [eventRefreshKey, resetCapacityWarningGuests, syncFinishedStepsFromEvent]);
 
   // restore details
   React.useEffect(()=>{
@@ -2209,7 +2254,7 @@ const handleOpenAddonModal = React.useCallback(() => {
         setSelectedFlowStep(null);
         let hasSession = !!sessionRef.current;
         if (!hasSession) {
-          const { data: { user } } = await supabase.auth.getUser();
+          const user = await resolveCurrentUserForSync();
           hasSession = !!user;
         }
         if (!hasSession) {
@@ -2580,9 +2625,13 @@ const handleOpenAddonModal = React.useCallback(() => {
   // designFile is the stored image file name in storage (or null). templateSrc is the relative path of template image chosen
   const saveEventToSupabase = async (designFile, templateSrc) => {
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      const user = await resolveCurrentUserForSync();
+      if (!user?.id) {
+        setStepErrorMsg('יש להתחבר כדי לשמור ולסנכרן את האירוע בין מכשירים.');
+        addToast?.('יש להתחבר כדי לשמור ולסנכרן את האירוע בין מכשירים.', 'error');
+        onAuthClick?.('sign_in');
+        return;
+      }
 
       const progress = templateSrc ? 3 : 2; // Progress based on design selection, not file
       
@@ -2651,11 +2700,13 @@ const handleOpenAddonModal = React.useCallback(() => {
 
         // Build update object - only include progress_step if it exists
         const updateData = {
+          user_id: user.id,
           event_details: eventDetailsForSave,
           invitation_path: designFile,
           allowed_guests: totalAllowedGuests,
           additional_packages: addonCountForDb,
           event_type: selectedEventType || null,
+          selected_plan: selectedPlan || planForDisplay || userPlanSettings?.plan || null,
         };
 
         if (progressStepSupportedRef.current) {
@@ -2677,11 +2728,13 @@ const handleOpenAddonModal = React.useCallback(() => {
             const { data: retryData, error: retryErr } = await supabase
               .from('events')
               .update({
+                user_id: user.id,
                 event_details: eventDetailsForSave,
                 invitation_path: designFile,
                 allowed_guests: totalAllowedGuests,
                 additional_packages: addonCountForDb,
                 event_type: selectedEventType || null,
+                selected_plan: selectedPlan || planForDisplay || userPlanSettings?.plan || null,
               })
               .eq('id', currentEventId)
               .select('id, invitation_path, event_details')
@@ -2731,6 +2784,18 @@ const handleOpenAddonModal = React.useCallback(() => {
           }
         }
 
+        await supabase
+          .from('user_settings')
+          .upsert(
+            {
+              user_id: user.id,
+              active_event_id: currentEventId,
+              plan_code: selectedPlan || planForDisplay || userPlanSettings?.plan || null,
+              addon_balance: addonCountForDb,
+            },
+            { onConflict: 'user_id' },
+          );
+
         // Do not auto-send on every event update to avoid duplicate WhatsApp sends.
         // WhatsApp sending is handled explicitly on guest send actions and first event creation.
 
@@ -2745,12 +2810,13 @@ const handleOpenAddonModal = React.useCallback(() => {
         const addonCountForDb = additionalPackageCounts['addon'] || 0;
 
         const payload = {
-          user_id: user?.id || null,
+          user_id: user.id,
           event_type: selectedEventType,
           event_details: eventDetails,
           invitation_path: designFile,
           allowed_guests: totalAllowedGuests,
           additional_packages: addonCountForDb,
+          selected_plan: selectedPlan || planForDisplay || userPlanSettings?.plan || null,
           status: 'active',
         };
 
@@ -2761,6 +2827,17 @@ const handleOpenAddonModal = React.useCallback(() => {
           console.debug('[StepButtons] Insert success', inserted);
           setCurrentEventId(inserted.id);
           setEventMessagesSentCount(0);
+          await supabase
+            .from('user_settings')
+            .upsert(
+              {
+                user_id: user.id,
+                active_event_id: inserted.id,
+                plan_code: selectedPlan || planForDisplay || userPlanSettings?.plan || null,
+                addon_balance: addonCountForDb,
+              },
+              { onConflict: 'user_id' },
+            );
         }
         if(insertErr){
           console.error('[StepButtons] Insert error', insertErr);
@@ -2982,7 +3059,7 @@ React.useEffect(() => {
     }
 
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = await resolveCurrentUserForSync();
       if (!user) return;
 
       const { data: evRow } = await supabase
@@ -3424,7 +3501,7 @@ React.useEffect(() => {
 
     try {
       // Get current user and event
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = await resolveCurrentUserForSync();
       if (!user) {
         setIsSavingExcelGuests(false);
         setInvitationResult({ 
@@ -3993,7 +4070,7 @@ React.useEffect(() => {
 
     if (!eventIdToDelete) {
       try {
-        const { data: { user } } = await supabase.auth.getUser();
+        const user = await resolveCurrentUserForSync();
         if (user) {
           const { data: ev, error: evErr } = await supabase
             .from('events')
@@ -4324,7 +4401,7 @@ React.useEffect(() => {
     }
 
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = await resolveCurrentUserForSync();
       if (user) {
         const { data: ev } = await supabase
           .from('events')
@@ -4590,7 +4667,7 @@ React.useEffect(() => {
           let eventIdForSave = eventIdForPlan;
           if (!eventIdForSave) {
             try {
-              const { data: { user } } = await supabase.auth.getUser();
+              const user = await resolveCurrentUserForSync();
               if (user) {
                 const { data: latestEv } = await supabase.from('events')
                   .select('id, allowed_guests').eq('user_id', user.id)
@@ -4819,13 +4896,13 @@ React.useEffect(() => {
   React.useEffect(()=>{
     (async ()=>{
       try{
-        const { data:{user} } = await supabase.auth.getUser();
+        const user = await resolveCurrentUserForSync();
         if(!user) return;
         let ev = null;
         let messagesSent = 0;
         const { data: evData, error: evError } = await supabase
           .from('events')
-          .select('id,event_details,allowed_guests,messages_sent_count,additional_packages,selected_plan,status')
+          .select('id,event_type,event_details,allowed_guests,messages_sent_count,additional_packages,selected_plan,status')
           .eq('user_id',user.id)
           .order('created_at',{ascending:false})
           .limit(1)
@@ -4833,7 +4910,7 @@ React.useEffect(() => {
         if (evError && (evError.message || '').toLowerCase().includes('column')) {
           const { data: evF } = await supabase
             .from('events')
-            .select('id,event_details,allowed_guests')
+            .select('id,event_type,event_details,allowed_guests')
             .eq('user_id',user.id)
             .order('created_at',{ascending:false})
             .limit(1)
@@ -4903,6 +4980,8 @@ React.useEffect(() => {
           }
         }
         const details=typeof ev.event_details==='string'?JSON.parse(ev.event_details):ev.event_details||{};
+        if (ev.event_type) setSelectedEventType(ev.event_type);
+        syncFinishedStepsFromEvent(ev.event_type || selectedEventType, details);
         const dateStr=details.date||details.start_datetime;
         const retentionDate = computePlanRetentionDate(dateStr);
         if (retentionDate) {
@@ -4920,7 +4999,7 @@ React.useEffect(() => {
         }
       }catch(e){console.error('archive check failed',e);}  
     })();
-  },[eventRefreshKey, loadUserPlanSettings, derivePlanFromRecord, persistUserPlanSettings, getPlanBaseLimit]);
+  },[eventRefreshKey, loadUserPlanSettings, derivePlanFromRecord, persistUserPlanSettings, getPlanBaseLimit, selectedEventType, syncFinishedStepsFromEvent]);
 
   // Realtime sync: when current event or its guests change in Supabase, refresh state.
   React.useEffect(() => {
@@ -4982,7 +5061,7 @@ React.useEffect(() => {
   const checkActiveEventExists = async () => {
     try{
       if (currentEventId || newEventStarted) return true;
-      const { data:{user} } = await supabase.auth.getUser();
+      const user = await resolveCurrentUserForSync();
       if(!user) return false;
       let ev = null;
       const { data: evData, error: evError } = await supabase
@@ -5173,7 +5252,7 @@ React.useEffect(() => {
     if (!showApprovedReport) return;
     (async () => {
       try {
-        const { data: { user } } = await supabase.auth.getUser();
+        const user = await resolveCurrentUserForSync();
         if (!user) return;
 
         // Use selectedEventForReport for archived events, otherwise use currentEventId
@@ -5200,7 +5279,7 @@ React.useEffect(() => {
     if (!showRejectedReport) return;
     (async () => {
       try {
-        const { data: { user } } = await supabase.auth.getUser();
+        const user = await resolveCurrentUserForSync();
         if (!user) return;
         
         // Use selectedEventForReport for archived events, otherwise use currentEventId
@@ -5227,7 +5306,7 @@ React.useEffect(() => {
     if (!showPendingReport) return;
     (async () => {
       try {
-        const { data: { user } } = await supabase.auth.getUser();
+        const user = await resolveCurrentUserForSync();
         if (!user) return;
         
         // Use selectedEventForReport for archived events, otherwise use currentEventId
@@ -5415,12 +5494,12 @@ React.useEffect(() => {
     if (currentEventId) return;
     (async () => {
       try {
-        const { data: { user } } = await supabase.auth.getUser();
+        const user = await resolveCurrentUserForSync();
         if (!user) return;
 
         const { data: ev } = await supabase
           .from('events')
-          .select('id, event_details, allowed_guests, messages_sent_count, additional_packages, selected_plan, status')
+          .select('id, event_type, event_details, allowed_guests, messages_sent_count, additional_packages, selected_plan, status')
           .eq('user_id', user.id)
           .or('status.neq.archived,status.is.null')
           .order('created_at', { ascending: false })
@@ -5445,6 +5524,10 @@ React.useEffect(() => {
                 lastRestoredEventIdRef.current = ev.id;
               }
               setCurrentEventId(ev.id);
+              if (ev.event_type) {
+                setSelectedEventType(ev.event_type);
+              }
+              syncFinishedStepsFromEvent(ev.event_type || '', details || {});
               if (newEventStarted) {
                 setNewEventStarted(false);
                 try { localStorage.removeItem('newEventStarted'); } catch(e){}
@@ -5468,8 +5551,6 @@ React.useEffect(() => {
               if (planToUse) {
                 setSelectedPlan(planToUse);
                 try { localStorage.setItem('selectedPlan', planToUse); } catch(e){}
-                try { localStorage.setItem('finishedSteps', JSON.stringify([1, 2])); } catch (e) {}
-                setFinishedSteps([1, 2]);
                 await persistUserPlanSettings(planToUse, restoreAddonCount);
                 if (
                   parseNonNegativeInt(ev.additional_packages) !== restoreAddonCount ||
@@ -5646,7 +5727,7 @@ React.useEffect(() => {
         isInitialLoadRef.current = false;
       }
     })();
-  }, [currentEventId, newEventStarted, eventRefreshKey, derivePlanFromRecord, persistUserPlanSettings, loadUserPlanSettings]);
+  }, [currentEventId, newEventStarted, eventRefreshKey, derivePlanFromRecord, persistUserPlanSettings, loadUserPlanSettings, syncFinishedStepsFromEvent]);
 
   // ---- Close modals when no active event ----
   React.useEffect(() => {
@@ -5709,13 +5790,13 @@ React.useEffect(() => {
   React.useEffect(()=>{
     (async()=>{
       try{
-        const { data:{user} } = await supabase.auth.getUser();
+        const user = await resolveCurrentUserForSync();
         if(!user) return;
         let ev = null;
         let messagesSent = 0;
         const { data: evData, error: evError } = await supabase
           .from('events')
-          .select('id,status,event_details,allowed_guests,messages_sent_count,additional_packages,selected_plan')
+          .select('id,event_type,status,event_details,allowed_guests,messages_sent_count,additional_packages,selected_plan')
           .eq('user_id', user.id)
           .order('created_at',{ascending:false})
           .limit(1)
@@ -5723,7 +5804,7 @@ React.useEffect(() => {
         if (evError && (evError.message || '').toLowerCase().includes('column')) {
           const { data: evFallback } = await supabase
             .from('events')
-            .select('id,event_details,allowed_guests')
+            .select('id,event_type,event_details,allowed_guests')
             .eq('user_id', user.id)
             .order('created_at',{ascending:false})
             .limit(1)
@@ -5764,6 +5845,9 @@ React.useEffect(() => {
         }
         if(ev){
           setCurrentEventId(ev.id);
+          if (ev.event_type) {
+            setSelectedEventType(ev.event_type);
+          }
           setEventMessagesSentCount(messagesSent);
           const addonCount = parseNonNegativeInt(userPlanSettingsRef.current?.addonCount);
           setDbAddonCount(addonCount);
@@ -5801,6 +5885,7 @@ React.useEffect(() => {
           const details = typeof ev.event_details === 'string' 
             ? JSON.parse(ev.event_details) 
             : ev.event_details;
+          syncFinishedStepsFromEvent(ev.event_type || '', details || {});
           const tpl = details?.template_src || null;
           if(tpl){
             setSelectedDesign(tpl);
@@ -5817,7 +5902,7 @@ React.useEffect(() => {
         isInitialLoadRef.current = false;
       }catch(e){ console.error('restore event failed', e);}  
     })();
-  },[loadUserPlanSettings]);
+  },[loadUserPlanSettings, syncFinishedStepsFromEvent]);
 
   // Load selectedDesign from localStorage if not already set from database
 React.useEffect(()=>{
@@ -5839,7 +5924,7 @@ React.useEffect(()=>{
   React.useEffect(()=>{
     (async ()=>{
       try{
-        const { data: {user} } = await supabase.auth.getUser();
+        const user = await resolveCurrentUserForSync();
         if(!user || !currentEventId) return;
         
         const { data: guests, error: guestsError } = await supabase
@@ -5998,7 +6083,7 @@ React.useEffect(()=>{
     
     (async ()=>{
       try {
-        const { data: { user } } = await supabase.auth.getUser();
+        const user = await resolveCurrentUserForSync();
         if (!user) return;
         
         const { data, error } = await supabase
@@ -7748,7 +7833,7 @@ React.useEffect(()=>{
             <button
               onClick={async () => {
                 try {
-                  const { data: { user } } = await supabase.auth.getUser();
+                  const user = await resolveCurrentUserForSync();
                   if (!user) {
                     alert('יש להתחבר כדי להציג דוח.');
                     return;
@@ -7784,7 +7869,7 @@ React.useEffect(()=>{
             <button
               onClick={async () => {
                 try {
-                  const { data: { user } } = await supabase.auth.getUser();
+                  const user = await resolveCurrentUserForSync();
                   if (!user) {
                     alert('יש להתחבר כדי להציג דוח.');
                     return;
@@ -7820,7 +7905,7 @@ React.useEffect(()=>{
             <button
               onClick={async () => {
                 try {
-                  const { data: { user } } = await supabase.auth.getUser();
+                  const user = await resolveCurrentUserForSync();
                   if (!user) {
                     alert('יש להתחבר כדי להציג דוח.');
                     return;
@@ -8623,7 +8708,7 @@ React.useEffect(()=>{
             <button onClick={async () => {
               setShowReportsOptions(false);
               try {
-                const { data: { user } } = await supabase.auth.getUser();
+                const user = await resolveCurrentUserForSync();
                 if (!user) {
                   alert('יש להתחבר כדי להציג דו"ח.');
                   return;
@@ -8732,7 +8817,7 @@ React.useEffect(()=>{
             <button onClick={async ()=>{
               setShowReportsOptions(false);
               try{
-                const {data:{user}}=await supabase.auth.getUser();
+                const user = await resolveCurrentUserForSync();
                 if(!user){alert('יש להתחבר כדי להציג.');return;}
                 
                 // Show loading indicator
@@ -9357,7 +9442,7 @@ React.useEffect(()=>{
                     setSelectedFlowStep(null);
                     let hasSession = !!sessionRef.current;
                     if (!hasSession) {
-                      const { data: { user } } = await supabase.auth.getUser();
+                      const user = await resolveCurrentUserForSync();
                       hasSession = !!user;
                     }
                     if (!hasSession) {
