@@ -3524,6 +3524,28 @@ React.useEffect(() => {
     exportFn();
   };
 
+  const renderReportActions = (exportFn, closeFn) => (
+    <div className="mt-4 flex flex-wrap justify-end gap-3">
+      <button
+        type="button"
+        data-mobile-excel-export-notice="true"
+        onClick={(event) => handleReportExcelExportClick(event, exportFn)}
+        onTouchStart={showMobileExcelExportMessage}
+        onPointerDown={showMobileExcelExportMessage}
+        className="relative z-50 pointer-events-auto touch-manipulation bg-white/[0.06] text-slate-100 border border-white/15 rounded-full px-6 py-2 font-medium hover:bg-indigo-500/15 hover:border-indigo-400/50 transition-all"
+      >
+        צור קובץ אקסל - ושמור בהורדות
+      </button>
+      <button
+        type="button"
+        onClick={closeFn}
+        className="bg-red-600 text-white border border-red-400/50 rounded-full px-8 py-3 font-medium hover:bg-red-700 transition-all"
+      >
+        סגור
+      </button>
+    </div>
+  );
+
   const handleExcelImport = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -8823,39 +8845,9 @@ React.useEffect(()=>{
                 </div>
               </>
             )}
-            <div className="mt-4 flex justify-center sm:hidden">
-              <button
-                type="button"
-                data-mobile-excel-export-notice="true"
-                onClick={(event) => handleReportExcelExportClick(event, exportReportXlsx)}
-                onTouchStart={showMobileExcelExportMessage}
-                onPointerDown={showMobileExcelExportMessage}
-                className="relative z-50 pointer-events-auto touch-manipulation bg-white/[0.06] text-slate-100 border border-white/15 rounded-full px-6 py-2 font-medium hover:bg-indigo-500/15 hover:border-indigo-400/50 transition-all"
-              >
-                צור קובץ אקסל - ושמור בהורדות
-              </button>
-            </div>
-            <div className="mt-4 flex justify-end sm:hidden">
-              <button
-                type="button"
-                onClick={() => setShowReportModal(false)}
-                className="bg-red-600 text-white border border-red-400/50 rounded-full px-8 py-3 font-medium hover:bg-red-700 transition-all"
-              >
-                סגור
-              </button>
-            </div>
+            {renderReportActions(exportReportXlsx, () => setShowReportModal(false))}
           </>)}
         </ModalBody>
-        <ModalFooter className="hidden sm:flex">
-          <button
-            type="button"
-            onClick={(event) => handleReportExcelExportClick(event, exportReportXlsx)}
-            className="bg-white/[0.06] text-slate-100 border border-white/15 rounded-full px-6 py-2 font-medium hover:bg-indigo-500/15 hover:border-indigo-400/50 transition-all"
-          >
-            צור קובץ אקסל - ושמור בהורדות
-          </button>
-          <button onClick={() => setShowReportModal(false)} className="bg-red-600 text-white border border-red-400/50 rounded-full px-8 py-3 font-medium hover:bg-red-700 transition-all">סגור</button>
-        </ModalFooter>
       </Modal>
       {/* Reports menu modal */}
       <Modal open={typeof showReportsOptions !== 'undefined' && showReportsOptions} onClose={() => setShowReportsOptions(false)} size="lg">
@@ -9129,44 +9121,8 @@ React.useEffect(()=>{
                   </tr>
                 </tfoot>
               </table>
-              <div className="mt-4 flex justify-center sm:hidden">
-                <button
-                  type="button"
-                  data-mobile-excel-export-notice="true"
-                  onClick={(event) => handleReportExcelExportClick(event, exportApprovedXlsx)}
-                  onTouchStart={showMobileExcelExportMessage}
-                  onPointerDown={showMobileExcelExportMessage}
-                  className="relative z-50 pointer-events-auto touch-manipulation bg-white/[0.06] text-slate-100 border border-white/15 rounded-full px-6 py-2 font-medium hover:bg-indigo-500/15 hover:border-indigo-400/50 transition-all"
-                >
-                  צור קובץ אקסל - ושמור בהורדות
-                </button>
-              </div>
-              <div className="mt-4 flex justify-end sm:hidden">
-                <button
-                  type="button"
-                  onClick={() => { setShowApprovedReport(false); setShowReportsOptions(true); }}
-                  className="bg-red-600 text-white border border-red-400/50 rounded-full px-8 py-3 font-medium hover:bg-red-700 transition-all"
-                >
-                  סגור
-                </button>
-              </div>
+              {renderReportActions(exportApprovedXlsx, () => { setShowApprovedReport(false); setShowReportsOptions(true); })}
         </ModalBody>
-        <ModalFooter className="hidden sm:flex">
-          <button
-            type="button"
-            onClick={(event) => handleReportExcelExportClick(event, exportApprovedXlsx)}
-            className="bg-white/[0.06] text-slate-100 border border-white/15 rounded-full px-6 py-2 font-medium hover:bg-indigo-500/15 hover:border-indigo-400/50 transition-all"
-          >
-            צור קובץ אקסל - ושמור בהורדות
-          </button>
-          <button
-            type="button"
-            onClick={() => { setShowApprovedReport(false); setShowReportsOptions(true); }}
-            className="bg-red-600 text-white border border-red-400/50 rounded-full px-8 py-3 font-medium hover:bg-red-700 transition-all"
-          >
-            סגור
-          </button>
-        </ModalFooter>
       </Modal>
 
       {/* Rejected report modal */}
@@ -9198,44 +9154,8 @@ React.useEffect(()=>{
                   </tr>
                 </tfoot>
               </table>
-              <div className="mt-4 flex justify-center sm:hidden">
-                <button
-                  type="button"
-                  data-mobile-excel-export-notice="true"
-                  onClick={showMobileExcelExportMessage}
-                  onTouchStart={showMobileExcelExportMessage}
-                  onPointerDown={showMobileExcelExportMessage}
-                  className="relative z-50 pointer-events-auto touch-manipulation bg-white/[0.06] text-slate-100 border border-white/15 rounded-full px-6 py-2 font-medium hover:bg-indigo-500/15 hover:border-indigo-400/50 transition-all"
-                >
-                  צור קובץ אקסל - ושמור בהורדות
-                </button>
-              </div>
-              <div className="mt-4 flex justify-end sm:hidden">
-                <button
-                  type="button"
-                  onClick={() => { setShowRejectedReport(false); setShowReportsOptions(true); }}
-                  className="bg-red-600 text-white border border-red-400/50 rounded-full px-8 py-3 font-medium hover:bg-red-700 transition-all"
-                >
-                  סגור
-                </button>
-              </div>
+              {renderReportActions(exportRejectedXlsx, () => { setShowRejectedReport(false); setShowReportsOptions(true); })}
         </ModalBody>
-        <ModalFooter className="hidden sm:flex">
-          <button
-            type="button"
-            onClick={(event) => handleReportExcelExportClick(event, exportRejectedXlsx)}
-            className="bg-white/[0.06] text-slate-100 border border-white/15 rounded-full px-6 py-2 font-medium hover:bg-indigo-500/15 hover:border-indigo-400/50 transition-all"
-          >
-            צור קובץ אקסל - ושמור בהורדות
-          </button>
-          <button
-            type="button"
-            onClick={() => { setShowRejectedReport(false); setShowReportsOptions(true); }}
-            className="bg-red-600 text-white border border-red-400/50 rounded-full px-8 py-3 font-medium hover:bg-red-700 transition-all"
-          >
-            סגור
-          </button>
-        </ModalFooter>
       </Modal>
 
       {/* Pending report modal */}
@@ -9267,44 +9187,8 @@ React.useEffect(()=>{
                   </tr>
                 </tfoot>
               </table>
-              <div className="mt-4 flex justify-center sm:hidden">
-                <button
-                  type="button"
-                  data-mobile-excel-export-notice="true"
-                  onClick={showMobileExcelExportMessage}
-                  onTouchStart={showMobileExcelExportMessage}
-                  onPointerDown={showMobileExcelExportMessage}
-                  className="relative z-50 pointer-events-auto touch-manipulation bg-white/[0.06] text-slate-100 border border-white/15 rounded-full px-6 py-2 font-medium hover:bg-indigo-500/15 hover:border-indigo-400/50 transition-all"
-                >
-                  צור קובץ אקסל - ושמור בהורדות
-                </button>
-              </div>
-              <div className="mt-4 flex justify-end sm:hidden">
-                <button
-                  type="button"
-                  onClick={() => { setShowPendingReport(false); setShowReportsOptions(true); }}
-                  className="bg-red-600 text-white border border-red-400/50 rounded-full px-8 py-3 font-medium hover:bg-red-700 transition-all"
-                >
-                  סגור
-                </button>
-              </div>
+              {renderReportActions(exportPendingXlsx, () => { setShowPendingReport(false); setShowReportsOptions(true); })}
         </ModalBody>
-        <ModalFooter className="hidden sm:flex">
-          <button
-            type="button"
-            onClick={(event) => handleReportExcelExportClick(event, exportPendingXlsx)}
-            className="bg-white/[0.06] text-slate-100 border border-white/15 rounded-full px-6 py-2 font-medium hover:bg-indigo-500/15 hover:border-indigo-400/50 transition-all"
-          >
-            צור קובץ אקסל - ושמור בהורדות
-          </button>
-          <button
-            type="button"
-            onClick={() => { setShowPendingReport(false); setShowReportsOptions(true); }}
-            className="bg-red-600 text-white border border-red-400/50 rounded-full px-8 py-3 font-medium hover:bg-red-700 transition-all"
-          >
-            סגור
-          </button>
-        </ModalFooter>
       </Modal>
 
       {/* Guest status query modal */}
