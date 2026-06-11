@@ -3252,7 +3252,6 @@ React.useEffect(() => {
       setShowMobileExcelExportNotice(true);
       return;
     }
-    if (!reportGuests.length) return;
 
     const generatedAt = new Date().toLocaleString('he-IL');
     const summaryRowIndexes = [];
@@ -3347,7 +3346,6 @@ React.useEffect(() => {
       setShowMobileExcelExportNotice(true);
       return;
     }
-    if (!approvedGuests.length) return;
 
     const generatedAt = new Date().toLocaleString('he-IL');
     const data = [
@@ -3467,6 +3465,7 @@ React.useEffect(() => {
   };
 
   const fileInputRef = useRef();
+  const reportExportPressAtRef = useRef(0);
 
   const isMobileDevice = () => {
     if (typeof window === 'undefined') return false;
@@ -3514,9 +3513,17 @@ React.useEffect(() => {
   };
 
   const handleReportExcelExportClick = (event, exportFn) => {
-    if (isMobileDevice() || isTouchLikeEvent(event)) {
+    const now = Date.now();
+    if (event?.type === 'click' && now - reportExportPressAtRef.current < 700) {
       event?.preventDefault?.();
       event?.stopPropagation?.();
+      return;
+    }
+    reportExportPressAtRef.current = now;
+    event?.preventDefault?.();
+    event?.stopPropagation?.();
+
+    if (isMobileDevice() || isTouchLikeEvent(event)) {
       setShowMobileExcelExportNotice(true);
       return;
     }
@@ -3530,8 +3537,7 @@ React.useEffect(() => {
         type="button"
         data-mobile-excel-export-notice="true"
         onClick={(event) => handleReportExcelExportClick(event, exportFn)}
-        onTouchStart={showMobileExcelExportMessage}
-        onPointerDown={showMobileExcelExportMessage}
+        onPointerDownCapture={(event) => handleReportExcelExportClick(event, exportFn)}
         className="relative z-50 pointer-events-auto touch-manipulation bg-white/[0.06] text-slate-100 border border-white/15 rounded-full px-6 py-2 font-medium hover:bg-indigo-500/15 hover:border-indigo-400/50 transition-all"
       >
         צור קובץ אקסל - ושמור בהורדות
