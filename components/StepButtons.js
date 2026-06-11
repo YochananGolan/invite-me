@@ -7332,8 +7332,16 @@ React.useEffect(()=>{
               <input type="tel" placeholder="טלפון" value={guestData.guestPhone} onChange={(e) => setGuestData({ ...guestData, guestPhone: e.target.value })} className={`w-full bg-white/10 border border-white/20 text-white placeholder-slate-400 rounded-xl focus:border-indigo-400 p-2 pr-12 sm:pr-2 outline-none ${visibleGuestErrors.guestPhone ? 'border-red-400 ring-2 ring-red-400/20' : ''}`} />
             </div>
           </form>
+          <div className="mt-6 flex flex-col gap-3 sm:hidden" dir="rtl">
+            <button type="button" onClick={handleSendInvitation} className="w-full bg-emerald-600 text-white border border-emerald-400/50 rounded-full px-8 py-3 font-medium hover:bg-emerald-700 transition-all">
+              שלח הזמנה בוואטסאפ
+            </button>
+            <button type="button" onClick={handleSendInvitationSms} className="w-full bg-primary text-white border border-primary rounded-full px-8 py-3 font-medium hover:bg-primary/90 transition-all">
+              שלח הזמנה ב-SMS
+            </button>
+          </div>
         </ModalBody>
-        <ModalFooter>
+        <ModalFooter className="hidden sm:flex">
           <div className="flex flex-col sm:flex-row justify-center gap-3 w-full" dir="rtl">
             <button type="button" onClick={handleSendInvitation} className="order-1 bg-emerald-600 text-white border border-emerald-400/50 rounded-full px-8 py-3 font-medium hover:bg-emerald-700 transition-all">
               שלח הזמנה בוואטסאפ
