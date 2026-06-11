@@ -5,9 +5,9 @@ const ToastContext = createContext(null);
 export function ToastProvider({ children }) {
   const [toasts, setToasts] = useState([]);
 
-  const addToast = useCallback((message, type = 'success', duration = 4000) => {
+  const addToast = useCallback((message, type = 'success', duration = 4000, options = {}) => {
     const id = Date.now();
-    setToasts(prev => [...prev, { id, message, type }]);
+    setToasts(prev => [...prev, { id, message, type, position: options.position || 'bottom-left' }]);
 
     if (duration > 0) {
       setTimeout(() => {
@@ -20,11 +20,9 @@ export function ToastProvider({ children }) {
     setToasts(prev => prev.filter(t => t.id !== id));
   }, []);
 
-  return (
-    <ToastContext.Provider value={{ addToast, removeToast }}>
-      {children}
-      <div className="fixed bottom-4 left-4 z-[9999] flex flex-col gap-2">
-        {toasts.map(toast => (
+  const renderToasts = (items) => (
+    <>
+      {items.map(toast => (
           <div
             key={toast.id}
             className={`
@@ -52,7 +50,21 @@ export function ToastProvider({ children }) {
               </span>
             </div>
           </div>
-        ))}
+      ))}
+    </>
+  );
+
+  const bottomLeftToasts = toasts.filter(toast => toast.position !== 'center-high');
+  const centerHighToasts = toasts.filter(toast => toast.position === 'center-high');
+
+  return (
+    <ToastContext.Provider value={{ addToast, removeToast }}>
+      {children}
+      <div className="fixed bottom-4 left-4 z-[9999] flex flex-col gap-2">
+        {renderToasts(bottomLeftToasts)}
+      </div>
+      <div className="fixed top-24 left-1/2 z-[9999] flex -translate-x-1/2 flex-col items-center gap-2">
+        {renderToasts(centerHighToasts)}
       </div>
     </ToastContext.Provider>
   );
