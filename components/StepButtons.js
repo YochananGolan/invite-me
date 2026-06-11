@@ -608,7 +608,6 @@ const [showExcelPreview, setShowExcelPreview] = useState(false);
 const [showExcelInstructions, setShowExcelInstructions] = useState(false);
 const [showMobileExcelNotice, setShowMobileExcelNotice] = useState(false);
 const [showMobileExcelExportNotice, setShowMobileExcelExportNotice] = useState(false);
-const [isMobileUi, setIsMobileUi] = useState(false);
 const [excelPreviewData, setExcelPreviewData] = useState([]);
 const [excelErrors, setExcelErrors] = useState([]);
 const [isSavingExcelGuests, setIsSavingExcelGuests] = useState(false);
@@ -619,26 +618,6 @@ const [whatsAppGroupGuestIds, setWhatsAppGroupGuestIds] = useState(null);
 const [whatsAppGroupGuestCount, setWhatsAppGroupGuestCount] = useState(0);
 const [isWhatsAppGroupSubmitting, setIsWhatsAppGroupSubmitting] = useState(false);
 const [hasWhatsAppGroup, setHasWhatsAppGroup] = useState(false);
-
-React.useEffect(() => {
-  if (typeof window === 'undefined') return;
-
-  const updateMobileUi = () => {
-    const userAgent = window.navigator?.userAgent || '';
-    const coarsePointer = window.matchMedia?.('(pointer: coarse)').matches;
-    const narrowViewport = window.matchMedia?.('(max-width: 900px)').matches;
-    const mobileAgent = /Android|iPhone|iPad|iPod|Mobile/i.test(userAgent);
-    setIsMobileUi(Boolean(mobileAgent || (coarsePointer && narrowViewport)));
-  };
-
-  updateMobileUi();
-  window.addEventListener('resize', updateMobileUi);
-  window.addEventListener('orientationchange', updateMobileUi);
-  return () => {
-    window.removeEventListener('resize', updateMobileUi);
-    window.removeEventListener('orientationchange', updateMobileUi);
-  };
-}, []);
 
 // Process flow diagram modal
   const [showFlowDiagram, setShowFlowDiagram] = useState(false);
@@ -3469,11 +3448,8 @@ React.useEffect(() => {
   };
 
   const shouldShowMobileExcelExportButton =
-    isMobileUi &&
-    (
-      (showReportModal && reportGuests.length > 0 && reportTitle === 'אורחים מגיעים ממוינים לפי שולחן') ||
-      (showApprovedReport && approvedGuests.length > 0)
-    );
+    (showReportModal && reportGuests.length > 0 && reportTitle === 'אורחים מגיעים ממוינים לפי שולחן') ||
+    (showApprovedReport && approvedGuests.length > 0);
 
   React.useEffect(() => {
     if (!shouldShowMobileExcelExportButton || typeof document === 'undefined') return;
@@ -8814,7 +8790,7 @@ React.useEffect(()=>{
               </div>
             )}
             {reportGuests.length > 0 && reportTitle === 'אורחים מגיעים ממוינים לפי שולחן' && (
-              <div className="mt-4 hidden justify-center sm:flex">
+              <div className="mt-4 flex justify-center">
                 <button 
                   type="button"
                   onClick={exportReportXlsx} 
@@ -9104,6 +9080,17 @@ React.useEffect(()=>{
                   </tr>
                 </tfoot>
               </table>
+              <div className="mt-4 flex justify-center">
+                <button
+                  type="button"
+                  onClick={exportApprovedXlsx}
+                  onTouchEnd={showMobileExcelExportMessage}
+                  onPointerUp={showMobileExcelExportMessage}
+                  className="relative z-50 pointer-events-auto touch-manipulation bg-white/[0.06] text-slate-100 border border-white/15 rounded-full px-6 py-2 font-medium hover:bg-indigo-500/15 hover:border-indigo-400/50 transition-all"
+                >
+                  צור קובץ אקסל - ושמור בהורדות
+                </button>
+              </div>
         </ModalBody>
         <ModalFooter className="hidden sm:flex">
           <button
