@@ -7520,23 +7520,6 @@ React.useEffect(()=>{
         </ModalFooter>
       </Modal>
 
-      <Modal open={showMobileExcelExportNotice} onClose={() => setShowMobileExcelExportNotice(false)} size="sm">
-        <ModalHeader onClose={() => setShowMobileExcelExportNotice(false)}>שמירת דוח אקסל</ModalHeader>
-        <ModalBody>
-          <p className="text-center text-slate-200 text-lg font-semibold leading-relaxed">
-            שמירת הדוח כקובץ אקסל אפשרי רק במחשב ולא בנייד
-          </p>
-        </ModalBody>
-        <ModalFooter>
-          <button
-            onClick={() => setShowMobileExcelExportNotice(false)}
-            className="w-full bg-gradient-to-br from-indigo-600 to-violet-600 text-white px-6 py-3 rounded-full font-bold hover:opacity-90 transition-all"
-          >
-            הבנתי
-          </button>
-        </ModalFooter>
-      </Modal>
-
       {/* Excel Instructions Modal */}
       <Modal open={showExcelInstructions} onClose={() => setShowExcelInstructions(false)} size="md">
         <ModalHeader onClose={() => setShowExcelInstructions(false)}>הנחיות לייבוא קובץ אקסל</ModalHeader>
@@ -9987,6 +9970,37 @@ React.useEffect(()=>{
             <button onClick={()=>setShowActiveError(false)} className="bg-primary text-white rounded-full px-8 py-2 font-medium hover:bg-primary/90 transition-all">סגור</button>
         </ModalFooter>
       </Modal>
+
+      {showMobileExcelExportNotice && (
+        <div
+          dir="rtl"
+          className="fixed inset-0 flex items-center justify-center bg-[#0a0b1e]/85 backdrop-blur-sm px-4"
+          style={{ zIndex: 2147483647 }}
+          onClick={(event) => {
+            if (event.target === event.currentTarget) {
+              setShowMobileExcelExportNotice(false);
+            }
+          }}
+        >
+          <div className="w-full max-w-sm rounded-2xl border border-white/15 bg-gradient-to-b from-[#1a1d4a]/95 to-[#12143a]/95 p-6 text-center text-slate-100 shadow-[0_24px_64px_-12px_rgba(0,0,0,0.6)]">
+            <h2 className="mb-4 text-xl font-bold">שמירת דוח אקסל</h2>
+            <p className="mb-6 text-lg font-semibold leading-relaxed text-slate-200">
+              שמירת הדוח כקובץ אקסל אפשרי רק במחשב ולא בנייד
+            </p>
+            <button
+              type="button"
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                setShowMobileExcelExportNotice(false);
+              }}
+              className="w-full rounded-full bg-gradient-to-br from-indigo-600 to-violet-600 px-6 py-3 font-bold text-white transition-all hover:opacity-90"
+            >
+              הבנתי
+            </button>
+          </div>
+        </div>
+      )}
     </>
   );
 });
