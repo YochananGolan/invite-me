@@ -3416,8 +3416,20 @@ React.useEffect(() => {
 
   const isMobileDevice = () => {
     if (typeof window === 'undefined') return false;
-    return window.matchMedia?.('(max-width: 768px)').matches ||
-      /Android|iPhone|iPad|iPod|Mobile/i.test(window.navigator?.userAgent || '');
+    const userAgent = window.navigator?.userAgent || '';
+    const hasTouch = Number(window.navigator?.maxTouchPoints || 0) > 0;
+    const coarsePointer = window.matchMedia?.('(pointer: coarse)').matches;
+    const narrowViewport = window.matchMedia?.('(max-width: 1024px)').matches;
+    const mobileAgent = /Android|iPhone|iPad|iPod|Mobile/i.test(userAgent);
+    return mobileAgent || (hasTouch && (coarsePointer || narrowViewport));
+  };
+
+  const isTouchLikeEvent = (event) => {
+    const nativeEvent = event?.nativeEvent || event;
+    return event?.type?.startsWith?.('touch') ||
+      nativeEvent?.type?.startsWith?.('touch') ||
+      nativeEvent?.pointerType === 'touch' ||
+      nativeEvent?.pointerType === 'pen';
   };
 
   const openExcelImport = () => {
@@ -3441,10 +3453,21 @@ React.useEffect(() => {
   };
 
   const showMobileExcelExportMessage = (event) => {
-    if (!isMobileDevice()) return;
+    if (!isMobileDevice() && !isTouchLikeEvent(event)) return;
     event?.preventDefault?.();
     event?.stopPropagation?.();
     setShowMobileExcelExportNotice(true);
+  };
+
+  const handleReportExcelExportClick = (event, exportFn) => {
+    if (isMobileDevice() || isTouchLikeEvent(event)) {
+      event?.preventDefault?.();
+      event?.stopPropagation?.();
+      setShowMobileExcelExportNotice(true);
+      return;
+    }
+
+    exportFn();
   };
 
   const shouldShowMobileExcelExportButton =
@@ -8711,9 +8734,9 @@ React.useEffect(()=>{
                 <div className="mb-4 flex justify-center">
                   <button
                     type="button"
-                    onClick={exportReportXlsx}
-                    onTouchEnd={showMobileExcelExportMessage}
-                    onPointerUp={showMobileExcelExportMessage}
+                    onClick={(event) => handleReportExcelExportClick(event, exportReportXlsx)}
+                    onTouchStart={showMobileExcelExportMessage}
+                    onPointerDown={showMobileExcelExportMessage}
                     className="relative z-50 pointer-events-auto touch-manipulation bg-white/[0.10] text-slate-100 border border-white/25 rounded-full px-6 py-2 font-bold hover:bg-indigo-500/15 hover:border-indigo-400/50 transition-all"
                   >
                     צור קובץ אקסל - ושמור בהורדות
@@ -8806,9 +8829,9 @@ React.useEffect(()=>{
               <div className="mt-4 flex justify-center">
                 <button 
                   type="button"
-                  onClick={exportReportXlsx} 
-                  onTouchEnd={showMobileExcelExportMessage}
-                  onPointerUp={showMobileExcelExportMessage}
+                  onClick={(event) => handleReportExcelExportClick(event, exportReportXlsx)}
+                  onTouchStart={showMobileExcelExportMessage}
+                  onPointerDown={showMobileExcelExportMessage}
                   className="relative z-50 pointer-events-auto touch-manipulation bg-white/[0.06] text-slate-100 border border-white/15 rounded-full px-6 py-2 font-medium hover:bg-indigo-500/15 hover:border-indigo-400/50 transition-all"
                 >
                   צור קובץ אקסל - ושמור בהורדות
@@ -9043,9 +9066,9 @@ React.useEffect(()=>{
                 <div className="mb-4 flex justify-center">
                   <button
                     type="button"
-                    onClick={exportApprovedXlsx}
-                    onTouchEnd={showMobileExcelExportMessage}
-                    onPointerUp={showMobileExcelExportMessage}
+                    onClick={(event) => handleReportExcelExportClick(event, exportApprovedXlsx)}
+                    onTouchStart={showMobileExcelExportMessage}
+                    onPointerDown={showMobileExcelExportMessage}
                     className="relative z-50 pointer-events-auto touch-manipulation bg-white/[0.10] text-slate-100 border border-white/25 rounded-full px-6 py-2 font-bold hover:bg-indigo-500/15 hover:border-indigo-400/50 transition-all"
                   >
                     צור קובץ אקסל - ושמור בהורדות
@@ -9109,9 +9132,9 @@ React.useEffect(()=>{
               <div className="mt-4 flex justify-center">
                 <button
                   type="button"
-                  onClick={exportApprovedXlsx}
-                  onTouchEnd={showMobileExcelExportMessage}
-                  onPointerUp={showMobileExcelExportMessage}
+                  onClick={(event) => handleReportExcelExportClick(event, exportApprovedXlsx)}
+                  onTouchStart={showMobileExcelExportMessage}
+                  onPointerDown={showMobileExcelExportMessage}
                   className="relative z-50 pointer-events-auto touch-manipulation bg-white/[0.06] text-slate-100 border border-white/15 rounded-full px-6 py-2 font-medium hover:bg-indigo-500/15 hover:border-indigo-400/50 transition-all"
                 >
                   צור קובץ אקסל - ושמור בהורדות
@@ -9121,7 +9144,7 @@ React.useEffect(()=>{
         <ModalFooter className="hidden sm:flex">
           <button
             type="button"
-            onClick={exportApprovedXlsx}
+            onClick={(event) => handleReportExcelExportClick(event, exportApprovedXlsx)}
             className="bg-white/[0.06] text-slate-100 border border-white/15 rounded-full px-6 py-2 font-medium hover:bg-indigo-500/15 hover:border-indigo-400/50 transition-all"
           >
             צור קובץ אקסל - ושמור בהורדות
