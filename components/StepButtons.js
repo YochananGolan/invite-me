@@ -3536,14 +3536,18 @@ React.useEffect(() => {
       <button
         type="button"
         data-mobile-excel-export-notice="true"
+        data-report-export-action="true"
         onClick={(event) => handleReportExcelExportClick(event, exportFn)}
-        onPointerDownCapture={(event) => handleReportExcelExportClick(event, exportFn)}
+        onPointerDownCapture={(event) => {
+          if (isTouchLikeEvent(event)) handleReportExcelExportClick(event, exportFn);
+        }}
         className="relative z-50 pointer-events-auto touch-manipulation bg-white/[0.06] text-slate-100 border border-white/15 rounded-full px-6 py-2 font-medium hover:bg-indigo-500/15 hover:border-indigo-400/50 transition-all"
       >
         צור קובץ אקסל - ושמור בהורדות
       </button>
       <button
         type="button"
+        data-report-close-action="true"
         onClick={closeFn}
         className="bg-red-600 text-white border border-red-400/50 rounded-full px-8 py-3 font-medium hover:bg-red-700 transition-all"
       >
@@ -3551,6 +3555,56 @@ React.useEffect(() => {
       </button>
     </div>
   );
+
+  React.useEffect(() => {
+    const hasOpenReport = showReportModal || showApprovedReport || showRejectedReport || showPendingReport;
+    if (!hasOpenReport || typeof document === 'undefined') return;
+
+    const getActiveActions = () => {
+      if (showReportModal) {
+        return { exportFn: exportReportXlsx, closeFn: () => setShowReportModal(false) };
+      }
+      if (showApprovedReport) {
+        return { exportFn: exportApprovedXlsx, closeFn: () => { setShowApprovedReport(false); setShowReportsOptions(true); } };
+      }
+      if (showRejectedReport) {
+        return { exportFn: exportRejectedXlsx, closeFn: () => { setShowRejectedReport(false); setShowReportsOptions(true); } };
+      }
+      if (showPendingReport) {
+        return { exportFn: exportPendingXlsx, closeFn: () => { setShowPendingReport(false); setShowReportsOptions(true); } };
+      }
+      return null;
+    };
+
+    const handleNativeReportAction = (event) => {
+      const exportButton = event.target?.closest?.('[data-report-export-action="true"]');
+      const closeButton = event.target?.closest?.('[data-report-close-action="true"]');
+      if (!exportButton && !closeButton) return;
+
+      const actions = getActiveActions();
+      if (!actions) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation?.();
+
+      if (exportButton) {
+        if (isMobileDevice() || isTouchLikeEvent(event)) {
+          setShowMobileExcelExportNotice(true);
+          return;
+        }
+        actions.exportFn();
+        return;
+      }
+
+      actions.closeFn();
+    };
+
+    document.addEventListener('click', handleNativeReportAction, true);
+    return () => {
+      document.removeEventListener('click', handleNativeReportAction, true);
+    };
+  }, [showReportModal, showApprovedReport, showRejectedReport, showPendingReport, reportGuests, approvedGuests, rejectedGuests, pendingGuests]);
 
   const handleExcelImport = (e) => {
     const file = e.target.files[0];
