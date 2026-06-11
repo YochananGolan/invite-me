@@ -3448,8 +3448,11 @@ React.useEffect(() => {
   };
 
   const shouldShowMobileExcelExportButton =
-    (showReportModal && reportGuests.length > 0 && reportTitle === 'אורחים מגיעים ממוינים לפי שולחן') ||
-    (showApprovedReport && approvedGuests.length > 0);
+    isMobileDevice() &&
+    (
+      (showReportModal && reportGuests.length > 0 && reportTitle === 'אורחים מגיעים ממוינים לפי שולחן') ||
+      (showApprovedReport && approvedGuests.length > 0)
+    );
 
   const handleExcelImport = (e) => {
     const file = e.target.files[0];
@@ -8766,7 +8769,7 @@ React.useEffect(()=>{
               </div>
             )}
             {reportGuests.length > 0 && reportTitle === 'אורחים מגיעים ממוינים לפי שולחן' && (
-              <div className="mt-4 flex justify-center">
+              <div className="mt-4 hidden justify-center sm:flex">
                 <button 
                   type="button"
                   onClick={exportReportXlsx} 
@@ -9056,17 +9059,6 @@ React.useEffect(()=>{
                   </tr>
                 </tfoot>
               </table>
-              <div className="mt-4 flex justify-center sm:hidden">
-                <button
-                  type="button"
-                  onClick={exportApprovedXlsx}
-                  onTouchEnd={showMobileExcelExportMessage}
-                  onPointerUp={showMobileExcelExportMessage}
-                  className="relative z-50 pointer-events-auto touch-manipulation bg-white/[0.06] text-slate-100 border border-white/15 rounded-full px-6 py-2 font-medium hover:bg-indigo-500/15 hover:border-indigo-400/50 transition-all"
-                >
-                  צור קובץ אקסל - ושמור בהורדות
-                </button>
-              </div>
         </ModalBody>
         <ModalFooter className="hidden sm:flex">
           <button
@@ -9082,10 +9074,26 @@ React.useEffect(()=>{
       {shouldShowMobileExcelExportButton && (
         <button
           type="button"
-          onClick={() => setShowMobileExcelExportNotice(true)}
+          onClick={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            setShowMobileExcelExportNotice(true);
+          }}
+          onMouseDown={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            setShowMobileExcelExportNotice(true);
+          }}
           onTouchStart={showMobileExcelExportMessage}
           onPointerDown={showMobileExcelExportMessage}
-          className="sm:hidden fixed left-4 right-4 bottom-24 z-[80] pointer-events-auto touch-manipulation bg-white/[0.10] text-slate-100 border border-white/25 rounded-full px-6 py-3 font-bold shadow-2xl backdrop-blur-xl"
+          className="fixed pointer-events-auto touch-manipulation bg-white/[0.14] text-slate-100 border border-white/30 rounded-full px-6 py-3 font-bold shadow-2xl backdrop-blur-xl"
+          style={{
+            left: '1rem',
+            right: '1rem',
+            bottom: 'calc(env(safe-area-inset-bottom, 0px) + 6.5rem)',
+            zIndex: 2147483647,
+            WebkitTapHighlightColor: 'transparent',
+          }}
         >
           צור קובץ אקסל - ושמור בהורדות
         </button>
