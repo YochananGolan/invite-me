@@ -8713,18 +8713,6 @@ React.useEffect(()=>{
         <ModalHeader onClose={() => setShowReportModal(false)}>{reportTitle}</ModalHeader>
         <ModalBody>
           {showReportModal && (<>
-            <div className="mb-4 flex justify-center">
-              <button
-                type="button"
-                data-mobile-excel-export-notice="true"
-                onClick={(event) => handleReportExcelExportClick(event, exportReportXlsx)}
-                onTouchStart={showMobileExcelExportMessage}
-                onPointerDown={showMobileExcelExportMessage}
-                className="relative z-50 pointer-events-auto touch-manipulation bg-white/[0.10] text-slate-100 border border-white/25 rounded-full px-6 py-2 font-bold hover:bg-indigo-500/15 hover:border-indigo-400/50 transition-all"
-              >
-                צור קובץ אקסל - ושמור בהורדות
-              </button>
-            </div>
             {reportGuests.length === 0 ? (
               <p className="text-center text-slate-400">אין נתונים להצגה</p>
             ) : (
@@ -8812,20 +8800,18 @@ React.useEffect(()=>{
                 </div>
               </>
             )}
-            {reportGuests.length > 0 && (
-              <div className="mt-4 flex justify-center">
-                <button 
-                  type="button"
-                  data-mobile-excel-export-notice="true"
-                  onClick={(event) => handleReportExcelExportClick(event, exportReportXlsx)}
-                  onTouchStart={showMobileExcelExportMessage}
-                  onPointerDown={showMobileExcelExportMessage}
-                  className="relative z-50 pointer-events-auto touch-manipulation bg-white/[0.06] text-slate-100 border border-white/15 rounded-full px-6 py-2 font-medium hover:bg-indigo-500/15 hover:border-indigo-400/50 transition-all"
-                >
-                  צור קובץ אקסל - ושמור בהורדות
-                </button>
-              </div>
-            )}
+            <div className="mt-4 flex justify-center">
+              <button
+                type="button"
+                data-mobile-excel-export-notice="true"
+                onClick={(event) => handleReportExcelExportClick(event, exportReportXlsx)}
+                onTouchStart={showMobileExcelExportMessage}
+                onPointerDown={showMobileExcelExportMessage}
+                className="relative z-50 pointer-events-auto touch-manipulation bg-white/[0.06] text-slate-100 border border-white/15 rounded-full px-6 py-2 font-medium hover:bg-indigo-500/15 hover:border-indigo-400/50 transition-all"
+              >
+                צור קובץ אקסל - ושמור בהורדות
+              </button>
+            </div>
           </>)}
         </ModalBody>
         <ModalFooter>
@@ -9050,18 +9036,6 @@ React.useEffect(()=>{
       <Modal open={showApprovedReport} onClose={()=>{setShowApprovedReport(false);setShowReportsOptions(true);}} size="full" landscape>
         <ModalHeader onClose={()=>{setShowApprovedReport(false);setShowReportsOptions(true);}}>דוח אורחים שאישרו הגעה</ModalHeader>
         <ModalBody className="overflow-x-auto">
-              <div className="mb-4 flex justify-center">
-                <button
-                  type="button"
-                  data-mobile-excel-export-notice="true"
-                  onClick={(event) => handleReportExcelExportClick(event, exportApprovedXlsx)}
-                  onTouchStart={showMobileExcelExportMessage}
-                  onPointerDown={showMobileExcelExportMessage}
-                  className="relative z-50 pointer-events-auto touch-manipulation bg-white/[0.10] text-slate-100 border border-white/25 rounded-full px-6 py-2 font-bold hover:bg-indigo-500/15 hover:border-indigo-400/50 transition-all"
-                >
-                  צור קובץ אקסל - ושמור בהורדות
-                </button>
-              </div>
               <table className="w-full text-right border border-collapse" style={{fontSize: '11px'}}>
                 <thead>
                   <tr className="bg-white/5 text-slate-300">
@@ -9145,18 +9119,6 @@ React.useEffect(()=>{
       <Modal open={showRejectedReport} onClose={()=>{setShowRejectedReport(false);setShowReportsOptions(true);}} size="full" landscape>
         <ModalHeader onClose={()=>{setShowRejectedReport(false);setShowReportsOptions(true);}}>דוח אורחים שלא מגיעים</ModalHeader>
         <ModalBody className="overflow-x-auto">
-              <div className="mb-4 flex justify-center">
-                <button
-                  type="button"
-                  data-mobile-excel-export-notice="true"
-                  onClick={showMobileExcelExportMessage}
-                  onTouchStart={showMobileExcelExportMessage}
-                  onPointerDown={showMobileExcelExportMessage}
-                  className="relative z-50 pointer-events-auto touch-manipulation bg-white/[0.10] text-slate-100 border border-white/25 rounded-full px-6 py-2 font-bold hover:bg-indigo-500/15 hover:border-indigo-400/50 transition-all"
-                >
-                  צור קובץ אקסל - ושמור בהורדות
-                </button>
-              </div>
               <table className="w-full text-right border border-white/10 border-collapse" style={{fontSize: '11px'}}>
                 <thead>
                   <tr className="bg-white/5 text-slate-300 font-bold whitespace-nowrap">
@@ -9182,6 +9144,18 @@ React.useEffect(()=>{
                   </tr>
                 </tfoot>
               </table>
+              <div className="mt-4 flex justify-center">
+                <button
+                  type="button"
+                  data-mobile-excel-export-notice="true"
+                  onClick={showMobileExcelExportMessage}
+                  onTouchStart={showMobileExcelExportMessage}
+                  onPointerDown={showMobileExcelExportMessage}
+                  className="relative z-50 pointer-events-auto touch-manipulation bg-white/[0.06] text-slate-100 border border-white/15 rounded-full px-6 py-2 font-medium hover:bg-indigo-500/15 hover:border-indigo-400/50 transition-all"
+                >
+                  צור קובץ אקסל - ושמור בהורדות
+                </button>
+              </div>
         </ModalBody>
       </Modal>
 
@@ -9189,18 +9163,6 @@ React.useEffect(()=>{
       <Modal open={showPendingReport} onClose={()=>{setShowPendingReport(false);setShowReportsOptions(true);}} size="full" landscape>
         <ModalHeader onClose={()=>{setShowPendingReport(false);setShowReportsOptions(true);}}>דוח אורחים שטרם הגיבו</ModalHeader>
         <ModalBody className="overflow-x-auto">
-              <div className="mb-4 flex justify-center">
-                <button
-                  type="button"
-                  data-mobile-excel-export-notice="true"
-                  onClick={showMobileExcelExportMessage}
-                  onTouchStart={showMobileExcelExportMessage}
-                  onPointerDown={showMobileExcelExportMessage}
-                  className="relative z-50 pointer-events-auto touch-manipulation bg-white/[0.10] text-slate-100 border border-white/25 rounded-full px-6 py-2 font-bold hover:bg-indigo-500/15 hover:border-indigo-400/50 transition-all"
-                >
-                  צור קובץ אקסל - ושמור בהורדות
-                </button>
-              </div>
               <table className="w-full text-right border border-white/10 border-collapse" style={{fontSize: '11px'}}>
                 <thead>
                   <tr className="bg-white/5 text-slate-300 font-bold whitespace-nowrap">
@@ -9226,6 +9188,18 @@ React.useEffect(()=>{
                   </tr>
                 </tfoot>
               </table>
+              <div className="mt-4 flex justify-center">
+                <button
+                  type="button"
+                  data-mobile-excel-export-notice="true"
+                  onClick={showMobileExcelExportMessage}
+                  onTouchStart={showMobileExcelExportMessage}
+                  onPointerDown={showMobileExcelExportMessage}
+                  className="relative z-50 pointer-events-auto touch-manipulation bg-white/[0.06] text-slate-100 border border-white/15 rounded-full px-6 py-2 font-medium hover:bg-indigo-500/15 hover:border-indigo-400/50 transition-all"
+                >
+                  צור קובץ אקסל - ושמור בהורדות
+                </button>
+              </div>
         </ModalBody>
       </Modal>
 
@@ -9970,37 +9944,6 @@ React.useEffect(()=>{
             <button onClick={()=>setShowActiveError(false)} className="bg-primary text-white rounded-full px-8 py-2 font-medium hover:bg-primary/90 transition-all">סגור</button>
         </ModalFooter>
       </Modal>
-
-      {shouldShowMobileExcelExportButton && (
-        <button
-          id="meetm-mobile-excel-export-button"
-          type="button"
-          data-mobile-excel-export-notice="true"
-          onClickCapture={(event) => {
-            event.preventDefault();
-            event.stopPropagation();
-            setShowMobileExcelExportNotice(true);
-          }}
-          onMouseDownCapture={(event) => {
-            event.preventDefault();
-            event.stopPropagation();
-            setShowMobileExcelExportNotice(true);
-          }}
-          onTouchStartCapture={showMobileExcelExportMessage}
-          onPointerDownCapture={showMobileExcelExportMessage}
-          className="fixed pointer-events-auto touch-manipulation bg-violet-700 text-white border border-white/40 rounded-full px-6 py-3 font-bold shadow-2xl"
-          style={{
-            left: '1rem',
-            right: '1rem',
-            top: 'calc(env(safe-area-inset-top, 0px) + 4.5rem)',
-            zIndex: 2147483646,
-            WebkitTapHighlightColor: 'transparent',
-            transform: 'translateZ(0)',
-          }}
-        >
-          צור קובץ אקסל - ושמור בהורדות
-        </button>
-      )}
 
       {showMobileExcelExportNotice && (
         <div
