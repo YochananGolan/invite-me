@@ -8,7 +8,6 @@ import he from 'date-fns/locale/he';
 import 'react-datepicker/dist/react-datepicker.css';
 import * as XLSX from 'xlsx-js-style';
 import { format } from 'date-fns';
-import { useToast } from './Toast';
 import TranzilaPayment from './TranzilaPayment';
 import Modal, { ModalHeader, ModalBody, ModalFooter } from './Modal';
 import Drawer, { DrawerHeader, DrawerBody, DrawerFooter } from './Drawer';
@@ -272,7 +271,6 @@ const hasMeaningfulFormValue = (key, value) => {
 
 const StepButtons = forwardRef(function StepButtons({ session, onAuthClick, triggerCreateEvent, onConsumedCreateTrigger }, ref) {
   const router = useRouter();
-  const { addToast } = useToast();
   const sessionRef = useRef(session);
   const hasSession = !!session;
   // After the user מחק אירוע קיים once successfully in this session, we don't need
@@ -2960,6 +2958,8 @@ const handleOpenAddonModal = React.useCallback(() => {
   const [showReportModal, setShowReportModal] = useState(false);
   const [reportGuests, setReportGuests] = useState([]);
   const [reportTitle, setReportTitle] = useState('');
+  const [showReportExcelSuccess, setShowReportExcelSuccess] = useState(false);
+  const reportExcelSuccessTimeoutRef = useRef(null);
   
   const cleanupGuestsAfterFailedSend = useCallback(async (guestIds = []) => {
     const ids = (guestIds || []).filter(Boolean);
@@ -3233,6 +3233,23 @@ React.useEffect(() => {
     return wb;
   };
 
+  const showReportExcelSuccessMessage = () => {
+    if (reportExcelSuccessTimeoutRef.current) {
+      clearTimeout(reportExcelSuccessTimeoutRef.current);
+    }
+    setShowReportExcelSuccess(true);
+    reportExcelSuccessTimeoutRef.current = setTimeout(() => {
+      setShowReportExcelSuccess(false);
+      reportExcelSuccessTimeoutRef.current = null;
+    }, 4000);
+  };
+
+  React.useEffect(() => () => {
+    if (reportExcelSuccessTimeoutRef.current) {
+      clearTimeout(reportExcelSuccessTimeoutRef.current);
+    }
+  }, []);
+
   const downloadWorkbook = (wb, fileName) => {
     const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array', cellStyles: true });
     const blob = new Blob([wbout], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
@@ -3245,7 +3262,7 @@ React.useEffect(() => {
     a.click();
     a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 0);
-    addToast('קובץ אקסל נוצר בהצלחה ונמצא בהורדות.', 'success', 4000, { position: 'center-high' });
+    showReportExcelSuccessMessage();
   };
 
   const exportReportXlsx = () => {
@@ -3534,18 +3551,25 @@ React.useEffect(() => {
 
   const renderReportActions = (exportFn, closeFn) => (
     <div className="mt-4 flex flex-wrap justify-end gap-3">
-      <button
-        type="button"
-        data-mobile-excel-export-notice="true"
-        data-report-export-action="true"
-        onClick={(event) => handleReportExcelExportClick(event, exportFn)}
-        onPointerDownCapture={(event) => {
-          if (isTouchLikeEvent(event)) handleReportExcelExportClick(event, exportFn);
-        }}
-        className="relative z-50 pointer-events-auto touch-manipulation bg-white/[0.06] text-slate-100 border border-white/15 rounded-full px-6 py-2 font-medium hover:bg-indigo-500/15 hover:border-indigo-400/50 transition-all"
-      >
-        צור קובץ אקסל - ושמור בהורדות
-      </button>
+      <div className="flex flex-col items-center gap-2">
+        <button
+          type="button"
+          data-mobile-excel-export-notice="true"
+          data-report-export-action="true"
+          onClick={(event) => handleReportExcelExportClick(event, exportFn)}
+          onPointerDownCapture={(event) => {
+            if (isTouchLikeEvent(event)) handleReportExcelExportClick(event, exportFn);
+          }}
+          className="relative z-50 pointer-events-auto touch-manipulation bg-white/[0.06] text-slate-100 border border-white/15 rounded-full px-6 py-2 font-medium hover:bg-indigo-500/15 hover:border-indigo-400/50 transition-all"
+        >
+          צור קובץ אקסל - ושמור בהורדות
+        </button>
+        {showReportExcelSuccess && (
+          <div className="rounded-full bg-green-600 px-4 py-2 text-sm font-medium text-white shadow-lg">
+            קובץ אקסל נוצר בהצלחה ונמצא בהורדות.
+          </div>
+        )}
+      </div>
       <button
         type="button"
         data-report-close-action="true"
