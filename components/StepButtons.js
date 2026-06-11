@@ -3440,6 +3440,13 @@ React.useEffect(() => {
     fileInputRef.current?.click();
   };
 
+  const showMobileExcelExportMessage = (event) => {
+    if (!isMobileDevice()) return;
+    event?.preventDefault?.();
+    event?.stopPropagation?.();
+    setShowMobileExcelExportNotice(true);
+  };
+
   const handleExcelImport = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -8757,8 +8764,11 @@ React.useEffect(()=>{
             {reportGuests.length > 0 && reportTitle === 'אורחים מגיעים ממוינים לפי שולחן' && (
               <div className="mt-4 flex justify-center">
                 <button 
+                  type="button"
                   onClick={exportReportXlsx} 
-                  className="bg-white/[0.06] text-slate-100 border border-white/15 rounded-full px-6 py-2 font-medium hover:bg-indigo-500/15 hover:border-indigo-400/50 transition-all"
+                  onTouchEnd={showMobileExcelExportMessage}
+                  onPointerUp={showMobileExcelExportMessage}
+                  className="relative z-50 pointer-events-auto touch-manipulation bg-white/[0.06] text-slate-100 border border-white/15 rounded-full px-6 py-2 font-medium hover:bg-indigo-500/15 hover:border-indigo-400/50 transition-all"
                 >
                   צור קובץ אקסל - ושמור בהורדות
                 </button>
@@ -9042,9 +9052,26 @@ React.useEffect(()=>{
                   </tr>
                 </tfoot>
               </table>
+              <div className="mt-4 flex justify-center sm:hidden">
+                <button
+                  type="button"
+                  onClick={exportApprovedXlsx}
+                  onTouchEnd={showMobileExcelExportMessage}
+                  onPointerUp={showMobileExcelExportMessage}
+                  className="relative z-50 pointer-events-auto touch-manipulation bg-white/[0.06] text-slate-100 border border-white/15 rounded-full px-6 py-2 font-medium hover:bg-indigo-500/15 hover:border-indigo-400/50 transition-all"
+                >
+                  צור קובץ אקסל - ושמור בהורדות
+                </button>
+              </div>
         </ModalBody>
-        <ModalFooter>
-          <button onClick={exportApprovedXlsx} className="bg-white/[0.06] text-slate-100 border border-white/15 rounded-full px-6 py-2 font-medium hover:bg-indigo-500/15 hover:border-indigo-400/50 transition-all">צור קובץ אקסל - ושמור בהורדות</button>
+        <ModalFooter className="hidden sm:flex">
+          <button
+            type="button"
+            onClick={exportApprovedXlsx}
+            className="bg-white/[0.06] text-slate-100 border border-white/15 rounded-full px-6 py-2 font-medium hover:bg-indigo-500/15 hover:border-indigo-400/50 transition-all"
+          >
+            צור קובץ אקסל - ושמור בהורדות
+          </button>
         </ModalFooter>
       </Modal>
 
