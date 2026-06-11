@@ -6649,7 +6649,7 @@ React.useEffect(()=>{
       {hasSession && (
       <div
         ref={stepBarAnchorRef}
-        className="relative mx-[calc(50%-50vw)] w-screen min-h-[7.25rem] sm:min-h-[5.25rem]"
+        className="relative mx-[calc(50%-50vw)] w-screen min-h-[21.5rem] sm:min-h-[5.25rem]"
         style={stepBarHeight ? { minHeight: `${stepBarHeight}px` } : undefined}
       >
       <div
@@ -6670,7 +6670,7 @@ React.useEffect(()=>{
         }}
       >
         <div className="flex flex-col gap-2 sm:hidden px-2">
-          <div className="grid grid-cols-3 gap-2">
+          <div className="flex flex-col gap-2">
             {steps.slice(1, 4).map((step, idx) => {
               const realIdx = idx + 1;
               const isFinished = finishedSteps.includes(realIdx) || (realIdx === 3 && finishedSteps.includes(2));
@@ -6693,7 +6693,7 @@ React.useEffect(()=>{
                     else if (realIdx === 2) { setShowEventDetails(true); setStepErrorMsg(''); }
                     else if (realIdx === 3) { setShowDesignChooser(true); setStepErrorMsg(''); }
                   }}
-                  className={`flex flex-col items-center justify-center gap-1.5 rounded-xl py-4 px-2 text-center transition-all ${
+                  className={`flex w-full flex-row items-center justify-center gap-3 rounded-xl py-3 px-4 text-center transition-all ${
                     isFinished
                       ? 'bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-[0_4px_14px_rgba(99,70,230,0.45)]'
                       : isDesign
@@ -6707,7 +6707,7 @@ React.useEffect(()=>{
               );
             })}
           </div>
-          <div className={`grid ${shouldShowWhatsAppGroupUpdateButton ? 'grid-cols-3' : 'grid-cols-2'} gap-2`}>
+          <div className="flex flex-col gap-2">
             {steps.slice(4).map((step, idx) => {
               const realIdx = idx + 4;
               const isFinished = finishedSteps.includes(realIdx);
@@ -6731,7 +6731,7 @@ React.useEffect(()=>{
                       setShowReportsOptions(true); setShowGuestListModal(false); setStepErrorMsg('');
                     }
                   }}
-                  className={`flex flex-col items-center justify-center gap-1.5 rounded-xl py-4 px-2 text-center transition-all ${
+                  className={`flex w-full flex-row items-center justify-center gap-3 rounded-xl py-3 px-4 text-center transition-all ${
                     isFinished
                       ? 'bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-[0_4px_14px_rgba(99,70,230,0.45)]'
                       : 'bg-white/[0.06] text-slate-100 border border-white/15 hover:bg-white/[0.10] hover:border-indigo-400/40'
@@ -6751,7 +6751,7 @@ React.useEffect(()=>{
                   e.stopPropagation();
                   openWhatsAppGroupModal();
                 }}
-                className="flex flex-col items-center justify-center gap-1.5 rounded-xl py-4 px-2 text-center transition-all bg-emerald-500/15 text-emerald-200 border border-emerald-400/40 shadow-[0_2px_10px_rgba(16,185,129,0.25)]"
+                className="flex w-full flex-row items-center justify-center gap-3 rounded-xl py-3 px-4 text-center transition-all bg-emerald-500/15 text-emerald-200 border border-emerald-400/40 shadow-[0_2px_10px_rgba(16,185,129,0.25)]"
               >
                 <span className="text-sm font-bold leading-tight text-center">צור/עדכן קבוצת וואטסאפ</span>
               </button>
