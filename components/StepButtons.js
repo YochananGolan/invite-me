@@ -608,6 +608,7 @@ const [showExcelPreview, setShowExcelPreview] = useState(false);
 const [showExcelInstructions, setShowExcelInstructions] = useState(false);
 const [showMobileExcelNotice, setShowMobileExcelNotice] = useState(false);
 const [showMobileExcelExportNotice, setShowMobileExcelExportNotice] = useState(false);
+const [isMobileUi, setIsMobileUi] = useState(false);
 const [excelPreviewData, setExcelPreviewData] = useState([]);
 const [excelErrors, setExcelErrors] = useState([]);
 const [isSavingExcelGuests, setIsSavingExcelGuests] = useState(false);
@@ -618,6 +619,26 @@ const [whatsAppGroupGuestIds, setWhatsAppGroupGuestIds] = useState(null);
 const [whatsAppGroupGuestCount, setWhatsAppGroupGuestCount] = useState(0);
 const [isWhatsAppGroupSubmitting, setIsWhatsAppGroupSubmitting] = useState(false);
 const [hasWhatsAppGroup, setHasWhatsAppGroup] = useState(false);
+
+React.useEffect(() => {
+  if (typeof window === 'undefined') return;
+
+  const updateMobileUi = () => {
+    const userAgent = window.navigator?.userAgent || '';
+    const coarsePointer = window.matchMedia?.('(pointer: coarse)').matches;
+    const narrowViewport = window.matchMedia?.('(max-width: 900px)').matches;
+    const mobileAgent = /Android|iPhone|iPad|iPod|Mobile/i.test(userAgent);
+    setIsMobileUi(Boolean(mobileAgent || (coarsePointer && narrowViewport)));
+  };
+
+  updateMobileUi();
+  window.addEventListener('resize', updateMobileUi);
+  window.addEventListener('orientationchange', updateMobileUi);
+  return () => {
+    window.removeEventListener('resize', updateMobileUi);
+    window.removeEventListener('orientationchange', updateMobileUi);
+  };
+}, []);
 
 // Process flow diagram modal
   const [showFlowDiagram, setShowFlowDiagram] = useState(false);
@@ -3448,11 +3469,35 @@ React.useEffect(() => {
   };
 
   const shouldShowMobileExcelExportButton =
-    isMobileDevice() &&
+    isMobileUi &&
     (
       (showReportModal && reportGuests.length > 0 && reportTitle === 'אורחים מגיעים ממוינים לפי שולחן') ||
       (showApprovedReport && approvedGuests.length > 0)
     );
+
+  React.useEffect(() => {
+    if (!shouldShowMobileExcelExportButton || typeof document === 'undefined') return;
+    const button = document.getElementById('meetm-mobile-excel-export-button');
+    if (!button) return;
+
+    const showNotice = (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      setShowMobileExcelExportNotice(true);
+    };
+
+    button.addEventListener('touchstart', showNotice, { capture: true, passive: false });
+    button.addEventListener('pointerdown', showNotice, { capture: true });
+    button.addEventListener('mousedown', showNotice, { capture: true });
+    button.addEventListener('click', showNotice, { capture: true });
+
+    return () => {
+      button.removeEventListener('touchstart', showNotice, { capture: true });
+      button.removeEventListener('pointerdown', showNotice, { capture: true });
+      button.removeEventListener('mousedown', showNotice, { capture: true });
+      button.removeEventListener('click', showNotice, { capture: true });
+    };
+  }, [shouldShowMobileExcelExportButton]);
 
   const handleExcelImport = (e) => {
     const file = e.target.files[0];
@@ -9073,26 +9118,28 @@ React.useEffect(()=>{
 
       {shouldShowMobileExcelExportButton && (
         <button
+          id="meetm-mobile-excel-export-button"
           type="button"
-          onClick={(event) => {
+          onClickCapture={(event) => {
             event.preventDefault();
             event.stopPropagation();
             setShowMobileExcelExportNotice(true);
           }}
-          onMouseDown={(event) => {
+          onMouseDownCapture={(event) => {
             event.preventDefault();
             event.stopPropagation();
             setShowMobileExcelExportNotice(true);
           }}
-          onTouchStart={showMobileExcelExportMessage}
-          onPointerDown={showMobileExcelExportMessage}
-          className="fixed pointer-events-auto touch-manipulation bg-white/[0.14] text-slate-100 border border-white/30 rounded-full px-6 py-3 font-bold shadow-2xl backdrop-blur-xl"
+          onTouchStartCapture={showMobileExcelExportMessage}
+          onPointerDownCapture={showMobileExcelExportMessage}
+          className="fixed pointer-events-auto touch-manipulation bg-violet-700 text-white border border-white/40 rounded-full px-6 py-3 font-bold shadow-2xl"
           style={{
             left: '1rem',
             right: '1rem',
-            bottom: 'calc(env(safe-area-inset-bottom, 0px) + 6.5rem)',
+            top: 'calc(env(safe-area-inset-top, 0px) + 4.5rem)',
             zIndex: 2147483647,
             WebkitTapHighlightColor: 'transparent',
+            transform: 'translateZ(0)',
           }}
         >
           צור קובץ אקסל - ושמור בהורדות
