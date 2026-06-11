@@ -3245,6 +3245,7 @@ React.useEffect(() => {
     a.click();
     a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 0);
+    addToast('קובץ אקסל נוצר בהצלחה ונמצא בהורדות.', 'success');
   };
 
   const exportReportXlsx = () => {
