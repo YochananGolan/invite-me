@@ -8,6 +8,7 @@ import he from 'date-fns/locale/he';
 import 'react-datepicker/dist/react-datepicker.css';
 import * as XLSX from 'xlsx-js-style';
 import { format } from 'date-fns';
+import { useToast } from './Toast';
 import TranzilaPayment from './TranzilaPayment';
 import Modal, { ModalHeader, ModalBody, ModalFooter } from './Modal';
 import Drawer, { DrawerHeader, DrawerBody, DrawerFooter } from './Drawer';
@@ -271,6 +272,7 @@ const hasMeaningfulFormValue = (key, value) => {
 
 const StepButtons = forwardRef(function StepButtons({ session, onAuthClick, triggerCreateEvent, onConsumedCreateTrigger }, ref) {
   const router = useRouter();
+  const { addToast } = useToast();
   const sessionRef = useRef(session);
   const hasSession = !!session;
   // After the user מחק אירוע קיים once successfully in this session, we don't need
@@ -3550,8 +3552,8 @@ React.useEffect(() => {
   };
 
   const renderReportActions = (exportFn, closeFn) => (
-    <div className="mt-4 flex flex-wrap justify-end gap-3">
-      <div className="flex flex-col items-center gap-2">
+    <div className="mt-4 flex flex-wrap items-start justify-end gap-3 pb-12">
+      <div className="relative inline-flex flex-col items-center">
         <button
           type="button"
           data-mobile-excel-export-notice="true"
@@ -3565,7 +3567,10 @@ React.useEffect(() => {
           צור קובץ אקסל - ושמור בהורדות
         </button>
         {showReportExcelSuccess && (
-          <div className="rounded-full bg-green-600 px-4 py-2 text-sm font-medium text-white shadow-lg">
+          <div
+            role="status"
+            className="absolute right-1/2 top-full z-50 mt-2 w-max max-w-[min(90vw,420px)] translate-x-1/2 rounded-full bg-green-600 px-4 py-2 text-center text-sm font-medium text-white shadow-lg"
+          >
             קובץ אקסל נוצר בהצלחה ונמצא בהורדות.
           </div>
         )}
