@@ -8781,9 +8781,18 @@ React.useEffect(()=>{
                 צור קובץ אקסל - ושמור בהורדות
               </button>
             </div>
+            <div className="mt-4 flex justify-end sm:hidden">
+              <button
+                type="button"
+                onClick={() => setShowReportModal(false)}
+                className="bg-red-600 text-white border border-red-400/50 rounded-full px-8 py-3 font-medium hover:bg-red-700 transition-all"
+              >
+                סגור
+              </button>
+            </div>
           </>)}
         </ModalBody>
-        <ModalFooter>
+        <ModalFooter className="hidden sm:flex">
           <button onClick={() => setShowReportModal(false)} className="bg-primary text-white border border-primary rounded-full px-8 py-3 font-medium hover:bg-primary/90 transition-all">סגור</button>
         </ModalFooter>
       </Modal>
@@ -9071,6 +9080,15 @@ React.useEffect(()=>{
                   צור קובץ אקסל - ושמור בהורדות
                 </button>
               </div>
+              <div className="mt-4 flex justify-end sm:hidden">
+                <button
+                  type="button"
+                  onClick={() => { setShowApprovedReport(false); setShowReportsOptions(true); }}
+                  className="bg-red-600 text-white border border-red-400/50 rounded-full px-8 py-3 font-medium hover:bg-red-700 transition-all"
+                >
+                  סגור
+                </button>
+              </div>
         </ModalBody>
         <ModalFooter className="hidden sm:flex">
           <button
@@ -9124,6 +9142,15 @@ React.useEffect(()=>{
                   צור קובץ אקסל - ושמור בהורדות
                 </button>
               </div>
+              <div className="mt-4 flex justify-end sm:hidden">
+                <button
+                  type="button"
+                  onClick={() => { setShowRejectedReport(false); setShowReportsOptions(true); }}
+                  className="bg-red-600 text-white border border-red-400/50 rounded-full px-8 py-3 font-medium hover:bg-red-700 transition-all"
+                >
+                  סגור
+                </button>
+              </div>
         </ModalBody>
       </Modal>
 
@@ -9166,6 +9193,15 @@ React.useEffect(()=>{
                   className="relative z-50 pointer-events-auto touch-manipulation bg-white/[0.06] text-slate-100 border border-white/15 rounded-full px-6 py-2 font-medium hover:bg-indigo-500/15 hover:border-indigo-400/50 transition-all"
                 >
                   צור קובץ אקסל - ושמור בהורדות
+                </button>
+              </div>
+              <div className="mt-4 flex justify-end sm:hidden">
+                <button
+                  type="button"
+                  onClick={() => { setShowPendingReport(false); setShowReportsOptions(true); }}
+                  className="bg-red-600 text-white border border-red-400/50 rounded-full px-8 py-3 font-medium hover:bg-red-700 transition-all"
+                >
+                  סגור
                 </button>
               </div>
         </ModalBody>
