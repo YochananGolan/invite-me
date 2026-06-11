@@ -3240,8 +3240,11 @@ React.useEffect(() => {
     const a = document.createElement('a');
     a.href = url;
     a.download = fileName;
+    a.style.display = 'none';
+    document.body.appendChild(a);
     a.click();
-    URL.revokeObjectURL(url);
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 0);
   };
 
   const exportReportXlsx = () => {
@@ -3412,6 +3415,57 @@ React.useEffect(() => {
     downloadWorkbook(wb, 'דוח_מאשרים_מעוצב.xlsx');
   };
 
+  const exportBasicGuestsXlsx = (rows, reportName, fileName, totalLabel) => {
+    if (isMobileDevice()) {
+      setShowMobileExcelExportNotice(true);
+      return;
+    }
+    const safeRows = rows || [];
+    const generatedAt = new Date().toLocaleString('he-IL');
+    const data = [
+      [reportName],
+      [`סה"כ רשומות: ${safeRows.length}`],
+      [`הופק בתאריך: ${generatedAt}`],
+      [],
+      ['#', 'שם פרטי', 'שם משפחה', 'טלפון'],
+      ...safeRows.map((g, idx) => [
+        idx + 1,
+        g.first_name || '',
+        g.last_name || '',
+        g.phone || '',
+      ]),
+    ];
+
+    data.push(['', totalLabel, '', safeRows.length]);
+
+    const columns = [
+      { wch: 5 },
+      { wch: 18 },
+      { wch: 18 },
+      { wch: 22 },
+    ];
+    const wb = createReportWorkbook(reportName, data, columns, {
+      title: reportName,
+      subtitle: `סה"כ רשומות: ${safeRows.length}`,
+      generatedAt,
+      totalRowLabel: totalLabel,
+      totalRowValue: safeRows.length,
+      headerRowIndex: 4,
+      totalRowIndex: data.length - 1,
+      summaryRowIndexes: [],
+      columnCount: columns.length,
+    });
+    downloadWorkbook(wb, fileName);
+  };
+
+  const exportRejectedXlsx = () => {
+    exportBasicGuestsXlsx(rejectedGuests, 'דוח אורחים שלא מגיעים', 'דוח_אורחים_שלא_מגיעים.xlsx', 'סה"כ לא מגיעים');
+  };
+
+  const exportPendingXlsx = () => {
+    exportBasicGuestsXlsx(pendingGuests, 'דוח אורחים שטרם הגיבו', 'דוח_אורחים_שטרם_הגיבו.xlsx', 'סה"כ טרם הגיבו');
+  };
+
   const fileInputRef = useRef();
 
   const isMobileDevice = () => {
@@ -3421,7 +3475,7 @@ React.useEffect(() => {
     const coarsePointer = window.matchMedia?.('(pointer: coarse)').matches;
     const narrowViewport = window.matchMedia?.('(max-width: 1024px)').matches;
     const mobileAgent = /Android|iPhone|iPad|iPod|Mobile/i.test(userAgent);
-    return mobileAgent || (hasTouch && (coarsePointer || narrowViewport));
+    return mobileAgent || (hasTouch && coarsePointer && narrowViewport);
   };
 
   const isTouchLikeEvent = (event) => {
@@ -8793,7 +8847,14 @@ React.useEffect(()=>{
           </>)}
         </ModalBody>
         <ModalFooter className="hidden sm:flex">
-          <button onClick={() => setShowReportModal(false)} className="bg-primary text-white border border-primary rounded-full px-8 py-3 font-medium hover:bg-primary/90 transition-all">סגור</button>
+          <button
+            type="button"
+            onClick={(event) => handleReportExcelExportClick(event, exportReportXlsx)}
+            className="bg-white/[0.06] text-slate-100 border border-white/15 rounded-full px-6 py-2 font-medium hover:bg-indigo-500/15 hover:border-indigo-400/50 transition-all"
+          >
+            צור קובץ אקסל - ושמור בהורדות
+          </button>
+          <button onClick={() => setShowReportModal(false)} className="bg-red-600 text-white border border-red-400/50 rounded-full px-8 py-3 font-medium hover:bg-red-700 transition-all">סגור</button>
         </ModalFooter>
       </Modal>
       {/* Reports menu modal */}
@@ -9098,6 +9159,13 @@ React.useEffect(()=>{
           >
             צור קובץ אקסל - ושמור בהורדות
           </button>
+          <button
+            type="button"
+            onClick={() => { setShowApprovedReport(false); setShowReportsOptions(true); }}
+            className="bg-red-600 text-white border border-red-400/50 rounded-full px-8 py-3 font-medium hover:bg-red-700 transition-all"
+          >
+            סגור
+          </button>
         </ModalFooter>
       </Modal>
 
@@ -9152,6 +9220,22 @@ React.useEffect(()=>{
                 </button>
               </div>
         </ModalBody>
+        <ModalFooter className="hidden sm:flex">
+          <button
+            type="button"
+            onClick={(event) => handleReportExcelExportClick(event, exportRejectedXlsx)}
+            className="bg-white/[0.06] text-slate-100 border border-white/15 rounded-full px-6 py-2 font-medium hover:bg-indigo-500/15 hover:border-indigo-400/50 transition-all"
+          >
+            צור קובץ אקסל - ושמור בהורדות
+          </button>
+          <button
+            type="button"
+            onClick={() => { setShowRejectedReport(false); setShowReportsOptions(true); }}
+            className="bg-red-600 text-white border border-red-400/50 rounded-full px-8 py-3 font-medium hover:bg-red-700 transition-all"
+          >
+            סגור
+          </button>
+        </ModalFooter>
       </Modal>
 
       {/* Pending report modal */}
@@ -9205,6 +9289,22 @@ React.useEffect(()=>{
                 </button>
               </div>
         </ModalBody>
+        <ModalFooter className="hidden sm:flex">
+          <button
+            type="button"
+            onClick={(event) => handleReportExcelExportClick(event, exportPendingXlsx)}
+            className="bg-white/[0.06] text-slate-100 border border-white/15 rounded-full px-6 py-2 font-medium hover:bg-indigo-500/15 hover:border-indigo-400/50 transition-all"
+          >
+            צור קובץ אקסל - ושמור בהורדות
+          </button>
+          <button
+            type="button"
+            onClick={() => { setShowPendingReport(false); setShowReportsOptions(true); }}
+            className="bg-red-600 text-white border border-red-400/50 rounded-full px-8 py-3 font-medium hover:bg-red-700 transition-all"
+          >
+            סגור
+          </button>
+        </ModalFooter>
       </Modal>
 
       {/* Guest status query modal */}
