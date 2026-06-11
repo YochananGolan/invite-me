@@ -3447,6 +3447,10 @@ React.useEffect(() => {
     setShowMobileExcelExportNotice(true);
   };
 
+  const shouldShowMobileExcelExportButton =
+    (showReportModal && reportGuests.length > 0 && reportTitle === 'אורחים מגיעים ממוינים לפי שולחן') ||
+    (showApprovedReport && approvedGuests.length > 0);
+
   const handleExcelImport = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -9074,6 +9078,18 @@ React.useEffect(()=>{
           </button>
         </ModalFooter>
       </Modal>
+
+      {shouldShowMobileExcelExportButton && (
+        <button
+          type="button"
+          onClick={() => setShowMobileExcelExportNotice(true)}
+          onTouchStart={showMobileExcelExportMessage}
+          onPointerDown={showMobileExcelExportMessage}
+          className="sm:hidden fixed left-4 right-4 bottom-24 z-[80] pointer-events-auto touch-manipulation bg-white/[0.10] text-slate-100 border border-white/25 rounded-full px-6 py-3 font-bold shadow-2xl backdrop-blur-xl"
+        >
+          צור קובץ אקסל - ושמור בהורדות
+        </button>
+      )}
 
       {/* Rejected report modal */}
       <Modal open={showRejectedReport} onClose={()=>{setShowRejectedReport(false);setShowReportsOptions(true);}} size="full" landscape>
