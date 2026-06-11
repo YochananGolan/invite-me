@@ -6693,7 +6693,7 @@ React.useEffect(()=>{
                     else if (realIdx === 2) { setShowEventDetails(true); setStepErrorMsg(''); }
                     else if (realIdx === 3) { setShowDesignChooser(true); setStepErrorMsg(''); }
                   }}
-                  className={`flex min-h-[4.75rem] w-full flex-col items-center justify-center gap-2 rounded-xl py-4 px-5 text-center transition-all ${
+                  className={`flex min-h-[4.75rem] w-full flex-row items-center justify-center gap-3 rounded-xl py-4 px-5 text-center transition-all ${
                     isFinished
                       ? 'bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-[0_4px_14px_rgba(99,70,230,0.45)]'
                       : isDesign
@@ -6701,11 +6701,18 @@ React.useEffect(()=>{
                         : 'bg-white/[0.06] text-slate-100 border border-white/15 hover:bg-white/[0.10] hover:border-indigo-400/40'
                   }`}
                 >
-                  <span className={`inline-flex shrink-0 items-center justify-center rounded-full px-3 py-2 text-2xl font-bold leading-none ${isFinished ? 'bg-white/25 text-white' : 'bg-indigo-500/30 text-indigo-200'}`}>
+                  <span
+                    className="inline-block w-24 shrink-0 text-center text-2xl font-bold leading-tight"
+                  >
                     שלב {realIdx}
                   </span>
                   <span
-                    className="text-2xl font-bold leading-tight text-center"
+                    className="shrink-0 text-2xl font-bold leading-tight"
+                  >
+                    -
+                  </span>
+                  <span
+                    className="text-center text-2xl font-bold leading-tight"
                   >
                     {stepsMobile[realIdx]}
                   </span>
@@ -6737,17 +6744,24 @@ React.useEffect(()=>{
                       setShowReportsOptions(true); setShowGuestListModal(false); setStepErrorMsg('');
                     }
                   }}
-                  className={`flex min-h-[4.75rem] w-full flex-col items-center justify-center gap-2 rounded-xl py-4 px-5 text-center transition-all ${
+                  className={`flex min-h-[4.75rem] w-full flex-row items-center justify-center gap-3 rounded-xl py-4 px-5 text-center transition-all ${
                     isFinished
                       ? 'bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-[0_4px_14px_rgba(99,70,230,0.45)]'
                       : 'bg-white/[0.06] text-slate-100 border border-white/15 hover:bg-white/[0.10] hover:border-indigo-400/40'
                   }`}
                 >
-                  <span className={`inline-flex shrink-0 items-center justify-center rounded-full px-3 py-2 text-2xl font-bold leading-none ${isFinished ? 'bg-white/25 text-white' : 'bg-indigo-500/30 text-indigo-200'}`}>
+                  <span
+                    className="inline-block w-24 shrink-0 text-center text-2xl font-bold leading-tight"
+                  >
                     שלב {realIdx}
                   </span>
                   <span
-                    className="text-2xl font-bold leading-tight text-center"
+                    className="shrink-0 text-2xl font-bold leading-tight"
+                  >
+                    -
+                  </span>
+                  <span
+                    className="text-center text-2xl font-bold leading-tight"
                   >
                     {stepsMobile[realIdx]}
                   </span>
@@ -6763,10 +6777,20 @@ React.useEffect(()=>{
                   e.stopPropagation();
                   openWhatsAppGroupModal();
                 }}
-                className="flex min-h-[4.75rem] w-full flex-row items-center justify-center gap-4 rounded-xl py-4 px-5 text-center transition-all bg-emerald-500/15 text-emerald-200 border border-emerald-400/40 shadow-[0_2px_10px_rgba(16,185,129,0.25)]"
+                className="flex min-h-[4.75rem] w-full flex-row items-center justify-center gap-3 rounded-xl py-4 px-5 text-center transition-all bg-emerald-500/15 text-emerald-200 border border-emerald-400/40 shadow-[0_2px_10px_rgba(16,185,129,0.25)]"
               >
                 <span
-                  className="text-2xl font-bold leading-tight text-center"
+                  className="inline-block w-24 shrink-0 text-center text-2xl font-bold leading-tight"
+                >
+                  שלב 6
+                </span>
+                <span
+                  className="shrink-0 text-2xl font-bold leading-tight"
+                >
+                  -
+                </span>
+                <span
+                  className="text-center text-2xl font-bold leading-tight"
                 >
                   צור/עדכן קבוצת וואטסאפ
                 </span>
