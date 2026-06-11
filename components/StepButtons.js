@@ -607,6 +607,7 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick, trig
 const [showExcelPreview, setShowExcelPreview] = useState(false);
 const [showExcelInstructions, setShowExcelInstructions] = useState(false);
 const [showMobileExcelNotice, setShowMobileExcelNotice] = useState(false);
+const [showMobileExcelExportNotice, setShowMobileExcelExportNotice] = useState(false);
 const [excelPreviewData, setExcelPreviewData] = useState([]);
 const [excelErrors, setExcelErrors] = useState([]);
 const [isSavingExcelGuests, setIsSavingExcelGuests] = useState(false);
@@ -3244,6 +3245,10 @@ React.useEffect(() => {
   };
 
   const exportReportXlsx = () => {
+    if (isMobileDevice()) {
+      setShowMobileExcelExportNotice(true);
+      return;
+    }
     if (!reportGuests.length) return;
 
     const generatedAt = new Date().toLocaleString('he-IL');
@@ -3335,6 +3340,10 @@ React.useEffect(() => {
 
   // Helper to export approved guests to CSV (Excel)
   const exportApprovedXlsx = () => {
+    if (isMobileDevice()) {
+      setShowMobileExcelExportNotice(true);
+      return;
+    }
     if (!approvedGuests.length) return;
 
     const generatedAt = new Date().toLocaleString('he-IL');
@@ -7446,6 +7455,23 @@ React.useEffect(()=>{
         <ModalFooter>
           <button
             onClick={() => setShowMobileExcelNotice(false)}
+            className="w-full bg-gradient-to-br from-indigo-600 to-violet-600 text-white px-6 py-3 rounded-full font-bold hover:opacity-90 transition-all"
+          >
+            הבנתי
+          </button>
+        </ModalFooter>
+      </Modal>
+
+      <Modal open={showMobileExcelExportNotice} onClose={() => setShowMobileExcelExportNotice(false)} size="sm">
+        <ModalHeader onClose={() => setShowMobileExcelExportNotice(false)}>שמירת דוח אקסל</ModalHeader>
+        <ModalBody>
+          <p className="text-center text-slate-200 text-lg font-semibold leading-relaxed">
+            שמירת הדוח כקובץ אקסל אפשרי רק במחשב ולא בנייד
+          </p>
+        </ModalBody>
+        <ModalFooter>
+          <button
+            onClick={() => setShowMobileExcelExportNotice(false)}
             className="w-full bg-gradient-to-br from-indigo-600 to-violet-600 text-white px-6 py-3 rounded-full font-bold hover:opacity-90 transition-all"
           >
             הבנתי
