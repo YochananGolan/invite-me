@@ -6649,7 +6649,7 @@ React.useEffect(()=>{
       {hasSession && (
       <div
         ref={stepBarAnchorRef}
-        className="relative mx-[calc(50%-50vw)] w-screen min-h-[21.5rem] sm:min-h-[5.25rem]"
+        className="relative mx-[calc(50%-50vw)] w-screen min-h-[29rem] sm:min-h-[5.25rem]"
         style={stepBarHeight ? { minHeight: `${stepBarHeight}px` } : undefined}
       >
       <div
@@ -6693,7 +6693,7 @@ React.useEffect(()=>{
                     else if (realIdx === 2) { setShowEventDetails(true); setStepErrorMsg(''); }
                     else if (realIdx === 3) { setShowDesignChooser(true); setStepErrorMsg(''); }
                   }}
-                  className={`flex w-full flex-row items-center justify-center gap-3 rounded-xl py-3 px-4 text-center transition-all ${
+                  className={`flex w-full flex-row items-center justify-center gap-5 rounded-xl py-5 px-5 text-center transition-all ${
                     isFinished
                       ? 'bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-[0_4px_14px_rgba(99,70,230,0.45)]'
                       : isDesign
@@ -6701,8 +6701,8 @@ React.useEffect(()=>{
                         : 'bg-white/[0.06] text-slate-100 border border-white/15 hover:bg-white/[0.10] hover:border-indigo-400/40'
                   }`}
                 >
-                  <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-sm font-bold shrink-0 ${isFinished ? 'bg-white/25 text-white' : 'bg-indigo-500/30 text-indigo-200'}`}>{realIdx}</span>
-                  <span className="text-sm font-bold leading-tight text-center">{stepsMobile[realIdx]}</span>
+                  <span className={`inline-flex items-center justify-center h-12 w-12 rounded-full text-2xl font-black shrink-0 ${isFinished ? 'bg-white/25 text-white' : 'bg-indigo-500/30 text-indigo-200'}`}>{realIdx}</span>
+                  <span className="text-[26px] font-black leading-tight text-center">{stepsMobile[realIdx]}</span>
                 </button>
               );
             })}
@@ -6731,14 +6731,14 @@ React.useEffect(()=>{
                       setShowReportsOptions(true); setShowGuestListModal(false); setStepErrorMsg('');
                     }
                   }}
-                  className={`flex w-full flex-row items-center justify-center gap-3 rounded-xl py-3 px-4 text-center transition-all ${
+                  className={`flex w-full flex-row items-center justify-center gap-5 rounded-xl py-5 px-5 text-center transition-all ${
                     isFinished
                       ? 'bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-[0_4px_14px_rgba(99,70,230,0.45)]'
                       : 'bg-white/[0.06] text-slate-100 border border-white/15 hover:bg-white/[0.10] hover:border-indigo-400/40'
                   }`}
                 >
-                  <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-sm font-bold shrink-0 ${isFinished ? 'bg-white/25 text-white' : 'bg-indigo-500/30 text-indigo-200'}`}>{realIdx}</span>
-                  <span className="text-sm font-bold leading-tight text-center">{stepsMobile[realIdx]}</span>
+                  <span className={`inline-flex items-center justify-center h-12 w-12 rounded-full text-2xl font-black shrink-0 ${isFinished ? 'bg-white/25 text-white' : 'bg-indigo-500/30 text-indigo-200'}`}>{realIdx}</span>
+                  <span className="text-[26px] font-black leading-tight text-center">{stepsMobile[realIdx]}</span>
                 </button>
               );
             })}
@@ -6751,9 +6751,9 @@ React.useEffect(()=>{
                   e.stopPropagation();
                   openWhatsAppGroupModal();
                 }}
-                className="flex w-full flex-row items-center justify-center gap-3 rounded-xl py-3 px-4 text-center transition-all bg-emerald-500/15 text-emerald-200 border border-emerald-400/40 shadow-[0_2px_10px_rgba(16,185,129,0.25)]"
+                className="flex w-full flex-row items-center justify-center gap-5 rounded-xl py-5 px-5 text-center transition-all bg-emerald-500/15 text-emerald-200 border border-emerald-400/40 shadow-[0_2px_10px_rgba(16,185,129,0.25)]"
               >
-                <span className="text-sm font-bold leading-tight text-center">צור/עדכן קבוצת וואטסאפ</span>
+                <span className="text-[26px] font-black leading-tight text-center">צור/עדכן קבוצת וואטסאפ</span>
               </button>
             )}
           </div>
