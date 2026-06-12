@@ -13,6 +13,7 @@ export default function Home({ session }) {
   const router = useRouter();
   const [showAuth, setShowAuth] = useState(false);
   const [authMode, setAuthMode] = useState('sign_in');
+  const [mobileActiveNav, setMobileActiveNav] = useState('home');
   const [showFeatures, setShowFeatures] = useState(false);
   const [showPricingTable, setShowPricingTable] = useState(false);
   const [pendingCreateEvent, setPendingCreateEvent] = useState(false);
@@ -82,6 +83,32 @@ export default function Home({ session }) {
     scrollToWizard();
   };
 
+  const scrollToHome = () => {
+    if (typeof window === 'undefined') return;
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleMobileNav = (target) => {
+    setMobileActiveNav(target);
+    if (target === 'home') {
+      scrollToHome();
+      return;
+    }
+    if (target === 'event') {
+      scrollToWizard();
+      return;
+    }
+    if (target === 'send') {
+      scrollToWizard();
+      setTimeout(() => stepRef.current?.openSendStep?.(), 250);
+      return;
+    }
+    if (target === 'reports') {
+      scrollToWizard();
+      setTimeout(() => stepRef.current?.openReportsStep?.(), 250);
+    }
+  };
+
   // Description of the creation process – should work גם בלי כניסה
   const handleShowProcess = () => {
     if (stepRef.current?.startFlow) {
@@ -138,7 +165,7 @@ export default function Home({ session }) {
               session={session}
             />
           </div>
-          <div id="pricing" className="scroll-mt-20 scroll-mb-28 bg-[linear-gradient(160deg,#0d0f2b_0%,#130f35_52%,#1a0f40_100%)] px-4 pt-0 pb-36 text-slate-100 sm:pb-24">
+          <div id="pricing" className="scroll-mt-20 scroll-mb-28 bg-[linear-gradient(160deg,#0d0f2b_0%,#130f35_52%,#1a0f40_100%)] px-4 pt-0 pb-44 text-slate-100 sm:pb-24">
             <div className="mx-auto max-w-6xl">
               <StepButtons 
                 ref={stepRef} 
@@ -151,6 +178,33 @@ export default function Home({ session }) {
           </div>
         </main>
         <Footer />
+        <nav className="fixed inset-x-0 bottom-0 z-40 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:hidden" dir="rtl" aria-label="ניווט תחתון">
+          <div className="mx-auto grid max-w-md grid-cols-4 gap-1 rounded-[2rem] border border-white/12 bg-[#101437]/92 p-2 shadow-[0_-14px_44px_rgba(0,0,0,0.45)] backdrop-blur-2xl">
+            {[
+              { key: 'home', label: 'בית', icon: '⌂' },
+              { key: 'event', label: 'אירוע', icon: '▣' },
+              { key: 'send', label: 'שליחה', icon: '✈' },
+              { key: 'reports', label: 'דוחות', icon: '▥' },
+            ].map((item) => {
+              const isActive = mobileActiveNav === item.key;
+              return (
+                <button
+                  key={item.key}
+                  type="button"
+                  onClick={() => handleMobileNav(item.key)}
+                  className={`flex min-w-0 flex-col items-center justify-center rounded-3xl px-2 py-2.5 text-center transition-all ${
+                    isActive
+                      ? 'bg-gradient-to-br from-emerald-500/25 to-violet-500/35 text-white shadow-[0_8px_24px_rgba(99,70,230,0.32)] ring-1 ring-violet-300/35'
+                      : 'text-slate-400 hover:bg-white/[0.05] hover:text-slate-100'
+                  }`}
+                >
+                  <span className={`text-2xl leading-none ${isActive ? 'text-emerald-200' : ''}`}>{item.icon}</span>
+                  <span className="mt-1 text-xs font-black leading-none">{item.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </nav>
       </div>
       <AuthModal 
         initialMode={authMode} 
