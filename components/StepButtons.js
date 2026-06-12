@@ -6770,7 +6770,6 @@ React.useEffect(()=>{
               }}
               className="relative flex min-h-[4.75rem] w-full flex-col items-center justify-center gap-1.5 rounded-2xl border border-emerald-400/40 bg-emerald-500/15 py-4 px-5 text-center text-emerald-200 shadow-[0_2px_10px_rgba(16,185,129,0.25)] transition-all"
             >
-              <span className="text-sm font-bold leading-none text-emerald-300/85">שלב 6</span>
               <span className="text-center text-2xl font-black leading-tight">קבוצת וואטסאפ</span>
             </button>
           </div>
