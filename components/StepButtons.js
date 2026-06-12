@@ -7466,6 +7466,12 @@ React.useEffect(()=>{
         <ModalBody>
           <div dir="rtl">
           {eventDetailsSubmitAttempted && errorMsg && <p className="text-red-400 text-sm text-center mb-3 bg-red-500/10 border border-red-400/30 rounded-xl p-2.5">{errorMsg}</p>}
+          {selectedEventType && (
+            <div className="mb-4 rounded-2xl border border-emerald-400/25 bg-emerald-500/10 px-4 py-3 text-center sm:hidden">
+              <div className="text-xs font-bold text-emerald-300/85">סוג האירוע שנבחר בשלב 1</div>
+              <div className="mt-1 text-2xl font-black text-emerald-100">{selectedEventType}</div>
+            </div>
+          )}
           <form dir="rtl" className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {/* Existing event details form (unchanged) */}
               {['חתונה', 'חינה', 'מסיבת אירוסין'].includes(selectedEventType) && (
