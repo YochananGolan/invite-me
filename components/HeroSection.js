@@ -605,7 +605,7 @@ const MobileHomepageHero = ({ onCreateEvent, onShowProcess }) => (
   <div className="sm:hidden" dir="rtl">
     <div className="mx-auto flex max-w-md flex-col items-center px-1 pb-6 pt-1 text-center">
       <div className="mb-5 text-2xl font-semibold tracking-wide text-white">
-        Invite<span className="text-violet-300">Me</span>
+        Meet<span className="text-violet-300">-M</span>
       </div>
 
       <div className="space-y-3">
