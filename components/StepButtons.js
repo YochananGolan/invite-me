@@ -410,6 +410,9 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick, trig
   }, []);
   const [guestStatusSummary, setGuestStatusSummary] = useState({ approved: 0, rejected: 0, pending: 0 });
   const [guestSummaryRefreshKey, setGuestSummaryRefreshKey] = useState(0);
+  const [mobileSummaryGuests, setMobileSummaryGuests] = useState([]);
+  const [mobileSummarySearch, setMobileSummarySearch] = useState('');
+  const [mobileSummaryFilter, setMobileSummaryFilter] = useState('all');
   const [specialMealsSummary, setSpecialMealsSummary] = useState({ 
     veg: { adults: 0, children: 0, total: 0 },
     vegan: { adults: 0, children: 0, total: 0 },
@@ -430,6 +433,22 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick, trig
     [statusChartData]
   );
   const hasStatusData = statusChartData.some(item => item.value > 0);
+  const mobileFilteredSummaryGuests = React.useMemo(() => {
+    const term = mobileSummarySearch.trim().toLowerCase();
+    return mobileSummaryGuests
+      .filter((guest) => {
+        const normalizedStatus = guest.status === 'approved' || guest.status === 'rejected' ? guest.status : 'pending';
+        if (mobileSummaryFilter !== 'all' && normalizedStatus !== mobileSummaryFilter) return false;
+        if (!term) return true;
+        return [
+          guest.first_name,
+          guest.last_name,
+          guest.phone,
+          guest.table_number,
+        ].some((value) => String(value || '').toLowerCase().includes(term));
+      })
+      .slice(0, 6);
+  }, [mobileSummaryFilter, mobileSummaryGuests, mobileSummarySearch]);
   const guestSummaryChartData = React.useMemo(() => ([
     { key: 'adults', name: 'מבוגרים', value: guestSummary.adults, color: '#16a34a' },
     { key: 'children', name: 'ילדים', value: guestSummary.children, color: '#f97316' },
@@ -6157,7 +6176,10 @@ React.useEffect(()=>{
     (async ()=>{
       try{
         const user = await resolveCurrentUserForSync();
-        if(!user || !currentEventId) return;
+        if(!user || !currentEventId) {
+          setMobileSummaryGuests([]);
+          return;
+        }
         
         const { data: guests, error: guestsError } = await supabase
           .from('invited_guests')
@@ -6176,7 +6198,9 @@ React.useEffect(()=>{
         };
         
         if(guests){
-          dedupeGuestsByIdentity(guests).forEach(g => {
+          const dedupedGuests = dedupeGuestsByIdentity(guests);
+          setMobileSummaryGuests(dedupedGuests);
+          dedupedGuests.forEach(g => {
             
             // Count by status
             if(g.status === 'approved') {
@@ -6206,6 +6230,8 @@ React.useEffect(()=>{
           specialMeals.vegan.total = specialMeals.vegan.adults + specialMeals.vegan.children;
           specialMeals.glatt.total = specialMeals.glatt.adults + specialMeals.glatt.children;
           specialMeals.allergy.total = specialMeals.allergy.adults + specialMeals.allergy.children;
+        } else {
+          setMobileSummaryGuests([]);
         }
         
         setGuestSummary(summary);
@@ -7133,7 +7159,123 @@ React.useEffect(()=>{
           {/* Third Column - Guest Status Summary */}
           {currentEventId && (
             <div className="w-full flex flex-col gap-6">
-              <div className="bg-white/[0.055] border border-white/15 backdrop-blur-xl rounded-2xl p-4 sm:p-6 text-center shadow-[0_8px_40px_rgba(0,0,0,0.35)] ring-2 ring-violet-400/30 w-full">
+              <div className="sm:hidden rounded-3xl border border-white/15 bg-white/[0.055] p-4 text-center shadow-[0_8px_40px_rgba(0,0,0,0.35)] backdrop-blur-xl ring-2 ring-violet-400/25">
+                <div className="mb-4 flex items-center justify-between gap-3">
+                  <div className="text-right">
+                    <h3 className="text-3xl font-black text-white">דוחות בקרה</h3>
+                    <p className="mt-1 text-sm font-semibold text-violet-200">מעקב אישורי הגעה בזמן אמת</p>
+                  </div>
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-violet-300/30 bg-violet-500/20 text-2xl">
+                    📊
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    ['approved', guestStatusSummary.approved, 'מגיעים', '✓', 'border-emerald-400/30 bg-emerald-500/10 text-emerald-300'],
+                    ['pending', guestStatusSummary.pending, 'טרם הגיבו', '◷', 'border-amber-400/30 bg-amber-500/10 text-amber-300'],
+                    ['rejected', guestStatusSummary.rejected, 'לא מגיעים', '×', 'border-rose-400/30 bg-rose-500/10 text-rose-300'],
+                  ].map(([key, value, label, icon, tone]) => (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => setMobileSummaryFilter(key)}
+                      className={`rounded-2xl border px-2 py-3 text-center transition-all ${tone} ${mobileSummaryFilter === key ? 'ring-2 ring-white/30' : ''}`}
+                    >
+                      <div className="mx-auto mb-1 flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-lg font-black">{icon}</div>
+                      <div className="text-3xl font-black leading-none tabular-nums">{value}</div>
+                      <div className="mt-1 text-[11px] font-black text-slate-100">{label}</div>
+                    </button>
+                  ))}
+                </div>
+
+                <div className="mt-3 rounded-2xl border border-white/10 bg-white/[0.04] p-3">
+                  <label className="sr-only" htmlFor="mobile-summary-search">חיפוש אורח</label>
+                  <input
+                    id="mobile-summary-search"
+                    type="search"
+                    value={mobileSummarySearch}
+                    onChange={(event) => setMobileSummarySearch(event.target.value)}
+                    placeholder="חיפוש אורח"
+                    className="w-full rounded-full border border-white/10 bg-white/[0.055] px-4 py-2.5 text-right text-sm font-semibold text-slate-100 placeholder:text-slate-500 focus:border-violet-300 focus:outline-none"
+                  />
+                  <div className="mt-3 grid grid-cols-4 gap-2">
+                    {[
+                      ['all', 'כולם'],
+                      ['approved', 'מגיעים'],
+                      ['pending', 'טרם הגיבו'],
+                      ['rejected', 'לא מגיעים'],
+                    ].map(([key, label]) => (
+                      <button
+                        key={key}
+                        type="button"
+                        onClick={() => setMobileSummaryFilter(key)}
+                        className={`rounded-full border px-2 py-2 text-xs font-black transition-all ${
+                          mobileSummaryFilter === key
+                            ? 'border-violet-300/60 bg-violet-500/35 text-white'
+                            : 'border-white/10 bg-white/[0.04] text-slate-300'
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="mt-3 space-y-2 text-right">
+                  {mobileFilteredSummaryGuests.length > 0 ? mobileFilteredSummaryGuests.map((guest, idx) => {
+                    const status = guest.status === 'approved' || guest.status === 'rejected' ? guest.status : 'pending';
+                    const statusMeta = status === 'approved'
+                      ? { label: 'מגיע', className: 'bg-emerald-500/15 text-emerald-300 border-emerald-400/30', icon: '✓' }
+                      : status === 'rejected'
+                        ? { label: 'לא מגיע', className: 'bg-rose-500/15 text-rose-300 border-rose-400/30', icon: '×' }
+                        : { label: 'טרם הגיב', className: 'bg-amber-500/15 text-amber-300 border-amber-400/30', icon: '◷' };
+                    const mealTags = [
+                      ((guest.veg_adults || 0) + (guest.veg_children || 0)) > 0 ? 'צמחוני' : null,
+                      ((guest.vegan_adults || 0) + (guest.vegan_children || 0)) > 0 ? 'טבעוני' : null,
+                      ((guest.glatt_adults || 0) + (guest.glatt_children || 0)) > 0 ? 'גלאט' : null,
+                      ((guest.allergy_adults || 0) + (guest.allergy_children || 0)) > 0 ? 'אלרגיה' : null,
+                    ].filter(Boolean);
+                    return (
+                      <div key={`${guest.phone || guest.first_name || 'guest'}-${idx}`} className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0 flex-1">
+                            <div className="truncate text-lg font-black text-white">
+                              {[guest.first_name, guest.last_name].filter(Boolean).join(' ') || `אורח ${idx + 1}`}
+                            </div>
+                            <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs font-semibold text-slate-400">
+                              {guest.phone && <span>☎ {guest.phone}</span>}
+                              <span>שולחן {guest.table_number || '-'}</span>
+                            </div>
+                          </div>
+                          <span className={`shrink-0 rounded-full border px-3 py-1 text-sm font-black ${statusMeta.className}`}>
+                            {statusMeta.icon} {statusMeta.label}
+                          </span>
+                        </div>
+                        {mealTags.length > 0 && (
+                          <div className="mt-2 flex flex-wrap gap-1.5">
+                            {mealTags.map((tag) => (
+                              <span key={tag} className="rounded-full border border-white/10 bg-white/[0.055] px-2 py-1 text-[11px] font-bold text-slate-300">
+                                {tag}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  }) : (
+                    <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-6 text-center text-sm font-semibold text-slate-400">
+                      אין אורחים להצגה בתקציר
+                    </div>
+                  )}
+                </div>
+
+                {!hasStatusData && (
+                  <p className="mt-3 text-xs text-slate-400">נתוני אישור הגעה יופיעו לאחר שליחת הזמנות ותגובות אורחים</p>
+                )}
+              </div>
+
+              <div className="hidden bg-white/[0.055] border border-white/15 backdrop-blur-xl rounded-2xl p-4 sm:block sm:p-6 text-center shadow-[0_8px_40px_rgba(0,0,0,0.35)] ring-2 ring-violet-400/30 w-full">
                 <div className="flex items-center justify-center gap-2 mb-2">
                   <span className="text-xl">📊</span>
                   <h3 className="text-lg font-bold text-violet-300">סטטוס אישורי הגעה</h3>
