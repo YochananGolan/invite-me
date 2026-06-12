@@ -340,6 +340,18 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick, trig
   const steps = ['צור אירוע חדש', '📅 שלב 1 - סוג אירוע', '📝 שלב 2 - פרטי האירוע', '🎨 שלב 3 - עיצוב הזמנה', '📤 שלב 4 - שליחת הזמנה לאורח', '📊 שלב 5 - דוחו"ת בקרה'];
   const stepsMobile = ['', 'סוג אירוע', 'פרטי האירוע', 'עיצוב', 'שליחה', 'דוחות בקרה'];
   const eventTypes = ['חתונה', 'חינה', 'מסיבת אירוסין', 'בר מצווה', 'בת מצווה', 'ברית', 'בריתה', 'יום הולדת', 'אירוע עסקי', 'הפרשת חלה'];
+  const eventTypeIcons = {
+    'חתונה': '💍',
+    'חינה': '🤲',
+    'מסיבת אירוסין': '🥂',
+    'בר מצווה': '✡️',
+    'בת מצווה': '👑',
+    'ברית': '🍼',
+    'בריתה': '🎀',
+    'יום הולדת': '🎂',
+    'אירוע עסקי': '💼',
+    'הפרשת חלה': '🥖',
+  };
   const times = Array.from({ length: (24 - 8) * 2 }, (_, i) => {
     const totalHalfHours = 16 + i; // מתחילים מ-08:00
     const hours = String(Math.floor(totalHalfHours / 2)).padStart(2, '0');
@@ -7423,7 +7435,36 @@ React.useEffect(()=>{
       <Modal open={showEventTypes} onClose={() => setShowEventTypes(false)} size="md">
         <ModalHeader onClose={() => setShowEventTypes(false)}>בחר סוג אירוע</ModalHeader>
         <ModalBody>
-          <ul className="space-y-2">
+          <div className="mb-4 text-center sm:hidden">
+            <h3 className="text-2xl font-black text-white">איזה אירוע תרצו ליצור?</h3>
+            <p className="mt-1 text-sm font-semibold text-slate-400">בחרו סוג אירוע כדי שנתאים את השדות וההזמנה.</p>
+          </div>
+          <div className="grid grid-cols-2 gap-3 sm:hidden">
+            {eventTypes.map((type) => {
+              const isSelected = selectedEventType === normalizeType(type);
+              return (
+                <button
+                  key={type}
+                  type="button"
+                  onClick={() => handleSelectEvent(type)}
+                  className={`relative min-h-[6rem] rounded-2xl border px-3 py-4 text-center transition-all ${
+                    isSelected
+                      ? 'border-emerald-300 bg-violet-500/20 text-white shadow-[0_8px_28px_rgba(139,92,246,0.35)] ring-2 ring-emerald-300/40'
+                      : 'border-white/12 bg-white/[0.045] text-slate-200 hover:border-violet-300/40'
+                  }`}
+                >
+                  {isSelected && (
+                    <span className="absolute left-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-emerald-400 text-sm font-black text-[#0d0f2b]">
+                      ✓
+                    </span>
+                  )}
+                  <span className="block text-3xl leading-none">{eventTypeIcons[type] || '🎉'}</span>
+                  <span className="mt-2 block text-lg font-black leading-tight">{type}</span>
+                </button>
+              );
+            })}
+          </div>
+          <ul className="hidden space-y-2 sm:block">
             {eventTypes.map((type) => (
               <li key={type}>
                 <button
@@ -7436,7 +7477,7 @@ React.useEffect(()=>{
             ))}
           </ul>
           {selectedEventType && (
-            <p className="text-center text-indigo-300 font-medium text-lg sm:text-xl mt-3">האירוע הנבחר: {selectedEventType}</p>
+            <p className="text-center text-indigo-300 font-medium text-lg sm:text-xl mt-4">האירוע הנבחר: {selectedEventType}</p>
           )}
         </ModalBody>
         <ModalFooter>
@@ -7456,7 +7497,8 @@ React.useEffect(()=>{
             }}
             className="w-full bg-gradient-to-br from-indigo-600 to-violet-600 text-white font-bold rounded-xl px-4 py-3 hover:opacity-90 transition-all"
           >
-            שמור וסגור
+            <span className="sm:hidden">המשך לפרטי האירוע</span>
+            <span className="hidden sm:inline">שמור וסגור</span>
           </button>
         </ModalFooter>
       </Modal>
