@@ -6649,7 +6649,7 @@ React.useEffect(()=>{
       {hasSession && (
       <div
         ref={stepBarAnchorRef}
-        className="relative mx-[calc(50%-50vw)] w-screen min-h-[29rem] sm:min-h-[5.25rem]"
+        className="relative mx-[calc(50%-50vw)] w-screen min-h-[31rem] sm:min-h-[5.25rem]"
         style={stepBarHeight ? { minHeight: `${stepBarHeight}px` } : undefined}
       >
       <div
@@ -6693,7 +6693,7 @@ React.useEffect(()=>{
                     else if (realIdx === 2) { setShowEventDetails(true); setStepErrorMsg(''); }
                     else if (realIdx === 3) { setShowDesignChooser(true); setStepErrorMsg(''); }
                   }}
-                  className={`flex min-h-[4.75rem] w-full flex-row items-center justify-center gap-3 rounded-xl py-4 px-5 text-center transition-all ${
+                  className={`relative flex min-h-[4.75rem] w-full flex-col items-center justify-center gap-1.5 rounded-2xl py-4 px-5 text-center transition-all ${
                     isFinished
                       ? 'bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-[0_4px_14px_rgba(99,70,230,0.45)]'
                       : isDesign
@@ -6701,19 +6701,15 @@ React.useEffect(()=>{
                         : 'bg-white/[0.06] text-slate-100 border border-white/15 hover:bg-white/[0.10] hover:border-indigo-400/40'
                   }`}
                 >
-                  <span
-                    className="inline-block w-24 shrink-0 text-center text-2xl font-bold leading-tight"
-                  >
+                  {isFinished && (
+                    <span className="absolute left-4 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-white/20 text-lg font-black text-white">
+                      ✓
+                    </span>
+                  )}
+                  <span className="text-sm font-bold leading-none text-slate-400">
                     שלב {realIdx}
                   </span>
-                  <span
-                    className="shrink-0 text-2xl font-bold leading-tight"
-                  >
-                    -
-                  </span>
-                  <span
-                    className="text-center text-2xl font-bold leading-tight"
-                  >
+                  <span className="text-center text-2xl font-black leading-tight text-slate-100">
                     {stepsMobile[realIdx]}
                   </span>
                 </button>
@@ -6744,58 +6740,39 @@ React.useEffect(()=>{
                       setShowReportsOptions(true); setShowGuestListModal(false); setStepErrorMsg('');
                     }
                   }}
-                  className={`flex min-h-[4.75rem] w-full flex-row items-center justify-center gap-3 rounded-xl py-4 px-5 text-center transition-all ${
+                  className={`relative flex min-h-[4.75rem] w-full flex-col items-center justify-center gap-1.5 rounded-2xl py-4 px-5 text-center transition-all ${
                     isFinished
                       ? 'bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-[0_4px_14px_rgba(99,70,230,0.45)]'
                       : 'bg-white/[0.06] text-slate-100 border border-white/15 hover:bg-white/[0.10] hover:border-indigo-400/40'
                   }`}
                 >
-                  <span
-                    className="inline-block w-24 shrink-0 text-center text-2xl font-bold leading-tight"
-                  >
+                  {isFinished && (
+                    <span className="absolute left-4 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-white/20 text-lg font-black text-white">
+                      ✓
+                    </span>
+                  )}
+                  <span className="text-sm font-bold leading-none text-slate-400">
                     שלב {realIdx}
                   </span>
-                  <span
-                    className="shrink-0 text-2xl font-bold leading-tight"
-                  >
-                    -
-                  </span>
-                  <span
-                    className="text-center text-2xl font-bold leading-tight"
-                  >
+                  <span className="text-center text-2xl font-black leading-tight text-slate-100">
                     {stepsMobile[realIdx]}
                   </span>
                 </button>
               );
             })}
-            {shouldShowWhatsAppGroupUpdateButton && (
-              <button
-                type="button"
-                style={{ cursor: 'pointer', position: 'relative', zIndex: 21, pointerEvents: 'auto' }}
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  openWhatsAppGroupModal();
-                }}
-                className="flex min-h-[4.75rem] w-full flex-row items-center justify-center gap-3 rounded-xl py-4 px-5 text-center transition-all bg-emerald-500/15 text-emerald-200 border border-emerald-400/40 shadow-[0_2px_10px_rgba(16,185,129,0.25)]"
-              >
-                <span
-                  className="inline-block w-24 shrink-0 text-center text-2xl font-bold leading-tight"
-                >
-                  שלב 6
-                </span>
-                <span
-                  className="shrink-0 text-2xl font-bold leading-tight"
-                >
-                  -
-                </span>
-                <span
-                  className="text-center text-2xl font-bold leading-tight"
-                >
-                  צור/עדכן קבוצת וואטסאפ
-                </span>
-              </button>
-            )}
+            <button
+              type="button"
+              style={{ cursor: 'pointer', position: 'relative', zIndex: 21, pointerEvents: 'auto' }}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                openWhatsAppGroupModal();
+              }}
+              className="relative flex min-h-[4.75rem] w-full flex-col items-center justify-center gap-1.5 rounded-2xl border border-emerald-400/40 bg-emerald-500/15 py-4 px-5 text-center text-emerald-200 shadow-[0_2px_10px_rgba(16,185,129,0.25)] transition-all"
+            >
+              <span className="text-sm font-bold leading-none text-emerald-300/85">שלב 6</span>
+              <span className="text-center text-2xl font-black leading-tight">קבוצת וואטסאפ</span>
+            </button>
           </div>
         </div>
         <div className="hidden sm:flex flex-row justify-center gap-4 flex-wrap">
