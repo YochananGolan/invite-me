@@ -7672,7 +7672,28 @@ React.useEffect(()=>{
         <ModalBody>
           {/* Invite card preview */}
           {(selectedDesign || invitationText) && (
-            <div className="mb-5 flex justify-center">
+            <div className="mb-4 rounded-3xl border border-white/15 bg-white/[0.055] p-3 shadow-[0_10px_32px_rgba(0,0,0,0.32)] sm:hidden" dir="rtl">
+              <div className="flex items-center gap-3">
+                <div className="relative h-20 w-16 shrink-0 overflow-hidden rounded-xl border border-white/15 bg-white/5">
+                  {selectedDesign ? (
+                    <img src={selectedDesign} alt="הזמנה" className="absolute inset-0 h-full w-full object-cover object-top" />
+                  ) : (
+                    <div className="absolute inset-0 bg-gradient-to-br from-[#f0e8ff] to-[#fdf6ee]" />
+                  )}
+                </div>
+                <div className="min-w-0 flex-1 text-right">
+                  <div className="inline-flex items-center gap-1 rounded-full bg-violet-500/20 px-2 py-1 text-xs font-black text-violet-200">
+                    ✓ ההזמנה מוכנה לשליחה
+                  </div>
+                  <p className="mt-2 text-sm font-semibold leading-6 text-slate-300">
+                    ההזמנה נשמרה וניתן לשלוח אותה לאורחים.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+          {(selectedDesign || invitationText) && (
+            <div className="mb-5 hidden justify-center sm:flex">
               <div className="relative w-full max-w-[220px]" dir="rtl">
                 <div className="relative w-full pt-[125%] rounded-xl shadow-xl overflow-hidden border border-white/15">
                   {selectedDesign ? (
@@ -7713,43 +7734,55 @@ React.useEffect(()=>{
             </div>
           )}
 
-          <div className="flex flex-col gap-3 mb-6">
+          <div className="flex flex-col gap-3 mb-4 sm:mb-6">
             <button
               type="button"
               onClick={openExcelImport}
-              className="w-full text-primary font-medium border-2 border-primary rounded-lg px-4 py-3 hover:bg-primary hover:text-white transition-colors"
+              className="w-full rounded-2xl border border-dashed border-white/20 bg-white/[0.035] px-4 py-3 text-sm font-bold text-slate-300 transition-colors hover:border-primary hover:text-primary sm:rounded-lg sm:border-2 sm:border-primary sm:bg-transparent sm:text-primary sm:hover:bg-primary sm:hover:text-white"
             >
-              ייבוא קובץ אורחים - אקסל
+              <span className="sm:hidden">ייבוא מאקסל זמין במחשב</span>
+              <span className="hidden sm:inline">ייבוא קובץ אורחים - אקסל</span>
             </button>
           </div>
 
-          <h3 className="text-lg font-semibold text-slate-100 mb-3">שלח הזמנה לאורח בודד - פרטי אורח:</h3>
+          <h3 className="text-xl font-black text-slate-100 mb-3 sm:text-lg sm:font-semibold">פרטי אורח</h3>
           {guestSubmitAttempted && guestErrorMsg && <p className="mb-3 rounded-xl border border-red-400/30 bg-red-500/10 p-3 text-red-300 text-base font-semibold text-center">{guestErrorMsg}</p>}
-          <form className="space-y-4">
+          <form className="space-y-4 rounded-3xl border border-white/15 bg-white/[0.045] p-4 sm:rounded-none sm:border-0 sm:bg-transparent sm:p-0">
             <div>
-              <label className="block mb-1 font-medium">שם פרטי</label>
-              <input type="text" placeholder="שם פרטי" value={guestData.guestFirstName} onChange={(e) => setGuestData({ ...guestData, guestFirstName: e.target.value })} className={`w-full bg-white/10 border border-white/20 text-white placeholder-slate-400 rounded-xl focus:border-indigo-400 p-2 pr-12 sm:pr-2 outline-none ${visibleGuestErrors.guestFirstName ? 'border-red-400 ring-2 ring-red-400/20' : ''}`} />
+              <label className="block mb-1.5 text-sm font-bold text-slate-300 sm:mb-1 sm:font-medium sm:text-white">שם פרטי</label>
+              <input type="text" placeholder="שם פרטי" value={guestData.guestFirstName} onChange={(e) => setGuestData({ ...guestData, guestFirstName: e.target.value })} className={`w-full bg-white/10 border border-white/20 text-white placeholder-slate-400 rounded-xl focus:border-indigo-400 p-3.5 pr-4 sm:p-2 sm:pr-2 outline-none ${visibleGuestErrors.guestFirstName ? 'border-red-400 ring-2 ring-red-400/20' : ''}`} />
             </div>
             <div>
-              <label className="block mb-1 font-medium">שם משפחה</label>
-              <input type="text" placeholder="שם משפחה" value={guestData.guestLastName} onChange={(e) => setGuestData({ ...guestData, guestLastName: e.target.value })} className={`w-full bg-white/10 border border-white/20 text-white placeholder-slate-400 rounded-xl focus:border-indigo-400 p-2 pr-12 sm:pr-2 outline-none ${visibleGuestErrors.guestLastName ? 'border-red-400 ring-2 ring-red-400/20' : ''}`} />
+              <label className="block mb-1.5 text-sm font-bold text-slate-300 sm:mb-1 sm:font-medium sm:text-white">שם משפחה</label>
+              <input type="text" placeholder="שם משפחה" value={guestData.guestLastName} onChange={(e) => setGuestData({ ...guestData, guestLastName: e.target.value })} className={`w-full bg-white/10 border border-white/20 text-white placeholder-slate-400 rounded-xl focus:border-indigo-400 p-3.5 pr-4 sm:p-2 sm:pr-2 outline-none ${visibleGuestErrors.guestLastName ? 'border-red-400 ring-2 ring-red-400/20' : ''}`} />
             </div>
             <div>
-              <label className="block mb-1 font-medium">מספר שולחן</label>
-              <input type="text" placeholder="מספר שולחן" value={guestData.guestTable} onChange={(e) => setGuestData({ ...guestData, guestTable: e.target.value })} required className={`w-full bg-white/10 border border-white/20 text-white placeholder-slate-400 rounded-xl focus:border-indigo-400 p-2 pr-12 sm:pr-2 outline-none ${visibleGuestErrors.guestTable ? 'border-red-400 ring-2 ring-red-400/20' : ''}`} />
+              <label className="block mb-1.5 text-sm font-bold text-slate-300 sm:mb-1 sm:font-medium sm:text-white">מספר שולחן</label>
+              <input type="text" placeholder="מספר שולחן" value={guestData.guestTable} onChange={(e) => setGuestData({ ...guestData, guestTable: e.target.value })} required className={`w-full bg-white/10 border border-white/20 text-white placeholder-slate-400 rounded-xl focus:border-indigo-400 p-3.5 pr-4 sm:p-2 sm:pr-2 outline-none ${visibleGuestErrors.guestTable ? 'border-red-400 ring-2 ring-red-400/20' : ''}`} />
             </div>
             <div>
-              <label className="block mb-1 font-medium">טלפון</label>
-              <input type="tel" placeholder="טלפון" value={guestData.guestPhone} onChange={(e) => setGuestData({ ...guestData, guestPhone: e.target.value })} className={`w-full bg-white/10 border border-white/20 text-white placeholder-slate-400 rounded-xl focus:border-indigo-400 p-2 pr-12 sm:pr-2 outline-none ${visibleGuestErrors.guestPhone ? 'border-red-400 ring-2 ring-red-400/20' : ''}`} />
+              <label className="block mb-1.5 text-sm font-bold text-slate-300 sm:mb-1 sm:font-medium sm:text-white">טלפון</label>
+              <input type="tel" placeholder="טלפון" value={guestData.guestPhone} onChange={(e) => setGuestData({ ...guestData, guestPhone: e.target.value })} className={`w-full bg-white/10 border border-white/20 text-white placeholder-slate-400 rounded-xl focus:border-indigo-400 p-3.5 pr-4 sm:p-2 sm:pr-2 outline-none ${visibleGuestErrors.guestPhone ? 'border-red-400 ring-2 ring-red-400/20' : ''}`} />
+              <p className="mt-1 text-xs font-semibold text-slate-500 sm:hidden">לדוגמה: 050-1234567</p>
             </div>
           </form>
           <div className="mt-6 flex flex-col gap-3 sm:hidden" dir="rtl">
-            <button type="button" onClick={handleSendInvitation} className="w-full bg-emerald-600 text-white border border-emerald-400/50 rounded-full px-8 py-3 font-medium hover:bg-emerald-700 transition-all">
-              שלח הזמנה בוואטסאפ
+            <button type="button" onClick={handleSendInvitation} className="w-full rounded-2xl border border-emerald-400/50 bg-emerald-600 px-8 py-4 text-lg font-black text-white shadow-[0_10px_28px_rgba(16,185,129,0.28)] transition-all hover:bg-emerald-700">
+              שלח בוואטסאפ
             </button>
-            <button type="button" onClick={handleSendInvitationSms} className="w-full bg-primary text-white border border-primary rounded-full px-8 py-3 font-medium hover:bg-primary/90 transition-all">
-              שלח הזמנה ב-SMS
+            <button type="button" onClick={handleSendInvitationSms} className="w-full rounded-2xl border border-rose-400/50 bg-gradient-to-br from-red-600 to-rose-600 px-8 py-4 text-lg font-black text-white shadow-[0_10px_28px_rgba(244,63,94,0.24)] transition-all hover:opacity-90">
+              שלח ב-SMS
             </button>
+            <div className="grid grid-cols-2 gap-2 rounded-2xl border border-white/10 bg-white/[0.04] p-3 text-center">
+              <div>
+                <div className="text-xs font-bold text-slate-500">נשלחו</div>
+                <div className="text-xl font-black text-violet-200">{effectiveMessagesSentCount}</div>
+              </div>
+              <div>
+                <div className="text-xs font-bold text-slate-500">נותרו במכסה</div>
+                <div className="text-xl font-black text-emerald-300">{Math.max(0, totalPlanCapacity - effectiveMessagesSentCount)}</div>
+              </div>
+            </div>
           </div>
         </ModalBody>
         <ModalFooter className="hidden sm:flex">
