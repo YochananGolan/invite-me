@@ -8321,6 +8321,24 @@ React.useEffect(()=>{
           <ModalHeader onClose={() => setShowStep5Options(false)}>בחר דוח</ModalHeader>
           <ModalBody>
             <div className="space-y-4">
+            <div className="sm:hidden">
+              <div className="mb-4 text-center">
+                <h3 className="text-3xl font-black text-white">דוחות</h3>
+                <p className="mt-1 text-sm font-semibold text-slate-400">בחרו איזה דוח תרצו לפתוח</p>
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  ['מגיעים', guestStatusSummary.approved, 'text-emerald-300', 'border-emerald-400/25 bg-emerald-500/10'],
+                  ['טרם הגיבו', guestStatusSummary.pending, 'text-amber-300', 'border-amber-400/25 bg-amber-500/10'],
+                  ['לא מגיעים', guestStatusSummary.rejected, 'text-rose-300', 'border-rose-400/25 bg-rose-500/10'],
+                ].map(([label, value, textClass, cardClass]) => (
+                  <div key={label} className={`rounded-2xl border px-2 py-3 text-center ${cardClass}`}>
+                    <div className={`text-2xl font-black leading-none tabular-nums ${textClass}`}>{value}</div>
+                    <div className="mt-1 text-[11px] font-bold text-slate-200">{label}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
 
             {/* Reports buttons */}
             <button
@@ -8355,9 +8373,17 @@ React.useEffect(()=>{
                   alert('שגיאה בטעינת הדוח');
                 }
               }}
-              className="w-full bg-white/[0.06] text-slate-100 border border-white/15 rounded-full px-4 py-2 font-medium hover:bg-indigo-500/15 hover:border-indigo-400/50 transition-all"
+              className="group w-full rounded-2xl border border-emerald-400/40 bg-white/[0.055] px-4 py-4 text-slate-100 shadow-[0_6px_22px_rgba(0,0,0,0.25)] transition-all hover:bg-indigo-500/15 hover:border-indigo-400/50 sm:rounded-full sm:border-white/15 sm:bg-white/[0.06] sm:px-4 sm:py-2 sm:font-medium sm:shadow-none"
             >
-              דו"ח אורחים מגיעים
+              <span className="hidden sm:inline">דו"ח אורחים מגיעים</span>
+              <span className="flex items-center justify-between gap-3 text-right sm:hidden">
+                <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-emerald-400/35 bg-emerald-500/15 text-2xl">👥</span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-xl font-black text-white">דוח אורחים מגיעים</span>
+                  <span className="mt-1 block text-sm font-semibold text-slate-400">רשימת אורחים שאישרו הגעה</span>
+                </span>
+                <span className="text-2xl text-violet-200">‹</span>
+              </span>
             </button>
             <button
               onClick={async () => {
@@ -8391,9 +8417,17 @@ React.useEffect(()=>{
                   alert('שגיאה בטעינת הדוח');
                 }
               }}
-              className="w-full bg-white/[0.06] text-slate-100 border border-white/15 rounded-full px-4 py-2 font-medium hover:bg-indigo-500/15 hover:border-indigo-400/50 transition-all"
+              className="group w-full rounded-2xl border border-white/15 bg-white/[0.055] px-4 py-4 text-slate-100 shadow-[0_6px_22px_rgba(0,0,0,0.25)] transition-all hover:bg-indigo-500/15 hover:border-indigo-400/50 sm:rounded-full sm:bg-white/[0.06] sm:px-4 sm:py-2 sm:font-medium sm:shadow-none"
             >
-              דו"ח אורחים לא מגיעים
+              <span className="hidden sm:inline">דו"ח אורחים לא מגיעים</span>
+              <span className="flex items-center justify-between gap-3 text-right sm:hidden">
+                <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-rose-400/35 bg-rose-500/15 text-2xl">🚫</span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-xl font-black text-white">דוח אורחים לא מגיעים</span>
+                  <span className="mt-1 block text-sm font-semibold text-slate-400">רשימת דחיות</span>
+                </span>
+                <span className="text-2xl text-violet-200">‹</span>
+              </span>
             </button>
             <button
               onClick={async () => {
@@ -8426,10 +8460,24 @@ React.useEffect(()=>{
                   alert('שגיאה בטעינת הדוח');
                 }
               }}
-              className="w-full bg-white/[0.06] text-slate-100 border border-white/15 rounded-full px-4 py-2 font-medium hover:bg-indigo-500/15 hover:border-indigo-400/50 transition-all"
+              className="group w-full rounded-2xl border border-white/15 bg-white/[0.055] px-4 py-4 text-slate-100 shadow-[0_6px_22px_rgba(0,0,0,0.25)] transition-all hover:bg-indigo-500/15 hover:border-indigo-400/50 sm:rounded-full sm:bg-white/[0.06] sm:px-4 sm:py-2 sm:font-medium sm:shadow-none"
             >
-              דו"ח אורחים שטרם הגיבו
+              <span className="hidden sm:inline">דו"ח אורחים שטרם הגיבו</span>
+              <span className="flex items-center justify-between gap-3 text-right sm:hidden">
+                <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-amber-400/35 bg-amber-500/15 text-2xl">⏱</span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-xl font-black text-white">דוח טרם הגיבו</span>
+                  <span className="mt-1 block text-sm font-semibold text-slate-400">אורחים שעדיין לא ענו</span>
+                </span>
+                <span className="text-2xl text-violet-200">‹</span>
+              </span>
             </button>
+            <div className="rounded-2xl border border-blue-400/20 bg-blue-500/10 px-4 py-3 text-center sm:hidden">
+              <div className="text-sm font-black text-blue-200">דוחות מפורטים</div>
+              <p className="mt-1 text-xs font-semibold leading-5 text-slate-400">
+                מומלץ לפתוח במחשב כדי לעבוד עם Excel בנוחות.
+              </p>
+            </div>
             </div>
           </ModalBody>
         </Modal>
