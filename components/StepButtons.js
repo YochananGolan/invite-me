@@ -8474,8 +8474,11 @@ React.useEffect(()=>{
                       <div className="flex items-center justify-end gap-1 mt-1">
                         <button
                           onClick={(e) => { e.stopPropagation(); setShowAdvancedEdit(index); }}
-                          className="px-2 py-0.5 bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white rounded text-sm font-medium"
-                        >✨ עיצוב</button>
+                          className="px-3 py-1.5 sm:px-2 sm:py-0.5 bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white rounded-lg sm:rounded text-base sm:text-sm font-bold sm:font-medium"
+                        >
+                          ✨ עיצוב
+                          <span className="block text-[11px] font-semibold text-white/85 sm:hidden">פונטים, צבעים ועוד</span>
+                        </button>
                         <button
                           onClick={() => deleteLine(index)}
                           className="px-2 py-0.5 bg-red-500/70 hover:bg-red-500 rounded text-sm text-white font-medium"
@@ -8577,6 +8580,10 @@ React.useEffect(()=>{
 
             {/* ── Col 3: Template grid ── */}
             <div className={`${designMobileTab === 'templates' ? 'flex' : 'hidden'} sm:flex flex-col w-full sm:w-[30%] overflow-y-auto p-4 gap-3`}>
+              <div className="rounded-2xl border border-violet-300/25 bg-violet-500/10 px-4 py-3 text-center sm:hidden">
+                <div className="text-lg font-black text-white">תצוגה מקדימה של ההזמנה</div>
+                <div className="mt-1 text-sm font-semibold text-violet-200">בחרו תבנית ולחצו עליה כדי לראות איך ההזמנה תיראה</div>
+              </div>
               <h3 className="text-sm font-bold text-slate-300 text-center sm:text-right shrink-0">ב. לחץ פעמיים לבחירת תבנית</h3>
               {designImages.length === 0 ? (
                 <p className="text-center text-slate-400 mt-10 text-sm">לא נמצאו תמונות</p>
