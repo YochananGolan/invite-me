@@ -567,6 +567,18 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick, trig
       })
       .slice(0, 6);
   }, [mobileSummaryFilter, mobileSummaryGuests, mobileSummarySearch]);
+  const mobileGlobalSearchResults = React.useMemo(() => {
+    const term = mobileSummarySearch.trim().toLowerCase();
+    if (!term) return [];
+    return mobileSummaryGuests
+      .filter((guest) => [
+        guest.first_name,
+        guest.last_name,
+        guest.phone,
+        guest.table_number,
+      ].some((value) => String(value || '').toLowerCase().includes(term)))
+      .slice(0, 5);
+  }, [mobileSummaryGuests, mobileSummarySearch]);
   const guestSummaryChartData = React.useMemo(() => ([
     { key: 'adults', name: 'מבוגרים', value: guestSummary.adults, color: '#16a34a' },
     { key: 'children', name: 'ילדים', value: guestSummary.children, color: '#f97316' },
@@ -6973,6 +6985,51 @@ React.useEffect(()=>{
     selectedEventType,
   ]);
 
+  const mobileDailySummaryModel = React.useMemo(() => {
+    if (!currentEventId || invitedCount === 0) return { shouldShow: false };
+
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayKey = yesterday.toISOString().slice(0, 10);
+    let approvedSinceYesterday = 0;
+
+    if (typeof window !== 'undefined') {
+      try {
+        const raw = localStorage.getItem(`mobileDaily_${currentEventId}_${yesterdayKey}`);
+        if (raw) {
+          const prev = JSON.parse(raw);
+          approvedSinceYesterday = Math.max(0, (guestStatusSummary.approved || 0) - (prev.approved || 0));
+        }
+      } catch {}
+    }
+
+    let recommendedLabel = 'פתח דוחות';
+    let recommendedAction = 'reports';
+    if (guestStatusSummary.pending > 0) {
+      recommendedLabel = 'שלח תזכורת';
+      recommendedAction = 'reminder';
+    }
+
+    return {
+      shouldShow: true,
+      approvedSinceYesterday,
+      pending: guestStatusSummary.pending || 0,
+      recommendedLabel,
+      recommendedAction,
+    };
+  }, [currentEventId, guestStatusSummary.approved, guestStatusSummary.pending, invitedCount]);
+
+  React.useEffect(() => {
+    if (!currentEventId || typeof window === 'undefined') return;
+    const todayKey = new Date().toISOString().slice(0, 10);
+    try {
+      localStorage.setItem(`mobileDaily_${currentEventId}_${todayKey}`, JSON.stringify({
+        approved: guestStatusSummary.approved || 0,
+        pending: guestStatusSummary.pending || 0,
+      }));
+    } catch {}
+  }, [currentEventId, guestStatusSummary.approved, guestStatusSummary.pending]);
+
   React.useEffect(() => {
     if (!onMobileNavMetaChange) return;
     onMobileNavMetaChange({
@@ -7025,6 +7082,9 @@ React.useEffect(()=>{
       if (mobilePullOffsetRef.current > 64) {
         setMobileIsRefreshing(true);
         setGuestSummaryRefreshKey((key) => key + 1);
+        if (isMobileViewport()) {
+          addToast?.('הסטטוס התעדכן בהצלחה', 'success');
+        }
         window.setTimeout(() => setMobileIsRefreshing(false), 900);
       }
       mobilePullOffsetRef.current = 0;
@@ -7040,7 +7100,7 @@ React.useEffect(()=>{
       window.removeEventListener('touchmove', onTouchMove);
       window.removeEventListener('touchend', onTouchEnd);
     };
-  }, []);
+  }, [addToast]);
 
   const openMobileResumeStep = React.useCallback((stepNumber) => {
     const mustStartFirst = !currentEventId && !newEventStarted && !planForDisplay;
@@ -7072,6 +7132,14 @@ React.useEffect(()=>{
     setShowGuestForm(true);
     setStepErrorMsg('');
   }, []);
+
+  const handleMobileDailyRecommendedAction = React.useCallback(() => {
+    if (mobileDailySummaryModel.recommendedAction === 'reminder') {
+      openMobileReminderFlow();
+      return;
+    }
+    openMobileResumeStep(5);
+  }, [mobileDailySummaryModel.recommendedAction, openMobileReminderFlow, openMobileResumeStep]);
 
   const handleMobileSmartAction = React.useCallback((action) => {
     if (action === 'pending') {
@@ -7390,6 +7458,69 @@ React.useEffect(()=>{
               </div>
             </div>
           </div>
+          <div className="mt-3">
+            <label className="sr-only" htmlFor="mobile-global-guest-search">חיפוש אורח</label>
+            <input
+              id="mobile-global-guest-search"
+              type="search"
+              value={mobileSummarySearch}
+              onChange={(event) => setMobileSummarySearch(event.target.value)}
+              placeholder="חפש אורח לפי שם או טלפון"
+              className="w-full rounded-full border border-white/10 bg-white/[0.055] px-4 py-2.5 text-right text-base font-semibold text-slate-100 placeholder:text-slate-500 focus:border-violet-300 focus:outline-none"
+            />
+          </div>
+          {mobileSummarySearch.trim() ? (
+            <div className="mt-2 max-h-72 overflow-y-auto rounded-2xl border border-white/10 bg-[#0c0f2e]/95 p-2">
+              {mobileGlobalSearchResults.length > 0 ? mobileGlobalSearchResults.map((guest, idx) => {
+                const status = guest.status === 'approved' || guest.status === 'rejected' ? guest.status : 'pending';
+                const statusMeta = status === 'approved'
+                  ? { label: 'אישר', className: 'bg-emerald-500/15 text-emerald-300 border-emerald-400/30', icon: '✓' }
+                  : status === 'rejected'
+                    ? { label: 'לא מגיע', className: 'bg-rose-500/15 text-rose-300 border-rose-400/30', icon: '×' }
+                    : { label: 'ממתין', className: 'bg-amber-500/15 text-amber-300 border-amber-400/30', icon: '◷' };
+                const guestName = [guest.first_name, guest.last_name].filter(Boolean).join(' ') || `אורח ${idx + 1}`;
+                const initials = guestName.split(' ').map((part) => part[0]).filter(Boolean).slice(0, 2).join('');
+                return (
+                  <MobileSwipeGuestCard
+                    key={`global-${guest.phone || guestName}-${idx}`}
+                    guestName={guestName}
+                    initials={initials}
+                    phone={guest.phone}
+                    statusMeta={statusMeta}
+                    onReminder={openMobileReminderFlow}
+                    onWhatsApp={() => openMobileGuestWhatsApp(guest.phone)}
+                  />
+                );
+              }) : (
+                <div className="px-3 py-4 text-center text-sm font-semibold text-slate-400">
+                  לא נמצאו אורחים תואמים
+                </div>
+              )}
+            </div>
+          ) : null}
+        </section>
+      )}
+
+      {hasSession && mobileDailySummaryModel.shouldShow && (
+        <section className="mx-auto mb-3 w-full max-w-md rounded-[1.5rem] border border-emerald-300/20 bg-emerald-500/[0.08] px-4 py-3 text-right shadow-[0_8px_24px_rgba(0,0,0,0.22)] ring-1 ring-emerald-400/15 sm:hidden" dir="rtl">
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <div className="text-xs font-black text-emerald-200">סיכום יומי</div>
+              <div className="mt-1 text-sm font-bold leading-6 text-white">
+                {mobileDailySummaryModel.approvedSinceYesterday > 0 ? (
+                  <span>{mobileDailySummaryModel.approvedSinceYesterday} אישרו מאתמול · </span>
+                ) : null}
+                <span className="text-amber-200">{mobileDailySummaryModel.pending} ממתינים</span>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={handleMobileDailyRecommendedAction}
+              className="shrink-0 rounded-2xl border border-emerald-300/35 bg-emerald-500/20 px-3 py-2 text-sm font-black text-emerald-100 transition-colors active:bg-emerald-500/30"
+            >
+              {mobileDailySummaryModel.recommendedLabel}
+            </button>
+          </div>
         </section>
       )}
 
@@ -7561,7 +7692,7 @@ React.useEffect(()=>{
         <section id="mobile-quick-guests" className="mx-auto mb-4 w-full max-w-md rounded-[1.75rem] border border-violet-300/25 bg-white/[0.06] p-4 text-right shadow-[0_14px_44px_rgba(0,0,0,0.36)] ring-1 ring-violet-400/20 backdrop-blur-2xl sm:hidden" dir="rtl">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0 flex-1">
-              <div className="text-sm font-black text-violet-200">חיפוש, סינון וטיפול באורחים מהנייד</div>
+              <div className="text-sm font-black text-violet-200">סינון וטיפול באורחים מהנייד</div>
               <h2 className="mt-1 text-3xl font-black leading-tight text-white">ניהול אורחים מהיר</h2>
               <p className="mt-1 text-sm font-semibold leading-6 text-slate-300">
                 מצא אורח, בדוק סטטוס ושלח פעולה מהירה בלי להיכנס לדוח מלא.
@@ -7591,16 +7722,7 @@ React.useEffect(()=>{
           </div>
 
           <div className="mt-3 rounded-2xl border border-white/10 bg-white/[0.04] p-3">
-            <label className="sr-only" htmlFor="mobile-quick-guest-search">חיפוש אורח</label>
-            <input
-              id="mobile-quick-guest-search"
-              type="search"
-              value={mobileSummarySearch}
-              onChange={(event) => setMobileSummarySearch(event.target.value)}
-              placeholder="חפש לפי שם או טלפון"
-              className="w-full rounded-full border border-white/10 bg-white/[0.055] px-4 py-3 text-right text-base font-semibold text-slate-100 placeholder:text-slate-500 focus:border-violet-300 focus:outline-none"
-            />
-            <div className="mt-3 grid grid-cols-4 gap-2">
+            <div className="grid grid-cols-4 gap-2">
               {[
                 ['all', 'כולם'],
                 ['approved', 'אישרו'],
