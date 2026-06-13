@@ -6855,6 +6855,17 @@ React.useEffect(()=>{
     openMobileResumeStep(5);
   }, [openMobilePendingReport, openMobileResumeStep]);
 
+  const openMobileGuestWhatsApp = React.useCallback((phone) => {
+    const normalizedPhone = normalizePhoneNumber(phone);
+    if (!normalizedPhone) {
+      addToast?.('לא נמצא מספר טלפון תקין לאורח', 'error');
+      return;
+    }
+    if (typeof window !== 'undefined') {
+      window.open(`https://wa.me/${normalizedPhone}`, '_blank', 'noopener,noreferrer');
+    }
+  }, [addToast]);
+
   const renderMobileNextActionCard = ({
     stepLabel,
     title,
@@ -7271,6 +7282,141 @@ React.useEffect(()=>{
               </div>
             </div>
           </div>
+        </section>
+      )}
+
+      {hasSession && currentEventId && (
+        <section className="mx-auto mb-4 w-full max-w-md rounded-[1.75rem] border border-violet-300/25 bg-white/[0.06] p-4 text-right shadow-[0_14px_44px_rgba(0,0,0,0.36)] ring-1 ring-violet-400/20 backdrop-blur-2xl sm:hidden" dir="rtl">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <div className="text-sm font-black text-violet-200">חיפוש, סינון וטיפול באורחים מהנייד</div>
+              <h2 className="mt-1 text-3xl font-black leading-tight text-white">ניהול אורחים מהיר</h2>
+              <p className="mt-1 text-sm font-semibold leading-6 text-slate-300">
+                מצא אורח, בדוק סטטוס ושלח פעולה מהירה בלי להיכנס לדוח מלא.
+              </p>
+            </div>
+            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-violet-300/30 bg-violet-500/20 text-2xl shadow-[0_8px_26px_rgba(139,92,246,0.32)]">
+              ◉
+            </div>
+          </div>
+
+          <div className="mt-4 grid grid-cols-3 gap-2">
+            {[
+              ['all', invitedCount, 'מוזמנים', 'border-violet-400/25 bg-violet-500/10 text-violet-200'],
+              ['approved', guestStatusSummary.approved, 'אישרו', 'border-emerald-400/25 bg-emerald-500/10 text-emerald-300'],
+              ['pending', guestStatusSummary.pending, 'ממתינים', 'border-amber-400/25 bg-amber-500/[0.12] text-amber-300'],
+            ].map(([key, value, label, tone]) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setMobileSummaryFilter(key)}
+                className={`rounded-2xl border px-2 py-3 text-center transition-all active:opacity-85 ${tone} ${mobileSummaryFilter === key ? 'ring-2 ring-white/30' : ''}`}
+              >
+                <div className="text-3xl font-black leading-none tabular-nums">{value || 0}</div>
+                <div className="mt-1 text-[11px] font-black text-slate-100">{label}</div>
+              </button>
+            ))}
+          </div>
+
+          <div className="mt-3 rounded-2xl border border-white/10 bg-white/[0.04] p-3">
+            <label className="sr-only" htmlFor="mobile-quick-guest-search">חיפוש אורח</label>
+            <input
+              id="mobile-quick-guest-search"
+              type="search"
+              value={mobileSummarySearch}
+              onChange={(event) => setMobileSummarySearch(event.target.value)}
+              placeholder="חפש לפי שם או טלפון"
+              className="w-full rounded-full border border-white/10 bg-white/[0.055] px-4 py-3 text-right text-base font-semibold text-slate-100 placeholder:text-slate-500 focus:border-violet-300 focus:outline-none"
+            />
+            <div className="mt-3 grid grid-cols-4 gap-2">
+              {[
+                ['all', 'כולם'],
+                ['approved', 'אישרו'],
+                ['pending', 'ממתינים'],
+                ['rejected', 'לא מגיעים'],
+              ].map(([key, label]) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setMobileSummaryFilter(key)}
+                  className={`rounded-full border px-2 py-2 text-xs font-black transition-all ${
+                    mobileSummaryFilter === key
+                      ? 'border-amber-300/70 bg-amber-500/30 text-white'
+                      : 'border-white/10 bg-white/[0.04] text-slate-300'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="mt-3 space-y-2">
+            {mobileFilteredSummaryGuests.length > 0 ? mobileFilteredSummaryGuests.slice(0, 4).map((guest, idx) => {
+              const status = guest.status === 'approved' || guest.status === 'rejected' ? guest.status : 'pending';
+              const statusMeta = status === 'approved'
+                ? { label: 'אישר', className: 'bg-emerald-500/15 text-emerald-300 border-emerald-400/30', icon: '✓' }
+                : status === 'rejected'
+                  ? { label: 'לא מגיע', className: 'bg-rose-500/15 text-rose-300 border-rose-400/30', icon: '×' }
+                  : { label: 'ממתין', className: 'bg-amber-500/15 text-amber-300 border-amber-400/30', icon: '◷' };
+              const guestName = [guest.first_name, guest.last_name].filter(Boolean).join(' ') || `אורח ${idx + 1}`;
+              const initials = guestName.split(' ').map((part) => part[0]).filter(Boolean).slice(0, 2).join('');
+              return (
+                <div key={`${guest.phone || guestName}-${idx}`} className="rounded-2xl border border-white/10 bg-white/[0.045] px-3 py-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-violet-300/25 bg-violet-500/20 text-sm font-black text-violet-100">
+                      {initials || 'א'}
+                    </div>
+                    <div className="min-w-0 flex-1 text-right">
+                      <div className="truncate text-lg font-black text-white">{guestName}</div>
+                      <div className="mt-0.5 text-xs font-semibold text-slate-400">{guest.phone || 'אין טלפון'}</div>
+                    </div>
+                    <span className={`shrink-0 rounded-full border px-3 py-1 text-xs font-black ${statusMeta.className}`}>
+                      {statusMeta.icon} {statusMeta.label}
+                    </span>
+                  </div>
+                  <div className="mt-3 grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={openMobileReminderFlow}
+                      className="rounded-xl border border-amber-300/35 bg-amber-500/[0.12] px-3 py-2 text-sm font-black text-amber-100 transition-colors active:bg-amber-500/[0.22]"
+                    >
+                      תזכורת
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => openMobileGuestWhatsApp(guest.phone)}
+                      className="rounded-xl border border-emerald-300/35 bg-emerald-500/15 px-3 py-2 text-sm font-black text-emerald-100 transition-colors active:bg-emerald-500/25"
+                    >
+                      WhatsApp
+                    </button>
+                  </div>
+                </div>
+              );
+            }) : (
+              <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-6 text-center">
+                <div className="text-base font-black text-white">אין אורחים להצגה</div>
+                <p className="mt-1 text-sm font-semibold text-slate-400">אחרי שליחת הזמנות תוכל לנהל כאן את האורחים במהירות.</p>
+                <button
+                  type="button"
+                  onClick={() => openMobileResumeStep(4)}
+                  className="mt-3 rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-600 px-5 py-3 text-base font-black text-white shadow-[0_10px_24px_rgba(16,185,129,0.28)] transition-opacity active:opacity-85"
+                >
+                  עבור לשליחה
+                </button>
+              </div>
+            )}
+          </div>
+
+          {mobileSummaryGuests.length > 4 && (
+            <button
+              type="button"
+              onClick={() => openMobileResumeStep(5)}
+              className="mt-3 w-full rounded-2xl border border-violet-300/30 bg-violet-500/15 px-4 py-3 text-base font-black text-violet-100 transition-colors active:bg-violet-500/25"
+            >
+              פתח דוחות לכל האורחים
+            </button>
+          )}
         </section>
       )}
 
