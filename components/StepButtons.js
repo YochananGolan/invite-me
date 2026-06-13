@@ -7705,9 +7705,9 @@ React.useEffect(()=>{
 
           <div className="mt-4 grid grid-cols-3 gap-2">
             {[
-              ['all', invitedCount, 'מוזמנים', 'border-violet-400/25 bg-violet-500/10 text-violet-200'],
               ['approved', guestStatusSummary.approved, 'אישרו', 'border-emerald-400/25 bg-emerald-500/10 text-emerald-300'],
-              ['pending', guestStatusSummary.pending, 'ממתינים', 'border-amber-400/25 bg-amber-500/[0.12] text-amber-300'],
+              ['pending', guestStatusSummary.pending, 'טרם הגיבו', 'border-amber-400/25 bg-amber-500/[0.12] text-amber-300'],
+              ['rejected', guestStatusSummary.rejected, 'לא מגיעים', 'border-rose-400/25 bg-rose-400/10 text-rose-300'],
             ].map(([key, value, label, tone]) => (
               <button
                 key={key}
