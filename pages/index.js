@@ -14,6 +14,7 @@ export default function Home({ session }) {
   const [showAuth, setShowAuth] = useState(false);
   const [authMode, setAuthMode] = useState('sign_in');
   const [mobileActiveNav, setMobileActiveNav] = useState('home');
+  const [mobileNavBadges, setMobileNavBadges] = useState({ send: 0, reports: 0 });
   const [showFeatures, setShowFeatures] = useState(false);
   const [showPricingTable, setShowPricingTable] = useState(false);
   const [pendingCreateEvent, setPendingCreateEvent] = useState(false);
@@ -173,6 +174,7 @@ export default function Home({ session }) {
                 onAuthClick={handleAuthClick}
                 triggerCreateEvent={triggerCreateEvent}
                 onConsumedCreateTrigger={() => setTriggerCreateEvent(false)}
+                onMobileNavMetaChange={setMobileNavBadges}
               />
             </div>
           </div>
@@ -187,17 +189,28 @@ export default function Home({ session }) {
               { key: 'reports', label: 'דוחות', icon: '▥' },
             ].map((item) => {
               const isActive = mobileActiveNav === item.key;
+              const badgeValue = item.key === 'send'
+                ? mobileNavBadges.send
+                : item.key === 'reports'
+                  ? mobileNavBadges.reports
+                  : 0;
+              const badgeLabel = badgeValue > 99 ? '99+' : String(badgeValue);
               return (
                 <button
                   key={item.key}
                   type="button"
                   onClick={() => handleMobileNav(item.key)}
-                  className={`flex min-w-0 flex-col items-center justify-center rounded-3xl px-2 py-2.5 text-center transition-all ${
+                  className={`relative flex min-w-0 flex-col items-center justify-center rounded-3xl px-2 py-2.5 text-center transition-all ${
                     isActive
                       ? 'bg-gradient-to-br from-emerald-500/25 to-violet-500/35 text-white shadow-[0_8px_24px_rgba(99,70,230,0.32)] ring-1 ring-violet-300/35'
                       : 'text-slate-400 hover:bg-white/[0.05] hover:text-slate-100'
                   }`}
                 >
+                  {badgeValue > 0 && (
+                    <span className="absolute left-2 top-1 min-w-[1.35rem] rounded-full bg-amber-400 px-1.5 py-0.5 text-[10px] font-black leading-none text-[#211436] shadow-[0_4px_12px_rgba(251,191,36,0.35)]">
+                      {badgeLabel}
+                    </span>
+                  )}
                   <span className={`text-2xl leading-none ${isActive ? 'text-emerald-200' : ''}`}>{item.icon}</span>
                   <span className="mt-1 text-xs font-black leading-none">{item.label}</span>
                 </button>

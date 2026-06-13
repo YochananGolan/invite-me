@@ -270,7 +270,7 @@ const hasMeaningfulFormValue = (key, value) => {
   return Boolean(value);
 };
 
-const StepButtons = forwardRef(function StepButtons({ session, onAuthClick, triggerCreateEvent, onConsumedCreateTrigger }, ref) {
+const StepButtons = forwardRef(function StepButtons({ session, onAuthClick, triggerCreateEvent, onConsumedCreateTrigger, onMobileNavMetaChange }, ref) {
   const router = useRouter();
   const { addToast } = useToast();
   const sessionRef = useRef(session);
@@ -425,6 +425,7 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick, trig
   const [mobileSummaryGuests, setMobileSummaryGuests] = useState([]);
   const [mobileSummarySearch, setMobileSummarySearch] = useState('');
   const [mobileSummaryFilter, setMobileSummaryFilter] = useState('all');
+  const [mobileShowMoreCards, setMobileShowMoreCards] = useState(false);
   const [specialMealsSummary, setSpecialMealsSummary] = useState({ 
     veg: { adults: 0, children: 0, total: 0 },
     vegan: { adults: 0, children: 0, total: 0 },
@@ -6808,6 +6809,72 @@ React.useEffect(()=>{
     selectedEventType,
   ]);
 
+  const mobileDashboardModel = React.useMemo(() => {
+    const dashboardActive = Boolean(
+      currentEventId ||
+      newEventStarted ||
+      selectedEventType ||
+      formDataHasMeaningfulValues ||
+      selectedDesign ||
+      invitedCount > 0 ||
+      guestStatusSummary.pending > 0
+    );
+    if (!dashboardActive) {
+      return { shouldShow: false, showGuestPrimary: false, showReadinessPrimary: false, secondaryCount: 0 };
+    }
+
+    const showGuestPrimary = Boolean(currentEventId && invitedCount > 0);
+    const showReadinessPrimary = Boolean(mobileReadinessModel.shouldShow && !showGuestPrimary);
+    let secondaryCount = 0;
+    if (mobileReadinessModel.shouldShow && showGuestPrimary) secondaryCount += 1;
+    if (mobileEventTodayModel.shouldShow) secondaryCount += 1;
+    if (mobileReminderStatusModel.shouldShow) secondaryCount += 1;
+    if (mobileResumeModel.shouldShow) secondaryCount += 1;
+    if (mobileSmartActionModel.shouldShow) secondaryCount += 1;
+
+    return {
+      shouldShow: true,
+      showGuestPrimary,
+      showReadinessPrimary,
+      secondaryCount,
+      readinessReadyCount: mobileReadinessModel.readyCount || 0,
+      readinessTotalCount: mobileReadinessModel.totalCount || 6,
+      readinessPercent: mobileReadinessModel.percent || 0,
+    };
+  }, [
+    currentEventId,
+    formDataHasMeaningfulValues,
+    guestStatusSummary.pending,
+    invitedCount,
+    mobileEventTodayModel.shouldShow,
+    mobileReadinessModel.percent,
+    mobileReadinessModel.readyCount,
+    mobileReadinessModel.shouldShow,
+    mobileReadinessModel.totalCount,
+    mobileReminderStatusModel.shouldShow,
+    mobileResumeModel.shouldShow,
+    mobileSmartActionModel.shouldShow,
+    newEventStarted,
+    selectedDesign,
+    selectedEventType,
+  ]);
+
+  React.useEffect(() => {
+    if (!onMobileNavMetaChange) return;
+    onMobileNavMetaChange({
+      send: messageCapacityChartModel?.remainingMessages ?? 0,
+      reports: guestStatusSummary.pending ?? 0,
+    });
+  }, [
+    guestStatusSummary.pending,
+    messageCapacityChartModel?.remainingMessages,
+    onMobileNavMetaChange,
+  ]);
+
+  React.useEffect(() => {
+    setMobileShowMoreCards(false);
+  }, [currentEventId]);
+
   const openMobileResumeStep = React.useCallback((stepNumber) => {
     const mustStartFirst = !currentEventId && !newEventStarted && !planForDisplay;
     if (stepNumber >= 1 && stepNumber <= 4 && mustStartFirst) {
@@ -7118,18 +7185,35 @@ React.useEffect(()=>{
         </div>
       )}
 
+      {hasSession && mobileDashboardModel.shouldShow && (
+        <section className="mx-auto mb-3 w-full max-w-md rounded-[1.5rem] border border-violet-300/20 bg-white/[0.05] px-4 py-3 text-right shadow-[0_10px_32px_rgba(0,0,0,0.28)] ring-1 ring-violet-400/15 backdrop-blur-2xl sm:hidden" dir="rtl">
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-lg font-black text-white">
+                {selectedEventType || 'אירוע'}
+                {mobileResumeEventDateText ? <span className="text-violet-200"> · {mobileResumeEventDateText}</span> : null}
+              </div>
+              <div className="mt-1 text-sm font-bold text-violet-200">
+                {mobileDashboardModel.readinessReadyCount} מתוך {mobileDashboardModel.readinessTotalCount} מוכנים
+              </div>
+            </div>
+            <div
+              className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full p-1 shadow-[0_8px_22px_rgba(16,185,129,0.22)]"
+              style={{ background: `conic-gradient(#34d399 ${mobileDashboardModel.readinessPercent}%, rgba(255,255,255,0.12) 0)` }}
+            >
+              <div className="flex h-full w-full items-center justify-center rounded-full bg-[#10153a] text-sm font-black text-white">
+                {mobileDashboardModel.readinessReadyCount}/{mobileDashboardModel.readinessTotalCount}
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
+
       {hasSession && mobileSmartActionModel.shouldShow && (
         <section className="mx-auto mb-4 w-full max-w-md rounded-[1.75rem] border border-violet-300/25 bg-white/[0.06] p-4 text-right shadow-[0_14px_44px_rgba(0,0,0,0.36)] ring-1 ring-violet-400/20 backdrop-blur-2xl sm:hidden" dir="rtl">
           <div className="text-center">
-            <div className="text-sm font-black text-violet-200">המערכת ממליצה מה לעשות עכשיו</div>
-            <h2 className="mt-1 text-3xl font-black leading-tight text-white">מרכז פעולות חכם</h2>
-            {(selectedEventType || mobileResumeEventDateText) && (
-              <div className="mx-auto mt-3 inline-flex max-w-full items-center gap-2 rounded-full border border-violet-300/25 bg-violet-500/15 px-4 py-2 text-sm font-black text-violet-100">
-                <span className="truncate">{selectedEventType || 'אירוע'}</span>
-                {mobileResumeEventDateText && <span className="text-slate-400">·</span>}
-                {mobileResumeEventDateText && <span>{mobileResumeEventDateText}</span>}
-              </div>
-            )}
+            <div className="text-sm font-black text-violet-200">הפעולה החשובה עכשיו</div>
+            <h2 className="mt-1 text-2xl font-black leading-tight text-white">מרכז פעולות חכם</h2>
           </div>
 
           <div className={`mt-4 rounded-3xl border p-4 text-center ${
@@ -7159,6 +7243,8 @@ React.useEffect(()=>{
             </button>
           </div>
 
+          {mobileShowMoreCards && (
+          <>
           <div className="mt-3 space-y-2">
             <button
               type="button"
@@ -7204,10 +7290,12 @@ React.useEffect(()=>{
               כדאי לשלוח תזכורת 5 ימים לפני האירוע לפי ערוץ ההזמנה המקורי.
             </p>
           </div>
+          </>
+          )}
         </section>
       )}
 
-      {hasSession && mobileReadinessModel.shouldShow && (
+      {hasSession && mobileReadinessModel.shouldShow && (mobileDashboardModel.showReadinessPrimary || mobileShowMoreCards) && (
         <section className="mx-auto mb-4 w-full max-w-md overflow-hidden rounded-[1.75rem] border border-violet-300/25 bg-white/[0.06] text-right shadow-[0_14px_44px_rgba(0,0,0,0.36)] ring-1 ring-violet-400/20 backdrop-blur-2xl sm:hidden" dir="rtl">
           <div className="relative p-4">
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(139,92,246,0.28),transparent_42%),linear-gradient(135deg,rgba(59,130,246,0.10),rgba(16,185,129,0.10))]" />
@@ -7285,7 +7373,7 @@ React.useEffect(()=>{
         </section>
       )}
 
-      {hasSession && currentEventId && (
+      {hasSession && currentEventId && mobileDashboardModel.showGuestPrimary && (
         <section className="mx-auto mb-4 w-full max-w-md rounded-[1.75rem] border border-violet-300/25 bg-white/[0.06] p-4 text-right shadow-[0_14px_44px_rgba(0,0,0,0.36)] ring-1 ring-violet-400/20 backdrop-blur-2xl sm:hidden" dir="rtl">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0 flex-1">
@@ -7420,7 +7508,21 @@ React.useEffect(()=>{
         </section>
       )}
 
-      {hasSession && mobileEventTodayModel.shouldShow && (
+      {hasSession && mobileDashboardModel.secondaryCount > 0 && (
+        <div className="mx-auto mb-4 w-full max-w-md sm:hidden" dir="rtl">
+          <button
+            type="button"
+            onClick={() => setMobileShowMoreCards((value) => !value)}
+            className="w-full rounded-2xl border border-white/12 bg-white/[0.05] px-4 py-3 text-center text-base font-black text-violet-100 transition-colors active:bg-white/[0.10]"
+          >
+            {mobileShowMoreCards
+              ? 'הסתר כרטיסים נוספים'
+              : `הצג עוד כרטיסים (${mobileDashboardModel.secondaryCount})`}
+          </button>
+        </div>
+      )}
+
+      {hasSession && mobileEventTodayModel.shouldShow && mobileShowMoreCards && (
         <section className="mx-auto mb-4 w-full max-w-md overflow-hidden rounded-[1.75rem] border border-violet-300/25 bg-white/[0.06] text-right shadow-[0_14px_44px_rgba(0,0,0,0.36)] ring-1 ring-violet-400/20 backdrop-blur-2xl sm:hidden" dir="rtl">
           <div className="relative p-4">
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(139,92,246,0.30),transparent_42%),linear-gradient(135deg,rgba(16,185,129,0.12),rgba(99,102,241,0.12))]" />
@@ -7522,7 +7624,7 @@ React.useEffect(()=>{
         </section>
       )}
 
-      {hasSession && mobileReminderStatusModel.shouldShow && (
+      {hasSession && mobileReminderStatusModel.shouldShow && mobileShowMoreCards && (
         <section className="mx-auto mb-4 w-full max-w-md rounded-[1.75rem] border border-amber-300/30 bg-white/[0.06] p-4 text-right shadow-[0_14px_44px_rgba(0,0,0,0.34)] ring-1 ring-amber-400/20 backdrop-blur-2xl sm:hidden" dir="rtl">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
@@ -7580,7 +7682,7 @@ React.useEffect(()=>{
         </section>
       )}
 
-      {hasSession && mobileResumeModel.shouldShow && (
+      {hasSession && mobileResumeModel.shouldShow && mobileShowMoreCards && (
         <section className="mx-auto mb-4 w-full max-w-md rounded-[1.75rem] border border-violet-300/25 bg-white/[0.06] p-4 text-right shadow-[0_14px_44px_rgba(0,0,0,0.36)] ring-1 ring-violet-400/20 backdrop-blur-2xl sm:hidden" dir="rtl">
           <div className="text-center">
             <div className="text-sm font-black text-violet-200">Meet-M זוכר את האירוע שלך</div>
