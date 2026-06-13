@@ -6534,6 +6534,45 @@ React.useEffect(()=>{
     selectedEventType,
   ]);
 
+  const mobileEventTodayModel = React.useMemo(() => {
+    const rawDate = formData?.date || formData?.start_datetime || '';
+    if (!rawDate || !currentEventId) return { shouldShow: false };
+
+    const parsedDate = new Date(rawDate);
+    if (!Number.isFinite(parsedDate.getTime())) return { shouldShow: false };
+
+    const today = new Date();
+    const eventDay = new Date(parsedDate);
+    today.setHours(0, 0, 0, 0);
+    eventDay.setHours(0, 0, 0, 0);
+    const shouldShow = today.getTime() === eventDay.getTime();
+    if (!shouldShow) return { shouldShow: false };
+
+    const dateText = parsedDate.toLocaleDateString('he-IL');
+    const timeText = formData?.time ? String(formData.time) : '';
+    let statusText = timeText ? `מתחיל בשעה ${timeText}` : 'האירוע מתקיים היום';
+
+    if (timeText && /^\d{1,2}:\d{2}$/.test(timeText)) {
+      const [hours, minutes] = timeText.split(':').map((value) => parseInt(value, 10));
+      const eventDateTime = new Date(parsedDate);
+      eventDateTime.setHours(hours, minutes, 0, 0);
+      const diffMs = eventDateTime.getTime() - Date.now();
+      if (diffMs > 0) {
+        const diffHours = Math.ceil(diffMs / (1000 * 60 * 60));
+        statusText = diffHours <= 1 ? 'מתחיל בקרוב' : `מתחיל בעוד ${diffHours} שעות`;
+      } else {
+        statusText = 'האירוע כבר התחיל';
+      }
+    }
+
+    return {
+      shouldShow: true,
+      dateText,
+      statusText,
+      venueText: formData?.hallName || formData?.hallAddress || '',
+    };
+  }, [currentEventId, formData?.date, formData?.hallAddress, formData?.hallName, formData?.start_datetime, formData?.time]);
+
   const openMobileResumeStep = React.useCallback((stepNumber) => {
     const mustStartFirst = !currentEventId && !newEventStarted && !planForDisplay;
     if (stepNumber >= 1 && stepNumber <= 4 && mustStartFirst) {
@@ -6551,6 +6590,19 @@ React.useEffect(()=>{
       setShowGuestListModal(false);
     }
   }, [currentEventId, newEventStarted, planForDisplay]);
+
+  const openMobilePendingReport = React.useCallback(() => {
+    setShowReportsOptions(false);
+    setShowGuestListModal(false);
+    setShowPendingReport(true);
+    setStepErrorMsg('');
+  }, []);
+
+  const openMobileReminderFlow = React.useCallback(() => {
+    setShowReportsOptions(false);
+    setShowGuestForm(true);
+    setStepErrorMsg('');
+  }, []);
 
   const renderMobileNextActionCard = ({
     stepLabel,
@@ -6802,6 +6854,108 @@ React.useEffect(()=>{
             הבנתי
           </button>
         </div>
+      )}
+
+      {hasSession && mobileEventTodayModel.shouldShow && (
+        <section className="mx-auto mb-4 w-full max-w-md overflow-hidden rounded-[1.75rem] border border-violet-300/25 bg-white/[0.06] text-right shadow-[0_14px_44px_rgba(0,0,0,0.36)] ring-1 ring-violet-400/20 backdrop-blur-2xl sm:hidden" dir="rtl">
+          <div className="relative p-4">
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(139,92,246,0.30),transparent_42%),linear-gradient(135deg,rgba(16,185,129,0.12),rgba(99,102,241,0.12))]" />
+            <div className="relative">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="text-sm font-black text-violet-200">ניהול בזמן אמת</div>
+                  <h2 className="mt-1 text-3xl font-black leading-tight text-white">האירוע היום</h2>
+                  <p className="mt-1 text-sm font-semibold text-slate-300">
+                    הכל מוכן לניהול מהיר מהנייד
+                  </p>
+                </div>
+                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-violet-300/30 bg-violet-500/20 text-2xl shadow-[0_8px_26px_rgba(139,92,246,0.32)]">
+                  {eventTypeIcons[selectedEventType] || '✦'}
+                </div>
+              </div>
+
+              <div className="mt-4 rounded-2xl border border-white/12 bg-[#11163d]/65 px-4 py-3">
+                <div className="text-lg font-black text-white">
+                  {selectedEventType || 'אירוע'}
+                  <span className="text-violet-200"> · {mobileEventTodayModel.dateText}</span>
+                </div>
+                {mobileEventTodayModel.venueText && (
+                  <div className="mt-1 truncate text-sm font-semibold text-slate-300">
+                    {mobileEventTodayModel.venueText}
+                  </div>
+                )}
+                <div className="mt-3 inline-flex rounded-full border border-violet-300/30 bg-violet-500/25 px-4 py-2 text-sm font-black text-violet-100">
+                  {mobileEventTodayModel.statusText}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-2 px-4 pb-4">
+            <button
+              type="button"
+              onClick={() => openMobileResumeStep(5)}
+              className="flex w-full items-center justify-between gap-3 rounded-2xl border border-emerald-400/35 bg-emerald-500/15 px-4 py-3 text-right transition-colors active:bg-emerald-500/25"
+            >
+              <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-emerald-500/20 text-2xl text-emerald-200">▥</span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-lg font-black text-white">פתח דוחות עכשיו</span>
+                <span className="block text-xs font-semibold text-emerald-100/80">צפה בנתונים ודוחות בזמן אמת</span>
+              </span>
+              <span className="text-2xl text-emerald-100">‹</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={openMobilePendingReport}
+              className="flex w-full items-center justify-between gap-3 rounded-2xl border border-amber-400/35 bg-amber-500/[0.12] px-4 py-3 text-right transition-colors active:bg-amber-500/[0.22]"
+            >
+              <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-amber-500/20 text-2xl text-amber-200">◷</span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-lg font-black text-white">מי עדיין לא הגיב?</span>
+                <span className="block text-xs font-semibold text-amber-100/80">רשימת אורחים שממתינים לתגובה</span>
+              </span>
+              <span className="rounded-full bg-amber-400 px-3 py-1 text-sm font-black text-[#1f1233]">{guestStatusSummary.pending || 0}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={openMobileReminderFlow}
+              className="flex w-full items-center justify-between gap-3 rounded-2xl border border-violet-400/35 bg-violet-500/15 px-4 py-3 text-right transition-colors active:bg-violet-500/25"
+            >
+              <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-violet-500/20 text-2xl text-violet-100">✈</span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-lg font-black text-white">שלח תזכורת</span>
+                <span className="block text-xs font-semibold text-violet-100/80">פתח את מסך השליחה להודעת תזכורת</span>
+              </span>
+              <span className="text-2xl text-violet-100">‹</span>
+            </button>
+
+            <div className="grid grid-cols-3 gap-2 text-center">
+              <div className="rounded-2xl border border-emerald-400/20 bg-emerald-500/10 px-2 py-2">
+                <div className="text-xl font-black text-emerald-300">{invitedCount}</div>
+                <div className="text-[11px] font-bold text-slate-400">מוזמנים</div>
+              </div>
+              <div className="rounded-2xl border border-blue-400/20 bg-blue-500/10 px-2 py-2">
+                <div className="text-xl font-black text-blue-300">{guestStatusSummary.approved || 0}</div>
+                <div className="text-[11px] font-bold text-slate-400">אישרו</div>
+              </div>
+              <div className="rounded-2xl border border-amber-400/20 bg-amber-500/10 px-2 py-2">
+                <div className="text-xl font-black text-amber-300">{guestStatusSummary.pending || 0}</div>
+                <div className="text-[11px] font-bold text-slate-400">ממתינים</div>
+              </div>
+            </div>
+
+            {guestStatusSummary.pending > 0 && (
+              <div className="rounded-2xl border border-violet-400/20 bg-violet-500/10 px-4 py-3 text-center">
+                <div className="text-sm font-black text-violet-200">כדאי לשלוח תזכורת אחרונה לממתינים</div>
+                <p className="mt-1 text-xs font-semibold text-slate-400">
+                  {guestStatusSummary.pending} אורחים עדיין לא אישרו הגעה
+                </p>
+              </div>
+            )}
+          </div>
+        </section>
       )}
 
       {hasSession && mobileResumeModel.shouldShow && (
