@@ -1,6 +1,6 @@
 /**
  * תזכורת אוטומטית – בדיוק חמישה ימים לפני האירוע.
- * נשלחת ב-SMS לכל מי שהזמנה נשלחה אליו (כל המופיעים ברשימת המוזמנים), לכולם באותו זמן.
+ * נשלחת לכל מי שהזמנה נשלחה אליו, באותו ערוץ של ההזמנה הראשונית: WhatsApp או SMS.
  * התזכורת נשלחת פעם אחת בלבד לאירוע (reminder_sent_at).
  * מופעלת אוטומטית על ידי Vercel Cron מדי יום; אפשר גם להפעיל ידנית עם CRON_SECRET.
  * מספר הימים לפני האירוע ניתן להגדרה ב-REMINDER_DAYS_BEFORE (ברירת מחדל: 5).
@@ -9,11 +9,50 @@
 import { createClient } from '@supabase/supabase-js';
 import { sendSmsToGuests } from '../../lib/activeTrailSms';
 import { getInviteBaseUrl } from '../../lib/inviteUrl';
+import { normalizePhoneNumber, sendWhatsAppTextMessage } from '../../lib/whatsappClient';
 
 const ISRAEL_TZ = 'Asia/Jerusalem';
 
 function getDateStringInIsrael(date) {
   return date.toLocaleDateString('en-CA', { timeZone: ISRAEL_TZ });
+}
+
+function personalizeReminderMessage(message, guest = {}) {
+  const firstName = guest.firstName || '';
+  const lastName = guest.lastName || '';
+  const inviteLink = guest.inviteLink || '';
+  return (message || '')
+    .replace(/{firstName}/g, firstName)
+    .replace(/{lastName}/g, lastName)
+    .replace(/{fullName}/g, `${firstName} ${lastName}`.trim())
+    .replace(/{inviteLink}/g, inviteLink);
+}
+
+async function sendWhatsAppReminderToGuests(guests, message) {
+  const results = [];
+  const errors = [];
+
+  for (const guest of guests) {
+    const phone = normalizePhoneNumber(guest.phone);
+    if (!phone) {
+      errors.push({ guest, error: 'Missing or invalid phone number' });
+      continue;
+    }
+
+    try {
+      const body = personalizeReminderMessage(message, guest);
+      const result = await sendWhatsAppTextMessage({ to: phone, body });
+      if (result.ok) {
+        results.push({ guest, success: true, response: result });
+      } else {
+        errors.push({ guest, status: result.status, error: result.error || 'WhatsApp send failed' });
+      }
+    } catch (err) {
+      errors.push({ guest, error: err?.message || 'WhatsApp send failed' });
+    }
+  }
+
+  return { sent: results.length, failed: errors.length, results, errors };
 }
 
 export default async function handler(req, res) {
@@ -108,7 +147,7 @@ export default async function handler(req, res) {
 
     const { data: guests, error: gError } = await supabase
       .from('invited_guests')
-      .select('id, first_name, last_name, phone')
+      .select('id, first_name, last_name, phone, invitation_channel')
       .eq('event_id', event.id);
 
     if (gError || !guests?.length) {
@@ -116,28 +155,55 @@ export default async function handler(req, res) {
       continue;
     }
 
-    const smsGuests = guests.map((g) => {
+    const reminderGuests = guests.map((g) => {
       const inviteLink = `${baseUrl}/${event.id}/${g.id}`;
       return {
+        id: g.id,
         phone: g.phone,
         firstName: g.first_name || '',
         lastName: g.last_name || '',
         inviteLink,
+        invitationChannel: g.invitation_channel || 'unknown',
       };
     });
+    const smsGuests = reminderGuests.filter((g) => g.invitationChannel === 'sms');
+    const whatsappGuests = reminderGuests.filter((g) => g.invitationChannel === 'whatsapp');
+    const unknownChannelGuests = reminderGuests.filter((g) => g.invitationChannel === 'unknown');
+    if (unknownChannelGuests.length > 0) {
+      report.errors.push({
+        eventId: event.id,
+        channel: 'unknown',
+        skippedGuests: unknownChannelGuests.length,
+        error: 'Missing invitation_channel; cannot determine original invitation channel',
+      });
+    }
+    if (smsGuests.length === 0 && whatsappGuests.length === 0) {
+      continue;
+    }
 
     // פורמט: הדגשת תזכורת, נוסח ההזמנה המלא, משפט ללא צורך באישור חוזר, לינק. התזכורת נשלחת פעם אחת בלבד (reminder_sent_at).
     const message = `שלום {firstName}, *תזכורת*:\n\n${fullInvitationText}\n\nאין צורך לאשר שוב אם אין שינויים.\n\nלאישור הגעה לחצו כאן:\n{inviteLink}`;
 
     if (dryRun) {
-      report.totalSent += smsGuests.length;
+      report.totalSent += smsGuests.length + whatsappGuests.length;
       report.eventsProcessed += 1;
       continue;
     }
     try {
-      const { sent, failed, errors: sendErrors } = await sendSmsToGuests(smsGuests, message, 'Reminder');
-      report.totalSent += sent;
-      if (failed > 0 && sendErrors?.length) report.errors.push({ eventId: event.id, sendErrors });
+      if (smsGuests.length > 0) {
+        const { sent, failed, errors: sendErrors } = await sendSmsToGuests(smsGuests, message, 'Reminder SMS');
+        report.totalSent += sent;
+        if (failed > 0 && sendErrors?.length) {
+          report.errors.push({ eventId: event.id, channel: 'sms', sendErrors });
+        }
+      }
+      if (whatsappGuests.length > 0) {
+        const { sent, failed, errors: sendErrors } = await sendWhatsAppReminderToGuests(whatsappGuests, message);
+        report.totalSent += sent;
+        if (failed > 0 && sendErrors?.length) {
+          report.errors.push({ eventId: event.id, channel: 'whatsapp', sendErrors });
+        }
+      }
     } catch (err) {
       report.errors.push({ eventId: event.id, error: err.message });
       continue;

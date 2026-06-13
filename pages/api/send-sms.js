@@ -102,6 +102,15 @@ export default async function handler(req, res) {
         const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
         if (supabaseUrl && supabaseKey) {
           const supabase = createClient(supabaseUrl, supabaseKey);
+          const sentGuestIds = results
+            .map((result) => result?.guest?.id)
+            .filter(Boolean);
+          if (sentGuestIds.length > 0) {
+            await supabase
+              .from('invited_guests')
+              .update({ invitation_channel: 'sms' })
+              .in('id', sentGuestIds);
+          }
           updatedMessagesSentCount = await atomicIncrement(supabase, eventId, sent);
         }
       } catch (dbErr) {

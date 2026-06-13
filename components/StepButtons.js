@@ -1665,6 +1665,11 @@ const handleOpenAddonModal = React.useCallback(() => {
           const results = apiResult.payload?.results || [];
           const success = results.some((r) => r.ok);
           if (success) {
+            await supabase
+              .from('invited_guests')
+              .update({ invitation_channel: 'whatsapp' })
+              .eq('id', newGuestRecord.id);
+            setGuestSummaryRefreshKey((key) => key + 1);
             setSentGuests((prev) => [
               ...prev,
               {
@@ -1820,6 +1825,7 @@ const handleOpenAddonModal = React.useCallback(() => {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             guests: [{
+              id: newGuest.id,
               phone: guestData.guestPhone,
               firstName: guestData.guestFirstName,
               lastName: guestData.guestLastName,
@@ -1839,6 +1845,11 @@ const handleOpenAddonModal = React.useCallback(() => {
         }
 
         if (smsResult.success && smsResult.sent > 0) {
+          await supabase
+            .from('invited_guests')
+            .update({ invitation_channel: 'sms' })
+            .eq('id', newGuest.id);
+          setGuestSummaryRefreshKey((key) => key + 1);
           if (typeof smsResult.updatedMessagesSentCount === 'number') {
             setEventMessagesSentCount(smsResult.updatedMessagesSentCount);
           } else {
@@ -3963,6 +3974,11 @@ React.useEffect(() => {
                 .filter(Boolean)
             );
             if (successIds.size > 0) {
+              await supabase
+                .from('invited_guests')
+                .update({ invitation_channel: 'sms' })
+                .in('id', Array.from(successIds));
+              setGuestSummaryRefreshKey((key) => key + 1);
               const guestsById = insertedGuests.reduce((acc, inserted, idx) => {
                 acc[inserted.id] = { inserted, original: guestsToSave[idx] };
                 return acc;
@@ -4056,6 +4072,11 @@ React.useEffect(() => {
               await cleanupGuestsAfterFailedSend(failedIds);
             }
             if (successIds.size > 0) {
+              await supabase
+                .from('invited_guests')
+                .update({ invitation_channel: 'whatsapp' })
+                .in('id', Array.from(successIds));
+              setGuestSummaryRefreshKey((key) => key + 1);
               const guestsById = insertedGuests.reduce((acc, inserted, idx) => {
                 acc[inserted.id] = { inserted, original: guestsToSave[idx] };
                 return acc;
@@ -6210,7 +6231,7 @@ React.useEffect(()=>{
         
         const { data: guests, error: guestsError } = await supabase
           .from('invited_guests')
-          .select('first_name, last_name, phone, table_number, status, adults, children, veg_adults, veg_children, vegan_adults, vegan_children, glatt_adults, glatt_children, allergy_adults, allergy_children')
+          .select('first_name, last_name, phone, table_number, status, adults, children, veg_adults, veg_children, vegan_adults, vegan_children, glatt_adults, glatt_children, allergy_adults, allergy_children, invitation_channel')
           .eq('event_id', currentEventId);
 
         if(guestsError) console.error('StepButtons - guests fetch error:', guestsError);
@@ -6572,6 +6593,51 @@ React.useEffect(()=>{
       venueText: formData?.hallName || formData?.hallAddress || '',
     };
   }, [currentEventId, formData?.date, formData?.hallAddress, formData?.hallName, formData?.start_datetime, formData?.time]);
+
+  const mobileReminderStatusModel = React.useMemo(() => {
+    const rawDate = formData?.date || formData?.start_datetime || '';
+    if (!rawDate || !currentEventId) return { shouldShow: false };
+
+    const parsedDate = new Date(rawDate);
+    if (!Number.isFinite(parsedDate.getTime())) return { shouldShow: false };
+
+    const today = new Date();
+    const eventDay = new Date(parsedDate);
+    today.setHours(0, 0, 0, 0);
+    eventDay.setHours(0, 0, 0, 0);
+    const msPerDay = 24 * 60 * 60 * 1000;
+    const daysUntilEvent = Math.round((eventDay.getTime() - today.getTime()) / msPerDay);
+    if (daysUntilEvent < 0) return { shouldShow: false };
+
+    const reminderDaysBefore = 5;
+    const daysUntilReminder = daysUntilEvent - reminderDaysBefore;
+    const whatsappCount = mobileSummaryGuests.filter((guest) => guest.invitation_channel === 'whatsapp').length;
+    const smsCount = mobileSummaryGuests.filter((guest) => guest.invitation_channel === 'sms').length;
+    const unknownCount = mobileSummaryGuests.filter((guest) => !guest.invitation_channel).length;
+    const knownChannelCount = whatsappCount + smsCount;
+    let statusText = 'התזכורת תופעל אחרי שליחת הזמנות';
+    if (knownChannelCount > 0) {
+      if (daysUntilReminder > 0) {
+        statusText = `נותרו ${daysUntilReminder} ימים לשליחת התזכורת`;
+      } else if (daysUntilReminder === 0) {
+        statusText = 'התזכורת האוטומטית תישלח היום';
+      } else {
+        statusText = daysUntilEvent === 0
+          ? 'התזכורת האוטומטית כבר טופלה אם הייתה פעילה'
+          : 'מועד התזכורת האוטומטית כבר עבר';
+      }
+    }
+
+    return {
+      shouldShow: true,
+      reminderDaysBefore,
+      statusText,
+      whatsappCount,
+      smsCount,
+      unknownCount,
+      knownChannelCount,
+    };
+  }, [currentEventId, formData?.date, formData?.start_datetime, mobileSummaryGuests]);
 
   const openMobileResumeStep = React.useCallback((stepNumber) => {
     const mustStartFirst = !currentEventId && !newEventStarted && !planForDisplay;
@@ -6954,6 +7020,64 @@ React.useEffect(()=>{
                 </p>
               </div>
             )}
+          </div>
+        </section>
+      )}
+
+      {hasSession && mobileReminderStatusModel.shouldShow && (
+        <section className="mx-auto mb-4 w-full max-w-md rounded-[1.75rem] border border-amber-300/30 bg-white/[0.06] p-4 text-right shadow-[0_14px_44px_rgba(0,0,0,0.34)] ring-1 ring-amber-400/20 backdrop-blur-2xl sm:hidden" dir="rtl">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="text-sm font-black text-amber-200">תזכורת אוטומטית פעילה</div>
+              <h2 className="mt-1 text-2xl font-black leading-tight text-white">המערכת תזכיר לאורחים בזמן</h2>
+              <p className="mt-1 text-sm font-semibold leading-6 text-slate-300">
+                תישלח {mobileReminderStatusModel.reminderDaysBefore} ימים לפני האירוע לפי ערוץ ההזמנה המקורי.
+              </p>
+            </div>
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-amber-300/35 bg-amber-500/15 text-2xl text-amber-200">
+              🔔
+            </div>
+          </div>
+
+          <div className="mt-4 grid grid-cols-2 gap-2">
+            <div className="rounded-2xl border border-emerald-400/25 bg-emerald-500/10 px-3 py-3 text-center">
+              <div className="text-lg font-black text-emerald-300">WhatsApp</div>
+              <div className="mt-1 text-xs font-bold text-slate-300">
+                {mobileReminderStatusModel.whatsappCount} אורחים שקיבלו WhatsApp
+              </div>
+            </div>
+            <div className="rounded-2xl border border-blue-400/25 bg-blue-500/10 px-3 py-3 text-center">
+              <div className="text-lg font-black text-blue-300">SMS</div>
+              <div className="mt-1 text-xs font-bold text-slate-300">
+                {mobileReminderStatusModel.smsCount} אורחים שקיבלו SMS
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-3 rounded-2xl border border-white/10 bg-[#11163d]/70 px-4 py-3 text-center">
+            <div className="text-sm font-black text-amber-200">{mobileReminderStatusModel.statusText}</div>
+            {mobileReminderStatusModel.unknownCount > 0 && (
+              <p className="mt-1 text-xs font-semibold text-slate-400">
+                {mobileReminderStatusModel.unknownCount} אורחים ישנים ללא ערוץ שמור לא יקבלו תזכורת אוטומטית עד שיוגדר להם ערוץ.
+              </p>
+            )}
+          </div>
+
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => openMobileResumeStep(5)}
+              className="rounded-2xl bg-gradient-to-br from-violet-600 to-indigo-600 px-4 py-3 text-base font-black text-white shadow-[0_10px_24px_rgba(99,102,241,0.28)] transition-opacity active:opacity-85"
+            >
+              פתח דוחות
+            </button>
+            <button
+              type="button"
+              onClick={openMobileReminderFlow}
+              className="rounded-2xl border border-white/14 bg-white/[0.055] px-4 py-3 text-base font-black text-slate-100 transition-colors active:bg-white/[0.10]"
+            >
+              שלח ידנית
+            </button>
           </div>
         </section>
       )}
