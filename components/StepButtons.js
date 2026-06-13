@@ -270,6 +270,106 @@ const hasMeaningfulFormValue = (key, value) => {
   return Boolean(value);
 };
 
+function MobileSwipeGuestCard({
+  guestName,
+  initials,
+  phone,
+  statusMeta,
+  onWhatsApp,
+  onReminder,
+}) {
+  const [offset, setOffset] = React.useState(0);
+  const startXRef = React.useRef(null);
+  const offsetRef = React.useRef(0);
+  const swipeThreshold = 72;
+  const maxOffset = 92;
+
+  const resetSwipe = React.useCallback(() => {
+    offsetRef.current = 0;
+    setOffset(0);
+    startXRef.current = null;
+  }, []);
+
+  const handleTouchStart = (event) => {
+    startXRef.current = event.touches[0].clientX;
+  };
+
+  const handleTouchMove = (event) => {
+    if (startXRef.current == null) return;
+    const delta = event.touches[0].clientX - startXRef.current;
+    const nextOffset = Math.max(-maxOffset, Math.min(maxOffset, delta));
+    offsetRef.current = nextOffset;
+    setOffset(nextOffset);
+  };
+
+  const handleTouchEnd = () => {
+    if (offsetRef.current <= -swipeThreshold) {
+      onWhatsApp();
+    } else if (offsetRef.current >= swipeThreshold) {
+      onReminder();
+    }
+    resetSwipe();
+  };
+
+  return (
+    <div className="relative overflow-hidden rounded-2xl">
+      <div className="absolute inset-0 flex">
+        <button
+          type="button"
+          onClick={onReminder}
+          className="flex flex-1 items-center justify-center bg-amber-500/25 text-sm font-black text-amber-100"
+        >
+          ◷ תזכורת
+        </button>
+        <button
+          type="button"
+          onClick={onWhatsApp}
+          className="flex flex-1 items-center justify-center bg-emerald-500/25 text-sm font-black text-emerald-100"
+        >
+          WhatsApp
+        </button>
+      </div>
+      <div
+        className="relative rounded-2xl border border-white/10 bg-[#12143a] px-3 py-3 transition-transform duration-150 touch-pan-y"
+        style={{ transform: `translateX(${offset}px)` }}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        onTouchCancel={resetSwipe}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-violet-300/25 bg-violet-500/20 text-sm font-black text-violet-100">
+            {initials || 'א'}
+          </div>
+          <div className="min-w-0 flex-1 text-right">
+            <div className="truncate text-lg font-black text-white">{guestName}</div>
+            <div className="mt-0.5 text-xs font-semibold text-slate-400">{phone || 'אין טלפון'}</div>
+          </div>
+          <span className={`shrink-0 rounded-full border px-3 py-1 text-xs font-black ${statusMeta.className}`}>
+            {statusMeta.icon} {statusMeta.label}
+          </span>
+        </div>
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={onReminder}
+            className="rounded-xl border border-amber-300/35 bg-amber-500/[0.12] px-3 py-2 text-sm font-black text-amber-100 transition-colors active:bg-amber-500/[0.22]"
+          >
+            תזכורת
+          </button>
+          <button
+            type="button"
+            onClick={onWhatsApp}
+            className="rounded-xl border border-emerald-300/35 bg-emerald-500/15 px-3 py-2 text-sm font-black text-emerald-100 transition-colors active:bg-emerald-500/25"
+          >
+            WhatsApp
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 const StepButtons = forwardRef(function StepButtons({ session, onAuthClick, triggerCreateEvent, onConsumedCreateTrigger, onMobileNavMetaChange }, ref) {
   const router = useRouter();
   const { addToast } = useToast();
@@ -426,6 +526,11 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick, trig
   const [mobileSummarySearch, setMobileSummarySearch] = useState('');
   const [mobileSummaryFilter, setMobileSummaryFilter] = useState('all');
   const [mobileShowMoreCards, setMobileShowMoreCards] = useState(false);
+  const [showMobileFirstSendSuccess, setShowMobileFirstSendSuccess] = useState(false);
+  const [mobilePullOffset, setMobilePullOffset] = useState(0);
+  const [mobileIsRefreshing, setMobileIsRefreshing] = useState(false);
+  const mobilePullStartYRef = useRef(null);
+  const mobilePullOffsetRef = useRef(0);
   const [specialMealsSummary, setSpecialMealsSummary] = useState({ 
     veg: { adults: 0, children: 0, total: 0 },
     vegan: { adults: 0, children: 0, total: 0 },
@@ -1607,6 +1712,8 @@ const handleOpenAddonModal = React.useCallback(() => {
         return;
       }
 
+      const wasFirstSend = invitedCount === 0 && effectiveMessagesSentCount === 0;
+
       const { data: evRow } = await supabase
         .from('events')
         .select('id')
@@ -1683,6 +1790,9 @@ const handleOpenAddonModal = React.useCallback(() => {
                 channel: 'whatsapp',
               },
             ]);
+            if (wasFirstSend) {
+              maybeShowMobileFirstSendSuccess();
+            }
           }
           setInvitationSent(true);
           setInvitationResult({
@@ -1819,6 +1929,7 @@ const handleOpenAddonModal = React.useCallback(() => {
         setIsSendingInvitation(false);
         return;
       }
+      const wasFirstSend = invitedCount === 0 && effectiveMessagesSentCount === 0;
       try {
         const smsMessage = `${invitationText}\n\nלאישור הגעה:\n{inviteLink}`;
         const smsResponse = await fetch('/api/send-sms', {
@@ -1858,6 +1969,9 @@ const handleOpenAddonModal = React.useCallback(() => {
           }
           setInvitationSent(true);
           setIsSendingInvitation(false);
+          if (wasFirstSend) {
+            maybeShowMobileFirstSendSuccess();
+          }
           setInvitationResult({ 
             type: 'success', 
             message: 'ההזמנה נשלחה בהצלחה ב-SMS!' 
@@ -6873,7 +6987,60 @@ React.useEffect(()=>{
 
   React.useEffect(() => {
     setMobileShowMoreCards(false);
+    setShowMobileFirstSendSuccess(false);
   }, [currentEventId]);
+
+  const maybeShowMobileFirstSendSuccess = React.useCallback(() => {
+    if (typeof window !== 'undefined' && window.innerWidth >= 640) return;
+    setShowMobileFirstSendSuccess(true);
+  }, []);
+
+  const scrollToMobileGuestManagement = React.useCallback(() => {
+    if (typeof window === 'undefined') return;
+    const target = document.getElementById('mobile-quick-guests');
+    if (target) {
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, []);
+
+  React.useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+    const isMobileViewport = () => window.innerWidth < 640;
+
+    const onTouchStart = (event) => {
+      if (!isMobileViewport() || window.scrollY > 12) return;
+      mobilePullStartYRef.current = event.touches[0].clientY;
+    };
+
+    const onTouchMove = (event) => {
+      if (mobilePullStartYRef.current == null || window.scrollY > 12) return;
+      const delta = event.touches[0].clientY - mobilePullStartYRef.current;
+      if (delta <= 0) return;
+      const nextOffset = Math.min(96, delta * 0.45);
+      mobilePullOffsetRef.current = nextOffset;
+      setMobilePullOffset(nextOffset);
+    };
+
+    const onTouchEnd = () => {
+      if (mobilePullOffsetRef.current > 64) {
+        setMobileIsRefreshing(true);
+        setGuestSummaryRefreshKey((key) => key + 1);
+        window.setTimeout(() => setMobileIsRefreshing(false), 900);
+      }
+      mobilePullOffsetRef.current = 0;
+      mobilePullStartYRef.current = null;
+      setMobilePullOffset(0);
+    };
+
+    window.addEventListener('touchstart', onTouchStart, { passive: true });
+    window.addEventListener('touchmove', onTouchMove, { passive: true });
+    window.addEventListener('touchend', onTouchEnd);
+    return () => {
+      window.removeEventListener('touchstart', onTouchStart);
+      window.removeEventListener('touchmove', onTouchMove);
+      window.removeEventListener('touchend', onTouchEnd);
+    };
+  }, []);
 
   const openMobileResumeStep = React.useCallback((stepNumber) => {
     const mustStartFirst = !currentEventId && !newEventStarted && !planForDisplay;
@@ -7185,16 +7352,33 @@ React.useEffect(()=>{
         </div>
       )}
 
+      {hasSession && mobileDashboardModel.shouldShow && (mobilePullOffset > 0 || mobileIsRefreshing) && (
+        <div
+          className="mx-auto mb-2 w-full max-w-md rounded-2xl border border-violet-300/20 bg-violet-500/10 px-4 py-2 text-center text-sm font-black text-violet-100 sm:hidden"
+          style={{ transform: `translateY(${Math.min(mobilePullOffset * 0.35, 24)}px)` }}
+          dir="rtl"
+        >
+          {mobileIsRefreshing ? 'מרענן סטטוס אורחים...' : 'משוך לרענון...'}
+        </div>
+      )}
+
       {hasSession && mobileDashboardModel.shouldShow && (
-        <section className="mx-auto mb-3 w-full max-w-md rounded-[1.5rem] border border-violet-300/20 bg-white/[0.05] px-4 py-3 text-right shadow-[0_10px_32px_rgba(0,0,0,0.28)] ring-1 ring-violet-400/15 backdrop-blur-2xl sm:hidden" dir="rtl">
+        <section className="sticky top-0 z-30 mx-auto mb-3 w-full max-w-md rounded-[1.5rem] border border-violet-300/20 bg-[#101437]/95 px-4 py-3 text-right shadow-[0_10px_32px_rgba(0,0,0,0.28)] ring-1 ring-violet-400/15 backdrop-blur-2xl sm:hidden" dir="rtl">
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0 flex-1">
               <div className="truncate text-lg font-black text-white">
                 {selectedEventType || 'אירוע'}
                 {mobileResumeEventDateText ? <span className="text-violet-200"> · {mobileResumeEventDateText}</span> : null}
               </div>
-              <div className="mt-1 text-sm font-bold text-violet-200">
-                {mobileDashboardModel.readinessReadyCount} מתוך {mobileDashboardModel.readinessTotalCount} מוכנים
+              <div className="mt-1 flex flex-wrap items-center gap-2">
+                <span className="text-sm font-bold text-violet-200">
+                  {mobileDashboardModel.readinessReadyCount} מתוך {mobileDashboardModel.readinessTotalCount} מוכנים
+                </span>
+                {guestStatusSummary.pending > 0 && (
+                  <span className="rounded-full border border-amber-300/35 bg-amber-500/20 px-2.5 py-0.5 text-xs font-black text-amber-200">
+                    {guestStatusSummary.pending} ממתינים
+                  </span>
+                )}
               </div>
             </div>
             <div
@@ -7374,7 +7558,7 @@ React.useEffect(()=>{
       )}
 
       {hasSession && currentEventId && mobileDashboardModel.showGuestPrimary && (
-        <section className="mx-auto mb-4 w-full max-w-md rounded-[1.75rem] border border-violet-300/25 bg-white/[0.06] p-4 text-right shadow-[0_14px_44px_rgba(0,0,0,0.36)] ring-1 ring-violet-400/20 backdrop-blur-2xl sm:hidden" dir="rtl">
+        <section id="mobile-quick-guests" className="mx-auto mb-4 w-full max-w-md rounded-[1.75rem] border border-violet-300/25 bg-white/[0.06] p-4 text-right shadow-[0_14px_44px_rgba(0,0,0,0.36)] ring-1 ring-violet-400/20 backdrop-blur-2xl sm:hidden" dir="rtl">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0 flex-1">
               <div className="text-sm font-black text-violet-200">חיפוש, סינון וטיפול באורחים מהנייד</div>
@@ -7439,6 +7623,10 @@ React.useEffect(()=>{
             </div>
           </div>
 
+          <div className="mt-3 rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2 text-center text-xs font-semibold text-slate-400">
+            החלק שמאלה ל-WhatsApp · ימינה לתזכורת
+          </div>
+
           <div className="mt-3 space-y-2">
             {mobileFilteredSummaryGuests.length > 0 ? mobileFilteredSummaryGuests.slice(0, 4).map((guest, idx) => {
               const status = guest.status === 'approved' || guest.status === 'rejected' ? guest.status : 'pending';
@@ -7450,36 +7638,15 @@ React.useEffect(()=>{
               const guestName = [guest.first_name, guest.last_name].filter(Boolean).join(' ') || `אורח ${idx + 1}`;
               const initials = guestName.split(' ').map((part) => part[0]).filter(Boolean).slice(0, 2).join('');
               return (
-                <div key={`${guest.phone || guestName}-${idx}`} className="rounded-2xl border border-white/10 bg-white/[0.045] px-3 py-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-violet-300/25 bg-violet-500/20 text-sm font-black text-violet-100">
-                      {initials || 'א'}
-                    </div>
-                    <div className="min-w-0 flex-1 text-right">
-                      <div className="truncate text-lg font-black text-white">{guestName}</div>
-                      <div className="mt-0.5 text-xs font-semibold text-slate-400">{guest.phone || 'אין טלפון'}</div>
-                    </div>
-                    <span className={`shrink-0 rounded-full border px-3 py-1 text-xs font-black ${statusMeta.className}`}>
-                      {statusMeta.icon} {statusMeta.label}
-                    </span>
-                  </div>
-                  <div className="mt-3 grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={openMobileReminderFlow}
-                      className="rounded-xl border border-amber-300/35 bg-amber-500/[0.12] px-3 py-2 text-sm font-black text-amber-100 transition-colors active:bg-amber-500/[0.22]"
-                    >
-                      תזכורת
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => openMobileGuestWhatsApp(guest.phone)}
-                      className="rounded-xl border border-emerald-300/35 bg-emerald-500/15 px-3 py-2 text-sm font-black text-emerald-100 transition-colors active:bg-emerald-500/25"
-                    >
-                      WhatsApp
-                    </button>
-                  </div>
-                </div>
+                <MobileSwipeGuestCard
+                  key={`${guest.phone || guestName}-${idx}`}
+                  guestName={guestName}
+                  initials={initials}
+                  phone={guest.phone}
+                  statusMeta={statusMeta}
+                  onReminder={openMobileReminderFlow}
+                  onWhatsApp={() => openMobileGuestWhatsApp(guest.phone)}
+                />
               );
             }) : (
               <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-6 text-center">
@@ -7506,6 +7673,40 @@ React.useEffect(()=>{
             </button>
           )}
         </section>
+      )}
+
+      {showMobileFirstSendSuccess && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0d0f2b]/75 px-4 backdrop-blur-sm sm:hidden" dir="rtl">
+          <div className="w-full max-w-md rounded-[1.75rem] border border-emerald-300/30 bg-[#12143a] p-6 text-center shadow-[0_20px_60px_rgba(0,0,0,0.45)] ring-1 ring-emerald-400/25">
+            <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full border border-emerald-300/35 bg-emerald-500/20 text-4xl text-emerald-200">
+              ✓
+            </div>
+            <h2 className="mt-4 text-3xl font-black text-white">ההזמנה הראשונה נשלחה!</h2>
+            <p className="mt-2 text-base font-semibold leading-6 text-slate-300">
+              עכשיו עקוב אחרי מי הגיב ונהל את האורחים מהנייד.
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                setShowMobileFirstSendSuccess(false);
+                scrollToMobileGuestManagement();
+              }}
+              className="mt-5 w-full rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-600 px-4 py-3.5 text-lg font-black text-white shadow-[0_10px_26px_rgba(16,185,129,0.30)] transition-opacity active:opacity-85"
+            >
+              פתח ניהול אורחים
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setShowMobileFirstSendSuccess(false);
+                openMobileResumeStep(4);
+              }}
+              className="mt-2 w-full rounded-2xl border border-white/12 bg-white/[0.05] px-4 py-3 text-base font-black text-slate-100 transition-colors active:bg-white/[0.10]"
+            >
+              שלח עוד הזמנה
+            </button>
+          </div>
+        </div>
       )}
 
       {hasSession && mobileDashboardModel.secondaryCount > 0 && (
@@ -8252,6 +8453,7 @@ React.useEffect(()=>{
           {/* Third Column - Guest Status Summary */}
           {currentEventId && (
             <div className="w-full flex flex-col gap-6">
+              {!mobileDashboardModel.showGuestPrimary && (
               <div className="sm:hidden rounded-3xl border border-white/15 bg-white/[0.055] p-4 text-center shadow-[0_8px_40px_rgba(0,0,0,0.35)] backdrop-blur-xl ring-2 ring-violet-400/25">
                 <div className="mb-4 flex items-center justify-between gap-3">
                   <div className="text-right">
@@ -8367,6 +8569,7 @@ React.useEffect(()=>{
                   <p className="mt-3 text-xs text-slate-400">נתוני אישור הגעה יופיעו לאחר שליחת הזמנות ותגובות אורחים</p>
                 )}
               </div>
+              )}
 
               <div className="hidden bg-white/[0.055] border border-white/15 backdrop-blur-xl rounded-2xl p-4 sm:block sm:p-6 text-center shadow-[0_8px_40px_rgba(0,0,0,0.35)] ring-2 ring-violet-400/30 w-full">
                 <div className="flex items-center justify-center gap-2 mb-2">
