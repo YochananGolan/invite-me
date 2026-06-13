@@ -6487,6 +6487,71 @@ React.useEffect(()=>{
     try{ localStorage.removeItem('draftEvent'); localStorage.removeItem('newEventStarted'); localStorage.removeItem('savedEventDetails'); }catch{}
   },[currentEventId, newEventStarted]);
 
+  const mobileResumeEventDateText = React.useMemo(() => {
+    const rawDate = formData?.date || formData?.start_datetime || '';
+    if (!rawDate) return '';
+    const parsed = new Date(rawDate);
+    return Number.isFinite(parsed.getTime()) ? parsed.toLocaleDateString('he-IL') : String(rawDate);
+  }, [formData?.date, formData?.start_datetime]);
+
+  const mobileResumeModel = React.useMemo(() => {
+    const step1Done = Boolean(selectedEventType) || finishedSteps.includes(0);
+    const step2Done = Boolean(eventDetailsCompleted || formDataHasMeaningfulValues || finishedSteps.includes(1));
+    const step3Done = Boolean(selectedDesign || finishedSteps.includes(2));
+    const step4Done = Boolean(effectiveMessagesSentCount > 0 || invitedCount > 0 || finishedSteps.includes(4));
+    const completedCount = [step1Done, step2Done, step3Done, step4Done].filter(Boolean).length;
+    const nextStep = !step1Done ? 1 : !step2Done ? 2 : !step3Done ? 3 : step4Done ? 5 : 4;
+    const continueLabels = {
+      1: 'המשך לבחירת סוג אירוע',
+      2: 'המשך לפרטי האירוע',
+      3: 'המשך לעיצוב',
+      4: 'עבור לשליחה',
+      5: 'פתח דוחות',
+    };
+
+    return {
+      completedCount,
+      nextStep,
+      continueLabel: continueLabels[nextStep] || 'המשך',
+      shouldShow: Boolean(
+        currentEventId ||
+        newEventStarted ||
+        selectedEventType ||
+        formDataHasMeaningfulValues ||
+        selectedDesign ||
+        finishedSteps.length > 0
+      ),
+    };
+  }, [
+    currentEventId,
+    effectiveMessagesSentCount,
+    eventDetailsCompleted,
+    finishedSteps,
+    formDataHasMeaningfulValues,
+    invitedCount,
+    newEventStarted,
+    selectedDesign,
+    selectedEventType,
+  ]);
+
+  const openMobileResumeStep = React.useCallback((stepNumber) => {
+    const mustStartFirst = !currentEventId && !newEventStarted && !planForDisplay;
+    if (stepNumber >= 1 && stepNumber <= 4 && mustStartFirst) {
+      setStepErrorMsg('\u05D9\u05E9 \u05EA\u05D7\u05D9\u05DC\u05D4 \u05DC\u05D9\u05E6\u05D5\u05E8 \u05D0\u05D9\u05E8\u05D5\u05E2 \u05D5\u05DC\u05D1\u05D7\u05D5\u05E8 \u05DE\u05E1\u05DC\u05D5\u05DC \u05EA\u05E9\u05DC\u05D5\u05DD.');
+      setShowStepError(true);
+      return;
+    }
+    setStepErrorMsg('');
+    if (stepNumber === 1) setShowEventTypes(true);
+    else if (stepNumber === 2) setShowEventDetails(true);
+    else if (stepNumber === 3) setShowDesignChooser(true);
+    else if (stepNumber === 4) setShowGuestForm(true);
+    else if (stepNumber === 5) {
+      setShowReportsOptions(true);
+      setShowGuestListModal(false);
+    }
+  }, [currentEventId, newEventStarted, planForDisplay]);
+
   if (!session) {
     return (
       <>
@@ -6696,6 +6761,88 @@ React.useEffect(()=>{
             הבנתי
           </button>
         </div>
+      )}
+
+      {hasSession && mobileResumeModel.shouldShow && (
+        <section className="mx-auto mb-4 w-full max-w-md rounded-[1.75rem] border border-violet-300/25 bg-white/[0.06] p-4 text-right shadow-[0_14px_44px_rgba(0,0,0,0.36)] ring-1 ring-violet-400/20 backdrop-blur-2xl sm:hidden" dir="rtl">
+          <div className="text-center">
+            <div className="text-sm font-black text-violet-200">Meet-M זוכר את האירוע שלך</div>
+            <h2 className="mt-1 text-2xl font-black leading-tight text-white">המשך מאיפה שעצרת</h2>
+            <p className="mt-1 text-sm font-semibold text-slate-300">האירוע שלך מוכן להמשך עבודה</p>
+          </div>
+
+          <div className="mt-4 rounded-3xl border border-white/12 bg-[#11163d]/70 p-4">
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <div className="text-lg font-black text-white">
+                  {selectedEventType || 'אירוע בתהליך'}
+                  {mobileResumeEventDateText ? <span className="text-violet-200"> · {mobileResumeEventDateText}</span> : null}
+                </div>
+                <div className="mt-1 text-sm font-bold text-emerald-200">
+                  {mobileResumeModel.completedCount > 0
+                    ? `שלב ${mobileResumeModel.completedCount} מתוך 5 הושלם`
+                    : 'האירוע מוכן להתחלה'}
+                </div>
+              </div>
+              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-violet-300/30 bg-violet-500/20 text-2xl shadow-[0_8px_26px_rgba(139,92,246,0.32)]">
+                {eventTypeIcons[selectedEventType] || '✦'}
+              </div>
+            </div>
+
+            <div className="mt-4 grid grid-cols-5 gap-1.5" aria-label="התקדמות האירוע">
+              {[1, 2, 3, 4, 5].map((stepNumber) => {
+                const isDone = stepNumber <= mobileResumeModel.completedCount;
+                return (
+                  <div
+                    key={stepNumber}
+                    className={`h-3 rounded-full ${isDone ? 'bg-gradient-to-r from-emerald-400 to-emerald-500 shadow-[0_0_12px_rgba(52,211,153,0.42)]' : 'bg-white/12'}`}
+                  />
+                );
+              })}
+            </div>
+
+            <div className="mt-4 flex flex-col gap-2">
+              <button
+                type="button"
+                onClick={() => openMobileResumeStep(mobileResumeModel.nextStep)}
+                className="w-full rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-600 px-4 py-3.5 text-lg font-black text-white shadow-[0_10px_28px_rgba(16,185,129,0.32)] transition-opacity active:opacity-85"
+              >
+                {mobileResumeModel.continueLabel}
+              </button>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => openMobileResumeStep(4)}
+                  className="rounded-2xl border border-violet-300/30 bg-violet-500/[0.18] px-3 py-3 text-base font-black text-violet-100 transition-colors active:bg-violet-500/[0.28]"
+                >
+                  עבור לשליחה
+                </button>
+                <button
+                  type="button"
+                  onClick={() => openMobileResumeStep(5)}
+                  className="rounded-2xl border border-white/12 bg-white/[0.06] px-3 py-3 text-base font-black text-slate-100 transition-colors active:bg-white/[0.10]"
+                >
+                  פתח דוחות
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-3 grid grid-cols-3 gap-2 text-center">
+            <div className="rounded-2xl border border-emerald-400/20 bg-emerald-500/10 px-2 py-2">
+              <div className="text-xl font-black text-emerald-300">{invitedCount}</div>
+              <div className="text-[11px] font-bold text-slate-400">מוזמנים</div>
+            </div>
+            <div className="rounded-2xl border border-blue-400/20 bg-blue-500/10 px-2 py-2">
+              <div className="text-xl font-black text-blue-300">{guestStatusSummary.approved || 0}</div>
+              <div className="text-[11px] font-bold text-slate-400">אישרו</div>
+            </div>
+            <div className="rounded-2xl border border-amber-400/20 bg-amber-500/10 px-2 py-2">
+              <div className="text-xl font-black text-amber-300">{guestStatusSummary.pending || 0}</div>
+              <div className="text-[11px] font-bold text-slate-400">ממתינים</div>
+            </div>
+          </div>
+        </section>
       )}
 
       {/* סרגל שלבים: למשתמש מחובר תמיד (לא רק כשיש אירוע פעיל) — אחרת נעלם אחרי מחיקת אירוע / רענון */}
