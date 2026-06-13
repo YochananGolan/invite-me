@@ -6552,6 +6552,47 @@ React.useEffect(()=>{
     }
   }, [currentEventId, newEventStarted, planForDisplay]);
 
+  const renderMobileNextActionCard = ({
+    stepLabel,
+    title,
+    description,
+    actionText,
+    onAction,
+    helpText,
+    icon = '⚡',
+  }) => (
+    <div className="mb-4 rounded-3xl border border-violet-300/25 bg-white/[0.06] p-4 text-center shadow-[0_10px_32px_rgba(0,0,0,0.28)] ring-1 ring-violet-400/20 backdrop-blur-2xl sm:hidden" dir="rtl">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1 text-right">
+          <div className="inline-flex rounded-full border border-violet-300/30 bg-violet-500/20 px-3 py-1 text-xs font-black text-violet-100">
+            {stepLabel}
+          </div>
+          <h3 className="mt-2 text-2xl font-black leading-tight text-white">הפעולה הבאה שלך</h3>
+          <p className="mt-1 text-base font-black text-emerald-200">{title}</p>
+        </div>
+        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-emerald-300/30 bg-emerald-500/15 text-2xl text-emerald-200">
+          {icon}
+        </div>
+      </div>
+      <p className="mt-3 text-sm font-semibold leading-6 text-slate-300">{description}</p>
+      {actionText && (
+        <button
+          type="button"
+          onClick={onAction}
+          className="mt-3 w-full rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-600 px-4 py-3 text-base font-black text-white shadow-[0_10px_24px_rgba(16,185,129,0.28)] transition-opacity active:opacity-85"
+        >
+          {actionText}
+        </button>
+      )}
+      {helpText && (
+        <details className="mt-3 rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2 text-right">
+          <summary className="cursor-pointer text-sm font-black text-violet-200">מה עושים כאן?</summary>
+          <p className="mt-2 text-sm font-semibold leading-6 text-slate-300">{helpText}</p>
+        </details>
+      )}
+    </div>
+  );
+
   if (!session) {
     return (
       <>
@@ -7597,6 +7638,25 @@ React.useEffect(()=>{
       <Modal open={showEventTypes} onClose={() => setShowEventTypes(false)} size="md">
         <ModalHeader onClose={() => setShowEventTypes(false)}>בחר סוג אירוע</ModalHeader>
         <ModalBody>
+          {renderMobileNextActionCard({
+            stepLabel: 'שלב 1 מתוך 5',
+            title: 'בחרו סוג אירוע',
+            description: 'בחרו את סוג האירוע כדי שהמערכת תתאים את השדות וההזמנה למסיבה שלכם.',
+            actionText: selectedEventType ? 'המשך לפרטי האירוע' : '',
+            onAction: selectedEventType ? () => {
+              setShowEventTypes(false);
+              if (!currentEventId) {
+                setFormData(initialFormState);
+                setFormErrors({});
+                try { localStorage.removeItem('savedEventDetails'); } catch(e){}
+                eventDetailsOpenedRef.current = true;
+              }
+              setShowEventDetails(true);
+              markStepDone(0);
+            } : undefined,
+            helpText: 'הבחירה כאן קובעת אילו פרטים נבקש בשלב הבא, למשל חתן וכלה בחתונה או שם חוגג ביום הולדת.',
+            icon: eventTypeIcons[selectedEventType] || '🎉',
+          })}
           <div className="mb-4 text-center sm:hidden">
             <h3 className="text-2xl font-black text-white">איזה אירוע תרצו ליצור?</h3>
             <p className="mt-1 text-sm font-semibold text-slate-400">בחרו סוג אירוע כדי שנתאים את השדות וההזמנה.</p>
@@ -7669,6 +7729,15 @@ React.useEffect(()=>{
         <ModalHeader onClose={() => setShowEventDetails(false)}>{`פרטי האירוע - ${selectedEventType}`}</ModalHeader>
         <ModalBody>
           <div dir="rtl">
+          {renderMobileNextActionCard({
+            stepLabel: 'שלב 2 מתוך 5',
+            title: 'מלאו את פרטי האירוע',
+            description: 'הזינו את התאריך, השעה, המקום והפרטים שיופיעו בהזמנה.',
+            actionText: 'שמור פרטים והמשך',
+            onAction: handleSaveDetails,
+            helpText: 'הפרטים שתמלאו כאן ישמשו ליצירת נוסח ההזמנה ולעדכון האירוע בכל המכשירים.',
+            icon: '📝',
+          })}
           {eventDetailsSubmitAttempted && errorMsg && <p className="text-red-400 text-sm text-center mb-3 bg-red-500/10 border border-red-400/30 rounded-xl p-2.5">{errorMsg}</p>}
           {selectedEventType && (
             <div className="mb-4 rounded-2xl border border-emerald-400/25 bg-emerald-500/10 px-4 py-3 text-center sm:hidden">
@@ -7832,6 +7901,13 @@ React.useEffect(()=>{
       <Modal open={showGuestForm} onClose={() => setShowGuestForm(false)} size="lg">
         <ModalHeader onClose={() => setShowGuestForm(false)}>שליחת הזמנות</ModalHeader>
         <ModalBody>
+          {renderMobileNextActionCard({
+            stepLabel: 'שלב 4 מתוך 5',
+            title: 'שלחו הזמנה לאורח',
+            description: 'מלאו פרטי אורח, ואז שלחו בוואטסאפ או ב-SMS מתוך הכפתורים שבתחתית הטופס.',
+            helpText: 'מומלץ להתחיל באורח אחד לבדיקה, לוודא שההזמנה נראית טוב, ואז להמשיך לשליחה לשאר האורחים.',
+            icon: '✈',
+          })}
           {/* Invite card preview */}
           {(selectedDesign || invitationText) && (
             <div className="mb-4 rounded-3xl border border-white/15 bg-white/[0.055] p-3 shadow-[0_10px_32px_rgba(0,0,0,0.32)] sm:hidden" dir="rtl">
@@ -8483,6 +8559,13 @@ React.useEffect(()=>{
           <ModalHeader onClose={() => setShowStep5Options(false)}>בחר דוח</ModalHeader>
           <ModalBody>
             <div className="space-y-4">
+            {renderMobileNextActionCard({
+              stepLabel: 'שלב 5 מתוך 5',
+              title: 'בחרו דוח להצגה',
+              description: 'פתחו דוח כדי לראות מי מגיע, מי לא מגיע ומי עדיין לא הגיב.',
+              helpText: 'הדוחות המפורטים זמינים גם בנייד, אבל לעבודה עם Excel מומלץ להשתמש במחשב.',
+              icon: '📊',
+            })}
             <div className="sm:hidden">
               <div className="mb-4 text-center">
                 <h3 className="text-3xl font-black text-white">דוחות</h3>
@@ -8653,6 +8736,19 @@ React.useEffect(()=>{
         </ModalHeader>
 
         <ModalBody className="p-0 overflow-hidden flex flex-col">
+          <div className="shrink-0 p-3 pb-0 sm:hidden">
+            {renderMobileNextActionCard({
+              stepLabel: 'שלב 3 מתוך 5',
+              title: designMobileTab === 'templates' ? 'בחרו עיצוב להזמנה' : 'ערכו את טקסט ההזמנה',
+              description: designMobileTab === 'templates'
+                ? 'בחרו תבנית, ראו תצוגה מקדימה ואז המשיכו לשליחה.'
+                : 'עדכנו פונטים, צבעים וטקסט, ואז עברו לבחירת תבנית.',
+              actionText: designMobileTab === 'text' ? 'עבור לבחירת תבנית' : '',
+              onAction: designMobileTab === 'text' ? () => setDesignMobileTab('templates') : undefined,
+              helpText: 'בשלב זה ניתן לבחור תבנית מוכנה וגם לשנות את הטקסט, הפונטים והצבעים של ההזמנה.',
+              icon: '🎨',
+            })}
+          </div>
           {/* Mobile tabs */}
           <div className="flex sm:hidden border-b border-white/10 shrink-0">
             <button
@@ -9399,6 +9495,13 @@ React.useEffect(()=>{
       <Modal open={typeof showReportsOptions !== 'undefined' && showReportsOptions} onClose={() => setShowReportsOptions(false)} size="lg">
         <ModalHeader onClose={() => setShowReportsOptions(false)}>בחר דו"ח להצגה</ModalHeader>
         <ModalBody className="text-center space-y-4">
+            {renderMobileNextActionCard({
+              stepLabel: 'שלב 5 מתוך 5',
+              title: 'בחרו דוח להצגה',
+              description: 'פתחו דוח כדי לעקוב אחרי אישורי ההגעה, שולחנות ואורחים שעדיין לא הגיבו.',
+              helpText: 'במובייל מומלץ להשתמש בדוחות לצפייה מהירה. לעבודה מפורטת עם Excel עדיף לפתוח במחשב.',
+              icon: '📊',
+            })}
             {selectedEventForReport && (
               <p className="text-base md:text-lg font-bold text-slate-100 mb-4 rtl text-right">
                 אירוע מהעבר: {selectedEventForReport.event_type || 'אירוע'} – {selectedEventForReport._eventDate?format(selectedEventForReport._eventDate,'dd/MM/yyyy',{locale:he}):''}
