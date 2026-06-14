@@ -85,9 +85,48 @@ function getGuestStatusBucket(status) {
   return status === 'approved' || status === 'rejected' ? status : 'pending';
 }
 
+function normalizePhoneForGuestSearch(rawDigits) {
+  const digits = String(rawDigits || '').replace(/\D/g, '');
+  if (!digits) return null;
+
+  const viaHelper = normalizePhoneNumber(digits);
+  if (viaHelper && viaHelper.startsWith('972') && viaHelper.length === 12) {
+    return viaHelper;
+  }
+
+  if (digits.startsWith('972') && digits.length === 12) {
+    return digits;
+  }
+
+  if (digits.startsWith('0') && digits.length === 10) {
+    return `972${digits.slice(1)}`;
+  }
+
+  if (digits.length === 9 && !digits.startsWith('0')) {
+    return `972${digits}`;
+  }
+
+  return digits;
+}
+
+function guestPhoneMatchesSearchTerm(guestPhone, searchDigits) {
+  const guestNorm = normalizePhoneForGuestSearch(String(guestPhone || '').replace(/\D/g, ''));
+  const searchNorm = normalizePhoneForGuestSearch(searchDigits);
+  if (!guestNorm || !searchNorm) return false;
+  return guestNorm === searchNorm;
+}
+
 function matchesGuestSearchTerm(guest, rawTerm) {
   const term = String(rawTerm || '').trim().toLowerCase();
   if (!term) return true;
+
+  const searchDigits = term.replace(/\D/g, '');
+  const termWithoutSpaces = term.replace(/\s/g, '');
+  const isPhoneSearch = searchDigits.length >= 7 && searchDigits.length >= termWithoutSpaces.length * 0.7;
+
+  if (isPhoneSearch) {
+    return guestPhoneMatchesSearchTerm(guest.phone, searchDigits);
+  }
 
   const fullName = [guest.first_name, guest.last_name].filter(Boolean).join(' ').toLowerCase();
   if (fullName.includes(term)) return true;
@@ -95,23 +134,7 @@ function matchesGuestSearchTerm(guest, rawTerm) {
   if (String(guest.last_name || '').toLowerCase().includes(term)) return true;
   if (String(guest.table_number || '').toLowerCase().includes(term)) return true;
 
-  const searchDigits = term.replace(/\D/g, '');
-  const guestPhoneRaw = String(guest.phone || '');
-  if (guestPhoneRaw.toLowerCase().includes(term)) return true;
-
-  if (!searchDigits) return false;
-
-  const guestPhoneDigits = guestPhoneRaw.replace(/\D/g, '');
-  const normalizedGuestPhone = normalizePhoneNumber(guestPhoneDigits) || guestPhoneDigits;
-  const normalizedSearchPhone = normalizePhoneNumber(searchDigits) || searchDigits;
-
-  if (guestPhoneDigits.includes(searchDigits)) return true;
-  if (normalizedGuestPhone.includes(normalizedSearchPhone)) return true;
-  if (normalizedSearchPhone.includes(normalizedGuestPhone)) return true;
-
-  const searchWithoutLeadingZero = searchDigits.startsWith('0') ? searchDigits.slice(1) : searchDigits;
-  if (searchWithoutLeadingZero && guestPhoneDigits.includes(searchWithoutLeadingZero)) return true;
-  if (searchWithoutLeadingZero && normalizedGuestPhone.includes(searchWithoutLeadingZero)) return true;
+  if (searchDigits && String(guest.table_number || '').replace(/\D/g, '').includes(searchDigits)) return true;
 
   return false;
 }
@@ -7426,65 +7449,6 @@ React.useEffect(()=>{
             </button>
           </form>
 
-          {mobileQuickGuestSearchSubmitted ? (
-            <div className="mt-3 rounded-2xl border border-violet-300/25 bg-white/[0.04] p-4 text-right">
-              <div className="mb-3">
-                <div className="text-sm font-black text-violet-200">תוצאות חיפוש</div>
-                {mobileQuickGuestSearchQuery ? (
-                  <p className="mt-1 text-sm font-semibold text-slate-300">
-                    חיפוש עבור: <span className="text-white">{mobileQuickGuestSearchQuery}</span>
-                  </p>
-                ) : null}
-              </div>
-
-              <div className="space-y-2">
-                {mobileQuickGuestSearchQuery ? (
-                  mobileQuickGuestSearchResults.length > 0 ? (
-                    mobileQuickGuestSearchResults.map((guest, idx) => {
-                      const status = guest.status === 'approved' || guest.status === 'rejected' ? guest.status : 'pending';
-                      const statusMeta = status === 'approved'
-                        ? { label: 'אישר', className: 'bg-emerald-500/15 text-emerald-300 border-emerald-400/30', icon: '✓' }
-                        : status === 'rejected'
-                          ? { label: 'לא מגיע', className: 'bg-rose-500/15 text-rose-300 border-rose-400/30', icon: '×' }
-                          : { label: 'ממתין', className: 'bg-amber-500/15 text-amber-300 border-amber-400/30', icon: '◷' };
-                      const guestName = [guest.first_name, guest.last_name].filter(Boolean).join(' ') || `אורח ${idx + 1}`;
-                      const initials = guestName.split(' ').map((part) => part[0]).filter(Boolean).slice(0, 2).join('');
-                      return (
-                        <MobileSwipeGuestCard
-                          key={`search-${guest.phone || guestName}-${idx}`}
-                          guestName={guestName}
-                          initials={initials}
-                          phone={guest.phone}
-                          statusMeta={statusMeta}
-                          onReminder={openMobileReminderFlow}
-                          onWhatsApp={() => openMobileGuestWhatsApp(guest.phone)}
-                          showActionButtons={false}
-                        />
-                      );
-                    })
-                  ) : (
-                    <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-6 text-center">
-                      <div className="text-base font-black text-white">לא נמצאו אורחים תואמים</div>
-                      <p className="mt-1 text-sm font-semibold text-slate-400">נסו שם אחר, מספר נייד או שינוי במסנן הסטטוס.</p>
-                    </div>
-                  )
-                ) : (
-                  <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-6 text-center">
-                    <div className="text-base font-black text-white">הזינו שם או מספר נייד</div>
-                    <p className="mt-1 text-sm font-semibold text-slate-400">לאחר מילוי השדה לחצו על «חפש».</p>
-                  </div>
-                )}
-              </div>
-
-              <button
-                type="button"
-                onClick={handleMobileQuickGuestSearchBack}
-                className="mt-4 w-full rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-600 px-4 py-3.5 text-base font-black text-white shadow-[0_10px_24px_rgba(16,185,129,0.28)] transition-opacity active:opacity-85"
-              >
-                חזור
-              </button>
-            </div>
-          ) : (
           <div className="mt-3 space-y-2">
             {mobileStatusFilteredGuests.length > 0 ? mobileStatusFilteredGuests.slice(0, 4).map((guest, idx) => {
               const status = guest.status === 'approved' || guest.status === 'rejected' ? guest.status : 'pending';
@@ -7521,9 +7485,8 @@ React.useEffect(()=>{
               </div>
             )}
           </div>
-          )}
 
-          {!mobileQuickGuestSearchSubmitted && mobileSummaryGuests.length > 4 && (
+          {mobileSummaryGuests.length > 4 && (
             <button
               type="button"
               onClick={() => openMobileResumeStep(5)}
@@ -7533,6 +7496,80 @@ React.useEffect(()=>{
             </button>
           )}
         </section>
+      )}
+
+      {mobileQuickGuestSearchSubmitted && (
+        <div className="fixed inset-0 z-[120] flex flex-col bg-[#08091a] sm:hidden" dir="rtl">
+          <div className="shrink-0 border-b border-white/10 bg-[#0d0f2b]/95 px-4 pb-4 pt-[max(1rem,env(safe-area-inset-top))] backdrop-blur-xl">
+            <div className="text-sm font-black text-violet-200">ניהול אורחים מהיר</div>
+            <h2 className="mt-1 text-3xl font-black text-white">תוצאות חיפוש</h2>
+            {mobileQuickGuestSearchQuery ? (
+              <p className="mt-2 text-base font-semibold text-slate-300">
+                חיפוש עבור: <span className="text-white">{mobileQuickGuestSearchQuery}</span>
+              </p>
+            ) : null}
+          </div>
+
+          <div className="flex-1 overflow-y-auto px-4 py-5">
+            {mobileQuickGuestSearchQuery ? (
+              mobileQuickGuestSearchResults.length > 0 ? (
+                <div className="space-y-3">
+                  <div className="text-sm font-black text-slate-400">
+                    נמצאו {mobileQuickGuestSearchResults.length} אורחים
+                  </div>
+                  {mobileQuickGuestSearchResults.map((guest, idx) => {
+                    const status = guest.status === 'approved' || guest.status === 'rejected' ? guest.status : 'pending';
+                    const statusMeta = status === 'approved'
+                      ? { label: 'אישר', className: 'bg-emerald-500/15 text-emerald-300 border-emerald-400/30', icon: '✓' }
+                      : status === 'rejected'
+                        ? { label: 'לא מגיע', className: 'bg-rose-500/15 text-rose-300 border-rose-400/30', icon: '×' }
+                        : { label: 'ממתין', className: 'bg-amber-500/15 text-amber-300 border-amber-400/30', icon: '◷' };
+                    const guestName = [guest.first_name, guest.last_name].filter(Boolean).join(' ') || `אורח ${idx + 1}`;
+                    const initials = guestName.split(' ').map((part) => part[0]).filter(Boolean).slice(0, 2).join('');
+                    return (
+                      <MobileSwipeGuestCard
+                        key={`search-${guest.phone || guestName}-${idx}`}
+                        guestName={guestName}
+                        initials={initials}
+                        phone={guest.phone}
+                        statusMeta={statusMeta}
+                        onReminder={openMobileReminderFlow}
+                        onWhatsApp={() => openMobileGuestWhatsApp(guest.phone)}
+                        showActionButtons={false}
+                      />
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="flex min-h-[50vh] flex-col items-center justify-center rounded-[1.75rem] border border-white/10 bg-white/[0.04] px-6 py-12 text-center">
+                  <div className="text-5xl">🔍</div>
+                  <div className="mt-4 text-2xl font-black text-white">לא נמצאו תוצאות</div>
+                  <p className="mt-3 max-w-xs text-base font-semibold leading-7 text-slate-400">
+                    לא נמצא אורח עם השם או מספר הנייד שהוזנו. בדקו שהמספר מלא ונכון, או שנו את מסנן הסטטוס.
+                  </p>
+                </div>
+              )
+            ) : (
+              <div className="flex min-h-[50vh] flex-col items-center justify-center rounded-[1.75rem] border border-white/10 bg-white/[0.04] px-6 py-12 text-center">
+                <div className="text-5xl">✎</div>
+                <div className="mt-4 text-2xl font-black text-white">הזינו שם או מספר נייד</div>
+                <p className="mt-3 max-w-xs text-base font-semibold leading-7 text-slate-400">
+                  לאחר מילוי השדה לחצו על «חפש».
+                </p>
+              </div>
+            )}
+          </div>
+
+          <div className="shrink-0 border-t border-white/10 bg-[#0d0f2b]/95 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4 backdrop-blur-xl">
+            <button
+              type="button"
+              onClick={handleMobileQuickGuestSearchBack}
+              className="w-full rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-600 px-4 py-4 text-lg font-black text-white shadow-[0_10px_24px_rgba(16,185,129,0.28)] transition-opacity active:opacity-85"
+            >
+              חזור
+            </button>
+          </div>
+        </div>
       )}
 
       {showMobileFirstSendSuccess && (
