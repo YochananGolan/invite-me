@@ -7092,6 +7092,12 @@ React.useEffect(()=>{
     setMobileQuickGuestSearchQuery('');
   }, []);
 
+  const handleMobileQuickGuestSearchClear = React.useCallback(() => {
+    setMobileQuickGuestSearchDraft('');
+    setMobileQuickGuestSearchQuery('');
+    setMobileQuickGuestSearchSubmitted(false);
+  }, []);
+
   const renderMobileNextActionCard = ({
     stepLabel,
     title,
@@ -7425,30 +7431,6 @@ React.useEffect(()=>{
             </button>
           </div>
 
-          <form
-            className="mt-3 flex items-center gap-2 rounded-2xl border border-white/10 bg-white/[0.055] p-2"
-            onSubmit={(event) => {
-              event.preventDefault();
-              handleMobileQuickGuestSearch();
-            }}
-          >
-            <label className="sr-only" htmlFor="mobile-quick-guest-search">חיפוש אורח</label>
-            <input
-              id="mobile-quick-guest-search"
-              type="search"
-              value={mobileQuickGuestSearchDraft}
-              onChange={(event) => setMobileQuickGuestSearchDraft(event.target.value)}
-              placeholder="חפש אורח לפי שם או מספר נייד"
-              className="min-w-0 flex-1 border-0 bg-transparent px-2 py-2 text-right text-base font-semibold text-slate-100 placeholder:text-slate-500 focus:outline-none"
-            />
-            <button
-              type="submit"
-              className="shrink-0 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600 px-4 py-2 text-sm font-black text-white shadow-[0_6px_18px_rgba(16,185,129,0.28)] transition-opacity active:opacity-85"
-            >
-              חפש
-            </button>
-          </form>
-
           <div className="mt-3 space-y-2">
             {mobileStatusFilteredGuests.length > 0 ? mobileStatusFilteredGuests.slice(0, 4).map((guest, idx) => {
               const status = guest.status === 'approved' || guest.status === 'rejected' ? guest.status : 'pending';
@@ -7485,6 +7467,37 @@ React.useEffect(()=>{
               </div>
             )}
           </div>
+
+          <form
+            className="mt-3 flex min-w-0 items-center gap-1.5 rounded-2xl border border-white/10 bg-white/[0.055] p-1.5"
+            onSubmit={(event) => {
+              event.preventDefault();
+              handleMobileQuickGuestSearch();
+            }}
+          >
+            <button
+              type="button"
+              onClick={handleMobileQuickGuestSearchClear}
+              className="shrink-0 rounded-lg border border-white/15 bg-white/[0.06] px-2 py-1.5 text-xs font-black text-slate-200 transition-colors active:bg-white/[0.12]"
+            >
+              נקה
+            </button>
+            <label className="sr-only" htmlFor="mobile-quick-guest-search">חיפוש אורח</label>
+            <input
+              id="mobile-quick-guest-search"
+              type="search"
+              value={mobileQuickGuestSearchDraft}
+              onChange={(event) => setMobileQuickGuestSearchDraft(event.target.value)}
+              placeholder="שם או מספר נייד"
+              className="min-w-0 w-0 flex-1 border-0 bg-transparent px-1 py-1.5 text-right text-sm font-semibold text-slate-100 placeholder:text-slate-500 focus:outline-none"
+            />
+            <button
+              type="submit"
+              className="shrink-0 rounded-lg bg-gradient-to-br from-emerald-500 to-emerald-600 px-2.5 py-1.5 text-xs font-black text-white shadow-[0_6px_18px_rgba(16,185,129,0.28)] transition-opacity active:opacity-85"
+            >
+              חפש
+            </button>
+          </form>
 
           {mobileSummaryGuests.length > 4 && (
             <button
