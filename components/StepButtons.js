@@ -8475,18 +8475,18 @@ React.useEffect(()=>{
                     )}
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-3 text-base">
-                    <div className="min-w-0 bg-white/5 border border-white/10 rounded-xl p-3 text-right">
-                      <div className="text-base font-semibold text-emerald-300">מבוגרים</div>
-                      <div className={`${previewMetricValueClass} text-3xl font-bold text-emerald-200`}>{guestSummary.adults}</div>
+                  <div className="grid grid-cols-3 gap-2 mt-3 text-base">
+                    <div className="min-w-0 bg-white/5 border border-white/10 rounded-xl p-2 sm:p-3 text-right">
+                      <div className="text-[11px] sm:text-base font-semibold text-emerald-300">מבוגרים</div>
+                      <div className={`${previewMetricValueClass} text-2xl sm:text-3xl font-bold text-emerald-200`}>{guestSummary.adults}</div>
                     </div>
-                    <div className="min-w-0 bg-white/5 border border-white/10 rounded-xl p-3 text-right">
-                      <div className="text-base font-semibold text-orange-400">ילדים</div>
-                      <div className={`${previewMetricValueClass} text-3xl font-bold text-orange-300`}>{guestSummary.children}</div>
+                    <div className="min-w-0 bg-white/5 border border-white/10 rounded-xl p-2 sm:p-3 text-right">
+                      <div className="text-[11px] sm:text-base font-semibold text-orange-400">ילדים</div>
+                      <div className={`${previewMetricValueClass} text-2xl sm:text-3xl font-bold text-orange-300`}>{guestSummary.children}</div>
                     </div>
-                    <div className="min-w-0 bg-white/5 border border-white/10 rounded-xl p-3 text-right">
-                      <div className="text-base font-semibold text-indigo-300">סה"כ</div>
-                      <div className={`${previewMetricValueClass} text-3xl font-bold text-indigo-200`}>{guestSummary.adults + guestSummary.children}</div>
+                    <div className="min-w-0 bg-white/5 border border-white/10 rounded-xl p-2 sm:p-3 text-right">
+                      <div className="text-[11px] sm:text-base font-semibold text-indigo-300">סה"כ</div>
+                      <div className={`${previewMetricValueClass} text-2xl sm:text-3xl font-bold text-indigo-200`}>{guestSummary.adults + guestSummary.children}</div>
                     </div>
                   </div>
                 </div>
@@ -8769,20 +8769,20 @@ React.useEffect(()=>{
                       )}
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-3 text-base">
-                      <div className="min-w-0 bg-white/5 border border-white/10 rounded-xl p-3 text-right">
-                        <div className="text-base font-semibold text-amber-300">מגבלת הודעות</div>
-                        <div className={`${previewMetricValueClass} text-3xl font-bold text-amber-200`}>{messageCapacityChartModel.messageLimit}</div>
+                    <div className="grid grid-cols-3 gap-2 mt-3 text-base">
+                      <div className="min-w-0 bg-white/5 border border-white/10 rounded-xl p-2 sm:p-3 text-right">
+                        <div className="text-[11px] sm:text-base font-semibold text-amber-300">מגבלת הודעות</div>
+                        <div className={`${previewMetricValueClass} text-2xl sm:text-3xl font-bold text-amber-200`}>{messageCapacityChartModel.messageLimit}</div>
                       </div>
-                      <div className="min-w-0 bg-white/5 border border-white/10 rounded-xl p-3 text-right">
-                        <div className="text-base font-semibold text-indigo-300">הודעות שנשלחו</div>
-                        <div className={`${previewMetricValueClass} text-3xl font-bold text-indigo-200`}>{messageCapacityChartModel.messagesSent}</div>
+                      <div className="min-w-0 bg-white/5 border border-white/10 rounded-xl p-2 sm:p-3 text-right">
+                        <div className="text-[11px] sm:text-base font-semibold text-indigo-300">הודעות שנשלחו</div>
+                        <div className={`${previewMetricValueClass} text-2xl sm:text-3xl font-bold text-indigo-200`}>{messageCapacityChartModel.messagesSent}</div>
                       </div>
-                      <div className={`min-w-0 bg-white/5 rounded-xl border ${messageCapacityChartModel.overMessages > 0 ? 'border-red-400/30' : 'border-emerald-400/30'} p-3 text-right`}>
-                        <div className={`text-base font-semibold ${messageCapacityChartModel.overMessages > 0 ? 'text-red-400' : 'text-emerald-300'}`}>
+                      <div className={`min-w-0 bg-white/5 rounded-xl border ${messageCapacityChartModel.overMessages > 0 ? 'border-red-400/30' : 'border-emerald-400/30'} p-2 sm:p-3 text-right`}>
+                        <div className={`text-[11px] sm:text-base font-semibold ${messageCapacityChartModel.overMessages > 0 ? 'text-red-400' : 'text-emerald-300'}`}>
                           {messageCapacityChartModel.overMessages > 0 ? 'חריגה' : 'יתרה'}
                         </div>
-                        <div className={`${previewMetricValueClass} text-3xl font-bold ${messageCapacityChartModel.overMessages > 0 ? 'text-red-300' : 'text-emerald-200'}`}>
+                        <div className={`${previewMetricValueClass} text-2xl sm:text-3xl font-bold ${messageCapacityChartModel.overMessages > 0 ? 'text-red-300' : 'text-emerald-200'}`}>
                           {messageCapacityChartModel.overMessages > 0 ? `-${messageCapacityChartModel.overMessages}` : messageCapacityChartModel.remainingMessages}
                         </div>
                       </div>
