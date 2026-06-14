@@ -7397,7 +7397,7 @@ React.useEffect(()=>{
           </div>
 
           <div className="mt-4">
-            <div className="mb-2 text-xs font-black text-violet-200">סטטוס אישורי הגעה</div>
+            <div className="mb-2 text-sm font-black text-violet-200">סטטוס אישורי הגעה</div>
             <div className="grid grid-cols-3 gap-2">
             {[
               ['approved', guestStatusSummary.approved, 'אישרו', 'border-emerald-400/25 bg-emerald-500/10 text-emerald-300'],
@@ -7418,7 +7418,7 @@ React.useEffect(()=>{
           </div>
 
           <div className="mt-3">
-            <div className="mb-2 text-xs font-black text-indigo-200">סיכום כל האורחים</div>
+            <div className="mb-2 text-sm font-black text-indigo-200">סיכום כל האורחים</div>
             <div className="grid grid-cols-3 gap-2">
               {[
                 [guestSummary.adults, 'מבוגרים', 'border-emerald-400/25 bg-emerald-500/10 text-emerald-300'],
@@ -7437,7 +7437,7 @@ React.useEffect(()=>{
           </div>
 
           <div className="mt-3">
-            <div className="mb-2 text-xs font-black text-amber-200">יתרת הודעות</div>
+            <div className="mb-2 text-sm font-black text-amber-200">יתרת הודעות</div>
             <div className="grid grid-cols-3 gap-2">
               {[
                 [mobileMessageBalanceMetrics.messageLimit, 'מגבלת הודעות', 'border-amber-400/25 bg-amber-500/10 text-amber-300'],
@@ -7464,7 +7464,7 @@ React.useEffect(()=>{
           </div>
 
           <div className="mt-3">
-            <div className="mb-2 text-xs font-black text-violet-200">סינון וצפייה ברשימות אורחים</div>
+            <div className="mb-2 text-sm font-black text-violet-200">סינון</div>
             <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-3">
             <div className="grid grid-cols-4 gap-2">
               {[
@@ -7490,13 +7490,16 @@ React.useEffect(()=>{
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={openMobileQuickGuestListScreen}
-            className="mt-3 w-full rounded-2xl border border-violet-300/30 bg-violet-500/15 px-4 py-3 text-base font-black text-violet-100 transition-colors active:bg-violet-500/25"
-          >
-            {`ראה רשימת אורחים : ${MOBILE_GUEST_FILTER_LABELS[mobileSummaryFilter] || MOBILE_GUEST_FILTER_LABELS.all}`}
-          </button>
+          <div className="mt-3">
+            <div className="mb-2 text-sm font-black text-violet-200">צפייה ברשימות אורחים</div>
+            <button
+              type="button"
+              onClick={openMobileQuickGuestListScreen}
+              className="w-full rounded-2xl border border-violet-300/30 bg-violet-500/15 px-4 py-3 text-base font-black text-violet-100 transition-colors active:bg-violet-500/25"
+            >
+              {`ראה רשימת אורחים : ${MOBILE_GUEST_FILTER_LABELS[mobileSummaryFilter] || MOBILE_GUEST_FILTER_LABELS.all}`}
+            </button>
+          </div>
 
           <form
             className="mt-3 flex min-w-0 items-center gap-1.5 rounded-2xl border border-white/10 bg-white/[0.055] p-1.5"
