@@ -619,7 +619,6 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick, trig
   const [mobileQuickGuestSearchSubmitted, setMobileQuickGuestSearchSubmitted] = useState(false);
   const [showMobileQuickGuestListScreen, setShowMobileQuickGuestListScreen] = useState(false);
   const [mobileSummaryFilter, setMobileSummaryFilter] = useState('all');
-  const [mobileShowMoreCards, setMobileShowMoreCards] = useState(false);
   const [showMobileFirstSendSuccess, setShowMobileFirstSendSuccess] = useState(false);
   const [specialMealsSummary, setSpecialMealsSummary] = useState({ 
     veg: { adults: 0, children: 0, total: 0 },
@@ -1244,6 +1243,7 @@ const [planSelectionError, setPlanSelectionError] = useState('');
 const [planWarningSuppressed, setPlanWarningSuppressed] = useState(false);
 const [pricingActionAttempted, setPricingActionAttempted] = useState(false);
 const [eventMessagesSentCount, setEventMessagesSentCount] = useState(0);
+const [eventReminderSentAt, setEventReminderSentAt] = useState(null);
 const [invitedGuestsCount, setInvitedGuestsCount] = useState(0);
 const [currentEventId,setCurrentEventId]=useState(null);
 const [eventRefreshKey, setEventRefreshKey] = useState(0);
@@ -2442,6 +2442,7 @@ const handleOpenAddonModal = React.useCallback(() => {
           setSelectedEventForReport(null);
           setInvitedGuestsCount(0);
           setEventMessagesSentCount(0);
+          setEventReminderSentAt(null);
           setNewEventStarted(false);
           try {
             localStorage.removeItem('savedEventDetails');
@@ -3121,6 +3122,7 @@ const handleOpenAddonModal = React.useCallback(() => {
           console.debug('[StepButtons] Insert success', inserted);
           setCurrentEventId(inserted.id);
           setEventMessagesSentCount(0);
+          setEventReminderSentAt(null);
           await supabase
             .from('user_settings')
             .upsert(
@@ -4496,6 +4498,7 @@ React.useEffect(() => {
     setSelectedEventForReport(null);
     setInvitedGuestsCount(0);
     setEventMessagesSentCount(0);
+    setEventReminderSentAt(null);
   };
 
   const getEventDateFromRecord = (record) => {
@@ -4790,6 +4793,7 @@ React.useEffect(() => {
     // המשתמש כבר רכש/בחר מסלול, אין סיבה לבקש ממנו לבחור שוב.
     setNewEventStarted(false);
     setEventMessagesSentCount(0);
+    setEventReminderSentAt(null);
     try { localStorage.removeItem('newEventStarted'); } catch(e){}
     
     // Reset guest data and reports (these are UI state only, data is preserved in DB)
@@ -5165,6 +5169,7 @@ React.useEffect(() => {
           setSelectedEventForReport(null);
           setInvitedGuestsCount(0);
           setEventMessagesSentCount(0);
+          setEventReminderSentAt(null);
           setGuestSummaryRefreshKey((prev) => prev + 1);
         } catch (error) {
           console.error('Error handling plan purchase:', error);
@@ -5436,7 +5441,7 @@ React.useEffect(() => {
         let messagesSent = 0;
         const { data: evData, error: evError } = await supabase
           .from('events')
-          .select('id,event_type,event_details,allowed_guests,messages_sent_count,additional_packages,selected_plan,status')
+          .select('id,event_type,event_details,allowed_guests,messages_sent_count,reminder_sent_at,additional_packages,selected_plan,status')
           .eq('user_id',user.id)
           .order('created_at',{ascending:false})
           .limit(1)
@@ -5477,6 +5482,7 @@ React.useEffect(() => {
           return;
         }
         setEventMessagesSentCount(messagesSent);
+        setEventReminderSentAt(ev?.reminder_sent_at ?? null);
         const settingsAddonCount = parseNonNegativeInt(userPlanSettingsRef.current?.addonCount);
         const addonCount = settingsAddonCount;
         setDbAddonCount(addonCount);
@@ -5551,11 +5557,15 @@ React.useEffect(() => {
             setEventAllowedGuests(null);
             setEventDataLoaded(false);
             setEventMessagesSentCount(0);
+            setEventReminderSentAt(null);
             setEventRefreshKey((k) => k + 1);
             return;
           }
           if (typeof ev.messages_sent_count === 'number') {
             setEventMessagesSentCount(ev.messages_sent_count);
+          }
+          if (ev.reminder_sent_at) {
+            setEventReminderSentAt(ev.reminder_sent_at);
           }
           if (ev.additional_packages != null && ev.additional_packages !== '') {
             const ap = parseNonNegativeInt(userPlanSettingsRef.current?.addonCount);
@@ -6033,7 +6043,7 @@ React.useEffect(() => {
 
         const { data: ev } = await supabase
           .from('events')
-          .select('id, event_type, event_details, allowed_guests, messages_sent_count, additional_packages, selected_plan, status')
+          .select('id, event_type, event_details, allowed_guests, messages_sent_count, reminder_sent_at, additional_packages, selected_plan, status')
           .eq('user_id', user.id)
           .or('status.neq.archived,status.is.null')
           .order('created_at', { ascending: false })
@@ -6067,6 +6077,7 @@ React.useEffect(() => {
                 try { localStorage.removeItem('newEventStarted'); } catch(e){}
               }
               setEventMessagesSentCount(ev.messages_sent_count ?? 0);
+              setEventReminderSentAt(ev.reminder_sent_at ?? null);
               const restoreAddonCount = parseNonNegativeInt(userPlanSettingsRef.current?.addonCount);
               setDbAddonCount(restoreAddonCount);
               setAdditionalPackages((prev) => {
@@ -6330,7 +6341,7 @@ React.useEffect(() => {
         let messagesSent = 0;
         const { data: evData, error: evError } = await supabase
           .from('events')
-          .select('id,event_type,status,event_details,allowed_guests,messages_sent_count,additional_packages,selected_plan')
+          .select('id,event_type,status,event_details,allowed_guests,messages_sent_count,reminder_sent_at,additional_packages,selected_plan')
           .eq('user_id', user.id)
           .order('created_at',{ascending:false})
           .limit(1)
@@ -6383,6 +6394,7 @@ React.useEffect(() => {
             setSelectedEventType(ev.event_type);
           }
           setEventMessagesSentCount(messagesSent);
+          setEventReminderSentAt(ev?.reminder_sent_at ?? null);
           const addonCount = parseNonNegativeInt(userPlanSettingsRef.current?.addonCount);
           setDbAddonCount(addonCount);
           setAdditionalPackages((prev) => {
@@ -6743,54 +6755,7 @@ React.useEffect(()=>{
     try{ localStorage.removeItem('draftEvent'); localStorage.removeItem('newEventStarted'); localStorage.removeItem('savedEventDetails'); }catch{}
   },[currentEventId, newEventStarted]);
 
-  const mobileResumeEventDateText = React.useMemo(() => {
-    const rawDate = formData?.date || formData?.start_datetime || '';
-    if (!rawDate) return '';
-    const parsed = new Date(rawDate);
-    return Number.isFinite(parsed.getTime()) ? parsed.toLocaleDateString('he-IL') : String(rawDate);
-  }, [formData?.date, formData?.start_datetime]);
-
-  const mobileResumeModel = React.useMemo(() => {
-    const step1Done = Boolean(selectedEventType) || finishedSteps.includes(0);
-    const step2Done = Boolean(isStep2Complete || eventDetailsCompleted || finishedSteps.includes(1));
-    const step3Done = Boolean(isStep3Complete);
-    const step4Done = Boolean(effectiveMessagesSentCount > 0 || invitedCount > 0 || finishedSteps.includes(4));
-    const completedCount = [step1Done, step2Done, step3Done, step4Done].filter(Boolean).length;
-    const nextStep = !step1Done ? 1 : !step2Done ? 2 : !step3Done ? 3 : step4Done ? 5 : 4;
-    const continueLabels = {
-      1: 'המשך לבחירת סוג אירוע',
-      2: 'המשך לפרטי האירוע',
-      3: 'המשך לעיצוב',
-      4: 'עבור לשליחה',
-      5: 'פתח דוחות',
-    };
-
-    return {
-      completedCount,
-      nextStep,
-      continueLabel: continueLabels[nextStep] || 'המשך',
-      shouldShow: Boolean(
-        currentEventId ||
-        newEventStarted ||
-        selectedEventType ||
-        formDataHasMeaningfulValues ||
-        selectedDesign ||
-        finishedSteps.length > 0
-      ),
-    };
-  }, [
-    currentEventId,
-    effectiveMessagesSentCount,
-    eventDetailsCompleted,
-    finishedSteps,
-    formDataHasMeaningfulValues,
-    invitedCount,
-    isStep2Complete,
-    isStep3Complete,
-    newEventStarted,
-    selectedDesign,
-    selectedEventType,
-  ]);
+  const MOBILE_REMINDER_DAYS_BEFORE = 5;
 
   React.useEffect(() => {
     selectedEventTypeRef.current = selectedEventType;
@@ -6799,46 +6764,7 @@ React.useEffect(()=>{
     isStep3CompleteRef.current = isStep3Complete;
   }, [selectedEventType, finishedSteps, isStep2Complete, isStep3Complete]);
 
-  const mobileEventTodayModel = React.useMemo(() => {
-    const rawDate = formData?.date || formData?.start_datetime || '';
-    if (!rawDate || !currentEventId) return { shouldShow: false };
-
-    const parsedDate = new Date(rawDate);
-    if (!Number.isFinite(parsedDate.getTime())) return { shouldShow: false };
-
-    const today = new Date();
-    const eventDay = new Date(parsedDate);
-    today.setHours(0, 0, 0, 0);
-    eventDay.setHours(0, 0, 0, 0);
-    const shouldShow = today.getTime() === eventDay.getTime();
-    if (!shouldShow) return { shouldShow: false };
-
-    const dateText = parsedDate.toLocaleDateString('he-IL');
-    const timeText = formData?.time ? String(formData.time) : '';
-    let statusText = timeText ? `מתחיל בשעה ${timeText}` : 'האירוע מתקיים היום';
-
-    if (timeText && /^\d{1,2}:\d{2}$/.test(timeText)) {
-      const [hours, minutes] = timeText.split(':').map((value) => parseInt(value, 10));
-      const eventDateTime = new Date(parsedDate);
-      eventDateTime.setHours(hours, minutes, 0, 0);
-      const diffMs = eventDateTime.getTime() - Date.now();
-      if (diffMs > 0) {
-        const diffHours = Math.ceil(diffMs / (1000 * 60 * 60));
-        statusText = diffHours <= 1 ? 'מתחיל בקרוב' : `מתחיל בעוד ${diffHours} שעות`;
-      } else {
-        statusText = 'האירוע כבר התחיל';
-      }
-    }
-
-    return {
-      shouldShow: true,
-      dateText,
-      statusText,
-      venueText: formData?.hallName || formData?.hallAddress || '',
-    };
-  }, [currentEventId, formData?.date, formData?.hallAddress, formData?.hallName, formData?.start_datetime, formData?.time]);
-
-  const mobileReminderStatusModel = React.useMemo(() => {
+  const mobileEventCountdownModel = React.useMemo(() => {
     const rawDate = formData?.date || formData?.start_datetime || '';
     if (!rawDate || !currentEventId) return { shouldShow: false };
 
@@ -6853,35 +6779,42 @@ React.useEffect(()=>{
     const daysUntilEvent = Math.round((eventDay.getTime() - today.getTime()) / msPerDay);
     if (daysUntilEvent < 0) return { shouldShow: false };
 
-    const reminderDaysBefore = 5;
-    const daysUntilReminder = daysUntilEvent - reminderDaysBefore;
-    const whatsappCount = mobileSummaryGuests.filter((guest) => guest.invitation_channel === 'whatsapp').length;
-    const smsCount = mobileSummaryGuests.filter((guest) => guest.invitation_channel === 'sms').length;
-    const unknownCount = mobileSummaryGuests.filter((guest) => !guest.invitation_channel).length;
-    const knownChannelCount = whatsappCount + smsCount;
-    let statusText = 'התזכורת תופעל אחרי שליחת הזמנות';
-    if (knownChannelCount > 0) {
-      if (daysUntilReminder > 0) {
-        statusText = `נותרו ${daysUntilReminder} ימים לשליחת התזכורת`;
-      } else if (daysUntilReminder === 0) {
-        statusText = 'התזכורת האוטומטית תישלח היום';
-      } else {
-        statusText = daysUntilEvent === 0
-          ? 'התזכורת האוטומטית כבר טופלה אם הייתה פעילה'
-          : 'מועד התזכורת האוטומטית כבר עבר';
+    const eventLine = daysUntilEvent === 0
+      ? 'האירוע יתקיים היום'
+      : `האירוע יתקיים בעוד ${daysUntilEvent} ימים`;
+
+    const daysUntilReminder = daysUntilEvent - MOBILE_REMINDER_DAYS_BEFORE;
+    let reminderLine = '';
+
+    if (eventReminderSentAt) {
+      const sentDay = new Date(eventReminderSentAt);
+      if (Number.isFinite(sentDay.getTime())) {
+        sentDay.setHours(0, 0, 0, 0);
+        const daysSinceSent = Math.round((today.getTime() - sentDay.getTime()) / msPerDay);
+        reminderLine = daysSinceSent === 0
+          ? 'תזכורת נשלחה היום'
+          : `תזכורת נשלחה לפני ${daysSinceSent} ימים`;
       }
+    } else if (daysUntilReminder > 0) {
+      reminderLine = `תזכורת נוספת תישלח לכל האורחים בעוד ${daysUntilReminder} ימים`;
+    } else if (daysUntilReminder === 0) {
+      reminderLine = 'תזכורת נוספת תישלח לכל האורחים היום';
+    } else {
+      const scheduledReminderDay = new Date(eventDay);
+      scheduledReminderDay.setDate(scheduledReminderDay.getDate() - MOBILE_REMINDER_DAYS_BEFORE);
+      scheduledReminderDay.setHours(0, 0, 0, 0);
+      const daysSinceScheduled = Math.round((today.getTime() - scheduledReminderDay.getTime()) / msPerDay);
+      reminderLine = daysSinceScheduled === 0
+        ? 'תזכורת נוספת תישלח לכל האורחים היום'
+        : `תזכורת נשלחה לפני ${daysSinceScheduled} ימים`;
     }
 
     return {
       shouldShow: true,
-      reminderDaysBefore,
-      statusText,
-      whatsappCount,
-      smsCount,
-      unknownCount,
-      knownChannelCount,
+      eventLine,
+      reminderLine,
     };
-  }, [currentEventId, formData?.date, formData?.start_datetime, mobileSummaryGuests]);
+  }, [currentEventId, eventReminderSentAt, formData?.date, formData?.start_datetime]);
 
   const mobileDashboardModel = React.useMemo(() => {
     const dashboardActive = Boolean(
@@ -6894,27 +6827,17 @@ React.useEffect(()=>{
       guestStatusSummary.pending > 0
     );
     if (!dashboardActive) {
-      return { showGuestPrimary: false, secondaryCount: 0 };
+      return { showGuestPrimary: false };
     }
 
-    const showGuestPrimary = Boolean(currentEventId && invitedCount > 0);
-    let secondaryCount = 0;
-    if (mobileEventTodayModel.shouldShow) secondaryCount += 1;
-    if (mobileReminderStatusModel.shouldShow) secondaryCount += 1;
-    if (mobileResumeModel.shouldShow) secondaryCount += 1;
-
     return {
-      showGuestPrimary,
-      secondaryCount,
+      showGuestPrimary: Boolean(currentEventId && invitedCount > 0),
     };
   }, [
     currentEventId,
     formDataHasMeaningfulValues,
     guestStatusSummary.pending,
     invitedCount,
-    mobileEventTodayModel.shouldShow,
-    mobileReminderStatusModel.shouldShow,
-    mobileResumeModel.shouldShow,
     newEventStarted,
     selectedDesign,
     selectedEventType,
@@ -6933,7 +6856,6 @@ React.useEffect(()=>{
   ]);
 
   React.useEffect(() => {
-    setMobileShowMoreCards(false);
     setShowMobileFirstSendSuccess(false);
   }, [currentEventId]);
 
@@ -7710,260 +7632,19 @@ React.useEffect(()=>{
         </div>
       )}
 
-      {hasSession && mobileDashboardModel.secondaryCount > 0 && (
+      {hasSession && currentEventId && mobileEventCountdownModel.shouldShow && (
         <div className="mx-auto mb-4 w-full max-w-md sm:hidden" dir="rtl">
-          <button
-            type="button"
-            onClick={() => setMobileShowMoreCards((value) => !value)}
-            className="w-full rounded-2xl border border-white/12 bg-white/[0.05] px-4 py-3 text-center text-base font-black text-violet-100 transition-colors active:bg-white/[0.10]"
-          >
-            {mobileShowMoreCards
-              ? 'הסתר כרטיסים נוספים'
-              : `הצג עוד כרטיסים (${mobileDashboardModel.secondaryCount})`}
-          </button>
+          <div className="rounded-2xl border border-white/12 bg-white/[0.05] px-4 py-3 text-center">
+            <div className="text-base font-black text-slate-100">
+              {mobileEventCountdownModel.eventLine}
+            </div>
+            {mobileEventCountdownModel.reminderLine && (
+              <div className="mt-2 text-sm font-semibold text-slate-300">
+                {mobileEventCountdownModel.reminderLine}
+              </div>
+            )}
+          </div>
         </div>
-      )}
-
-      {hasSession && mobileEventTodayModel.shouldShow && mobileShowMoreCards && (
-        <section className="mx-auto mb-4 w-full max-w-md overflow-hidden rounded-[1.75rem] border border-violet-300/25 bg-white/[0.06] text-right shadow-[0_14px_44px_rgba(0,0,0,0.36)] ring-1 ring-violet-400/20 backdrop-blur-2xl sm:hidden" dir="rtl">
-          <div className="relative p-4">
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(139,92,246,0.30),transparent_42%),linear-gradient(135deg,rgba(16,185,129,0.12),rgba(99,102,241,0.12))]" />
-            <div className="relative">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="text-sm font-black text-violet-200">ניהול בזמן אמת</div>
-                  <h2 className="mt-1 text-3xl font-black leading-tight text-white">האירוע היום</h2>
-                  <p className="mt-1 text-sm font-semibold text-slate-300">
-                    הכל מוכן לניהול מהיר מהנייד
-                  </p>
-                </div>
-                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-violet-300/30 bg-violet-500/20 text-2xl shadow-[0_8px_26px_rgba(139,92,246,0.32)]">
-                  {eventTypeIcons[selectedEventType] || '✦'}
-                </div>
-              </div>
-
-              <div className="mt-4 rounded-2xl border border-white/12 bg-[#11163d]/65 px-4 py-3">
-                <div className="text-lg font-black text-white">
-                  {selectedEventType || 'אירוע'}
-                  <span className="text-violet-200"> · {mobileEventTodayModel.dateText}</span>
-                </div>
-                {mobileEventTodayModel.venueText && (
-                  <div className="mt-1 truncate text-sm font-semibold text-slate-300">
-                    {mobileEventTodayModel.venueText}
-                  </div>
-                )}
-                <div className="mt-3 inline-flex rounded-full border border-violet-300/30 bg-violet-500/25 px-4 py-2 text-sm font-black text-violet-100">
-                  {mobileEventTodayModel.statusText}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="space-y-2 px-4 pb-4">
-            <button
-              type="button"
-              onClick={() => openMobileResumeStep(5)}
-              className="flex w-full items-center justify-between gap-3 rounded-2xl border border-emerald-400/35 bg-emerald-500/15 px-4 py-3 text-right transition-colors active:bg-emerald-500/25"
-            >
-              <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-emerald-500/20 text-2xl text-emerald-200">▥</span>
-              <span className="min-w-0 flex-1">
-                <span className="block text-lg font-black text-white">פתח דוחות עכשיו</span>
-                <span className="block text-xs font-semibold text-emerald-100/80">צפה בנתונים ודוחות בזמן אמת</span>
-              </span>
-              <span className="text-2xl text-emerald-100">‹</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={openMobilePendingReport}
-              className="flex w-full items-center justify-between gap-3 rounded-2xl border border-amber-400/35 bg-amber-500/[0.12] px-4 py-3 text-right transition-colors active:bg-amber-500/[0.22]"
-            >
-              <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-amber-500/20 text-2xl text-amber-200">◷</span>
-              <span className="min-w-0 flex-1">
-                <span className="block text-lg font-black text-white">מי עדיין לא הגיב?</span>
-                <span className="block text-xs font-semibold text-amber-100/80">רשימת אורחים שממתינים לתגובה</span>
-              </span>
-              <span className="rounded-full bg-amber-400 px-3 py-1 text-sm font-black text-[#1f1233]">{guestStatusSummary.pending || 0}</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={openMobileReminderFlow}
-              className="flex w-full items-center justify-between gap-3 rounded-2xl border border-violet-400/35 bg-violet-500/15 px-4 py-3 text-right transition-colors active:bg-violet-500/25"
-            >
-              <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-violet-500/20 text-2xl text-violet-100">✈</span>
-              <span className="min-w-0 flex-1">
-                <span className="block text-lg font-black text-white">שלח תזכורת</span>
-                <span className="block text-xs font-semibold text-violet-100/80">פתח את מסך השליחה להודעת תזכורת</span>
-              </span>
-              <span className="text-2xl text-violet-100">‹</span>
-            </button>
-
-            <div className="grid grid-cols-3 gap-2 text-center">
-              <div className="rounded-2xl border border-emerald-400/20 bg-emerald-500/10 px-2 py-2">
-                <div className="text-xl font-black text-emerald-300">{invitedCount}</div>
-                <div className="text-[11px] font-bold text-slate-400">מוזמנים</div>
-              </div>
-              <div className="rounded-2xl border border-blue-400/20 bg-blue-500/10 px-2 py-2">
-                <div className="text-xl font-black text-blue-300">{guestStatusSummary.approved || 0}</div>
-                <div className="text-[11px] font-bold text-slate-400">אישרו</div>
-              </div>
-              <div className="rounded-2xl border border-amber-400/20 bg-amber-500/10 px-2 py-2">
-                <div className="text-xl font-black text-amber-300">{guestStatusSummary.pending || 0}</div>
-                <div className="text-[11px] font-bold text-slate-400">ממתינים</div>
-              </div>
-            </div>
-
-            {guestStatusSummary.pending > 0 && (
-              <div className="rounded-2xl border border-violet-400/20 bg-violet-500/10 px-4 py-3 text-center">
-                <div className="text-sm font-black text-violet-200">כדאי לשלוח תזכורת אחרונה לממתינים</div>
-                <p className="mt-1 text-xs font-semibold text-slate-400">
-                  {guestStatusSummary.pending} אורחים עדיין לא אישרו הגעה
-                </p>
-              </div>
-            )}
-          </div>
-        </section>
-      )}
-
-      {hasSession && mobileReminderStatusModel.shouldShow && mobileShowMoreCards && (
-        <section className="mx-auto mb-4 w-full max-w-md rounded-[1.75rem] border border-amber-300/30 bg-white/[0.06] p-4 text-right shadow-[0_14px_44px_rgba(0,0,0,0.34)] ring-1 ring-amber-400/20 backdrop-blur-2xl sm:hidden" dir="rtl">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <div className="text-sm font-black text-amber-200">תזכורת אוטומטית פעילה</div>
-              <h2 className="mt-1 text-2xl font-black leading-tight text-white">המערכת תזכיר לאורחים בזמן</h2>
-              <p className="mt-1 text-sm font-semibold leading-6 text-slate-300">
-                תישלח {mobileReminderStatusModel.reminderDaysBefore} ימים לפני האירוע לפי ערוץ ההזמנה המקורי.
-              </p>
-            </div>
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-amber-300/35 bg-amber-500/15 text-2xl text-amber-200">
-              🔔
-            </div>
-          </div>
-
-          <div className="mt-4 grid grid-cols-2 gap-2">
-            <div className="rounded-2xl border border-emerald-400/25 bg-emerald-500/10 px-3 py-3 text-center">
-              <div className="text-lg font-black text-emerald-300">WhatsApp</div>
-              <div className="mt-1 text-xs font-bold text-slate-300">
-                {mobileReminderStatusModel.whatsappCount} אורחים שקיבלו WhatsApp
-              </div>
-            </div>
-            <div className="rounded-2xl border border-blue-400/25 bg-blue-500/10 px-3 py-3 text-center">
-              <div className="text-lg font-black text-blue-300">SMS</div>
-              <div className="mt-1 text-xs font-bold text-slate-300">
-                {mobileReminderStatusModel.smsCount} אורחים שקיבלו SMS
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-3 rounded-2xl border border-white/10 bg-[#11163d]/70 px-4 py-3 text-center">
-            <div className="text-sm font-black text-amber-200">{mobileReminderStatusModel.statusText}</div>
-            {mobileReminderStatusModel.unknownCount > 0 && (
-              <p className="mt-1 text-xs font-semibold text-slate-400">
-                {mobileReminderStatusModel.unknownCount} אורחים ישנים ללא ערוץ שמור לא יקבלו תזכורת אוטומטית עד שיוגדר להם ערוץ.
-              </p>
-            )}
-          </div>
-
-          <div className="mt-3 grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              onClick={() => openMobileResumeStep(5)}
-              className="rounded-2xl bg-gradient-to-br from-violet-600 to-indigo-600 px-4 py-3 text-base font-black text-white shadow-[0_10px_24px_rgba(99,102,241,0.28)] transition-opacity active:opacity-85"
-            >
-              פתח דוחות
-            </button>
-            <button
-              type="button"
-              onClick={openMobileReminderFlow}
-              className="rounded-2xl border border-white/14 bg-white/[0.055] px-4 py-3 text-base font-black text-slate-100 transition-colors active:bg-white/[0.10]"
-            >
-              שלח ידנית
-            </button>
-          </div>
-        </section>
-      )}
-
-      {hasSession && mobileResumeModel.shouldShow && mobileShowMoreCards && (
-        <section className="mx-auto mb-4 w-full max-w-md rounded-[1.75rem] border border-violet-300/25 bg-white/[0.06] p-4 text-right shadow-[0_14px_44px_rgba(0,0,0,0.36)] ring-1 ring-violet-400/20 backdrop-blur-2xl sm:hidden" dir="rtl">
-          <div className="text-center">
-            <div className="text-sm font-black text-violet-200">Meet-M זוכר את האירוע שלך</div>
-            <h2 className="mt-1 text-2xl font-black leading-tight text-white">המשך מאיפה שעצרת</h2>
-            <p className="mt-1 text-sm font-semibold text-slate-300">האירוע שלך מוכן להמשך עבודה</p>
-          </div>
-
-          <div className="mt-4 rounded-3xl border border-white/12 bg-[#11163d]/70 p-4">
-            <div className="flex items-center justify-between gap-3">
-              <div className="min-w-0">
-                <div className="text-lg font-black text-white">
-                  {selectedEventType || 'אירוע בתהליך'}
-                  {mobileResumeEventDateText ? <span className="text-violet-200"> · {mobileResumeEventDateText}</span> : null}
-                </div>
-                <div className="mt-1 text-sm font-bold text-emerald-200">
-                  {mobileResumeModel.completedCount > 0
-                    ? `שלב ${mobileResumeModel.completedCount} מתוך 5 הושלם`
-                    : 'האירוע מוכן להתחלה'}
-                </div>
-              </div>
-              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-violet-300/30 bg-violet-500/20 text-2xl shadow-[0_8px_26px_rgba(139,92,246,0.32)]">
-                {eventTypeIcons[selectedEventType] || '✦'}
-              </div>
-            </div>
-
-            <div className="mt-4 grid grid-cols-5 gap-1.5" aria-label="התקדמות האירוע">
-              {[1, 2, 3, 4, 5].map((stepNumber) => {
-                const isDone = stepNumber <= mobileResumeModel.completedCount;
-                return (
-                  <div
-                    key={stepNumber}
-                    className={`h-3 rounded-full ${isDone ? 'bg-gradient-to-r from-emerald-400 to-emerald-500 shadow-[0_0_12px_rgba(52,211,153,0.42)]' : 'bg-white/12'}`}
-                  />
-                );
-              })}
-            </div>
-
-            <div className="mt-4 flex flex-col gap-2">
-              <button
-                type="button"
-                onClick={() => openMobileResumeStep(mobileResumeModel.nextStep)}
-                className="w-full rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-600 px-4 py-3.5 text-lg font-black text-white shadow-[0_10px_28px_rgba(16,185,129,0.32)] transition-opacity active:opacity-85"
-              >
-                {mobileResumeModel.continueLabel}
-              </button>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => openMobileResumeStep(4)}
-                  className="rounded-2xl border border-violet-300/30 bg-violet-500/[0.18] px-3 py-3 text-base font-black text-violet-100 transition-colors active:bg-violet-500/[0.28]"
-                >
-                  עבור לשליחה
-                </button>
-                <button
-                  type="button"
-                  onClick={() => openMobileResumeStep(5)}
-                  className="rounded-2xl border border-white/12 bg-white/[0.06] px-3 py-3 text-base font-black text-slate-100 transition-colors active:bg-white/[0.10]"
-                >
-                  פתח דוחות
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-3 grid grid-cols-3 gap-2 text-center">
-            <div className="rounded-2xl border border-emerald-400/20 bg-emerald-500/10 px-2 py-2">
-              <div className="text-xl font-black text-emerald-300">{invitedCount}</div>
-              <div className="text-[11px] font-bold text-slate-400">מוזמנים</div>
-            </div>
-            <div className="rounded-2xl border border-blue-400/20 bg-blue-500/10 px-2 py-2">
-              <div className="text-xl font-black text-blue-300">{guestStatusSummary.approved || 0}</div>
-              <div className="text-[11px] font-bold text-slate-400">אישרו</div>
-            </div>
-            <div className="rounded-2xl border border-amber-400/20 bg-amber-500/10 px-2 py-2">
-              <div className="text-xl font-black text-amber-300">{guestStatusSummary.pending || 0}</div>
-              <div className="text-[11px] font-bold text-slate-400">ממתינים</div>
-            </div>
-          </div>
-        </section>
       )}
 
       {/* סרגל שלבים: למשתמש מחובר תמיד (לא רק כשיש אירוע פעיל) — אחרת נעלם אחרי מחיקת אירוע / רענון */}
