@@ -7064,6 +7064,11 @@ React.useEffect(()=>{
     setMobileQuickGuestSearchSubmitted(true);
   }, [mobileQuickGuestSearchDraft]);
 
+  const handleMobileQuickGuestSearchBack = React.useCallback(() => {
+    setMobileQuickGuestSearchSubmitted(false);
+    setMobileQuickGuestSearchQuery('');
+  }, []);
+
   const renderMobileNextActionCard = ({
     stepLabel,
     title,
@@ -7421,45 +7426,67 @@ React.useEffect(()=>{
             </button>
           </form>
 
-          <div className="mt-3 space-y-2">
-            {mobileQuickGuestSearchSubmitted ? (
-              mobileQuickGuestSearchQuery ? (
-                mobileQuickGuestSearchResults.length > 0 ? (
-                  mobileQuickGuestSearchResults.slice(0, 4).map((guest, idx) => {
-                    const status = guest.status === 'approved' || guest.status === 'rejected' ? guest.status : 'pending';
-                    const statusMeta = status === 'approved'
-                      ? { label: 'אישר', className: 'bg-emerald-500/15 text-emerald-300 border-emerald-400/30', icon: '✓' }
-                      : status === 'rejected'
-                        ? { label: 'לא מגיע', className: 'bg-rose-500/15 text-rose-300 border-rose-400/30', icon: '×' }
-                        : { label: 'ממתין', className: 'bg-amber-500/15 text-amber-300 border-amber-400/30', icon: '◷' };
-                    const guestName = [guest.first_name, guest.last_name].filter(Boolean).join(' ') || `אורח ${idx + 1}`;
-                    const initials = guestName.split(' ').map((part) => part[0]).filter(Boolean).slice(0, 2).join('');
-                    return (
-                      <MobileSwipeGuestCard
-                        key={`search-${guest.phone || guestName}-${idx}`}
-                        guestName={guestName}
-                        initials={initials}
-                        phone={guest.phone}
-                        statusMeta={statusMeta}
-                        onReminder={openMobileReminderFlow}
-                        onWhatsApp={() => openMobileGuestWhatsApp(guest.phone)}
-                        showActionButtons={false}
-                      />
-                    );
-                  })
+          {mobileQuickGuestSearchSubmitted ? (
+            <div className="mt-3 rounded-2xl border border-violet-300/25 bg-white/[0.04] p-4 text-right">
+              <div className="mb-3">
+                <div className="text-sm font-black text-violet-200">תוצאות חיפוש</div>
+                {mobileQuickGuestSearchQuery ? (
+                  <p className="mt-1 text-sm font-semibold text-slate-300">
+                    חיפוש עבור: <span className="text-white">{mobileQuickGuestSearchQuery}</span>
+                  </p>
+                ) : null}
+              </div>
+
+              <div className="space-y-2">
+                {mobileQuickGuestSearchQuery ? (
+                  mobileQuickGuestSearchResults.length > 0 ? (
+                    mobileQuickGuestSearchResults.map((guest, idx) => {
+                      const status = guest.status === 'approved' || guest.status === 'rejected' ? guest.status : 'pending';
+                      const statusMeta = status === 'approved'
+                        ? { label: 'אישר', className: 'bg-emerald-500/15 text-emerald-300 border-emerald-400/30', icon: '✓' }
+                        : status === 'rejected'
+                          ? { label: 'לא מגיע', className: 'bg-rose-500/15 text-rose-300 border-rose-400/30', icon: '×' }
+                          : { label: 'ממתין', className: 'bg-amber-500/15 text-amber-300 border-amber-400/30', icon: '◷' };
+                      const guestName = [guest.first_name, guest.last_name].filter(Boolean).join(' ') || `אורח ${idx + 1}`;
+                      const initials = guestName.split(' ').map((part) => part[0]).filter(Boolean).slice(0, 2).join('');
+                      return (
+                        <MobileSwipeGuestCard
+                          key={`search-${guest.phone || guestName}-${idx}`}
+                          guestName={guestName}
+                          initials={initials}
+                          phone={guest.phone}
+                          statusMeta={statusMeta}
+                          onReminder={openMobileReminderFlow}
+                          onWhatsApp={() => openMobileGuestWhatsApp(guest.phone)}
+                          showActionButtons={false}
+                        />
+                      );
+                    })
+                  ) : (
+                    <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-6 text-center">
+                      <div className="text-base font-black text-white">לא נמצאו אורחים תואמים</div>
+                      <p className="mt-1 text-sm font-semibold text-slate-400">נסו שם אחר, מספר נייד או שינוי במסנן הסטטוס.</p>
+                    </div>
+                  )
                 ) : (
                   <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-6 text-center">
-                    <div className="text-base font-black text-white">לא נמצאו אורחים תואמים</div>
-                    <p className="mt-1 text-sm font-semibold text-slate-400">נסו שם אחר, מספר נייד או שינוי במסנן הסטטוס.</p>
+                    <div className="text-base font-black text-white">הזינו שם או מספר נייד</div>
+                    <p className="mt-1 text-sm font-semibold text-slate-400">לאחר מילוי השדה לחצו על «חפש».</p>
                   </div>
-                )
-              ) : (
-                <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-6 text-center">
-                  <div className="text-base font-black text-white">הזינו שם או מספר נייד</div>
-                  <p className="mt-1 text-sm font-semibold text-slate-400">לאחר מילוי השדה לחצו על «חפש».</p>
-                </div>
-              )
-            ) : mobileStatusFilteredGuests.length > 0 ? mobileStatusFilteredGuests.slice(0, 4).map((guest, idx) => {
+                )}
+              </div>
+
+              <button
+                type="button"
+                onClick={handleMobileQuickGuestSearchBack}
+                className="mt-4 w-full rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-600 px-4 py-3.5 text-base font-black text-white shadow-[0_10px_24px_rgba(16,185,129,0.28)] transition-opacity active:opacity-85"
+              >
+                חזור
+              </button>
+            </div>
+          ) : (
+          <div className="mt-3 space-y-2">
+            {mobileStatusFilteredGuests.length > 0 ? mobileStatusFilteredGuests.slice(0, 4).map((guest, idx) => {
               const status = guest.status === 'approved' || guest.status === 'rejected' ? guest.status : 'pending';
               const statusMeta = status === 'approved'
                 ? { label: 'אישר', className: 'bg-emerald-500/15 text-emerald-300 border-emerald-400/30', icon: '✓' }
@@ -7494,8 +7521,9 @@ React.useEffect(()=>{
               </div>
             )}
           </div>
+          )}
 
-          {mobileSummaryGuests.length > 4 && (
+          {!mobileQuickGuestSearchSubmitted && mobileSummaryGuests.length > 4 && (
             <button
               type="button"
               onClick={() => openMobileResumeStep(5)}
