@@ -7377,11 +7377,7 @@ React.useEffect(()=>{
         <section id="mobile-quick-guests" className="mx-auto mb-4 w-full max-w-md rounded-[1.75rem] border border-violet-300/25 bg-white/[0.06] p-4 text-right shadow-[0_14px_44px_rgba(0,0,0,0.36)] ring-1 ring-violet-400/20 backdrop-blur-2xl sm:hidden" dir="rtl">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0 flex-1">
-              <div className="text-sm font-black text-violet-200">סינון וטיפול באורחים מהנייד</div>
-              <h2 className="mt-1 text-3xl font-black leading-tight text-white">ניהול אורחים מהיר</h2>
-              <p className="mt-1 text-sm font-semibold leading-6 text-slate-300">
-                מצא אורח, בדוק סטטוס ושלח פעולה מהירה בלי להיכנס לדוח מלא.
-              </p>
+              <h2 className="text-3xl font-black leading-tight text-white">ניהול אורחים מהיר</h2>
             </div>
             <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-violet-300/30 bg-violet-500/20 text-2xl shadow-[0_8px_26px_rgba(139,92,246,0.32)]">
               ◉
