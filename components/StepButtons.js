@@ -6817,91 +6817,6 @@ React.useEffect(()=>{
     };
   }, [currentEventId, formData?.date, formData?.start_datetime, mobileSummaryGuests]);
 
-  const mobileReadinessModel = React.useMemo(() => {
-    const shouldShow = Boolean(
-      currentEventId ||
-      newEventStarted ||
-      selectedEventType ||
-      formDataHasMeaningfulValues ||
-      selectedDesign ||
-      invitedCount > 0 ||
-      guestStatusSummary.pending > 0
-    );
-    if (!shouldShow) return { shouldShow: false, items: [], readyCount: 0, totalCount: 6 };
-
-    const eventTypeReady = Boolean(selectedEventType) || finishedSteps.includes(0);
-    const eventDetailsReady = Boolean(isStep2Complete || eventDetailsCompleted || finishedSteps.includes(1));
-    const designReady = Boolean(selectedDesign || finishedSteps.includes(2));
-    const invitationsReady = invitedCount > 0 || effectiveMessagesSentCount > 0 || finishedSteps.includes(4);
-    const pendingReady = (guestStatusSummary.pending || 0) === 0 && invitationsReady;
-    const reminderReady = Boolean(mobileReminderStatusModel.shouldShow && mobileReminderStatusModel.knownChannelCount > 0);
-    const items = [
-      {
-        label: 'סוג אירוע נבחר',
-        detail: selectedEventType || 'עדיין לא נבחר סוג אירוע',
-        ready: eventTypeReady,
-        action: 1,
-      },
-      {
-        label: 'פרטי האירוע הושלמו',
-        detail: mobileResumeEventDateText || 'חסר תאריך או פרטי אירוע',
-        ready: eventDetailsReady,
-        action: 2,
-      },
-      {
-        label: 'עיצוב הזמנה נבחר',
-        detail: designReady ? 'אפשר להמשיך לשליחה' : 'בחר תבנית לפני שליחה',
-        ready: designReady,
-        action: 3,
-      },
-      {
-        label: invitationsReady ? `נשלחו ${invitedCount || effectiveMessagesSentCount} הזמנות` : 'עדיין לא נשלחו הזמנות',
-        detail: invitationsReady ? 'יש אורחים באירוע' : 'הוסף אורח ושלח הזמנה ראשונה',
-        ready: invitationsReady,
-        action: 4,
-      },
-      {
-        label: pendingReady ? 'אין אורחים שממתינים לתגובה' : `${guestStatusSummary.pending || 0} אורחים עדיין לא הגיבו`,
-        detail: pendingReady ? 'מצב התגובות נראה טוב' : 'כדאי לבדוק את דוח הממתינים',
-        ready: pendingReady,
-        warning: invitationsReady && (guestStatusSummary.pending || 0) > 0,
-        action: 'pending',
-      },
-      {
-        label: 'תזכורת אוטומטית פעילה',
-        detail: reminderReady ? mobileReminderStatusModel.statusText : 'תופעל אחרי שליחת הזמנות עם ערוץ שמור',
-        ready: reminderReady,
-        action: 4,
-      },
-    ];
-    const readyCount = items.filter((item) => item.ready).length;
-
-    return {
-      shouldShow,
-      items,
-      readyCount,
-      totalCount: items.length,
-      pendingCount: guestStatusSummary.pending || 0,
-      percent: Math.round((readyCount / items.length) * 100),
-    };
-  }, [
-    currentEventId,
-    effectiveMessagesSentCount,
-    eventDetailsCompleted,
-    finishedSteps,
-    formDataHasMeaningfulValues,
-    guestStatusSummary.pending,
-    invitedCount,
-    isStep2Complete,
-    mobileReminderStatusModel.knownChannelCount,
-    mobileReminderStatusModel.shouldShow,
-    mobileReminderStatusModel.statusText,
-    mobileResumeEventDateText,
-    newEventStarted,
-    selectedDesign,
-    selectedEventType,
-  ]);
-
   const mobileDashboardModel = React.useMemo(() => {
     const dashboardActive = Boolean(
       currentEventId ||
@@ -6913,13 +6828,11 @@ React.useEffect(()=>{
       guestStatusSummary.pending > 0
     );
     if (!dashboardActive) {
-      return { shouldShow: false, showGuestPrimary: false, showReadinessPrimary: false, secondaryCount: 0 };
+      return { shouldShow: false, showGuestPrimary: false, secondaryCount: 0 };
     }
 
     const showGuestPrimary = Boolean(currentEventId && invitedCount > 0);
-    const showReadinessPrimary = Boolean(mobileReadinessModel.shouldShow && !showGuestPrimary);
     let secondaryCount = 0;
-    if (mobileReadinessModel.shouldShow && showGuestPrimary) secondaryCount += 1;
     if (mobileEventTodayModel.shouldShow) secondaryCount += 1;
     if (mobileReminderStatusModel.shouldShow) secondaryCount += 1;
     if (mobileResumeModel.shouldShow) secondaryCount += 1;
@@ -6927,11 +6840,7 @@ React.useEffect(()=>{
     return {
       shouldShow: true,
       showGuestPrimary,
-      showReadinessPrimary,
       secondaryCount,
-      readinessReadyCount: mobileReadinessModel.readyCount || 0,
-      readinessTotalCount: mobileReadinessModel.totalCount || 6,
-      readinessPercent: mobileReadinessModel.percent || 0,
     };
   }, [
     currentEventId,
@@ -6939,10 +6848,6 @@ React.useEffect(()=>{
     guestStatusSummary.pending,
     invitedCount,
     mobileEventTodayModel.shouldShow,
-    mobileReadinessModel.percent,
-    mobileReadinessModel.readyCount,
-    mobileReadinessModel.shouldShow,
-    mobileReadinessModel.totalCount,
     mobileReminderStatusModel.shouldShow,
     mobileResumeModel.shouldShow,
     newEventStarted,
@@ -7504,22 +7409,11 @@ React.useEffect(()=>{
                 {mobileResumeEventDateText ? <span className="text-violet-200"> · {mobileResumeEventDateText}</span> : null}
               </div>
               <div className="mt-1 flex flex-wrap items-center gap-2">
-                <span className="text-sm font-bold text-violet-200">
-                  {mobileDashboardModel.readinessReadyCount} מתוך {mobileDashboardModel.readinessTotalCount} מוכנים
-                </span>
                 {guestStatusSummary.pending > 0 && (
                   <span className="rounded-full border border-amber-300/35 bg-amber-500/20 px-2.5 py-0.5 text-xs font-black text-amber-200">
                     {guestStatusSummary.pending} ממתינים
                   </span>
                 )}
-              </div>
-            </div>
-            <div
-              className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full p-1 shadow-[0_8px_22px_rgba(16,185,129,0.22)]"
-              style={{ background: `conic-gradient(#34d399 ${mobileDashboardModel.readinessPercent}%, rgba(255,255,255,0.12) 0)` }}
-            >
-              <div className="flex h-full w-full items-center justify-center rounded-full bg-[#10153a] text-sm font-black text-white">
-                {mobileDashboardModel.readinessReadyCount}/{mobileDashboardModel.readinessTotalCount}
               </div>
             </div>
           </div>
@@ -7585,84 +7479,6 @@ React.useEffect(()=>{
             >
               {mobileDailySummaryModel.recommendedLabel}
             </button>
-          </div>
-        </section>
-      )}
-
-      {hasSession && mobileReadinessModel.shouldShow && (mobileDashboardModel.showReadinessPrimary || mobileShowMoreCards) && (
-        <section className="mx-auto mb-4 w-full max-w-md overflow-hidden rounded-[1.75rem] border border-violet-300/25 bg-white/[0.06] text-right shadow-[0_14px_44px_rgba(0,0,0,0.36)] ring-1 ring-violet-400/20 backdrop-blur-2xl sm:hidden" dir="rtl">
-          <div className="relative p-4">
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(139,92,246,0.28),transparent_42%),linear-gradient(135deg,rgba(59,130,246,0.10),rgba(16,185,129,0.10))]" />
-            <div className="relative">
-              <div className="flex items-start justify-between gap-4">
-                <div className="min-w-0 flex-1">
-                  <div className="text-sm font-black text-violet-200">הכל מוכן לאירוע?</div>
-                  <h2 className="mt-1 text-3xl font-black leading-tight text-white">בדיקת מוכנות</h2>
-                  <p className="mt-1 text-sm font-semibold leading-6 text-slate-300">
-                    מבט מהיר על הדברים החשובים לפני השליחה והמעקב.
-                  </p>
-                </div>
-                <div className="shrink-0 text-center">
-                  <div
-                    className="flex h-16 w-16 items-center justify-center rounded-full p-1 shadow-[0_10px_26px_rgba(16,185,129,0.24)]"
-                    style={{ background: `conic-gradient(#34d399 ${mobileReadinessModel.percent}%, rgba(255,255,255,0.12) 0)` }}
-                  >
-                    <div className="flex h-full w-full items-center justify-center rounded-full bg-[#10153a] text-base font-black text-white">
-                      {mobileReadinessModel.readyCount}/{mobileReadinessModel.totalCount}
-                    </div>
-                  </div>
-                  <div className="mt-1 text-[11px] font-black text-emerald-200">
-                    {mobileReadinessModel.readyCount} מתוך {mobileReadinessModel.totalCount}
-                  </div>
-                </div>
-              </div>
-
-              <div className="mt-4 space-y-2">
-                {mobileReadinessModel.items.map((item) => (
-                  <div
-                    key={item.label}
-                    className={`flex items-center justify-between gap-3 rounded-2xl border px-3 py-2.5 ${
-                      item.ready
-                        ? 'border-emerald-400/25 bg-emerald-500/10'
-                        : item.warning
-                          ? 'border-amber-400/30 bg-amber-500/[0.12]'
-                          : 'border-white/10 bg-white/[0.045]'
-                    }`}
-                  >
-                    <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-base font-black ${
-                      item.ready
-                        ? 'bg-emerald-500 text-white'
-                        : item.warning
-                          ? 'bg-amber-400 text-[#211436]'
-                          : 'bg-white/10 text-slate-300'
-                    }`}>
-                      {item.ready ? '✓' : item.warning ? '!' : '•'}
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block text-sm font-black text-white">{item.label}</span>
-                      <span className="block truncate text-xs font-semibold text-slate-400">{item.detail}</span>
-                    </span>
-                  </div>
-                ))}
-              </div>
-
-              <div className="mt-4 grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={openMobileReminderFlow}
-                  className="rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-600 px-4 py-3 text-base font-black text-white shadow-[0_10px_24px_rgba(16,185,129,0.28)] transition-opacity active:opacity-85"
-                >
-                  שלח תזכורת
-                </button>
-                <button
-                  type="button"
-                  onClick={() => openMobileResumeStep(5)}
-                  className="rounded-2xl bg-gradient-to-br from-violet-600 to-indigo-600 px-4 py-3 text-base font-black text-white shadow-[0_10px_24px_rgba(99,102,241,0.28)] transition-opacity active:opacity-85"
-                >
-                  פתח דוחות
-                </button>
-              </div>
-            </div>
           </div>
         </section>
       )}
