@@ -7396,7 +7396,9 @@ React.useEffect(()=>{
             </div>
           </div>
 
-          <div className="mt-4 grid grid-cols-3 gap-2">
+          <div className="mt-4">
+            <div className="mb-2 text-xs font-black text-violet-200">סטטוס אישורי הגעה</div>
+            <div className="grid grid-cols-3 gap-2">
             {[
               ['approved', guestStatusSummary.approved, 'אישרו', 'border-emerald-400/25 bg-emerald-500/10 text-emerald-300'],
               ['pending', guestStatusSummary.pending, 'טרם הגיבו', 'border-amber-400/25 bg-amber-500/[0.12] text-amber-300'],
@@ -7412,6 +7414,7 @@ React.useEffect(()=>{
                 <div className="mt-1 text-[11px] font-black text-slate-100">{label}</div>
               </button>
             ))}
+            </div>
           </div>
 
           <div className="mt-3">
@@ -7460,7 +7463,9 @@ React.useEffect(()=>{
             </div>
           </div>
 
-          <div className="mt-3 rounded-2xl border border-white/10 bg-white/[0.04] p-3">
+          <div className="mt-3">
+            <div className="mb-2 text-xs font-black text-violet-200">סינון וצפייה ברשימות אורחים</div>
+            <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-3">
             <div className="grid grid-cols-4 gap-2">
               {[
                 ['all', 'כולם'],
@@ -7481,6 +7486,7 @@ React.useEffect(()=>{
                   {label}
                 </button>
               ))}
+            </div>
             </div>
           </div>
 
