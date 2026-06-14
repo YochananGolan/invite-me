@@ -136,6 +136,28 @@ function computeMissingDetails(formData, selectedEventType){
   });
 }
 
+function isEventDateFuture(dateStr) {
+  if (!dateStr) return false;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const selectedDate = new Date(dateStr);
+  if (!Number.isFinite(selectedDate.getTime())) return false;
+  return selectedDate > today;
+}
+
+function isEventDetailsCompleteForType(formData, selectedEventType) {
+  if (!selectedEventType) return false;
+  if (computeMissingDetails(formData, selectedEventType).length > 0) return false;
+  return isEventDateFuture(formData?.date);
+}
+
+const WIZARD_STEP_BLOCK_MESSAGES = {
+  1: 'יש לבחור תחילה סוג אירוע לפני המשך.',
+  2: 'טרם מולאו פרטי האירוע — לא ניתן להמשיך לשלב הבא.',
+  3: 'יש לבחור תחילה עיצוב להזמנה לפני המשך.',
+  4: 'יש לשלוח הזמנות לאורחים לפני המשך לדוחות.',
+};
+
 // Hebrew labels for form keys – used across component
 const fieldLabels = {
   brideName: 'שם הכלה',
@@ -486,6 +508,10 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick, trig
   const formDataHasMeaningfulValues = React.useMemo(() => {
     return Object.entries(formData || {}).some(([key, value]) => hasMeaningfulFormValue(key, value));
   }, [formData]);
+  const isStep2Complete = React.useMemo(
+    () => isEventDetailsCompleteForType(formData, selectedEventType),
+    [formData, selectedEventType]
+  );
   const formDataIsMeaningfullyEmpty = !formDataHasMeaningfulValues;
   const [formErrors, setFormErrors] = useState({});
   const [eventDetailsCompleted, setEventDetailsCompleted] = useState(false);
@@ -658,11 +684,12 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick, trig
 
   const syncFinishedStepsFromEvent = useCallback((eventType, details = {}) => {
     const progress = parseNonNegativeInt(details?.progress_step);
-    const hasDetails = details && Object.entries(details).some(([key, value]) => hasMeaningfulFormValue(key, value));
+    const mergedDetails = { ...initialFormState, ...(details || {}) };
+    const detailsComplete = isEventDetailsCompleteForType(mergedDetails, eventType);
     const restoredSteps = new Set();
 
     if (eventType) restoredSteps.add(0);
-    if (hasDetails || progress >= 2) restoredSteps.add(1);
+    if (detailsComplete || progress >= 2) restoredSteps.add(1);
     if (details?.template_src || progress >= 3) restoredSteps.add(2);
     if (!restoredSteps.size) return;
 
@@ -775,6 +802,14 @@ const [hasWhatsAppGroup, setHasWhatsAppGroup] = useState(false);
   const [stepBarTransform, setStepBarTransform] = useState('translate3d(0, 0, 0)');
   const [stepBarHeight, setStepBarHeight] = useState(null);
   const stepBarAnchorRef = useRef(null);
+  const tryOpenWizardStepRef = useRef(null);
+  const scrollToWizardSectionRef = useRef(null);
+  const selectedEventTypeRef = useRef(selectedEventType);
+  const finishedStepsRef = useRef(finishedSteps);
+  const isStep2CompleteRef = useRef(isStep2Complete);
+  const isStep3CompleteRef = useRef(false);
+  const getFirstIncompleteWizardStepRef = useRef(() => null);
+  const wizardAutoResumedRef = useRef(false);
   const stepBarRef = useRef(null);
   const reportsSectionRef = useRef(null);
 
@@ -2071,6 +2106,10 @@ const handleOpenAddonModal = React.useCallback(() => {
   ];
 
   const [selectedDesign, setSelectedDesign] = useState(null);
+  const isStep3Complete = React.useMemo(
+    () => Boolean(selectedDesign || finishedSteps.includes(2)),
+    [selectedDesign, finishedSteps]
+  );
   const fontsOptions = [
     { key: 'assistant', label: 'Assistant',          css: "'Assistant', sans-serif" },
     { key: 'heebo',     label: 'Heebo',               css: "'Heebo', sans-serif" },
@@ -2378,9 +2417,12 @@ const handleOpenAddonModal = React.useCallback(() => {
         setSelectedEventType(data.event_type || '');
         syncFinishedStepsFromEvent(data.event_type || '', details || {});
         setFormData((prev)=>({ ...prev, ...(details || {}) }));
-        if (details && Object.keys(details).length) {
+        const mergedDetails = { ...initialFormState, ...(details || {}) };
+        if (isEventDetailsCompleteForType(mergedDetails, data.event_type || '')) {
           setEventDetailsCompleted(true);
           markStepDone(1);
+        } else {
+          setEventDetailsCompleted(false);
         }
         try { localStorage.setItem('savedEventDetails', JSON.stringify(details || {})); } catch(e){}
       } catch (err) {
@@ -2421,19 +2463,19 @@ const handleOpenAddonModal = React.useCallback(() => {
       setSelectedFlowStep(5);
     },
     openSendStep: () => {
-      const mustStartFirst = !currentEventId && !newEventStarted && !planForDisplay;
-      if (mustStartFirst) {
-        setStepErrorMsg('\u05D9\u05E9 \u05EA\u05D7\u05D9\u05DC\u05D4 \u05DC\u05D9\u05E6\u05D5\u05E8 \u05D0\u05D9\u05E8\u05D5\u05E2 \u05D5\u05DC\u05D1\u05D7\u05D5\u05E8 \u05DE\u05E1\u05DC\u05D5\u05DC \u05EA\u05E9\u05DC\u05D5\u05DD.');
-        setShowStepError(true);
-        return;
-      }
-      setShowGuestForm(true);
-      setStepErrorMsg('');
+      scrollToWizardSectionRef.current?.();
+      tryOpenWizardStepRef.current?.(4);
     },
     openReportsStep: () => {
-      setShowReportsOptions(true);
-      setShowGuestListModal(false);
-      setStepErrorMsg('');
+      scrollToWizardSectionRef.current?.();
+      tryOpenWizardStepRef.current?.(5);
+    },
+    openResumeWizardStep: () => {
+      scrollToWizardSectionRef.current?.();
+      const firstIncomplete = getFirstIncompleteWizardStepRef.current?.();
+      if (firstIncomplete) {
+        tryOpenWizardStepRef.current?.(firstIncomplete);
+      }
     },
     createNewEvent: async () => {
       try {
@@ -6644,8 +6686,8 @@ React.useEffect(()=>{
 
   const mobileResumeModel = React.useMemo(() => {
     const step1Done = Boolean(selectedEventType) || finishedSteps.includes(0);
-    const step2Done = Boolean(eventDetailsCompleted || formDataHasMeaningfulValues || finishedSteps.includes(1));
-    const step3Done = Boolean(selectedDesign || finishedSteps.includes(2));
+    const step2Done = Boolean(isStep2Complete || eventDetailsCompleted || finishedSteps.includes(1));
+    const step3Done = Boolean(isStep3Complete);
     const step4Done = Boolean(effectiveMessagesSentCount > 0 || invitedCount > 0 || finishedSteps.includes(4));
     const completedCount = [step1Done, step2Done, step3Done, step4Done].filter(Boolean).length;
     const nextStep = !step1Done ? 1 : !step2Done ? 2 : !step3Done ? 3 : step4Done ? 5 : 4;
@@ -6677,10 +6719,19 @@ React.useEffect(()=>{
     finishedSteps,
     formDataHasMeaningfulValues,
     invitedCount,
+    isStep2Complete,
+    isStep3Complete,
     newEventStarted,
     selectedDesign,
     selectedEventType,
   ]);
+
+  React.useEffect(() => {
+    selectedEventTypeRef.current = selectedEventType;
+    finishedStepsRef.current = finishedSteps;
+    isStep2CompleteRef.current = isStep2Complete;
+    isStep3CompleteRef.current = isStep3Complete;
+  }, [selectedEventType, finishedSteps, isStep2Complete, isStep3Complete]);
 
   const mobileEventTodayModel = React.useMemo(() => {
     const rawDate = formData?.date || formData?.start_datetime || '';
@@ -6864,7 +6915,7 @@ React.useEffect(()=>{
     if (!shouldShow) return { shouldShow: false, items: [], readyCount: 0, totalCount: 6 };
 
     const eventTypeReady = Boolean(selectedEventType) || finishedSteps.includes(0);
-    const eventDetailsReady = Boolean(eventDetailsCompleted || formDataHasMeaningfulValues || finishedSteps.includes(1));
+    const eventDetailsReady = Boolean(isStep2Complete || eventDetailsCompleted || finishedSteps.includes(1));
     const designReady = Boolean(selectedDesign || finishedSteps.includes(2));
     const invitationsReady = invitedCount > 0 || effectiveMessagesSentCount > 0 || finishedSteps.includes(4);
     const pendingReady = (guestStatusSummary.pending || 0) === 0 && invitationsReady;
@@ -6926,6 +6977,7 @@ React.useEffect(()=>{
     formDataHasMeaningfulValues,
     guestStatusSummary.pending,
     invitedCount,
+    isStep2Complete,
     mobileReminderStatusModel.knownChannelCount,
     mobileReminderStatusModel.shouldShow,
     mobileReminderStatusModel.statusText,
@@ -7102,14 +7154,40 @@ React.useEffect(()=>{
     };
   }, [addToast]);
 
-  const openMobileResumeStep = React.useCallback((stepNumber) => {
-    const mustStartFirst = !currentEventId && !newEventStarted && !planForDisplay;
-    if (stepNumber >= 1 && stepNumber <= 4 && mustStartFirst) {
-      setStepErrorMsg('\u05D9\u05E9 \u05EA\u05D7\u05D9\u05DC\u05D4 \u05DC\u05D9\u05E6\u05D5\u05E8 \u05D0\u05D9\u05E8\u05D5\u05E2 \u05D5\u05DC\u05D1\u05D7\u05D5\u05E8 \u05DE\u05E1\u05DC\u05D5\u05DC \u05EA\u05E9\u05DC\u05D5\u05DD.');
-      setShowStepError(true);
-      return;
-    }
-    setStepErrorMsg('');
+  const scrollToWizardSection = React.useCallback(() => {
+    if (typeof window === 'undefined') return;
+    document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    stepBarAnchorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }, []);
+
+  const wizardStepCompletion = React.useMemo(() => ({
+    1: Boolean(selectedEventType) || finishedSteps.includes(0),
+    2: isStep2Complete || eventDetailsCompleted || finishedSteps.includes(1),
+    3: isStep3Complete,
+    4: Boolean(effectiveMessagesSentCount > 0 || invitedCount > 0 || finishedSteps.includes(4)),
+  }), [
+    effectiveMessagesSentCount,
+    eventDetailsCompleted,
+    finishedSteps,
+    invitedCount,
+    isStep2Complete,
+    isStep3Complete,
+    selectedEventType,
+  ]);
+
+  const getFirstIncompleteWizardStep = React.useCallback(() => {
+    if (!wizardStepCompletion[1]) return 1;
+    if (!wizardStepCompletion[2]) return 2;
+    if (!wizardStepCompletion[3]) return 3;
+    if (!wizardStepCompletion[4]) return 4;
+    return null;
+  }, [wizardStepCompletion]);
+
+  const redirectToWizardStep = React.useCallback((stepNumber) => {
+    setShowEventTypes(false);
+    setShowEventDetails(false);
+    setShowDesignChooser(false);
+    setShowGuestForm(false);
     if (stepNumber === 1) setShowEventTypes(true);
     else if (stepNumber === 2) setShowEventDetails(true);
     else if (stepNumber === 3) setShowDesignChooser(true);
@@ -7118,7 +7196,90 @@ React.useEffect(()=>{
       setShowReportsOptions(true);
       setShowGuestListModal(false);
     }
-  }, [currentEventId, newEventStarted, planForDisplay]);
+  }, []);
+
+  const tryOpenWizardStep = React.useCallback((stepNumber) => {
+    const mustStartFirst = !currentEventId && !newEventStarted && !planForDisplay;
+    if (stepNumber >= 1 && stepNumber <= 4 && mustStartFirst) {
+      setStepErrorMsg('\u05D9\u05E9 \u05EA\u05D7\u05D9\u05DC\u05D4 \u05DC\u05D9\u05E6\u05D5\u05E8 \u05D0\u05D9\u05E8\u05D5\u05E2 \u05D5\u05DC\u05D1\u05D7\u05D5\u05E8 \u05DE\u05E1\u05DC\u05D5\u05DC \u05EA\u05E9\u05DC\u05D5\u05DD.');
+      setShowStepError(true);
+      return false;
+    }
+
+    if (stepNumber >= 1 && stepNumber <= 5) {
+      for (let requiredStep = 1; requiredStep < stepNumber; requiredStep += 1) {
+        if (requiredStep > 4) break;
+        if (!wizardStepCompletion[requiredStep]) {
+          setStepErrorMsg(WIZARD_STEP_BLOCK_MESSAGES[requiredStep]);
+          setShowStepError(true);
+          redirectToWizardStep(requiredStep);
+          scrollToWizardSection();
+          return false;
+        }
+      }
+    }
+
+    setStepErrorMsg('');
+    setShowStepError(false);
+    redirectToWizardStep(stepNumber);
+    return true;
+  }, [
+    currentEventId,
+    newEventStarted,
+    planForDisplay,
+    redirectToWizardStep,
+    scrollToWizardSection,
+    wizardStepCompletion,
+  ]);
+
+  React.useEffect(() => {
+    tryOpenWizardStepRef.current = tryOpenWizardStep;
+    scrollToWizardSectionRef.current = scrollToWizardSection;
+    getFirstIncompleteWizardStepRef.current = getFirstIncompleteWizardStep;
+  }, [getFirstIncompleteWizardStep, tryOpenWizardStep, scrollToWizardSection]);
+
+  React.useEffect(() => {
+    if (!session) return undefined;
+    if (wizardAutoResumedRef.current) return undefined;
+    const flowStarted = Boolean(
+      currentEventId ||
+      newEventStarted ||
+      selectedEventType ||
+      finishedSteps.length > 0
+    );
+    if (!flowStarted) return undefined;
+
+    const firstIncomplete = getFirstIncompleteWizardStep();
+    if (!firstIncomplete) return undefined;
+
+    wizardAutoResumedRef.current = true;
+    const timer = window.setTimeout(() => {
+      scrollToWizardSection();
+      redirectToWizardStep(firstIncomplete);
+      setStepErrorMsg('');
+    }, 450);
+    return () => window.clearTimeout(timer);
+  }, [
+    currentEventId,
+    finishedSteps,
+    getFirstIncompleteWizardStep,
+    newEventStarted,
+    redirectToWizardStep,
+    scrollToWizardSection,
+    selectedEventType,
+    session,
+    wizardStepCompletion,
+  ]);
+
+  React.useEffect(() => {
+    if (!currentEventId && !newEventStarted && !selectedEventType && finishedSteps.length === 0) {
+      wizardAutoResumedRef.current = false;
+    }
+  }, [currentEventId, finishedSteps.length, newEventStarted, selectedEventType]);
+
+  const openMobileResumeStep = React.useCallback((stepNumber) => {
+    tryOpenWizardStep(stepNumber);
+  }, [tryOpenWizardStep]);
 
   const openMobilePendingReport = React.useCallback(() => {
     setShowReportsOptions(false);
@@ -7129,9 +7290,9 @@ React.useEffect(()=>{
 
   const openMobileReminderFlow = React.useCallback(() => {
     setShowReportsOptions(false);
-    setShowGuestForm(true);
     setStepErrorMsg('');
-  }, []);
+    tryOpenWizardStep(4);
+  }, [tryOpenWizardStep]);
 
   const handleMobileDailyRecommendedAction = React.useCallback(() => {
     if (mobileDailySummaryModel.recommendedAction === 'reminder') {
@@ -8122,7 +8283,7 @@ React.useEffect(()=>{
           <div className="flex flex-col gap-2">
             {steps.slice(1, 4).map((step, idx) => {
               const realIdx = idx + 1;
-              const isFinished = finishedSteps.includes(realIdx) || (realIdx === 3 && finishedSteps.includes(2));
+              const isFinished = wizardStepCompletion[realIdx] || false;
               const isDesign = realIdx === 3;
               return (
                 <button
@@ -8132,15 +8293,7 @@ React.useEffect(()=>{
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    const mustStartFirst = !currentEventId && !newEventStarted && !planForDisplay;
-                    if (mustStartFirst) {
-                      setStepErrorMsg('\u05D9\u05E9 \u05EA\u05D7\u05D9\u05DC\u05D4 \u05DC\u05D9\u05E6\u05D5\u05E8 \u05D0\u05D9\u05E8\u05D5\u05E2 \u05D5\u05DC\u05D1\u05D7\u05D5\u05E8 \u05DE\u05E1\u05DC\u05D5\u05DC \u05EA\u05E9\u05DC\u05D5\u05DD.');
-                      setShowStepError(true);
-                      return;
-                    }
-                    if (realIdx === 1) { setShowEventTypes(true); setStepErrorMsg(''); }
-                    else if (realIdx === 2) { setShowEventDetails(true); setStepErrorMsg(''); }
-                    else if (realIdx === 3) { setShowDesignChooser(true); setStepErrorMsg(''); }
+                    tryOpenWizardStep(realIdx);
                   }}
                   className={`relative flex min-h-[4.75rem] w-full flex-col items-center justify-center gap-1.5 rounded-2xl py-4 px-5 text-center transition-all ${
                     isFinished
@@ -8168,7 +8321,11 @@ React.useEffect(()=>{
           <div className="flex flex-col gap-2">
             {steps.slice(4).map((step, idx) => {
               const realIdx = idx + 4;
-              const isFinished = finishedSteps.includes(realIdx);
+              const isFinished = realIdx === 4
+                ? wizardStepCompletion[4]
+                : realIdx === 5
+                  ? wizardStepCompletion[4]
+                  : finishedSteps.includes(realIdx);
               return (
                 <button
                   key={realIdx}
@@ -8177,17 +8334,8 @@ React.useEffect(()=>{
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    if (realIdx === 4) {
-                      const mustStartFirst = !currentEventId && !newEventStarted && !planForDisplay;
-                      if (mustStartFirst) {
-                        setStepErrorMsg('\u05D9\u05E9 \u05EA\u05D7\u05D9\u05DC\u05D4 \u05DC\u05D9\u05E6\u05D5\u05E8 \u05D0\u05D9\u05E8\u05D5\u05E2 \u05D5\u05DC\u05D1\u05D7\u05D5\u05E8 \u05DE\u05E1\u05DC\u05D5\u05DC \u05EA\u05E9\u05DC\u05D5\u05DD.');
-                        setShowStepError(true);
-                        return;
-                      }
-                      setShowGuestForm(true); setStepErrorMsg('');
-                    } else if (realIdx === 5) {
-                      setShowReportsOptions(true); setShowGuestListModal(false); setStepErrorMsg('');
-                    }
+                    if (realIdx === 4) tryOpenWizardStep(4);
+                    else if (realIdx === 5) tryOpenWizardStep(5);
                   }}
                   className={`relative flex min-h-[4.75rem] w-full flex-col items-center justify-center gap-1.5 rounded-2xl py-4 px-5 text-center transition-all ${
                     isFinished
@@ -8226,6 +8374,9 @@ React.useEffect(()=>{
         <div className="hidden sm:flex flex-row justify-center gap-4 flex-wrap">
           {steps.slice(1).map((step, idx) => {
             const realIdx = idx + 1;
+            const isFinished = realIdx === 5
+              ? wizardStepCompletion[4]
+              : Boolean(wizardStepCompletion[realIdx]);
             return (
               <button
                 key={realIdx}
@@ -8235,21 +8386,10 @@ React.useEffect(()=>{
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
-                  const mustStartFirst = !currentEventId && !newEventStarted && !planForDisplay;
-                  const stepRequiresFlow = realIdx >= 1 && realIdx <= 4;
-                  if (stepRequiresFlow && mustStartFirst) {
-                    setStepErrorMsg('\u05D9\u05E9 \u05EA\u05D7\u05D9\u05DC\u05D4 \u05DC\u05D9\u05E6\u05D5\u05E8 \u05D0\u05D9\u05E8\u05D5\u05E2 \u05D5\u05DC\u05D1\u05D7\u05D5\u05E8 \u05DE\u05E1\u05DC\u05D5\u05DC \u05EA\u05E9\u05DC\u05D5\u05DD.');
-                    setShowStepError(true);
-                    return;
-                  }
-                  if (realIdx === 1) { setShowEventTypes(true); setStepErrorMsg(''); }
-                  else if (realIdx === 2) { setShowEventDetails(true); setStepErrorMsg(''); }
-                  else if (realIdx === 3) { setShowDesignChooser(true); setStepErrorMsg(''); }
-                  else if (realIdx === 4) { setShowGuestForm(true); setStepErrorMsg(''); }
-                  else if (realIdx === 5) { setShowReportsOptions(true); setShowGuestListModal(false); setStepErrorMsg(''); }
+                  tryOpenWizardStep(realIdx);
                 }}
                 className={`${
-                  finishedSteps.includes(realIdx) || (realIdx === 3 && finishedSteps.includes(2))
+                  isFinished
                     ? 'bg-gradient-to-br from-indigo-600 to-violet-600 text-white border border-indigo-400/50 rounded-full px-7 py-3 font-bold shadow-[0_6px_20px_rgba(99,70,230,0.45)] hover:opacity-90 transition-all text-base shrink-0'
                     : realIdx === 3
                       ? 'bg-violet-500/15 text-violet-100 border border-violet-400/40 rounded-full px-7 py-3 font-bold shadow-[0_4px_14px_rgba(139,92,246,0.3)] hover:bg-violet-500/25 transition-all text-base shrink-0'

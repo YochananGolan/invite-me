@@ -80,8 +80,8 @@ export default function Home({ session }) {
   };
 
   const handleShowReports = () => {
-    stepRef.current?.goToReportsStep?.();
     scrollToWizard();
+    stepRef.current?.openReportsStep?.();
   };
 
   const scrollToHome = () => {
@@ -97,6 +97,7 @@ export default function Home({ session }) {
     }
     if (target === 'event') {
       scrollToWizard();
+      setTimeout(() => stepRef.current?.openResumeWizardStep?.(), 250);
       return;
     }
     if (target === 'send') {
