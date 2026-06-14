@@ -601,7 +601,7 @@ const ProductCards = () => (
   </>
 );
 
-const MobileHomepageHero = ({ onCreateEvent, onShowProcess, showDemoCard = true }) => (
+const MobileHomepageHero = ({ onCreateEvent, onShowProcess, showPreEventMarketing = true }) => (
   <div className="sm:hidden" dir="rtl">
     <div className="mx-auto flex max-w-md flex-col items-center px-1 pb-6 pt-1 text-center">
       <div className="mb-5 text-2xl font-semibold tracking-wide text-white">
@@ -628,67 +628,69 @@ const MobileHomepageHero = ({ onCreateEvent, onShowProcess, showDemoCard = true 
         <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white/18 text-2xl leading-none">+</span>
       </button>
 
-      <button
-        type="button"
-        onClick={onShowProcess}
-        className="mt-4 inline-flex items-center justify-center gap-2 rounded-full px-4 py-2 text-sm font-bold text-violet-200"
-      >
-        <span>צפה איך זה עובד</span>
-        <span className="flex h-6 w-6 items-center justify-center rounded-full border border-violet-300/50 text-[10px]">▶</span>
-      </button>
+      {showPreEventMarketing && (
+        <>
+          <button
+            type="button"
+            onClick={onShowProcess}
+            className="mt-4 inline-flex items-center justify-center gap-2 rounded-full px-4 py-2 text-sm font-bold text-violet-200"
+          >
+            <span>צפה איך זה עובד</span>
+            <span className="flex h-6 w-6 items-center justify-center rounded-full border border-violet-300/50 text-[10px]">▶</span>
+          </button>
 
-      {showDemoCard && (
-        <div className="mt-5 w-full overflow-hidden rounded-3xl border border-white/15 bg-white/[0.055] p-4 text-right shadow-[0_14px_46px_rgba(0,0,0,0.38)] backdrop-blur-xl">
-          <div className="mb-4 flex items-center justify-between gap-3">
-            <div>
-              <p className="text-sm font-bold text-slate-400">כרטיס הדגמה</p>
-              <h2 className="mt-1 text-2xl font-black text-white">חתונת דניאל ומיכל</h2>
+          <div className="mt-5 w-full overflow-hidden rounded-3xl border border-white/15 bg-white/[0.055] p-4 text-right shadow-[0_14px_46px_rgba(0,0,0,0.38)] backdrop-blur-xl">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-bold text-slate-400">כרטיס הדגמה</p>
+                <h2 className="mt-1 text-2xl font-black text-white">חתונת דניאל ומיכל</h2>
+              </div>
+              <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full border border-emerald-300/30 bg-emerald-400/10 text-3xl">
+                💐
+              </div>
             </div>
-            <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full border border-emerald-300/30 bg-emerald-400/10 text-3xl">
-              💐
+
+            <div className="grid grid-cols-3 gap-2">
+              {[
+                ['124', 'אישרו', 'text-emerald-300', 'border-emerald-300/25 bg-emerald-400/10'],
+                ['18', 'טרם הגיבו', 'text-amber-300', 'border-amber-300/25 bg-amber-400/10'],
+                ['7', 'לא מגיעים', 'text-rose-300', 'border-rose-300/25 bg-rose-400/10'],
+              ].map(([value, label, valueClass, cardClass]) => (
+                <div key={label} className={`rounded-2xl border px-2 py-3 text-center ${cardClass}`}>
+                  <div className={`text-3xl font-black leading-none tabular-nums ${valueClass}`}>{value}</div>
+                  <div className="mt-1 text-xs font-bold text-slate-300">{label}</div>
+                </div>
+              ))}
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-2">
+          <div className="mt-3 w-full space-y-2">
             {[
-              ['124', 'אישרו', 'text-emerald-300', 'border-emerald-300/25 bg-emerald-400/10'],
-              ['18', 'טרם הגיבו', 'text-amber-300', 'border-amber-300/25 bg-amber-400/10'],
-              ['7', 'לא מגיעים', 'text-rose-300', 'border-rose-300/25 bg-rose-400/10'],
-            ].map(([value, label, valueClass, cardClass]) => (
-              <div key={label} className={`rounded-2xl border px-2 py-3 text-center ${cardClass}`}>
-                <div className={`text-3xl font-black leading-none tabular-nums ${valueClass}`}>{value}</div>
-                <div className="mt-1 text-xs font-bold text-slate-300">{label}</div>
+              ['🎨', 'הזמנה מעוצבת', 'עיצובים יוקרתיים שמתאימים לאירוע שלכם'],
+              ['📱', 'שליחה בוואטסאפ ו-SMS', 'מגיעים לכל אורח, בדרך הנוחה לו'],
+              ['📊', 'דוחות בזמן אמת', 'מעקב אחרי אישורי הגעה וסטטיסטיקות'],
+            ].map(([icon, title, subtitle]) => (
+              <div key={title} className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.045] px-4 py-3 text-right">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-violet-500/20 text-xl">{icon}</div>
+                <div className="min-w-0 flex-1">
+                  <h3 className="text-base font-black text-slate-100">{title}</h3>
+                  <p className="mt-0.5 text-xs font-medium text-slate-400">{subtitle}</p>
+                </div>
               </div>
             ))}
           </div>
-        </div>
-      )}
 
-      <div className="mt-3 w-full space-y-2">
-        {[
-          ['🎨', 'הזמנה מעוצבת', 'עיצובים יוקרתיים שמתאימים לאירוע שלכם'],
-          ['📱', 'שליחה בוואטסאפ ו-SMS', 'מגיעים לכל אורח, בדרך הנוחה לו'],
-          ['📊', 'דוחות בזמן אמת', 'מעקב אחרי אישורי הגעה וסטטיסטיקות'],
-        ].map(([icon, title, subtitle]) => (
-          <div key={title} className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.045] px-4 py-3 text-right">
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-violet-500/20 text-xl">{icon}</div>
-            <div className="min-w-0 flex-1">
-              <h3 className="text-base font-black text-slate-100">{title}</h3>
-              <p className="mt-0.5 text-xs font-medium text-slate-400">{subtitle}</p>
-            </div>
+          <div className="sticky bottom-3 z-10 mt-4 w-full rounded-3xl border border-white/10 bg-[#101437]/90 p-3 shadow-[0_18px_50px_rgba(0,0,0,0.45)] backdrop-blur-xl">
+            <button
+              type="button"
+              onClick={onCreateEvent}
+              className="w-full rounded-2xl bg-gradient-to-l from-emerald-500 to-green-400 px-6 py-3.5 text-lg font-black text-white shadow-[0_12px_34px_rgba(16,185,129,0.28)]"
+            >
+              התחל עכשיו
+            </button>
           </div>
-        ))}
-      </div>
-
-      <div className="sticky bottom-3 z-10 mt-4 w-full rounded-3xl border border-white/10 bg-[#101437]/90 p-3 shadow-[0_18px_50px_rgba(0,0,0,0.45)] backdrop-blur-xl">
-        <button
-          type="button"
-          onClick={onCreateEvent}
-          className="w-full rounded-2xl bg-gradient-to-l from-emerald-500 to-green-400 px-6 py-3.5 text-lg font-black text-white shadow-[0_12px_34px_rgba(16,185,129,0.28)]"
-        >
-          התחל עכשיו
-        </button>
-      </div>
+        </>
+      )}
     </div>
   </div>
 );
@@ -813,7 +815,7 @@ export default forwardRef(function HeroSection({ onStart, onPressCreateEvent, se
       <MobileHomepageHero
         onCreateEvent={handleCreateNewEvent}
         onShowProcess={() => onStart?.()}
-        showDemoCard={!activeEventId}
+        showPreEventMarketing={!activeEventId}
       />
       <div className={`mx-auto hidden max-w-6xl items-center gap-10 sm:grid lg:min-h-[calc(100vh-86px)] lg:gap-12 ${shouldShowActiveReports ? 'lg:grid-cols-[0.96fr_1.04fr]' : 'lg:grid-cols-[0.96fr_1.04fr]'}`}>
         <div className={`flex flex-col items-center gap-6 text-center lg:items-start lg:text-right ${shouldShowActiveReports ? 'lg:order-1' : 'lg:order-1'}`}>
