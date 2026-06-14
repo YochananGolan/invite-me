@@ -8775,7 +8775,7 @@ React.useEffect(()=>{
                         <div className={`${previewMetricValueClass} text-2xl sm:text-3xl font-bold text-amber-200`}>{messageCapacityChartModel.messageLimit}</div>
                       </div>
                       <div className="min-w-0 bg-white/5 border border-white/10 rounded-xl p-2 sm:p-3 text-right">
-                        <div className="text-[11px] sm:text-base font-semibold text-indigo-300">הודעות שנשלחו</div>
+                        <div className="text-[11px] sm:text-base font-semibold text-indigo-300">נשלחו</div>
                         <div className={`${previewMetricValueClass} text-2xl sm:text-3xl font-bold text-indigo-200`}>{messageCapacityChartModel.messagesSent}</div>
                       </div>
                       <div className={`min-w-0 bg-white/5 rounded-xl border ${messageCapacityChartModel.overMessages > 0 ? 'border-red-400/30' : 'border-emerald-400/30'} p-2 sm:p-3 text-right`}>
