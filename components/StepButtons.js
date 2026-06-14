@@ -7176,22 +7176,29 @@ React.useEffect(()=>{
     onAction,
     helpText,
     icon = '⚡',
+    minimal = false,
   }) => (
     <div className="mb-4 rounded-3xl border border-violet-300/25 bg-white/[0.06] p-4 text-center shadow-[0_10px_32px_rgba(0,0,0,0.28)] ring-1 ring-violet-400/20 backdrop-blur-2xl sm:hidden" dir="rtl">
-      <div className="flex items-start justify-between gap-3">
+      <div className={`flex items-start justify-between gap-3${minimal ? ' justify-center' : ''}`}>
         <div className="min-w-0 flex-1 text-right">
-          <div className="inline-flex rounded-full border border-violet-300/30 bg-violet-500/20 px-3 py-1 text-xs font-black text-violet-100">
-            {stepLabel}
-          </div>
-          <h3 className="mt-2 text-2xl font-black leading-tight text-white">הפעולה הבאה שלך</h3>
+          {!minimal && stepLabel && (
+            <div className="inline-flex rounded-full border border-violet-300/30 bg-violet-500/20 px-3 py-1 text-xs font-black text-violet-100">
+              {stepLabel}
+            </div>
+          )}
+          <h3 className={`${minimal ? '' : 'mt-2 '}text-2xl font-black leading-tight text-white`}>הפעולה הבאה שלך</h3>
           <p className="mt-1 text-base font-black text-emerald-200">{title}</p>
         </div>
-        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-emerald-300/30 bg-emerald-500/15 text-2xl text-emerald-200">
-          {icon}
-        </div>
+        {!minimal && (
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-emerald-300/30 bg-emerald-500/15 text-2xl text-emerald-200">
+            {icon}
+          </div>
+        )}
       </div>
-      <p className="mt-3 text-sm font-semibold leading-6 text-slate-300">{description}</p>
-      {actionText && (
+      {!minimal && description && (
+        <p className="mt-3 text-sm font-semibold leading-6 text-slate-300">{description}</p>
+      )}
+      {!minimal && actionText && onAction && (
         <button
           type="button"
           onClick={onAction}
@@ -7200,7 +7207,7 @@ React.useEffect(()=>{
           {actionText}
         </button>
       )}
-      {helpText && (
+      {!minimal && helpText && (
         <details className="mt-3 rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2 text-right">
           <summary className="cursor-pointer text-sm font-black text-violet-200">מה עושים כאן?</summary>
           <p className="mt-2 text-sm font-semibold leading-6 text-slate-300">{helpText}</p>
@@ -8933,13 +8940,8 @@ React.useEffect(()=>{
         <ModalBody>
           <div dir="rtl">
           {renderMobileNextActionCard({
-            stepLabel: 'שלב 2 מתוך 5',
             title: 'מלאו את פרטי האירוע',
-            description: 'הזינו את התאריך, השעה, המקום והפרטים שיופיעו בהזמנה.',
-            actionText: 'שמור פרטים והמשך',
-            onAction: handleSaveDetails,
-            helpText: 'הפרטים שתמלאו כאן ישמשו ליצירת נוסח ההזמנה ולעדכון האירוע בכל המכשירים.',
-            icon: '📝',
+            minimal: true,
           })}
           {eventDetailsSubmitAttempted && errorMsg && <p className="text-red-400 text-sm text-center mb-3 bg-red-500/10 border border-red-400/30 rounded-xl p-2.5">{errorMsg}</p>}
           {selectedEventType && (
