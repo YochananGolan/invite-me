@@ -7402,6 +7402,48 @@ React.useEffect(()=>{
             ))}
           </div>
 
+          <div className="mt-3 grid grid-cols-3 gap-2">
+            {[
+              [guestSummary.adults, 'מבוגרים', 'border-emerald-400/25 bg-emerald-500/10 text-emerald-300'],
+              [guestSummary.children, 'ילדים', 'border-orange-400/25 bg-orange-500/10 text-orange-300'],
+              [guestSummary.adults + guestSummary.children, 'סה״כ', 'border-indigo-400/25 bg-indigo-500/10 text-indigo-300'],
+            ].map(([value, label, tone], idx) => (
+              <div
+                key={`guest-summary-${idx}`}
+                className={`rounded-2xl border px-2 py-3 text-center ${tone}`}
+              >
+                <div className="text-3xl font-black leading-none tabular-nums">{value || 0}</div>
+                <div className="mt-1 text-[11px] font-black text-slate-100">{label}</div>
+              </div>
+            ))}
+          </div>
+
+          {messageCapacityChartModel && (
+            <div className="mt-3 grid grid-cols-3 gap-2">
+              {[
+                [messageCapacityChartModel.messageLimit, 'מגבלת הודעות', 'border-amber-400/25 bg-amber-500/10 text-amber-300'],
+                [messageCapacityChartModel.messagesSent, 'נשלחו', 'border-indigo-400/25 bg-indigo-500/10 text-indigo-300'],
+                [
+                  messageCapacityChartModel.overMessages > 0
+                    ? `-${messageCapacityChartModel.overMessages}`
+                    : messageCapacityChartModel.remainingMessages,
+                  messageCapacityChartModel.overMessages > 0 ? 'חריגה' : 'יתרה',
+                  messageCapacityChartModel.overMessages > 0
+                    ? 'border-rose-400/25 bg-rose-500/10 text-rose-300'
+                    : 'border-emerald-400/25 bg-emerald-500/10 text-emerald-300',
+                ],
+              ].map(([value, label, tone], idx) => (
+                <div
+                  key={`message-balance-${idx}`}
+                  className={`rounded-2xl border px-2 py-3 text-center ${tone}`}
+                >
+                  <div className="text-3xl font-black leading-none tabular-nums">{value ?? 0}</div>
+                  <div className="mt-1 text-[11px] font-black text-slate-100">{label}</div>
+                </div>
+              ))}
+            </div>
+          )}
+
           <div className="mt-3 rounded-2xl border border-white/10 bg-white/[0.04] p-3">
             <div className="grid grid-cols-4 gap-2">
               {[
