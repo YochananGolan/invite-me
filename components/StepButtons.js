@@ -7671,6 +7671,9 @@ React.useEffect(()=>{
           setStepBarTransform('translate3d(0, 0, 0)');
         }}
       >
+        <h2 className="mb-2 px-2 text-center text-sm font-black text-violet-200 sm:mb-3 sm:text-base">
+          שלבי יצירת הזמנה
+        </h2>
         <div className="flex flex-col gap-2 sm:hidden px-2">
           <div className="flex flex-col gap-2">
             {steps.slice(1, 4).map((step, idx) => {
