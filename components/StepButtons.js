@@ -85,6 +85,37 @@ function getGuestStatusBucket(status) {
   return status === 'approved' || status === 'rejected' ? status : 'pending';
 }
 
+function matchesGuestSearchTerm(guest, rawTerm) {
+  const term = String(rawTerm || '').trim().toLowerCase();
+  if (!term) return true;
+
+  const fullName = [guest.first_name, guest.last_name].filter(Boolean).join(' ').toLowerCase();
+  if (fullName.includes(term)) return true;
+  if (String(guest.first_name || '').toLowerCase().includes(term)) return true;
+  if (String(guest.last_name || '').toLowerCase().includes(term)) return true;
+  if (String(guest.table_number || '').toLowerCase().includes(term)) return true;
+
+  const searchDigits = term.replace(/\D/g, '');
+  const guestPhoneRaw = String(guest.phone || '');
+  if (guestPhoneRaw.toLowerCase().includes(term)) return true;
+
+  if (!searchDigits) return false;
+
+  const guestPhoneDigits = guestPhoneRaw.replace(/\D/g, '');
+  const normalizedGuestPhone = normalizePhoneNumber(guestPhoneDigits) || guestPhoneDigits;
+  const normalizedSearchPhone = normalizePhoneNumber(searchDigits) || searchDigits;
+
+  if (guestPhoneDigits.includes(searchDigits)) return true;
+  if (normalizedGuestPhone.includes(normalizedSearchPhone)) return true;
+  if (normalizedSearchPhone.includes(normalizedGuestPhone)) return true;
+
+  const searchWithoutLeadingZero = searchDigits.startsWith('0') ? searchDigits.slice(1) : searchDigits;
+  if (searchWithoutLeadingZero && guestPhoneDigits.includes(searchWithoutLeadingZero)) return true;
+  if (searchWithoutLeadingZero && normalizedGuestPhone.includes(searchWithoutLeadingZero)) return true;
+
+  return false;
+}
+
 function dedupeGuestsByIdentity(guests = []) {
   const byIdentity = new Map();
 
@@ -587,29 +618,14 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick, trig
     })
   ), [mobileSummaryFilter, mobileSummaryGuests]);
   const mobileQuickGuestSearchResults = React.useMemo(() => {
-    const term = mobileQuickGuestSearchQuery.trim().toLowerCase();
+    const term = mobileQuickGuestSearchQuery.trim();
     if (!term) return [];
-    return mobileStatusFilteredGuests.filter((guest) => (
-      [
-        guest.first_name,
-        guest.last_name,
-        guest.phone,
-        guest.table_number,
-      ].some((value) => String(value || '').toLowerCase().includes(term))
-    ));
+    return mobileStatusFilteredGuests.filter((guest) => matchesGuestSearchTerm(guest, term));
   }, [mobileQuickGuestSearchQuery, mobileStatusFilteredGuests]);
   const mobileFilteredSummaryGuests = React.useMemo(() => {
-    const term = mobileSummarySearch.trim().toLowerCase();
+    const term = mobileSummarySearch.trim();
     return mobileStatusFilteredGuests
-      .filter((guest) => {
-        if (!term) return true;
-        return [
-          guest.first_name,
-          guest.last_name,
-          guest.phone,
-          guest.table_number,
-        ].some((value) => String(value || '').toLowerCase().includes(term));
-      })
+      .filter((guest) => matchesGuestSearchTerm(guest, term))
       .slice(0, 6);
   }, [mobileStatusFilteredGuests, mobileSummarySearch]);
   const guestSummaryChartData = React.useMemo(() => ([
@@ -7401,7 +7417,7 @@ React.useEffect(()=>{
               type="submit"
               className="shrink-0 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600 px-4 py-2 text-sm font-black text-white shadow-[0_6px_18px_rgba(16,185,129,0.28)] transition-opacity active:opacity-85"
             >
-              התחל
+              חפש
             </button>
           </form>
 
@@ -7440,7 +7456,7 @@ React.useEffect(()=>{
               ) : (
                 <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-6 text-center">
                   <div className="text-base font-black text-white">הזינו שם או מספר נייד</div>
-                  <p className="mt-1 text-sm font-semibold text-slate-400">לאחר מילוי השדה לחצו על «התחל» לחיפוש.</p>
+                  <p className="mt-1 text-sm font-semibold text-slate-400">לאחר מילוי השדה לחצו על «חפש».</p>
                 </div>
               )
             ) : mobileStatusFilteredGuests.length > 0 ? mobileStatusFilteredGuests.slice(0, 4).map((guest, idx) => {
