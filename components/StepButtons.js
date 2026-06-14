@@ -7438,43 +7438,6 @@ React.useEffect(()=>{
             {`ראה רשימת אורחים : ${MOBILE_GUEST_FILTER_LABELS[mobileSummaryFilter] || MOBILE_GUEST_FILTER_LABELS.all}`}
           </button>
 
-          <div className="mt-3 space-y-2">
-            {mobileStatusFilteredGuests.length > 0 ? mobileStatusFilteredGuests.slice(0, 4).map((guest, idx) => {
-              const status = guest.status === 'approved' || guest.status === 'rejected' ? guest.status : 'pending';
-              const statusMeta = status === 'approved'
-                ? { label: 'אישר', className: 'bg-emerald-500/15 text-emerald-300 border-emerald-400/30', icon: '✓' }
-                : status === 'rejected'
-                  ? { label: 'לא מגיע', className: 'bg-rose-500/15 text-rose-300 border-rose-400/30', icon: '×' }
-                  : { label: 'ממתין', className: 'bg-amber-500/15 text-amber-300 border-amber-400/30', icon: '◷' };
-              const guestName = [guest.first_name, guest.last_name].filter(Boolean).join(' ') || `אורח ${idx + 1}`;
-              const initials = guestName.split(' ').map((part) => part[0]).filter(Boolean).slice(0, 2).join('');
-              return (
-                <MobileSwipeGuestCard
-                  key={`${guest.phone || guestName}-${idx}`}
-                  guestName={guestName}
-                  initials={initials}
-                  phone={guest.phone}
-                  statusMeta={statusMeta}
-                  onReminder={openMobileReminderFlow}
-                  onWhatsApp={() => openMobileGuestWhatsApp(guest.phone)}
-                  showActionButtons={false}
-                />
-              );
-            }) : (
-              <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-6 text-center">
-                <div className="text-base font-black text-white">אין אורחים להצגה</div>
-                <p className="mt-1 text-sm font-semibold text-slate-400">אחרי שליחת הזמנות תוכל לנהל כאן את האורחים במהירות.</p>
-                <button
-                  type="button"
-                  onClick={() => openMobileResumeStep(4)}
-                  className="mt-3 rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-600 px-5 py-3 text-base font-black text-white shadow-[0_10px_24px_rgba(16,185,129,0.28)] transition-opacity active:opacity-85"
-                >
-                  עבור לשליחה
-                </button>
-              </div>
-            )}
-          </div>
-
           <form
             className="mt-3 flex min-w-0 items-center gap-1.5 rounded-2xl border border-white/10 bg-white/[0.055] p-1.5"
             onSubmit={(event) => {
