@@ -7335,23 +7335,19 @@ React.useEffect(()=>{
             </div>
           </div>
 
-          <div className="mt-3 rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2 text-center text-xs font-semibold text-slate-400">
-            החלק שמאלה ל-WhatsApp · ימינה לתזכורת
-          </div>
-
-          <div className="mt-3">
-            <label className="sr-only" htmlFor="mobile-quick-guest-search">חיפוש אורח</label>
-            <input
-              id="mobile-quick-guest-search"
-              type="search"
-              value={mobileSummarySearch}
-              onChange={(event) => setMobileSummarySearch(event.target.value)}
-              placeholder="חפש אורח לפי שם או מספר נייד"
-              className="w-full rounded-2xl border border-white/10 bg-white/[0.055] px-4 py-3 text-right text-base font-semibold text-slate-100 placeholder:text-slate-500 focus:border-violet-300 focus:outline-none"
-            />
-          </div>
-
           <div className="mt-3 space-y-2">
+            <div>
+              <label className="sr-only" htmlFor="mobile-quick-guest-search">חיפוש אורח</label>
+              <input
+                id="mobile-quick-guest-search"
+                type="search"
+                value={mobileSummarySearch}
+                onChange={(event) => setMobileSummarySearch(event.target.value)}
+                placeholder="חפש אורח לפי שם או מספר נייד"
+                className="w-full rounded-2xl border border-white/10 bg-white/[0.055] px-4 py-3 text-right text-base font-semibold text-slate-100 placeholder:text-slate-500 focus:border-violet-300 focus:outline-none"
+              />
+            </div>
+
             {mobileFilteredSummaryGuests.length > 0 ? mobileFilteredSummaryGuests.slice(0, 4).map((guest, idx) => {
               const status = guest.status === 'approved' || guest.status === 'rejected' ? guest.status : 'pending';
               const statusMeta = status === 'approved'
