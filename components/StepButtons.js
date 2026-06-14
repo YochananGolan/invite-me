@@ -85,6 +85,13 @@ function getGuestStatusBucket(status) {
   return status === 'approved' || status === 'rejected' ? status : 'pending';
 }
 
+const MOBILE_GUEST_FILTER_LABELS = {
+  all: 'כולם',
+  approved: 'אישרו',
+  pending: 'ממתינים',
+  rejected: 'לא מגיעים',
+};
+
 function normalizePhoneForGuestSearch(rawDigits) {
   const digits = String(rawDigits || '').replace(/\D/g, '');
   if (!digits) return null;
@@ -610,6 +617,7 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick, trig
   const [mobileQuickGuestSearchDraft, setMobileQuickGuestSearchDraft] = useState('');
   const [mobileQuickGuestSearchQuery, setMobileQuickGuestSearchQuery] = useState('');
   const [mobileQuickGuestSearchSubmitted, setMobileQuickGuestSearchSubmitted] = useState(false);
+  const [showMobileQuickGuestListScreen, setShowMobileQuickGuestListScreen] = useState(false);
   const [mobileSummaryFilter, setMobileSummaryFilter] = useState('all');
   const [mobileShowMoreCards, setMobileShowMoreCards] = useState(false);
   const [showMobileFirstSendSuccess, setShowMobileFirstSendSuccess] = useState(false);
@@ -7098,6 +7106,14 @@ React.useEffect(()=>{
     setMobileQuickGuestSearchSubmitted(false);
   }, []);
 
+  const openMobileQuickGuestListScreen = React.useCallback(() => {
+    setShowMobileQuickGuestListScreen(true);
+  }, []);
+
+  const closeMobileQuickGuestListScreen = React.useCallback(() => {
+    setShowMobileQuickGuestListScreen(false);
+  }, []);
+
   const renderMobileNextActionCard = ({
     stepLabel,
     title,
@@ -7414,22 +7430,13 @@ React.useEffect(()=>{
             </div>
           </div>
 
-          <div className="mt-3 grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              onClick={openMobileReminderFlow}
-              className="rounded-xl border border-amber-300/35 bg-amber-500/[0.12] px-3 py-2 text-sm font-black text-amber-100 transition-colors active:bg-amber-500/[0.22]"
-            >
-              תזכורת
-            </button>
-            <button
-              type="button"
-              onClick={() => openMobileResumeStep(4)}
-              className="rounded-xl border border-emerald-300/35 bg-emerald-500/15 px-3 py-2 text-sm font-black text-emerald-100 transition-colors active:bg-emerald-500/25"
-            >
-              WhatsApp
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={openMobileQuickGuestListScreen}
+            className="mt-3 w-full rounded-2xl border border-violet-300/30 bg-violet-500/15 px-4 py-3 text-base font-black text-violet-100 transition-colors active:bg-violet-500/25"
+          >
+            {`ראה רשימת אורחים : ${MOBILE_GUEST_FILTER_LABELS[mobileSummaryFilter] || MOBILE_GUEST_FILTER_LABELS.all}`}
+          </button>
 
           <div className="mt-3 space-y-2">
             {mobileStatusFilteredGuests.length > 0 ? mobileStatusFilteredGuests.slice(0, 4).map((guest, idx) => {
@@ -7577,6 +7584,67 @@ React.useEffect(()=>{
             <button
               type="button"
               onClick={handleMobileQuickGuestSearchBack}
+              className="w-full rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-600 px-4 py-4 text-lg font-black text-white shadow-[0_10px_24px_rgba(16,185,129,0.28)] transition-opacity active:opacity-85"
+            >
+              חזור
+            </button>
+          </div>
+        </div>
+      )}
+
+      {showMobileQuickGuestListScreen && (
+        <div className="fixed inset-0 z-[120] flex flex-col bg-[#08091a] sm:hidden" dir="rtl">
+          <div className="shrink-0 border-b border-white/10 bg-[#0d0f2b]/95 px-4 pb-4 pt-[max(1rem,env(safe-area-inset-top))] backdrop-blur-xl">
+            <div className="text-sm font-black text-violet-200">ניהול אורחים מהיר</div>
+            <h2 className="mt-1 text-3xl font-black text-white">
+              {`ראה רשימת אורחים : ${MOBILE_GUEST_FILTER_LABELS[mobileSummaryFilter] || MOBILE_GUEST_FILTER_LABELS.all}`}
+            </h2>
+            <p className="mt-2 text-base font-semibold text-slate-300">
+              {mobileStatusFilteredGuests.length} אורחים
+            </p>
+          </div>
+
+          <div className="flex-1 overflow-y-auto px-4 py-5">
+            {mobileStatusFilteredGuests.length > 0 ? (
+              <div className="space-y-3">
+                {mobileStatusFilteredGuests.map((guest, idx) => {
+                  const status = guest.status === 'approved' || guest.status === 'rejected' ? guest.status : 'pending';
+                  const statusMeta = status === 'approved'
+                    ? { label: 'אישר', className: 'bg-emerald-500/15 text-emerald-300 border-emerald-400/30', icon: '✓' }
+                    : status === 'rejected'
+                      ? { label: 'לא מגיע', className: 'bg-rose-500/15 text-rose-300 border-rose-400/30', icon: '×' }
+                      : { label: 'ממתין', className: 'bg-amber-500/15 text-amber-300 border-amber-400/30', icon: '◷' };
+                  const guestName = [guest.first_name, guest.last_name].filter(Boolean).join(' ') || `אורח ${idx + 1}`;
+                  const initials = guestName.split(' ').map((part) => part[0]).filter(Boolean).slice(0, 2).join('');
+                  return (
+                    <MobileSwipeGuestCard
+                      key={`list-${guest.phone || guestName}-${idx}`}
+                      guestName={guestName}
+                      initials={initials}
+                      phone={guest.phone}
+                      statusMeta={statusMeta}
+                      onReminder={openMobileReminderFlow}
+                      onWhatsApp={() => openMobileGuestWhatsApp(guest.phone)}
+                      showActionButtons={false}
+                    />
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="flex min-h-[50vh] flex-col items-center justify-center rounded-[1.75rem] border border-white/10 bg-white/[0.04] px-6 py-12 text-center">
+                <div className="text-5xl">👥</div>
+                <div className="mt-4 text-2xl font-black text-white">אין אורחים להצגה</div>
+                <p className="mt-3 max-w-xs text-base font-semibold leading-7 text-slate-400">
+                  אין אורחים במסנן «{MOBILE_GUEST_FILTER_LABELS[mobileSummaryFilter] || MOBILE_GUEST_FILTER_LABELS.all}». נסו לשנות את המסנן.
+                </p>
+              </div>
+            )}
+          </div>
+
+          <div className="shrink-0 border-t border-white/10 bg-[#0d0f2b]/95 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4 backdrop-blur-xl">
+            <button
+              type="button"
+              onClick={closeMobileQuickGuestListScreen}
               className="w-full rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-600 px-4 py-4 text-lg font-black text-white shadow-[0_10px_24px_rgba(16,185,129,0.28)] transition-opacity active:opacity-85"
             >
               חזור
