@@ -6817,91 +6817,6 @@ React.useEffect(()=>{
     };
   }, [currentEventId, formData?.date, formData?.start_datetime, mobileSummaryGuests]);
 
-  const mobileSmartActionModel = React.useMemo(() => {
-    const shouldShow = Boolean(
-      currentEventId ||
-      newEventStarted ||
-      selectedEventType ||
-      formDataHasMeaningfulValues ||
-      selectedDesign ||
-      invitedCount > 0 ||
-      guestStatusSummary.pending > 0
-    );
-    if (!shouldShow) return { shouldShow: false };
-
-    if (mobileEventTodayModel.shouldShow) {
-      return {
-        shouldShow: true,
-        title: 'פתח דוחות עכשיו',
-        description: 'האירוע היום, כדאי לעקוב אחרי אישורי ההגעה בזמן אמת.',
-        badge: 'האירוע היום',
-        actionText: 'פתח דוחות',
-        action: 'reports',
-        icon: '▥',
-        tone: 'emerald',
-      };
-    }
-
-    if (guestStatusSummary.pending > 0) {
-      return {
-        shouldShow: true,
-        title: 'בדוק מי עדיין לא הגיב',
-        description: 'יש אורחים שממתינים לתגובה, וכדאי לטפל בהם לפני האירוע.',
-        badge: `${guestStatusSummary.pending} ממתינים`,
-        actionText: 'פתח דוח ממתינים',
-        action: 'pending',
-        icon: '◷',
-        tone: 'emerald',
-      };
-    }
-
-    if (!selectedDesign) {
-      return {
-        shouldShow: true,
-        title: 'בחר עיצוב להזמנה',
-        description: 'השלב הבא הוא לבחור תבנית ולעצב את ההזמנה לפני שליחה.',
-        badge: 'שלב מומלץ',
-        actionText: 'בחר עיצוב',
-        action: 'design',
-        icon: '🎨',
-        tone: 'violet',
-      };
-    }
-
-    if (invitedCount === 0) {
-      return {
-        shouldShow: true,
-        title: 'שלח הזמנה ראשונה',
-        description: 'ההזמנה מוכנה, עכשיו אפשר לשלוח אותה לאורח הראשון.',
-        badge: 'אין מוזמנים עדיין',
-        actionText: 'עבור לשליחה',
-        action: 'send',
-        icon: '✈',
-        tone: 'emerald',
-      };
-    }
-
-    return {
-      shouldShow: true,
-      title: 'פתח דוחות',
-      description: 'עקוב אחרי מצב האורחים ואישורי ההגעה של האירוע.',
-      badge: `${invitedCount} מוזמנים`,
-      actionText: 'פתח דוחות',
-      action: 'reports',
-      icon: '▥',
-      tone: 'violet',
-    };
-  }, [
-    currentEventId,
-    formDataHasMeaningfulValues,
-    guestStatusSummary.pending,
-    invitedCount,
-    mobileEventTodayModel.shouldShow,
-    newEventStarted,
-    selectedDesign,
-    selectedEventType,
-  ]);
-
   const mobileReadinessModel = React.useMemo(() => {
     const shouldShow = Boolean(
       currentEventId ||
@@ -7008,7 +6923,6 @@ React.useEffect(()=>{
     if (mobileEventTodayModel.shouldShow) secondaryCount += 1;
     if (mobileReminderStatusModel.shouldShow) secondaryCount += 1;
     if (mobileResumeModel.shouldShow) secondaryCount += 1;
-    if (mobileSmartActionModel.shouldShow) secondaryCount += 1;
 
     return {
       shouldShow: true,
@@ -7031,7 +6945,6 @@ React.useEffect(()=>{
     mobileReadinessModel.totalCount,
     mobileReminderStatusModel.shouldShow,
     mobileResumeModel.shouldShow,
-    mobileSmartActionModel.shouldShow,
     newEventStarted,
     selectedDesign,
     selectedEventType,
@@ -7301,22 +7214,6 @@ React.useEffect(()=>{
     }
     openMobileResumeStep(5);
   }, [mobileDailySummaryModel.recommendedAction, openMobileReminderFlow, openMobileResumeStep]);
-
-  const handleMobileSmartAction = React.useCallback((action) => {
-    if (action === 'pending') {
-      openMobilePendingReport();
-      return;
-    }
-    if (action === 'design') {
-      openMobileResumeStep(3);
-      return;
-    }
-    if (action === 'send') {
-      openMobileResumeStep(4);
-      return;
-    }
-    openMobileResumeStep(5);
-  }, [openMobilePendingReport, openMobileResumeStep]);
 
   const openMobileGuestWhatsApp = React.useCallback((phone) => {
     const normalizedPhone = normalizePhoneNumber(phone);
@@ -7689,92 +7586,6 @@ React.useEffect(()=>{
               {mobileDailySummaryModel.recommendedLabel}
             </button>
           </div>
-        </section>
-      )}
-
-      {hasSession && mobileSmartActionModel.shouldShow && (
-        <section className="mx-auto mb-4 w-full max-w-md rounded-[1.75rem] border border-violet-300/25 bg-white/[0.06] p-4 text-right shadow-[0_14px_44px_rgba(0,0,0,0.36)] ring-1 ring-violet-400/20 backdrop-blur-2xl sm:hidden" dir="rtl">
-          <div className="text-center">
-            <div className="text-sm font-black text-violet-200">הפעולה החשובה עכשיו</div>
-            <h2 className="mt-1 text-2xl font-black leading-tight text-white">מרכז פעולות חכם</h2>
-          </div>
-
-          <div className={`mt-4 rounded-3xl border p-4 text-center ${
-            mobileSmartActionModel.tone === 'emerald'
-              ? 'border-emerald-400/35 bg-emerald-500/[0.12]'
-              : 'border-violet-400/35 bg-violet-500/15'
-          }`}>
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-white/15 bg-white/10 text-2xl text-white">
-                {mobileSmartActionModel.icon}
-              </div>
-              <div className="min-w-0 flex-1 text-right">
-                <div className="text-sm font-black text-emerald-200">הפעולה המומלצת</div>
-                <h3 className="mt-1 text-2xl font-black leading-tight text-white">{mobileSmartActionModel.title}</h3>
-                <p className="mt-1 text-sm font-semibold leading-6 text-slate-300">{mobileSmartActionModel.description}</p>
-              </div>
-              <div className="shrink-0 rounded-2xl border border-white/15 bg-white/10 px-3 py-2 text-center">
-                <div className="text-sm font-black text-emerald-200">{mobileSmartActionModel.badge}</div>
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={() => handleMobileSmartAction(mobileSmartActionModel.action)}
-              className="mt-4 w-full rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-600 px-4 py-3.5 text-lg font-black text-white shadow-[0_10px_26px_rgba(16,185,129,0.30)] transition-opacity active:opacity-85"
-            >
-              {mobileSmartActionModel.actionText}
-            </button>
-          </div>
-
-          {mobileShowMoreCards && (
-          <>
-          <div className="mt-3 space-y-2">
-            <button
-              type="button"
-              onClick={openMobileReminderFlow}
-              className="flex w-full items-center justify-between gap-3 rounded-2xl border border-white/12 bg-white/[0.055] px-4 py-3 text-right transition-colors active:bg-white/[0.10]"
-            >
-              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-violet-500/20 text-xl text-violet-100">✈</span>
-              <span className="min-w-0 flex-1">
-                <span className="block text-base font-black text-white">שלח תזכורת</span>
-                <span className="block text-xs font-semibold text-slate-400">פתח את מסך השליחה לאורחים</span>
-              </span>
-              <span className="text-2xl text-violet-200">‹</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => openMobileResumeStep(4)}
-              className="flex w-full items-center justify-between gap-3 rounded-2xl border border-white/12 bg-white/[0.055] px-4 py-3 text-right transition-colors active:bg-white/[0.10]"
-            >
-              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-blue-500/20 text-xl text-blue-100">+</span>
-              <span className="min-w-0 flex-1">
-                <span className="block text-base font-black text-white">שלח הזמנה ראשונה</span>
-                <span className="block text-xs font-semibold text-slate-400">הוסף אורח ושלח הזמנה</span>
-              </span>
-              <span className="text-2xl text-violet-200">‹</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => openMobileResumeStep(5)}
-              className="flex w-full items-center justify-between gap-3 rounded-2xl border border-white/12 bg-white/[0.055] px-4 py-3 text-right transition-colors active:bg-white/[0.10]"
-            >
-              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-indigo-500/20 text-xl text-indigo-100">▥</span>
-              <span className="min-w-0 flex-1">
-                <span className="block text-base font-black text-white">פתח דוחות</span>
-                <span className="block text-xs font-semibold text-slate-400">צפה בדוחות ועקוב אחרי ההזמנות</span>
-              </span>
-              <span className="text-2xl text-violet-200">‹</span>
-            </button>
-          </div>
-
-          <div className="mt-3 rounded-2xl border border-violet-400/20 bg-violet-500/10 px-4 py-3 text-center">
-            <div className="text-sm font-black text-violet-200">תובנה חכמה</div>
-            <p className="mt-1 text-xs font-semibold leading-5 text-slate-400">
-              כדאי לשלוח תזכורת 5 ימים לפני האירוע לפי ערוץ ההזמנה המקורי.
-            </p>
-          </div>
-          </>
-          )}
         </section>
       )}
 
