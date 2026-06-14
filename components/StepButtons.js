@@ -7435,14 +7435,24 @@ React.useEffect(()=>{
               נקה
             </button>
             <label className="sr-only" htmlFor="mobile-quick-guest-search">חיפוש אורח</label>
-            <input
-              id="mobile-quick-guest-search"
-              type="search"
-              value={mobileQuickGuestSearchDraft}
-              onChange={(event) => setMobileQuickGuestSearchDraft(event.target.value)}
-              placeholder="שם או מספר נייד"
-              className="min-w-0 w-0 flex-1 border-0 bg-transparent px-1 py-1.5 text-right text-sm font-semibold text-slate-100 placeholder:text-slate-500 focus:outline-none"
-            />
+            <div className="relative min-w-0 flex-1">
+              {!mobileQuickGuestSearchDraft && (
+                <span
+                  aria-hidden="true"
+                  className="pointer-events-none absolute inset-y-0 right-1 flex items-center text-sm font-semibold text-slate-500"
+                >
+                  חפש אורח לפי שם או נייד
+                </span>
+              )}
+              <input
+                id="mobile-quick-guest-search"
+                type="search"
+                value={mobileQuickGuestSearchDraft}
+                onChange={(event) => setMobileQuickGuestSearchDraft(event.target.value)}
+                placeholder=""
+                className="w-full border-0 bg-transparent px-1 py-1.5 text-right text-sm font-semibold text-slate-100 focus:outline-none"
+              />
+            </div>
             <button
               type="submit"
               className="shrink-0 rounded-lg bg-gradient-to-br from-emerald-500 to-emerald-600 px-2.5 py-1.5 text-xs font-black text-white shadow-[0_6px_18px_rgba(16,185,129,0.28)] transition-opacity active:opacity-85"
