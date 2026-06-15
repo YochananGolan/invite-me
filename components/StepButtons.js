@@ -617,6 +617,7 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick, trig
   const [mobileQuickGuestSearchDraft, setMobileQuickGuestSearchDraft] = useState('');
   const [mobileQuickGuestSearchQuery, setMobileQuickGuestSearchQuery] = useState('');
   const [mobileQuickGuestSearchSubmitted, setMobileQuickGuestSearchSubmitted] = useState(false);
+  const [mobileQuickGuestSearchSelectedKey, setMobileQuickGuestSearchSelectedKey] = useState(null);
   const [showMobileQuickGuestListScreen, setShowMobileQuickGuestListScreen] = useState(false);
   const [mobileSummaryFilter, setMobileSummaryFilter] = useState('all');
   const [showMobileFirstSendSuccess, setShowMobileFirstSendSuccess] = useState(false);
@@ -652,6 +653,30 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick, trig
     if (!term) return [];
     return mobileStatusFilteredGuests.filter((guest) => matchesGuestSearchTerm(guest, term));
   }, [mobileQuickGuestSearchQuery, mobileStatusFilteredGuests]);
+
+  const mobileQuickGuestSearchTargetGuest = React.useMemo(() => {
+    if (mobileQuickGuestSearchResults.length === 0) return null;
+    if (mobileQuickGuestSearchSelectedKey) {
+      const selectedGuest = mobileQuickGuestSearchResults.find(
+        (guest) => getGuestIdentityKey(guest) === mobileQuickGuestSearchSelectedKey
+      );
+      if (selectedGuest) return selectedGuest;
+    }
+    return mobileQuickGuestSearchResults[0];
+  }, [mobileQuickGuestSearchResults, mobileQuickGuestSearchSelectedKey]);
+
+  React.useEffect(() => {
+    if (mobileQuickGuestSearchResults.length === 0) {
+      setMobileQuickGuestSearchSelectedKey(null);
+      return;
+    }
+    setMobileQuickGuestSearchSelectedKey((prev) => {
+      if (prev && mobileQuickGuestSearchResults.some((guest) => getGuestIdentityKey(guest) === prev)) {
+        return prev;
+      }
+      return getGuestIdentityKey(mobileQuickGuestSearchResults[0]);
+    });
+  }, [mobileQuickGuestSearchResults]);
   const mobileFilteredSummaryGuests = React.useMemo(() => {
     const term = mobileSummarySearch.trim();
     return mobileStatusFilteredGuests
@@ -7012,6 +7037,23 @@ React.useEffect(()=>{
     tryOpenWizardStep(4);
   }, [tryOpenWizardStep]);
 
+  const openMobileReminderForGuest = React.useCallback((guest) => {
+    if (guest) {
+      setGuestData({
+        guestFirstName: guest.first_name || '',
+        guestLastName: guest.last_name || '',
+        guestPhone: guest.phone || '',
+        guestTable: guest.table_number || '',
+      });
+      setGuestErrors({});
+      setGuestSubmitAttempted(false);
+    }
+    setMobileQuickGuestSearchSubmitted(false);
+    setShowReportsOptions(false);
+    setStepErrorMsg('');
+    tryOpenWizardStep(4);
+  }, [tryOpenWizardStep]);
+
   const openMobileGuestWhatsApp = React.useCallback((phone) => {
     const normalizedPhone = normalizePhoneNumber(phone);
     if (!normalizedPhone) {
@@ -7032,12 +7074,14 @@ React.useEffect(()=>{
   const handleMobileQuickGuestSearchBack = React.useCallback(() => {
     setMobileQuickGuestSearchSubmitted(false);
     setMobileQuickGuestSearchQuery('');
+    setMobileQuickGuestSearchSelectedKey(null);
   }, []);
 
   const handleMobileQuickGuestSearchClear = React.useCallback(() => {
     setMobileQuickGuestSearchDraft('');
     setMobileQuickGuestSearchQuery('');
     setMobileQuickGuestSearchSubmitted(false);
+    setMobileQuickGuestSearchSelectedKey(null);
   }, []);
 
   const openMobileQuickGuestListScreen = React.useCallback(() => {
@@ -7492,7 +7536,14 @@ React.useEffect(()=>{
                   <div className="text-sm font-black text-slate-400">
                     נמצאו {mobileQuickGuestSearchResults.length} אורחים
                   </div>
+                  {mobileQuickGuestSearchResults.length > 1 && (
+                    <p className="text-xs font-semibold text-violet-200">
+                      לחצו על אורח לבחירה לפני שליחת תזכורת או WhatsApp
+                    </p>
+                  )}
                   {mobileQuickGuestSearchResults.map((guest, idx) => {
+                    const guestKey = getGuestIdentityKey(guest);
+                    const isSelected = mobileQuickGuestSearchSelectedKey === guestKey;
                     const status = guest.status === 'approved' || guest.status === 'rejected' ? guest.status : 'pending';
                     const statusMeta = status === 'approved'
                       ? { label: 'אישר', className: 'bg-emerald-500/15 text-emerald-300 border-emerald-400/30', icon: '✓' }
@@ -7502,16 +7553,33 @@ React.useEffect(()=>{
                     const guestName = [guest.first_name, guest.last_name].filter(Boolean).join(' ') || `אורח ${idx + 1}`;
                     const initials = guestName.split(' ').map((part) => part[0]).filter(Boolean).slice(0, 2).join('');
                     return (
-                      <MobileSwipeGuestCard
-                        key={`search-${guest.phone || guestName}-${idx}`}
-                        guestName={guestName}
-                        initials={initials}
-                        phone={guest.phone}
-                        statusMeta={statusMeta}
-                        onReminder={openMobileReminderFlow}
-                        onWhatsApp={() => openMobileGuestWhatsApp(guest.phone)}
-                        showActionButtons={false}
-                      />
+                      <div
+                        key={`search-${guestKey}-${idx}`}
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => setMobileQuickGuestSearchSelectedKey(guestKey)}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter' || event.key === ' ') {
+                            event.preventDefault();
+                            setMobileQuickGuestSearchSelectedKey(guestKey);
+                          }
+                        }}
+                        className={`block w-full rounded-2xl text-right transition-all ${
+                          isSelected
+                            ? 'ring-2 ring-violet-400/80 ring-offset-2 ring-offset-[#08091a]'
+                            : 'ring-1 ring-transparent'
+                        }`}
+                      >
+                        <MobileSwipeGuestCard
+                          guestName={guestName}
+                          initials={initials}
+                          phone={guest.phone}
+                          statusMeta={statusMeta}
+                          onReminder={openMobileReminderFlow}
+                          onWhatsApp={() => openMobileGuestWhatsApp(guest.phone)}
+                          showActionButtons={false}
+                        />
+                      </div>
                     );
                   })}
                 </div>
@@ -7536,6 +7604,36 @@ React.useEffect(()=>{
           </div>
 
           <div className="shrink-0 border-t border-white/10 bg-[#0d0f2b]/95 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4 backdrop-blur-xl">
+            {mobileQuickGuestSearchQuery && mobileQuickGuestSearchResults.length > 0 && mobileQuickGuestSearchTargetGuest && (
+              <>
+                {mobileQuickGuestSearchResults.length > 1 && (
+                  <p className="mb-2 text-center text-xs font-semibold text-slate-400">
+                    נבחר:{' '}
+                    <span className="font-black text-white">
+                      {[mobileQuickGuestSearchTargetGuest.first_name, mobileQuickGuestSearchTargetGuest.last_name]
+                        .filter(Boolean)
+                        .join(' ') || 'אורח'}
+                    </span>
+                  </p>
+                )}
+                <div className="mb-3 grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => openMobileReminderForGuest(mobileQuickGuestSearchTargetGuest)}
+                    className="rounded-2xl border border-amber-300/35 bg-amber-500/[0.12] px-3 py-3.5 text-base font-black text-amber-100 transition-colors active:bg-amber-500/[0.22]"
+                  >
+                    שלח תזכורת
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => openMobileGuestWhatsApp(mobileQuickGuestSearchTargetGuest.phone)}
+                    className="rounded-2xl border border-emerald-300/35 bg-emerald-500/15 px-3 py-3.5 text-base font-black text-emerald-100 transition-colors active:bg-emerald-500/25"
+                  >
+                    WhatsApp
+                  </button>
+                </div>
+              </>
+            )}
             <button
               type="button"
               onClick={handleMobileQuickGuestSearchBack}
