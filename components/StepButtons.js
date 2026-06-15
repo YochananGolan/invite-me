@@ -1829,12 +1829,14 @@ const handleOpenAddonModal = React.useCallback(() => {
       return;
     }
 
+    setIsSendingInvitation(true);
 
     // Attempt to save guest to Supabase (optional – will work only if table exists)
     let newGuestRecord = null;
     try {
       const user = await resolveCurrentUserForSync();
       if (!user) {
+        setIsSendingInvitation(false);
         setGuestErrorMsg('יש להתחבר כדי לשלוח הזמנות');
         return;
       }
@@ -1844,6 +1846,7 @@ const handleOpenAddonModal = React.useCallback(() => {
         (getPlanBaseLimit(selectedPlan || planForDisplay || userPlanSettings?.plan || null) || 0) +
         addonCountForDisplay * (getPlanBaseLimit('addon') || 100);
       if (totalLimitForSend > 0 && effectiveMessagesSentCount >= totalLimitForSend) {
+        setIsSendingInvitation(false);
         setPendingAddonCount(1);
         setShowPlanLimitWarning(true);
         setPlanAddOnMode(true);
@@ -1971,6 +1974,7 @@ const handleOpenAddonModal = React.useCallback(() => {
       }
     } catch (err) {
       console.error('Failed to send invitation:', err);
+      setIsSendingInvitation(false);
       if (newGuestRecord?.id) {
         await cleanupGuestsAfterFailedSend([newGuestRecord.id]);
       }
@@ -11311,18 +11315,24 @@ React.useEffect(()=>{
         </ModalBody>
       </Modal>
 
-      {/* Invitation Send Loading Modal */}
-      <Modal open={isSendingInvitation} onClose={() => {}} size="sm">
-        <ModalBody className="text-center py-8">
-            <div className="text-6xl md:text-7xl mb-6 animate-spin">⏳</div>
-            <h2 className="text-2xl md:text-3xl font-bold text-primary mb-4">
-              שולח הזמנה...
-            </h2>
-            <p className="text-lg md:text-xl text-slate-300">
-              אנא המתן, ההזמנה נשלחת כעת
+      {/* Invitation Send Loading Overlay */}
+      {isSendingInvitation && (
+        <div
+          className="fixed inset-0 z-[140] flex items-center justify-center bg-[#0a0b1e]/80 px-6 backdrop-blur-sm"
+          dir="rtl"
+          role="alertdialog"
+          aria-live="polite"
+          aria-busy="true"
+          aria-label="מתבצעת שליחת הזמנה"
+        >
+          <div className="max-w-sm text-center">
+            <div className="mb-6 text-7xl leading-none">⏳</div>
+            <p className="text-xl font-black leading-relaxed text-white sm:text-2xl">
+              מתבצעת שליחת הזמנה נא להמתין .....
             </p>
-        </ModalBody>
-      </Modal>
+          </div>
+        </div>
+      )}
 
       {/* Invitation Send Result Modal */}
       <Modal open={showInvitationResultModal} onClose={() => setShowInvitationResultModal(false)} size="sm">
