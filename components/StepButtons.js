@@ -13,6 +13,14 @@ import TranzilaPayment from './TranzilaPayment';
 import Modal, { ModalHeader, ModalBody, ModalFooter } from './Modal';
 import Drawer, { DrawerHeader, DrawerBody, DrawerFooter } from './Drawer';
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid, LabelList } from 'recharts';
+import {
+  RSVP_STATUS_LABELS,
+  RSVP_STATUS_LABELS_COMPACT,
+  RSVP_FILTER_LABELS,
+  getGuestStatusBucket,
+  getGuestStatusMeta,
+  getRsvpStatusLabel,
+} from '../lib/rsvpLabels';
 
 const RADIAN = Math.PI / 180;
 const previewMetricValueClass = 'max-w-full min-w-0 break-all tabular-nums leading-tight';
@@ -80,17 +88,6 @@ function getGuestIdentityKey(guest = {}) {
   const tableNumber = String(guest.table_number ?? guest.guestTable ?? '').trim().toLowerCase();
   return `name:${firstName}|${lastName}|${tableNumber}`;
 }
-
-function getGuestStatusBucket(status) {
-  return status === 'approved' || status === 'rejected' ? status : 'pending';
-}
-
-const MOBILE_GUEST_FILTER_LABELS = {
-  all: 'כולם',
-  approved: 'אישרו',
-  pending: 'ממתינים',
-  rejected: 'לא מגיעים',
-};
 
 function normalizePhoneForGuestSearch(rawDigits) {
   const digits = String(rawDigits || '').replace(/\D/g, '');
@@ -671,9 +668,9 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick, trig
     allergy: { adults: 0, children: 0, total: 0 }
   });
   const statusChartData = React.useMemo(() => ([
-    { key: 'approved', name: 'אישרו הגעה', value: guestStatusSummary.approved, color: '#16a34a' },
-    { key: 'pending', name: 'טרם הגיבו', value: guestStatusSummary.pending, color: '#facc15' },
-    { key: 'rejected', name: 'לא אישרו', value: guestStatusSummary.rejected, color: '#dc2626' }
+    { key: 'approved', name: RSVP_STATUS_LABELS.approved, value: guestStatusSummary.approved, color: '#16a34a' },
+    { key: 'pending', name: RSVP_STATUS_LABELS.pending, value: guestStatusSummary.pending, color: '#facc15' },
+    { key: 'rejected', name: RSVP_STATUS_LABELS.rejected, value: guestStatusSummary.rejected, color: '#dc2626' }
   ]), [guestStatusSummary]);
   const statusChartDataNonZero = React.useMemo(
     () => statusChartData.filter(item => Number(item.value) > 0),
@@ -7315,15 +7312,15 @@ React.useEffect(()=>{
       </div>
       <div className={`grid gap-2 mt-3 ${forMobileOverlay ? 'grid-cols-3 text-[11px]' : 'grid-cols-1 sm:grid-cols-3 text-base'}`}>
         <div className={`min-w-0 bg-white/5 border border-white/10 rounded-xl text-right ${forMobileOverlay ? 'p-2 text-center' : 'p-3'}`}>
-          <div className={`font-semibold text-emerald-300 ${forMobileOverlay ? 'leading-tight whitespace-nowrap' : ''}`}>{forMobileOverlay ? 'אישרו\u00A0הגעה' : 'אישרו הגעה'}</div>
+          <div className={`font-semibold text-emerald-300 ${forMobileOverlay ? 'leading-tight whitespace-nowrap' : ''}`}>{forMobileOverlay ? RSVP_STATUS_LABELS.approved.replace(' ', '\u00A0') : RSVP_STATUS_LABELS.approved}</div>
           <div className={`${previewMetricValueClass} font-bold text-emerald-300 ${forMobileOverlay ? 'text-2xl' : 'text-3xl'}`}>{guestStatusSummary.approved}</div>
         </div>
         <div className={`min-w-0 bg-white/5 border border-white/10 rounded-xl text-right ${forMobileOverlay ? 'p-2 text-center' : 'p-3'}`}>
-          <div className={`font-semibold text-amber-300 ${forMobileOverlay ? 'leading-tight' : ''}`}>טרם הגיבו</div>
+          <div className={`font-semibold text-amber-300 ${forMobileOverlay ? 'leading-tight' : ''}`}>{RSVP_STATUS_LABELS.pending}</div>
           <div className={`${previewMetricValueClass} font-bold text-amber-300 ${forMobileOverlay ? 'text-2xl' : 'text-3xl'}`}>{guestStatusSummary.pending}</div>
         </div>
         <div className={`min-w-0 bg-white/5 border border-white/10 rounded-xl text-right ${forMobileOverlay ? 'p-2 text-center' : 'p-3'}`}>
-          <div className={`font-semibold text-rose-400 ${forMobileOverlay ? 'leading-tight' : ''}`}>לא אישרו</div>
+          <div className={`font-semibold text-rose-400 ${forMobileOverlay ? 'leading-tight' : ''}`}>{RSVP_STATUS_LABELS.rejected}</div>
           <div className={`${previewMetricValueClass} font-bold text-rose-400 ${forMobileOverlay ? 'text-2xl' : 'text-3xl'}`}>{guestStatusSummary.rejected}</div>
         </div>
       </div>
@@ -7735,9 +7732,9 @@ React.useEffect(()=>{
             <div className="mb-2 text-sm font-black text-violet-200">סטטוס אישורי הגעה</div>
             <div className="grid grid-cols-3 gap-2">
             {[
-              ['approved', guestStatusSummary.approved, 'אישרו', 'border-emerald-400/25 bg-emerald-500/10 text-emerald-300'],
-              ['pending', guestStatusSummary.pending, 'טרם הגיבו', 'border-amber-400/25 bg-amber-500/[0.12] text-amber-300'],
-              ['rejected', guestStatusSummary.rejected, 'לא מגיעים', 'border-rose-400/25 bg-rose-400/10 text-rose-300'],
+              ['approved', guestStatusSummary.approved, RSVP_STATUS_LABELS.approved, 'border-emerald-400/25 bg-emerald-500/10 text-emerald-300'],
+              ['pending', guestStatusSummary.pending, RSVP_STATUS_LABELS.pending, 'border-amber-400/25 bg-amber-500/[0.12] text-amber-300'],
+              ['rejected', guestStatusSummary.rejected, RSVP_STATUS_LABELS.rejected, 'border-rose-400/25 bg-rose-400/10 text-rose-300'],
             ].map(([key, value, label, tone]) => (
               <button
                 key={key}
@@ -7803,10 +7800,10 @@ React.useEffect(()=>{
             <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-3">
             <div className="grid grid-cols-4 gap-2">
               {[
-                ['all', 'כולם'],
-                ['approved', 'אישרו'],
-                ['pending', 'ממתינים'],
-                ['rejected', 'לא מגיעים'],
+                ['all', RSVP_FILTER_LABELS.all],
+                ['approved', RSVP_STATUS_LABELS_COMPACT.approved],
+                ['pending', RSVP_STATUS_LABELS.pending],
+                ['rejected', RSVP_STATUS_LABELS.rejected],
               ].map(([key, label]) => (
                 <button
                   key={key}
@@ -7830,7 +7827,7 @@ React.useEffect(()=>{
             onClick={openMobileQuickGuestListScreen}
             className="mt-3 w-full rounded-2xl border border-violet-300/30 bg-violet-500/15 px-4 py-3 text-base font-black text-violet-100 transition-colors active:bg-violet-500/25"
           >
-            {`ראה רשימת אורחים : ${MOBILE_GUEST_FILTER_LABELS[mobileSummaryFilter] || MOBILE_GUEST_FILTER_LABELS.all}`}
+            {`ראה רשימת אורחים : ${RSVP_FILTER_LABELS[mobileSummaryFilter] || RSVP_FILTER_LABELS.all}`}
           </button>
 
           <form
@@ -7913,12 +7910,7 @@ React.useEffect(()=>{
                   {mobileQuickGuestSearchResults.map((guest, idx) => {
                     const guestKey = getGuestIdentityKey(guest);
                     const isSelected = mobileQuickGuestSearchSelectedKey === guestKey;
-                    const status = guest.status === 'approved' || guest.status === 'rejected' ? guest.status : 'pending';
-                    const statusMeta = status === 'approved'
-                      ? { label: 'אישר', className: 'bg-emerald-500/15 text-emerald-300 border-emerald-400/30', icon: '✓' }
-                      : status === 'rejected'
-                        ? { label: 'לא מגיע', className: 'bg-rose-500/15 text-rose-300 border-rose-400/30', icon: '×' }
-                        : { label: 'ממתין', className: 'bg-amber-500/15 text-amber-300 border-amber-400/30', icon: '◷' };
+                  const statusMeta = getGuestStatusMeta(guest.status);
                     const guestName = [guest.first_name, guest.last_name].filter(Boolean).join(' ') || `אורח ${idx + 1}`;
                     const initials = guestName.split(' ').map((part) => part[0]).filter(Boolean).slice(0, 2).join('');
                     return (
@@ -8019,7 +8011,7 @@ React.useEffect(()=>{
           <div className="shrink-0 border-b border-white/10 bg-[#0d0f2b]/95 px-4 pb-4 pt-[max(1rem,env(safe-area-inset-top))] backdrop-blur-xl">
             <div className="text-sm font-black text-violet-200">ניהול אורחים מהיר</div>
             <h2 className="mt-1 text-3xl font-black text-white">
-              {`ראה רשימת אורחים : ${MOBILE_GUEST_FILTER_LABELS[mobileSummaryFilter] || MOBILE_GUEST_FILTER_LABELS.all}`}
+              {`ראה רשימת אורחים : ${RSVP_FILTER_LABELS[mobileSummaryFilter] || RSVP_FILTER_LABELS.all}`}
             </h2>
             <p className="mt-2 text-base font-semibold text-slate-300">
               {mobileStatusFilteredGuests.length} אורחים
@@ -8030,12 +8022,7 @@ React.useEffect(()=>{
             {mobileStatusFilteredGuests.length > 0 ? (
               <div className="space-y-3">
                 {mobileStatusFilteredGuests.map((guest, idx) => {
-                  const status = guest.status === 'approved' || guest.status === 'rejected' ? guest.status : 'pending';
-                  const statusMeta = status === 'approved'
-                    ? { label: 'אישר', className: 'bg-emerald-500/15 text-emerald-300 border-emerald-400/30', icon: '✓' }
-                    : status === 'rejected'
-                      ? { label: 'לא מגיע', className: 'bg-rose-500/15 text-rose-300 border-rose-400/30', icon: '×' }
-                      : { label: 'ממתין', className: 'bg-amber-500/15 text-amber-300 border-amber-400/30', icon: '◷' };
+                  const statusMeta = getGuestStatusMeta(guest.status);
                   const guestName = [guest.first_name, guest.last_name].filter(Boolean).join(' ') || `אורח ${idx + 1}`;
                   const initials = guestName.split(' ').map((part) => part[0]).filter(Boolean).slice(0, 2).join('');
                   return (
@@ -8057,7 +8044,7 @@ React.useEffect(()=>{
                 <div className="text-5xl">👥</div>
                 <div className="mt-4 text-2xl font-black text-white">אין אורחים להצגה</div>
                 <p className="mt-3 max-w-xs text-base font-semibold leading-7 text-slate-400">
-                  אין אורחים במסנן «{MOBILE_GUEST_FILTER_LABELS[mobileSummaryFilter] || MOBILE_GUEST_FILTER_LABELS.all}». נסו לשנות את המסנן.
+                  אין אורחים במסנן «{RSVP_FILTER_LABELS[mobileSummaryFilter] || RSVP_FILTER_LABELS.all}». נסו לשנות את המסנן.
                 </p>
               </div>
             )}
@@ -8079,8 +8066,8 @@ React.useEffect(()=>{
       {showMobileChartsScreen && (
         <div className="fixed inset-0 z-[120] flex flex-col bg-[#08091a] sm:hidden" dir="rtl">
           <div className="shrink-0 border-b border-white/10 bg-[#0d0f2b]/95 px-4 pb-4 pt-[max(1rem,env(safe-area-inset-top))] backdrop-blur-xl">
-            <div className="text-sm font-black text-indigo-200">דוחות וגרפים</div>
-            <h2 className="mt-1 text-3xl font-black text-white">הצג גרפים</h2>
+            <div className="text-sm font-black text-indigo-200">הצג גרפים</div>
+            <h2 className="mt-1 text-3xl font-black text-white">דוחות וגרפים</h2>
           </div>
           <div className="flex-1 overflow-y-auto px-4 py-5 space-y-6">
             {mobileChartsScreenReady ? (
@@ -8108,8 +8095,8 @@ React.useEffect(()=>{
       {showMobileDetailsScreen && (
         <div className="fixed inset-0 z-[120] flex flex-col bg-[#08091a] sm:hidden" dir="rtl">
           <div className="shrink-0 border-b border-white/10 bg-[#0d0f2b]/95 px-4 pb-4 pt-[max(1rem,env(safe-area-inset-top))] backdrop-blur-xl">
-            <div className="text-sm font-black text-sky-200">פרטי אירוע ומסלול</div>
-            <h2 className="mt-1 text-3xl font-black text-white">פרטים נוספים</h2>
+            <div className="text-sm font-black text-sky-200">פרטים נוספים</div>
+            <h2 className="mt-1 text-3xl font-black text-white">אירוע ומסלול</h2>
           </div>
           <div className="flex-1 overflow-y-auto px-4 py-5 space-y-6">
             {renderDashboardDetailsCards()}
@@ -8466,9 +8453,9 @@ React.useEffect(()=>{
 
                 <div className="grid grid-cols-3 gap-2">
                   {[
-                    ['approved', guestStatusSummary.approved, 'מגיעים', '✓', 'border-emerald-400/30 bg-emerald-500/10 text-emerald-300'],
-                    ['pending', guestStatusSummary.pending, 'טרם הגיבו', '◷', 'border-amber-400/30 bg-amber-500/10 text-amber-300'],
-                    ['rejected', guestStatusSummary.rejected, 'לא מגיעים', '×', 'border-rose-400/30 bg-rose-500/10 text-rose-300'],
+                    ['approved', guestStatusSummary.approved, RSVP_STATUS_LABELS.approved, '✓', 'border-emerald-400/30 bg-emerald-500/10 text-emerald-300'],
+                    ['pending', guestStatusSummary.pending, RSVP_STATUS_LABELS.pending, '◷', 'border-amber-400/30 bg-amber-500/10 text-amber-300'],
+                    ['rejected', guestStatusSummary.rejected, RSVP_STATUS_LABELS.rejected, '×', 'border-rose-400/30 bg-rose-500/10 text-rose-300'],
                   ].map(([key, value, label, icon, tone]) => (
                     <button
                       key={key}
@@ -8495,10 +8482,10 @@ React.useEffect(()=>{
                   />
                   <div className="mt-3 grid grid-cols-4 gap-2">
                     {[
-                      ['all', 'כולם'],
-                      ['approved', 'מגיעים'],
-                      ['pending', 'טרם הגיבו'],
-                      ['rejected', 'לא מגיעים'],
+                      ['all', RSVP_FILTER_LABELS.all],
+                      ['approved', RSVP_STATUS_LABELS_COMPACT.approved],
+                      ['pending', RSVP_STATUS_LABELS.pending],
+                      ['rejected', RSVP_STATUS_LABELS.rejected],
                     ].map(([key, label]) => (
                       <button
                         key={key}
@@ -8518,12 +8505,7 @@ React.useEffect(()=>{
 
                 <div className="mt-3 space-y-2 text-right">
                   {mobileFilteredSummaryGuests.length > 0 ? mobileFilteredSummaryGuests.map((guest, idx) => {
-                    const status = guest.status === 'approved' || guest.status === 'rejected' ? guest.status : 'pending';
-                    const statusMeta = status === 'approved'
-                      ? { label: 'מגיע', className: 'bg-emerald-500/15 text-emerald-300 border-emerald-400/30', icon: '✓' }
-                      : status === 'rejected'
-                        ? { label: 'לא מגיע', className: 'bg-rose-500/15 text-rose-300 border-rose-400/30', icon: '×' }
-                        : { label: 'טרם הגיב', className: 'bg-amber-500/15 text-amber-300 border-amber-400/30', icon: '◷' };
+                    const statusMeta = getGuestStatusMeta(guest.status);
                     const mealTags = [
                       ((guest.veg_adults || 0) + (guest.veg_children || 0)) > 0 ? 'צמחוני' : null,
                       ((guest.vegan_adults || 0) + (guest.vegan_children || 0)) > 0 ? 'טבעוני' : null,
@@ -9041,7 +9023,7 @@ React.useEffect(()=>{
           <div className="flex justify-center gap-2 mb-4">
             {['approved','rejected','pending'].map(key=> (
               <button key={key} onClick={()=>setSelectedReport(key)} className={`${selectedReport===key?'bg-gradient-to-br from-indigo-600 to-violet-600 text-white border-indigo-400/50':'bg-white/[0.06] text-slate-100 border-white/15 hover:bg-indigo-500/15 hover:border-indigo-400/50'} border rounded-full px-4 py-1 text-sm font-medium transition-all`}>
-                {key==='approved'?'אישרו הגעה': key==='rejected'?'לא מגיעים':'טרם הגיבו'}
+                {RSVP_STATUS_LABELS[key]}
               </button>
             ))}
           </div>
@@ -9510,7 +9492,7 @@ React.useEffect(()=>{
             {renderMobileNextActionCard({
               stepLabel: 'שלב 5 מתוך 5',
               title: 'בחרו דוח להצגה',
-              description: 'פתחו דוח כדי לראות מי מגיע, מי לא מגיע ומי עדיין לא הגיב.',
+              description: `פתחו דוח לפי סטטוס: ${RSVP_STATUS_LABELS.approved}, ${RSVP_STATUS_LABELS.pending} ו${RSVP_STATUS_LABELS.rejected}.`,
               helpText: 'הדוחות המפורטים זמינים גם בנייד, אבל לעבודה עם Excel מומלץ להשתמש במחשב.',
               icon: '📊',
             })}
@@ -9521,9 +9503,9 @@ React.useEffect(()=>{
               </div>
               <div className="grid grid-cols-3 gap-2">
                 {[
-                  ['מגיעים', guestStatusSummary.approved, 'text-emerald-300', 'border-emerald-400/25 bg-emerald-500/10'],
-                  ['טרם הגיבו', guestStatusSummary.pending, 'text-amber-300', 'border-amber-400/25 bg-amber-500/10'],
-                  ['לא מגיעים', guestStatusSummary.rejected, 'text-rose-300', 'border-rose-400/25 bg-rose-500/10'],
+                  [RSVP_STATUS_LABELS.approved, guestStatusSummary.approved, 'text-emerald-300', 'border-emerald-400/25 bg-emerald-500/10'],
+                  [RSVP_STATUS_LABELS.pending, guestStatusSummary.pending, 'text-amber-300', 'border-amber-400/25 bg-amber-500/10'],
+                  [RSVP_STATUS_LABELS.rejected, guestStatusSummary.rejected, 'text-rose-300', 'border-rose-400/25 bg-rose-500/10'],
                 ].map(([label, value, textClass, cardClass]) => (
                   <div key={label} className={`rounded-2xl border px-2 py-3 text-center ${cardClass}`}>
                     <div className={`text-2xl font-black leading-none tabular-nums ${textClass}`}>{value}</div>
@@ -9568,12 +9550,12 @@ React.useEffect(()=>{
               }}
               className="group w-full rounded-2xl border border-emerald-400/40 bg-white/[0.055] px-4 py-4 text-slate-100 shadow-[0_6px_22px_rgba(0,0,0,0.25)] transition-all hover:bg-indigo-500/15 hover:border-indigo-400/50 sm:rounded-full sm:border-white/15 sm:bg-white/[0.06] sm:px-4 sm:py-2 sm:font-medium sm:shadow-none"
             >
-              <span className="hidden sm:inline">דו"ח אורחים מגיעים</span>
+              <span className="hidden sm:inline">דוח אורחים שאישרו הגעה</span>
               <span className="flex items-center justify-between gap-3 text-right sm:hidden">
                 <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-emerald-400/35 bg-emerald-500/15 text-2xl">👥</span>
                 <span className="min-w-0 flex-1">
-                  <span className="block text-xl font-black text-white">דוח אורחים מגיעים</span>
-                  <span className="mt-1 block text-sm font-semibold text-slate-400">רשימת אורחים שאישרו הגעה</span>
+                  <span className="block text-xl font-black text-white">דוח אורחים שאישרו הגעה</span>
+                  <span className="mt-1 block text-sm font-semibold text-slate-400">{RSVP_STATUS_LABELS.approved}</span>
                 </span>
                 <span className="text-2xl text-violet-200">‹</span>
               </span>
@@ -9612,12 +9594,12 @@ React.useEffect(()=>{
               }}
               className="group w-full rounded-2xl border border-white/15 bg-white/[0.055] px-4 py-4 text-slate-100 shadow-[0_6px_22px_rgba(0,0,0,0.25)] transition-all hover:bg-indigo-500/15 hover:border-indigo-400/50 sm:rounded-full sm:bg-white/[0.06] sm:px-4 sm:py-2 sm:font-medium sm:shadow-none"
             >
-              <span className="hidden sm:inline">דו"ח אורחים לא מגיעים</span>
+              <span className="hidden sm:inline">דוח אורחים {RSVP_STATUS_LABELS.rejected}</span>
               <span className="flex items-center justify-between gap-3 text-right sm:hidden">
                 <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-rose-400/35 bg-rose-500/15 text-2xl">🚫</span>
                 <span className="min-w-0 flex-1">
-                  <span className="block text-xl font-black text-white">דוח אורחים לא מגיעים</span>
-                  <span className="mt-1 block text-sm font-semibold text-slate-400">רשימת דחיות</span>
+                  <span className="block text-xl font-black text-white">דוח אורחים {RSVP_STATUS_LABELS.rejected}</span>
+                  <span className="mt-1 block text-sm font-semibold text-slate-400">{RSVP_STATUS_LABELS.rejected}</span>
                 </span>
                 <span className="text-2xl text-violet-200">‹</span>
               </span>
@@ -10455,7 +10437,7 @@ React.useEffect(()=>{
                 אירוע מהעבר: {selectedEventForReport.event_type || 'אירוע'} – {selectedEventForReport._eventDate?format(selectedEventForReport._eventDate,'dd/MM/yyyy',{locale:he}):''}
               </p>
             )}
-            <button onClick={()=>{setShowReportsOptions(false);setShowApprovedReport(true);}} className="w-full bg-white/[0.06] text-slate-100 border border-white/15 rounded-full px-4 py-2 text-lg font-medium hover:bg-indigo-500/15 hover:border-indigo-400/50 transition-all">אישרו הגעה</button>
+            <button onClick={()=>{setShowReportsOptions(false);setShowApprovedReport(true);}} className="w-full bg-white/[0.06] text-slate-100 border border-white/15 rounded-full px-4 py-2 text-lg font-medium hover:bg-indigo-500/15 hover:border-indigo-400/50 transition-all">{RSVP_STATUS_LABELS.approved}</button>
             <button onClick={async () => {
               setShowReportsOptions(false);
               try {
@@ -10561,8 +10543,8 @@ React.useEffect(()=>{
                 alert('שגיאה בטעינת הדוח');
               }
             }} className="w-full bg-white/[0.06] text-slate-100 border border-white/15 rounded-full px-4 py-2 text-lg font-medium hover:bg-indigo-500/15 hover:border-indigo-400/50 transition-all">אישרו הגעה ממוינים לפי שולחן</button>
-            <button onClick={()=>{setShowReportsOptions(false);setShowRejectedReport(true);}} className="w-full bg-white/[0.06] text-slate-100 border border-white/15 rounded-full px-4 py-2 text-lg font-medium hover:bg-indigo-500/15 hover:border-indigo-400/50 transition-all">לא מגיעים</button>
-            <button onClick={()=>{setShowReportsOptions(false);setShowPendingReport(true);}} className="w-full bg-white/[0.06] text-slate-100 border border-white/15 rounded-full px-4 py-2 text-lg font-medium hover:bg-indigo-500/15 hover:border-indigo-400/50 transition-all">טרם הגיבו</button>
+            <button onClick={()=>{setShowReportsOptions(false);setShowRejectedReport(true);}} className="w-full bg-white/[0.06] text-slate-100 border border-white/15 rounded-full px-4 py-2 text-lg font-medium hover:bg-indigo-500/15 hover:border-indigo-400/50 transition-all">{RSVP_STATUS_LABELS.rejected}</button>
+            <button onClick={()=>{setShowReportsOptions(false);setShowPendingReport(true);}} className="w-full bg-white/[0.06] text-slate-100 border border-white/15 rounded-full px-4 py-2 text-lg font-medium hover:bg-indigo-500/15 hover:border-indigo-400/50 transition-all">{RSVP_STATUS_LABELS.pending}</button>
             {/* Guest status query button */}
             <button onClick={()=>{setShowReportsOptions(false);setShowSearchGuest(true);}} className="w-full bg-white/[0.06] text-slate-100 border border-white/15 rounded-full px-4 py-2 text-lg font-medium hover:bg-indigo-500/15 hover:border-indigo-400/50 transition-all">שאילתת סטטוס אורח</button>
             <button onClick={async ()=>{
@@ -10822,7 +10804,7 @@ React.useEffect(()=>{
                         <td className="px-0.5 py-0.5 border border-white/10 whitespace-nowrap">{g.first_name}</td>
                         <td className="px-0.5 py-0.5 border border-white/10 whitespace-nowrap">{g.last_name}</td>
                         <td className="px-0.5 py-0.5 border border-white/10 whitespace-nowrap">{g.phone}</td>
-                        <td className="px-0.5 py-0.5 border border-white/10 text-center whitespace-nowrap">{g.status==='approved'? 'מגיע' : g.status==='rejected'? 'לא מגיע' : 'טרם הגיב'}</td>
+                        <td className="px-0.5 py-0.5 border border-white/10 text-center whitespace-nowrap">{getRsvpStatusLabel(g.status, { compact: true })}</td>
                       </tr>
                     ))}
                   </tbody>

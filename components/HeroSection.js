@@ -1,5 +1,6 @@
 import { forwardRef, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabaseClient';
+import { RSVP_STATUS_LABELS } from '../lib/rsvpLabels';
 
 function normalizePhoneNumber(phone = '') {
   return String(phone).replace(/\D/g, '').replace(/^0/, '972');
@@ -281,14 +282,14 @@ const ActiveEventReportsDashboard = ({ summary }) => (
       </CardHeader>
       <div className="space-y-4 p-4" dir="rtl">
         <div className="grid grid-cols-3 gap-2">
-          <MiniMetric label="מגיעים" value={summary.approved} tone="text-emerald-300" />
-          <MiniMetric label="טרם השיבו" value={summary.pending} tone="text-amber-300" />
-          <MiniMetric label="לא מגיעים" value={summary.rejected} tone="text-rose-300" />
+          <MiniMetric label={RSVP_STATUS_LABELS.approved} value={summary.approved} tone="text-emerald-300" />
+          <MiniMetric label={RSVP_STATUS_LABELS.pending} value={summary.pending} tone="text-amber-300" />
+          <MiniMetric label={RSVP_STATUS_LABELS.rejected} value={summary.rejected} tone="text-rose-300" />
         </div>
         <div className="space-y-3">
-          <RsvpBar color="#34d399" label="מגיעים" value={summary.approved} total={summary.totalRsvp} />
-          <RsvpBar color="#fbbf24" label="טרם השיבו" value={summary.pending} total={summary.totalRsvp} />
-          <RsvpBar color="#fb7185" label="לא מגיעים" value={summary.rejected} total={summary.totalRsvp} />
+          <RsvpBar color="#34d399" label={RSVP_STATUS_LABELS.approved} value={summary.approved} total={summary.totalRsvp} />
+          <RsvpBar color="#fbbf24" label={RSVP_STATUS_LABELS.pending} value={summary.pending} total={summary.totalRsvp} />
+          <RsvpBar color="#fb7185" label={RSVP_STATUS_LABELS.rejected} value={summary.rejected} total={summary.totalRsvp} />
         </div>
       </div>
     </GlassCard>
@@ -382,9 +383,9 @@ const StatsCard = () => (
     <div className="flex items-center gap-3 px-3 py-3" dir="rtl">
       <div className="flex min-w-0 flex-1 flex-col gap-1.5">
         {[
-          ['#34d399', 'אישרו הגעה', '192 (59%)'],
-          ['#fbbf24', 'טרם הגיבו', '98 (30%)'],
-          ['#f87171', 'לא מגיעים', '36 (11%)'],
+          ['#34d399', RSVP_STATUS_LABELS.approved, '192 (59%)'],
+          ['#fbbf24', RSVP_STATUS_LABELS.pending, '98 (30%)'],
+          ['#f87171', RSVP_STATUS_LABELS.rejected, '36 (11%)'],
         ].map(([color, label, value]) => (
           <div key={label} className="flex items-center gap-1.5 text-[10px] text-slate-400">
             <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: color }} />
@@ -652,9 +653,9 @@ const MobileHomepageHero = ({ onCreateEvent, onShowProcess, showPreEventMarketin
 
             <div className="grid grid-cols-3 gap-2">
               {[
-                ['124', 'אישרו', 'text-emerald-300', 'border-emerald-300/25 bg-emerald-400/10'],
-                ['18', 'טרם הגיבו', 'text-amber-300', 'border-amber-300/25 bg-amber-400/10'],
-                ['7', 'לא מגיעים', 'text-rose-300', 'border-rose-300/25 bg-rose-400/10'],
+                ['124', RSVP_STATUS_LABELS.approved, 'text-emerald-300', 'border-emerald-300/25 bg-emerald-400/10'],
+                ['18', RSVP_STATUS_LABELS.pending, 'text-amber-300', 'border-amber-300/25 bg-amber-400/10'],
+                ['7', RSVP_STATUS_LABELS.rejected, 'text-rose-300', 'border-rose-300/25 bg-rose-400/10'],
               ].map(([value, label, valueClass, cardClass]) => (
                 <div key={label} className={`rounded-2xl border px-2 py-3 text-center ${cardClass}`}>
                   <div className={`text-3xl font-black leading-none tabular-nums ${valueClass}`}>{value}</div>

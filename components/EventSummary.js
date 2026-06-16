@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabaseClient';
 import { differenceInCalendarDays, parseISO, format } from 'date-fns';
 import { isBefore } from 'date-fns';
 import { he } from 'date-fns/locale';
+import { RSVP_STATUS_LABELS } from '../lib/rsvpLabels';
 
 export default function EventSummary() {
   const [event, setEvent] = useState(null);
@@ -166,9 +167,9 @@ export default function EventSummary() {
       {/* Approval Stats Card */}
       <div className="bg-white/[0.055] border border-white/15 backdrop-blur-xl rounded-2xl shadow-[0_8px_40px_rgba(0,0,0,0.35)] p-6 flex-1 min-w-[220px] max-w-xs text-center rtl ring-2 ring-indigo-400/30">
         <h3 className="text-base font-bold mb-4 text-slate-100">סיכום מספר אישורים</h3>
-        <p className="mb-2 text-sm text-slate-300">מגיעים: <span className="font-bold text-emerald-300">{stats.approved}</span></p>
-        <p className="mb-2 text-sm text-slate-300">לא מגיעים: <span className="font-bold text-red-400">{stats.rejected}</span></p>
-        <p className="text-sm text-slate-300">טרם השיבו: <span className="font-bold text-slate-100">{stats.pending}</span></p>
+        <p className="mb-2 text-sm text-slate-300">{RSVP_STATUS_LABELS.approved}: <span className="font-bold text-emerald-300">{stats.approved}</span></p>
+        <p className="mb-2 text-sm text-slate-300">{RSVP_STATUS_LABELS.rejected}: <span className="font-bold text-red-400">{stats.rejected}</span></p>
+        <p className="text-sm text-slate-300">{RSVP_STATUS_LABELS.pending}: <span className="font-bold text-slate-100">{stats.pending}</span></p>
       </div>
 
       {/* Participants Card */}
