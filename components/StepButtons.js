@@ -7313,18 +7313,18 @@ React.useEffect(()=>{
           <div className="py-10 text-sm text-slate-400">אין נתונים להצגה עדיין</div>
         )}
       </div>
-      <div className={`grid gap-2 mt-3 text-base ${forMobileOverlay ? 'grid-cols-3' : 'grid-cols-1 sm:grid-cols-3'}`}>
-        <div className="min-w-0 bg-white/5 border border-white/10 rounded-xl p-3 text-right">
-          <div className="text-base font-semibold text-emerald-300">אישרו הגעה</div>
-          <div className={`${previewMetricValueClass} text-3xl font-bold text-emerald-300`}>{guestStatusSummary.approved}</div>
+      <div className={`grid gap-2 mt-3 ${forMobileOverlay ? 'grid-cols-3 text-[11px]' : 'grid-cols-1 sm:grid-cols-3 text-base'}`}>
+        <div className={`min-w-0 bg-white/5 border border-white/10 rounded-xl text-right ${forMobileOverlay ? 'p-2 text-center' : 'p-3'}`}>
+          <div className={`font-semibold text-emerald-300 ${forMobileOverlay ? 'leading-tight whitespace-nowrap' : ''}`}>{forMobileOverlay ? 'אישרו\u00A0הגעה' : 'אישרו הגעה'}</div>
+          <div className={`${previewMetricValueClass} font-bold text-emerald-300 ${forMobileOverlay ? 'text-2xl' : 'text-3xl'}`}>{guestStatusSummary.approved}</div>
         </div>
-        <div className="min-w-0 bg-white/5 border border-white/10 rounded-xl p-3 text-right">
-          <div className="text-base font-semibold text-amber-300">טרם הגיבו</div>
-          <div className={`${previewMetricValueClass} text-3xl font-bold text-amber-300`}>{guestStatusSummary.pending}</div>
+        <div className={`min-w-0 bg-white/5 border border-white/10 rounded-xl text-right ${forMobileOverlay ? 'p-2 text-center' : 'p-3'}`}>
+          <div className={`font-semibold text-amber-300 ${forMobileOverlay ? 'leading-tight' : ''}`}>טרם הגיבו</div>
+          <div className={`${previewMetricValueClass} font-bold text-amber-300 ${forMobileOverlay ? 'text-2xl' : 'text-3xl'}`}>{guestStatusSummary.pending}</div>
         </div>
-        <div className="min-w-0 bg-white/5 border border-white/10 rounded-xl p-3 text-right">
-          <div className="text-base font-semibold text-rose-400">לא אישרו</div>
-          <div className={`${previewMetricValueClass} text-3xl font-bold text-rose-400`}>{guestStatusSummary.rejected}</div>
+        <div className={`min-w-0 bg-white/5 border border-white/10 rounded-xl text-right ${forMobileOverlay ? 'p-2 text-center' : 'p-3'}`}>
+          <div className={`font-semibold text-rose-400 ${forMobileOverlay ? 'leading-tight' : ''}`}>לא אישרו</div>
+          <div className={`${previewMetricValueClass} font-bold text-rose-400 ${forMobileOverlay ? 'text-2xl' : 'text-3xl'}`}>{guestStatusSummary.rejected}</div>
         </div>
       </div>
       {!hasStatusData && (
