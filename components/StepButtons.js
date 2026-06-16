@@ -7244,6 +7244,79 @@ React.useEffect(()=>{
     );
   };
 
+  const renderGuestStatusChartCard = () => (
+    <div className="bg-white/[0.055] border border-white/15 backdrop-blur-xl rounded-2xl p-4 sm:p-6 text-center shadow-[0_8px_40px_rgba(0,0,0,0.35)] ring-2 ring-violet-400/30 w-full">
+      <div className="flex items-center justify-center gap-2 mb-2">
+        <span className="text-xl">📊</span>
+        <h3 className="text-lg font-bold text-violet-300">סטטוס אישורי הגעה</h3>
+      </div>
+      <div className="bg-white/5 border border-white/10 rounded-xl p-3 mt-3">
+        {!shouldShowCharts ? (
+          <div className="py-10 text-sm text-slate-400 text-center">טוען נתונים...</div>
+        ) : hasStatusData ? (
+          <div>
+            <ResponsiveContainer width="100%" height={260}>
+              <PieChart margin={{ top: 12, right: 24, bottom: 12, left: 24 }}>
+                <Pie
+                  data={statusChartDataNonZero}
+                  dataKey="value"
+                  nameKey="name"
+                  innerRadius={isMobileView ? 40 : 50}
+                  outerRadius={isMobileView ? 66 : 76}
+                  paddingAngle={statusChartDataNonZero.length > 1 ? 2 : 0}
+                  isAnimationActive={false}
+                  label={renderStatusSliceLabel}
+                  labelLine={false}
+                >
+                  {statusChartDataNonZero.map((item) => (
+                    <Cell key={item.key} fill={item.color} />
+                  ))}
+                </Pie>
+                <Tooltip content={() => null} active={false} cursor={false} />
+                <Legend
+                  verticalAlign="bottom"
+                  align="center"
+                  layout="horizontal"
+                  iconType="circle"
+                  wrapperStyle={{
+                    width: '100%',
+                    direction: 'rtl',
+                    textAlign: 'center',
+                    color: '#cbd5e1',
+                    marginTop: 8,
+                    fontSize: 13,
+                  }}
+                  formatter={(value) => (
+                    <span style={{ color: '#cbd5e1', fontWeight: 600 }}>{value}</span>
+                  )}
+                />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+        ) : (
+          <div className="py-10 text-sm text-slate-400">אין נתונים להצגה עדיין</div>
+        )}
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-3 text-base">
+        <div className="min-w-0 bg-white/5 border border-white/10 rounded-xl p-3 text-right">
+          <div className="text-base font-semibold text-emerald-300">אישרו הגעה</div>
+          <div className={`${previewMetricValueClass} text-3xl font-bold text-emerald-300`}>{guestStatusSummary.approved}</div>
+        </div>
+        <div className="min-w-0 bg-white/5 border border-white/10 rounded-xl p-3 text-right">
+          <div className="text-base font-semibold text-amber-300">טרם הגיבו</div>
+          <div className={`${previewMetricValueClass} text-3xl font-bold text-amber-300`}>{guestStatusSummary.pending}</div>
+        </div>
+        <div className="min-w-0 bg-white/5 border border-white/10 rounded-xl p-3 text-right">
+          <div className="text-base font-semibold text-rose-400">לא אישרו</div>
+          <div className={`${previewMetricValueClass} text-3xl font-bold text-rose-400`}>{guestStatusSummary.rejected}</div>
+        </div>
+      </div>
+      {!hasStatusData && (
+        <p className="text-xs text-slate-400 mt-2 text-center">נתוני אישור הגעה יופיעו לאחר שליחת הזמנות ותגובות אורחים</p>
+      )}
+    </div>
+  );
+
   const renderDashboardDetailsCards = () => (
     <>
       {currentEventId && isCurrentEventActive ? (
@@ -7995,6 +8068,7 @@ React.useEffect(()=>{
           </div>
           <div className="flex-1 overflow-y-auto px-4 py-5 space-y-6">
             {renderGuestSummaryChartCard()}
+            {renderGuestStatusChartCard()}
             {renderMessageCapacityChartCard()}
           </div>
           <div className="shrink-0 border-t border-white/10 bg-[#0d0f2b]/95 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4 backdrop-blur-xl">
@@ -8474,75 +8548,8 @@ React.useEffect(()=>{
               </div>
               )}
 
-              <div className="hidden bg-white/[0.055] border border-white/15 backdrop-blur-xl rounded-2xl p-4 sm:block sm:p-6 text-center shadow-[0_8px_40px_rgba(0,0,0,0.35)] ring-2 ring-violet-400/30 w-full">
-                <div className="flex items-center justify-center gap-2 mb-2">
-                  <span className="text-xl">📊</span>
-                  <h3 className="text-lg font-bold text-violet-300">סטטוס אישורי הגעה</h3>
-                </div>
-                <div className="bg-white/5 border border-white/10 rounded-xl p-3 mt-3">
-                    {!shouldShowCharts ? (
-                    <div className="py-10 text-sm text-slate-400 text-center">טוען נתונים...</div>
-                  ) : hasStatusData ? (
-                    <div>
-                      <ResponsiveContainer width="100%" height={260}>
-                        <PieChart margin={{ top: 12, right: 24, bottom: 12, left: 24 }}>
-                          <Pie
-                            data={statusChartDataNonZero}
-                            dataKey="value"
-                            nameKey="name"
-                            innerRadius={isMobileView ? 40 : 50}
-                            outerRadius={isMobileView ? 66 : 76}
-                            paddingAngle={statusChartDataNonZero.length > 1 ? 2 : 0}
-                            isAnimationActive={false}
-                            label={renderStatusSliceLabel}
-                            labelLine={false}
-                          >
-                            {statusChartDataNonZero.map((item) => (
-                              <Cell key={item.key} fill={item.color} />
-                            ))}
-                          </Pie>
-                          <Tooltip content={() => null} active={false} cursor={false} />
-                          <Legend
-                            verticalAlign="bottom"
-                            align="center"
-                            layout="horizontal"
-                            iconType="circle"
-                            wrapperStyle={{
-                              width: '100%',
-                              direction: 'rtl',
-                              textAlign: 'center',
-                              color: '#cbd5e1',
-                              marginTop: 8,
-                              fontSize: 13,
-                            }}
-                            formatter={(value) => (
-                              <span style={{ color: '#cbd5e1', fontWeight: 600 }}>{value}</span>
-                            )}
-                          />
-                        </PieChart>
-                      </ResponsiveContainer>
-                    </div>
-                  ) : (
-                    <div className="py-10 text-sm text-slate-400">אין נתונים להצגה עדיין</div>
-                  )}
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-3 text-base">
-                  <div className="min-w-0 bg-white/5 border border-white/10 rounded-xl p-3 text-right">
-                    <div className="text-base font-semibold text-emerald-300">אישרו הגעה</div>
-                    <div className={`${previewMetricValueClass} text-3xl font-bold text-emerald-300`}>{guestStatusSummary.approved}</div>
-                  </div>
-                  <div className="min-w-0 bg-white/5 border border-white/10 rounded-xl p-3 text-right">
-                    <div className="text-base font-semibold text-amber-300">טרם הגיבו</div>
-                    <div className={`${previewMetricValueClass} text-3xl font-bold text-amber-300`}>{guestStatusSummary.pending}</div>
-                  </div>
-                  <div className="min-w-0 bg-white/5 border border-white/10 rounded-xl p-3 text-right">
-                    <div className="text-base font-semibold text-rose-400">לא אישרו</div>
-                    <div className={`${previewMetricValueClass} text-3xl font-bold text-rose-400`}>{guestStatusSummary.rejected}</div>
-                  </div>
-                </div>
-                {!hasStatusData && (
-                  <p className="text-xs text-slate-400 mt-2 text-center">נתוני אישור הגעה יופיעו לאחר שליחת הזמנות ותגובות אורחים</p>
-                )}
+              <div className="hidden sm:block">
+                {renderGuestStatusChartCard()}
               </div>
               {(planForDisplay || currentEventId) && messageCapacityChartModel && (
                 <div className="hidden sm:block">
