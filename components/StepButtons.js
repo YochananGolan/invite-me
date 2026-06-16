@@ -663,6 +663,7 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick, trig
   const [showMobileFirstSendSuccess, setShowMobileFirstSendSuccess] = useState(false);
   const [showMobileChartsScreen, setShowMobileChartsScreen] = useState(false);
   const [showMobileDetailsScreen, setShowMobileDetailsScreen] = useState(false);
+  const [mobileChartsScreenReady, setMobileChartsScreenReady] = useState(false);
   const [specialMealsSummary, setSpecialMealsSummary] = useState({ 
     veg: { adults: 0, children: 0, total: 0 },
     vegan: { adults: 0, children: 0, total: 0 },
@@ -7119,6 +7120,21 @@ React.useEffect(()=>{
     setShowMobileQuickGuestListScreen(false);
   }, []);
 
+  React.useEffect(() => {
+    if (!showMobileChartsScreen) {
+      setMobileChartsScreenReady(false);
+      return undefined;
+    }
+    let cancelled = false;
+    const raf = requestAnimationFrame(() => {
+      if (!cancelled) setMobileChartsScreenReady(true);
+    });
+    return () => {
+      cancelled = true;
+      cancelAnimationFrame(raf);
+    };
+  }, [showMobileChartsScreen]);
+
   const renderGuestSummaryChartCard = () => (
     <div className="bg-white/[0.055] border border-white/15 backdrop-blur-xl rounded-2xl p-4 sm:p-6 text-center shadow-[0_8px_40px_rgba(0,0,0,0.35)] ring-2 ring-indigo-400/30 w-full">
       <div className="flex items-center justify-center gap-2 mb-2">
@@ -7244,7 +7260,7 @@ React.useEffect(()=>{
     );
   };
 
-  const renderGuestStatusChartCard = () => (
+  const renderGuestStatusChartCard = ({ forMobileOverlay = false } = {}) => (
     <div className="bg-white/[0.055] border border-white/15 backdrop-blur-xl rounded-2xl p-4 sm:p-6 text-center shadow-[0_8px_40px_rgba(0,0,0,0.35)] ring-2 ring-violet-400/30 w-full">
       <div className="flex items-center justify-center gap-2 mb-2">
         <span className="text-xl">📊</span>
@@ -7254,15 +7270,15 @@ React.useEffect(()=>{
         {!shouldShowCharts ? (
           <div className="py-10 text-sm text-slate-400 text-center">טוען נתונים...</div>
         ) : hasStatusData ? (
-          <div>
-            <ResponsiveContainer width="100%" height={260}>
+          <div className="h-[260px] w-full min-h-[260px]">
+            <ResponsiveContainer width="100%" height="100%">
               <PieChart margin={{ top: 12, right: 24, bottom: 12, left: 24 }}>
                 <Pie
                   data={statusChartDataNonZero}
                   dataKey="value"
                   nameKey="name"
-                  innerRadius={isMobileView ? 40 : 50}
-                  outerRadius={isMobileView ? 66 : 76}
+                  innerRadius={forMobileOverlay || isMobileView ? 40 : 50}
+                  outerRadius={forMobileOverlay || isMobileView ? 66 : 76}
                   paddingAngle={statusChartDataNonZero.length > 1 ? 2 : 0}
                   isAnimationActive={false}
                   label={renderStatusSliceLabel}
@@ -7297,7 +7313,7 @@ React.useEffect(()=>{
           <div className="py-10 text-sm text-slate-400">אין נתונים להצגה עדיין</div>
         )}
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-3 text-base">
+      <div className={`grid gap-2 mt-3 text-base ${forMobileOverlay ? 'grid-cols-3' : 'grid-cols-1 sm:grid-cols-3'}`}>
         <div className="min-w-0 bg-white/5 border border-white/10 rounded-xl p-3 text-right">
           <div className="text-base font-semibold text-emerald-300">אישרו הגעה</div>
           <div className={`${previewMetricValueClass} text-3xl font-bold text-emerald-300`}>{guestStatusSummary.approved}</div>
@@ -8067,9 +8083,15 @@ React.useEffect(()=>{
             <h2 className="mt-1 text-3xl font-black text-white">הצג גרפים</h2>
           </div>
           <div className="flex-1 overflow-y-auto px-4 py-5 space-y-6">
-            {renderGuestSummaryChartCard()}
-            {renderGuestStatusChartCard()}
-            {renderMessageCapacityChartCard()}
+            {mobileChartsScreenReady ? (
+              <>
+                {renderGuestSummaryChartCard()}
+                {renderGuestStatusChartCard({ forMobileOverlay: true })}
+                {renderMessageCapacityChartCard()}
+              </>
+            ) : (
+              <div className="py-16 text-center text-sm font-semibold text-slate-400">טוען גרפים...</div>
+            )}
           </div>
           <div className="shrink-0 border-t border-white/10 bg-[#0d0f2b]/95 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4 backdrop-blur-xl">
             <button
