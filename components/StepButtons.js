@@ -661,6 +661,8 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick, trig
   const [showMobileQuickGuestListScreen, setShowMobileQuickGuestListScreen] = useState(false);
   const [mobileSummaryFilter, setMobileSummaryFilter] = useState('all');
   const [showMobileFirstSendSuccess, setShowMobileFirstSendSuccess] = useState(false);
+  const [showEndDashboardCharts, setShowEndDashboardCharts] = useState(false);
+  const [showEndDashboardDetails, setShowEndDashboardDetails] = useState(false);
   const [specialMealsSummary, setSpecialMealsSummary] = useState({ 
     veg: { adults: 0, children: 0, total: 0 },
     vegan: { adults: 0, children: 0, total: 0 },
@@ -7909,6 +7911,38 @@ React.useEffect(()=>{
             >
               <span className="text-center text-2xl font-black leading-tight">צור/עדכן קבוצת וואטסאפ</span>
             </button>
+            {currentEventId && isCurrentEventActive && (
+              <button
+                type="button"
+                style={{ cursor: 'pointer', position: 'relative', zIndex: 21, pointerEvents: 'auto' }}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setShowEndDashboardCharts((prev) => !prev);
+                }}
+                className="relative flex min-h-[4.75rem] w-full flex-col items-center justify-center gap-1.5 rounded-2xl border border-indigo-400/40 bg-indigo-500/15 py-4 px-5 text-center text-indigo-200 shadow-[0_2px_10px_rgba(99,102,241,0.25)] transition-all"
+              >
+                <span className="text-center text-2xl font-black leading-tight">
+                  {showEndDashboardCharts ? 'הסתר גרפים' : 'הצג גרפים'}
+                </span>
+              </button>
+            )}
+            {hasSession && (
+              <button
+                type="button"
+                style={{ cursor: 'pointer', position: 'relative', zIndex: 21, pointerEvents: 'auto' }}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setShowEndDashboardDetails((prev) => !prev);
+                }}
+                className="relative flex min-h-[4.75rem] w-full flex-col items-center justify-center gap-1.5 rounded-2xl border border-sky-400/40 bg-sky-500/15 py-4 px-5 text-center text-sky-200 shadow-[0_2px_10px_rgba(14,165,233,0.25)] transition-all"
+              >
+                <span className="text-center text-2xl font-black leading-tight">
+                  {showEndDashboardDetails ? 'הסתר פרטים נוספים' : 'פרטים נוספים'}
+                </span>
+              </button>
+            )}
           </div>
         </div>
         <div className="hidden sm:flex flex-row justify-center gap-4 flex-wrap">
@@ -7976,6 +8010,7 @@ React.useEffect(()=>{
                 )}
               </div>
             )}
+            <div className={showEndDashboardDetails ? 'contents' : 'hidden sm:contents'}>
             {currentEventId && isCurrentEventActive ? (
               <div className="bg-white/[0.055] border border-white/15 backdrop-blur-xl rounded-2xl p-4 sm:p-6 text-center shadow-[0_8px_40px_rgba(0,0,0,0.35)] ring-2 ring-indigo-400/30 w-full">
                 <div className="flex items-center justify-center gap-2 mb-2">
@@ -8142,12 +8177,13 @@ React.useEffect(()=>{
                 </div>
               </div>
             )}
+            </div>
           </div>
 
           {/* Second Column - Guest Summary + Table Report */}
           {currentEventId && (
             <div className="w-full flex flex-col gap-6">
-              <div className="bg-white/[0.055] border border-white/15 backdrop-blur-xl rounded-2xl p-4 sm:p-6 text-center shadow-[0_8px_40px_rgba(0,0,0,0.35)] ring-2 ring-indigo-400/30 w-full">
+              <div className={`bg-white/[0.055] border border-white/15 backdrop-blur-xl rounded-2xl p-4 sm:p-6 text-center shadow-[0_8px_40px_rgba(0,0,0,0.35)] ring-2 ring-indigo-400/30 w-full ${showEndDashboardCharts ? 'block' : 'hidden sm:block'}`}>
                 <div className="flex items-center justify-center gap-2 mb-2">
                   <span className="text-xl">👥</span>
                   <h3 className="text-lg font-bold text-indigo-300">סיכום כל האורחים המוזמנים</h3>
@@ -8451,7 +8487,7 @@ React.useEffect(()=>{
                 )}
               </div>
               {(planForDisplay || currentEventId) && messageCapacityChartModel && (
-                  <div className="bg-white/[0.055] border border-white/15 backdrop-blur-xl rounded-2xl p-4 sm:p-6 text-center shadow-[0_8px_40px_rgba(0,0,0,0.35)] ring-2 ring-amber-400/30 w-full">
+                  <div className={`bg-white/[0.055] border border-white/15 backdrop-blur-xl rounded-2xl p-4 sm:p-6 text-center shadow-[0_8px_40px_rgba(0,0,0,0.35)] ring-2 ring-amber-400/30 w-full ${showEndDashboardCharts ? 'block' : 'hidden sm:block'}`}>
                     <div className="flex items-center justify-center gap-2 mb-2">
                       <span className="text-xl">📈</span>
                       <h3 className="text-lg font-bold text-amber-300">יתרת הודעות</h3>
