@@ -251,14 +251,54 @@ const STEP_BAR_SETTLE_DURATION_MS = 180;
 const parseEventDate = (str) => {
   if (!str) return null;
   const dateOnly = String(str).split(/[T ]/)[0];
-  const native = new Date(dateOnly);
-  if (!Number.isNaN(native.getTime())) return native;
+  const isoMatch = dateOnly.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (isoMatch) {
+    const [, year, month, day] = isoMatch;
+    return new Date(Number(year), Number(month) - 1, Number(day));
+  }
   const match = dateOnly.match(/^(\d{1,2})[.\/-](\d{1,2})[.\/-](\d{4})$/);
   if (match) {
     const [, day, month, year] = match;
     return new Date(Number(year), Number(month) - 1, Number(day));
   }
+  const native = new Date(dateOnly);
+  if (!Number.isNaN(native.getTime())) return native;
   return null;
+};
+
+const isEventDateOnOrAfterToday = (rawDate) => {
+  const eventDate = parseEventDate(rawDate);
+  if (!eventDate) return false;
+  eventDate.setHours(0, 0, 0, 0);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return eventDate.getTime() >= today.getTime();
+};
+
+const getRawEventDateFromDetails = (details) => {
+  if (!details || typeof details !== 'object') return null;
+  return details.date || details.event_date || details.start_datetime || details.end_datetime || null;
+};
+
+const getEventDetailsFromRecord = (record) => {
+  if (!record) return {};
+  if (typeof record.event_details === 'string') {
+    try {
+      return JSON.parse(record.event_details);
+    } catch (_) {
+      return {};
+    }
+  }
+  return record.event_details || {};
+};
+
+const isEventRecordActive = (record) => {
+  if (!record) return false;
+  const status = typeof record.status === 'string' ? record.status.toLowerCase() : '';
+  if (status === 'archived') return false;
+  const rawDate = getRawEventDateFromDetails(getEventDetailsFromRecord(record));
+  if (!rawDate) return false;
+  return isEventDateOnOrAfterToday(rawDate);
 };
 
 const computePlanRetentionDate = (rawDate) => {
@@ -2488,26 +2528,13 @@ const handleOpenAddonModal = React.useCallback(() => {
           return;
         }
 
-        const details = data.event_details || {};
-        const rawDate =
-          details?.date ||
-          details?.event_date ||
-          details?.start_datetime ||
-          details?.end_datetime ||
-          null;
-        const retentionDate = computePlanRetentionDate(rawDate);
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const isArchived = data.status === 'archived';
-        const isPastEvent =
-          retentionDate ? today >= retentionDate : false;
-
-        if (isArchived || isPastEvent) {
-          clearEventDetails();
+        if (!isEventRecordActive(data)) {
+          await clearEndedEvent(data.id);
           return;
         }
 
         setCurrentEventId(data.id);
+        const details = data.event_details || {};
         const capFromRow = parseNonNegativeInt(data?.allowed_guests);
         setEventAllowedGuests(capFromRow > 0 ? capFromRow : null);
         setSelectedEventType(data.event_type || '');
@@ -2529,6 +2556,7 @@ const handleOpenAddonModal = React.useCallback(() => {
 
   // restore details
   React.useEffect(()=>{
+    if(!currentEventId) return;
     if(!finishedSteps.includes(1)) return;
     if(formDataHasMeaningfulValues) return;
     try{
@@ -2536,7 +2564,7 @@ const handleOpenAddonModal = React.useCallback(() => {
       const saved = (raw && typeof raw === 'string' && raw.trim().startsWith('{')) ? JSON.parse(raw) : {};
       if (saved && typeof saved === 'object' && Object.keys(saved).length) setFormData(saved);
     }catch{}
-  },[finishedSteps]);
+  },[currentEventId, finishedSteps]);
 
   // Restore selected event type from localStorage if Supabase didn't set it
   // Removed useEffect that was loading selectedEventType from localStorage on page load
@@ -4528,36 +4556,24 @@ React.useEffect(() => {
     setInvitedGuestsCount(0);
     setEventMessagesSentCount(0);
     setEventReminderSentAt(null);
+    setMobileSummaryGuests([]);
+    setMobileQuickGuestSearchDraft('');
+    setMobileQuickGuestSearchQuery('');
+    setMobileQuickGuestSearchSubmitted(false);
+    setMobileQuickGuestSearchSelectedKey(null);
+    setShowMobileQuickGuestListScreen(false);
+    try { localStorage.removeItem('savedEventDetails'); } catch (_) {}
+    try { localStorage.removeItem('selectedEventType'); } catch (_) {}
+    try { localStorage.removeItem('selectedDesign'); } catch (_) {}
+    try { localStorage.removeItem('finishedSteps'); } catch (_) {}
+    try { localStorage.removeItem('draftEvent'); } catch (_) {}
   };
 
   const getEventDateFromRecord = (record) => {
-    if (!record) return null;
-    const details = typeof record.event_details === 'string'
-      ? (() => {
-          try {
-            return JSON.parse(record.event_details);
-          } catch (_) {
-            return {};
-          }
-        })()
-      : record.event_details || {};
-    const rawDate =
-      details.date ||
-      details.event_date ||
-      details.start_datetime ||
-      details.end_datetime ||
-      null;
-    return parseEventDate(rawDate);
+    return parseEventDate(getRawEventDateFromDetails(getEventDetailsFromRecord(record)));
   };
 
-  const hasEventEnded = (record) => {
-    const eventDate = getEventDateFromRecord(record);
-    if (!eventDate) return false;
-    eventDate.setHours(0, 0, 0, 0);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    return eventDate < today;
-  };
+  const hasEventEnded = (record) => !isEventRecordActive(record);
 
   const clearEndedEvent = async (eventId) => {
     if (!eventId) return;
@@ -4574,11 +4590,9 @@ React.useEffect(() => {
       }
       if (error) {
         console.error('Failed to clear ended event:', error);
-        return;
       }
     } catch (err) {
       console.error('Failed to clear ended event:', err);
-      return;
     }
 
     clearCarryPlanAfterManualDelete();
@@ -5488,8 +5502,16 @@ React.useEffect(() => {
           ev = evData;
           messagesSent = ev?.messages_sent_count ?? 0;
         }
-        if (!ev || (ev.status === 'archived')) {
+        if (!ev || (typeof ev.status === 'string' && ev.status.toLowerCase() === 'archived')) {
           setEventAllowedGuests(null);
+          if (currentEventId) {
+            setCurrentEventId(null);
+            setGuestStatusSummary({ approved: 0, rejected: 0, pending: 0 });
+            setGuestSummary({ approved: 0, adults: 0, children: 0 });
+            setMobileSummaryGuests([]);
+            setInvitedGuestsCount(0);
+            setEventDataLoaded(false);
+          }
           const settings = await loadUserPlanSettings();
           const fallbackAddon = settings?.addonCount ?? 0;
           if ((settings?.plan || null) !== null) {
@@ -5557,13 +5579,14 @@ React.useEffect(() => {
           planRetentionUntilRef.current = retentionDate;
         }
         const parsedDate = parseEventDate(dateStr);
-        if(parsedDate) {
+        if (parsedDate) {
           const today = new Date();
           today.setHours(0, 0, 0, 0);
           const eventDate = new Date(parsedDate);
           eventDate.setHours(0, 0, 0, 0);
-          if(eventDate < today){
-            // Event has ended - no need to update status since column doesn't exist
+          if (eventDate < today) {
+            await clearEndedEvent(ev.id);
+            return;
           }
         }
       }catch(e){console.error('archive check failed',e);}  
@@ -5658,14 +5681,7 @@ React.useEffect(() => {
         ev = evData;
       }
       if(!ev) return false;
-      const details=typeof ev.event_details==='string'?JSON.parse(ev.event_details):ev.event_details||{};
-      const dateStr=details.date||details.start_datetime||details.end_datetime;
-      if(!dateStr) return true;
-      const today = new Date();
-      today.setHours(0,0,0,0);
-      const eventDate = new Date(dateStr);
-      eventDate.setHours(0,0,0,0);
-      return eventDate >= today;
+      return isEventRecordActive(ev);
     }catch(e){ console.error('checkActiveEventExists err', e); return false; }
   }
 
@@ -6012,8 +6028,7 @@ React.useEffect(() => {
 
         const rowStatus = typeof dbEvent.status === 'string' ? dbEvent.status.toLowerCase() : '';
         if (rowStatus === 'archived') {
-          setCurrentEventId(null);
-          setEventAllowedGuests(null);
+          await resetWizardStateForNoEvent();
           return;
         }
 
@@ -6023,17 +6038,15 @@ React.useEffect(() => {
         const dbDate = details.date || details.start_datetime;
         if (!dbDate) return;
 
+        const eventDate = parseEventDate(dbDate);
+        if (!eventDate) return;
+        eventDate.setHours(0, 0, 0, 0);
         const today = new Date();
         today.setHours(0, 0, 0, 0);
-        const eventDate = new Date(dbDate);
-        if (!Number.isFinite(eventDate.getTime())) return;
-        eventDate.setHours(0, 0, 0, 0);
 
         if (eventDate >= today) return;
 
-        (async () => {
-          await clearEndedEvent(currentEventId);
-        })();
+        await clearEndedEvent(currentEventId);
       } catch (err) {
         console.error('auto-archive fetch failed', err);
       }
@@ -6081,80 +6094,74 @@ React.useEffect(() => {
 
         if (ev) {
           noEventLoggedRef.current = false;
+
+          if (!isEventRecordActive(ev)) {
+            if (lastRestoredEventIdRef.current !== 'ended') {
+              console.log('Event found but has ended, clearing active event');
+              lastRestoredEventIdRef.current = 'ended';
+            }
+            await clearEndedEvent(ev.id);
+            return;
+          }
+
           const details = typeof ev.event_details === 'string'
             ? JSON.parse(ev.event_details)
             : ev.event_details;
 
-          if (details && details.date) {
-            const eventDate = new Date(details.date);
-            eventDate.setHours(0, 0, 0, 0);
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
-
-            if (eventDate >= today) {
-              if (lastRestoredEventIdRef.current !== ev.id) {
-                console.log('Found future event in database, restoring...', ev.id);
-                lastRestoredEventIdRef.current = ev.id;
-              }
-              setCurrentEventId(ev.id);
-              if (ev.event_type) {
-                setSelectedEventType(ev.event_type);
-              }
-              syncFinishedStepsFromEvent(ev.event_type || '', details || {});
-              if (newEventStarted) {
-                setNewEventStarted(false);
-                try { localStorage.removeItem('newEventStarted'); } catch(e){}
-              }
-              setEventMessagesSentCount(ev.messages_sent_count ?? 0);
-              setEventReminderSentAt(ev.reminder_sent_at ?? null);
-              const restoreAddonCount = parseNonNegativeInt(userPlanSettingsRef.current?.addonCount);
-              setDbAddonCount(restoreAddonCount);
-              setAdditionalPackages((prev) => {
-                const prevCount = prev ? prev.length : 0;
-                if (prevCount !== restoreAddonCount) return Array(restoreAddonCount).fill('addon');
-                return prev;
-              });
-              try { localStorage.setItem('additionalPackages_' + ev.id, String(restoreAddonCount)); } catch (_) {}
-              setEventDataLoaded(true);
-              const fallbackPlan = userPlanSettingsRef.current?.plan || selectedPlanRef.current || null;
-              const planToUse = derivePlanFromRecord(ev) || fallbackPlan;
-              const repairedAllowedGuests = planToUse
-                ? (getPlanBaseLimit(planToUse) || 0) + restoreAddonCount * (getPlanBaseLimit('addon') || 100)
-                : parseNonNegativeInt(ev.allowed_guests);
-              setEventAllowedGuests(repairedAllowedGuests > 0 ? repairedAllowedGuests : null);
-              if (planToUse) {
-                setSelectedPlan(planToUse);
-                try { localStorage.setItem('selectedPlan', planToUse); } catch(e){}
-                await persistUserPlanSettings(planToUse, restoreAddonCount);
-                if (
-                  parseNonNegativeInt(ev.additional_packages) !== restoreAddonCount ||
-                  parseNonNegativeInt(ev.allowed_guests) !== repairedAllowedGuests
-                ) {
-                  await supabase
-                    .from('events')
-                    .update({
-                      additional_packages: restoreAddonCount,
-                      allowed_guests: repairedAllowedGuests,
-                      selected_plan: planToUse,
-                    })
-                    .eq('id', ev.id);
-                }
-              }
-              setFormData(prev => ({ ...prev, ...details }));
-
-              const tpl = details?.template_src || null;
-              if (tpl) {
-                setSelectedDesign(tpl);
-                markStepDone(2);
-              }
-            } else {
-              if (lastRestoredEventIdRef.current !== 'ended') {
-                console.log('Event found but has ended, clearing active event');
-                lastRestoredEventIdRef.current = 'ended';
-              }
-              await clearEndedEvent(ev.id);
-              return;
+          if (lastRestoredEventIdRef.current !== ev.id) {
+            console.log('Found active event in database, restoring...', ev.id);
+            lastRestoredEventIdRef.current = ev.id;
+          }
+          setCurrentEventId(ev.id);
+          if (ev.event_type) {
+            setSelectedEventType(ev.event_type);
+          }
+          syncFinishedStepsFromEvent(ev.event_type || '', details || {});
+          if (newEventStarted) {
+            setNewEventStarted(false);
+            try { localStorage.removeItem('newEventStarted'); } catch(e){}
+          }
+          setEventMessagesSentCount(ev.messages_sent_count ?? 0);
+          setEventReminderSentAt(ev.reminder_sent_at ?? null);
+          const restoreAddonCount = parseNonNegativeInt(userPlanSettingsRef.current?.addonCount);
+          setDbAddonCount(restoreAddonCount);
+          setAdditionalPackages((prev) => {
+            const prevCount = prev ? prev.length : 0;
+            if (prevCount !== restoreAddonCount) return Array(restoreAddonCount).fill('addon');
+            return prev;
+          });
+          try { localStorage.setItem('additionalPackages_' + ev.id, String(restoreAddonCount)); } catch (_) {}
+          setEventDataLoaded(true);
+          const fallbackPlan = userPlanSettingsRef.current?.plan || selectedPlanRef.current || null;
+          const planToUse = derivePlanFromRecord(ev) || fallbackPlan;
+          const repairedAllowedGuests = planToUse
+            ? (getPlanBaseLimit(planToUse) || 0) + restoreAddonCount * (getPlanBaseLimit('addon') || 100)
+            : parseNonNegativeInt(ev.allowed_guests);
+          setEventAllowedGuests(repairedAllowedGuests > 0 ? repairedAllowedGuests : null);
+          if (planToUse) {
+            setSelectedPlan(planToUse);
+            try { localStorage.setItem('selectedPlan', planToUse); } catch(e){}
+            await persistUserPlanSettings(planToUse, restoreAddonCount);
+            if (
+              parseNonNegativeInt(ev.additional_packages) !== restoreAddonCount ||
+              parseNonNegativeInt(ev.allowed_guests) !== repairedAllowedGuests
+            ) {
+              await supabase
+                .from('events')
+                .update({
+                  additional_packages: restoreAddonCount,
+                  allowed_guests: repairedAllowedGuests,
+                  selected_plan: planToUse,
+                })
+                .eq('id', ev.id);
             }
+          }
+          setFormData(prev => ({ ...prev, ...details }));
+
+          const tpl = details?.template_src || null;
+          if (tpl) {
+            setSelectedDesign(tpl);
+            markStepDone(2);
           }
         } else {
           if (!noEventLoggedRef.current) {
@@ -6394,6 +6401,12 @@ React.useEffect(() => {
           typeof ev.status === 'string' &&
           ev.status.toLowerCase() === 'archived';
         if (evIsArchived) {
+          setCurrentEventId(null);
+          setGuestStatusSummary({ approved: 0, rejected: 0, pending: 0 });
+          setGuestSummary({ approved: 0, adults: 0, children: 0 });
+          setMobileSummaryGuests([]);
+          setInvitedGuestsCount(0);
+          setEventDataLoaded(false);
           setEventAllowedGuests(null);
           const settings = await loadUserPlanSettings();
           if (settings?.plan) {
@@ -6412,12 +6425,12 @@ React.useEffect(() => {
           isInitialLoadRef.current = false;
           return;
         }
-        if (ev && hasEventEnded(ev)) {
+        if (ev && !isEventRecordActive(ev)) {
           await clearEndedEvent(ev.id);
           isInitialLoadRef.current = false;
           return;
         }
-        if(ev){
+        if(ev && isEventRecordActive(ev)){
           setCurrentEventId(ev.id);
           if (ev.event_type) {
             setSelectedEventType(ev.event_type);
@@ -6502,6 +6515,19 @@ React.useEffect(()=>{
         const user = await resolveCurrentUserForSync();
         if(!user || !currentEventId) {
           setMobileSummaryGuests([]);
+          return;
+        }
+
+        const { data: eventRow, error: eventError } = await supabase
+          .from('events')
+          .select('id, status, event_details')
+          .eq('id', currentEventId)
+          .maybeSingle();
+        if (eventError || !eventRow || !isEventRecordActive(eventRow)) {
+          setMobileSummaryGuests([]);
+          setGuestSummary({ approved: 0, adults: 0, children: 0 });
+          resetCapacityWarningGuests();
+          setGuestStatusSummary({ approved: 0, rejected: 0, pending: 0 });
           return;
         }
         
@@ -6845,41 +6871,54 @@ React.useEffect(()=>{
     };
   }, [currentEventId, eventReminderSentAt, formData?.date, formData?.start_datetime]);
 
+  const isCurrentEventActive = React.useMemo(() => {
+    if (!currentEventId) return false;
+    const rawDate = formData?.date || formData?.start_datetime;
+    if (!rawDate) return false;
+    return isEventDateOnOrAfterToday(rawDate);
+  }, [currentEventId, formData?.date, formData?.start_datetime]);
+
   const mobileDashboardModel = React.useMemo(() => {
     const dashboardActive = Boolean(
-      currentEventId ||
+      (currentEventId && isCurrentEventActive) ||
       newEventStarted ||
       selectedEventType ||
       formDataHasMeaningfulValues ||
-      selectedDesign ||
-      invitedCount > 0 ||
-      guestStatusSummary.pending > 0
+      selectedDesign
     );
     if (!dashboardActive) {
       return { showGuestPrimary: false };
     }
 
     return {
-      showGuestPrimary: Boolean(currentEventId && invitedCount > 0),
+      showGuestPrimary: Boolean(isCurrentEventActive && invitedCount > 0),
     };
   }, [
-    currentEventId,
     formDataHasMeaningfulValues,
     guestStatusSummary.pending,
     invitedCount,
+    isCurrentEventActive,
     newEventStarted,
     selectedDesign,
     selectedEventType,
   ]);
 
   React.useEffect(() => {
+    if (!currentEventId || isCurrentEventActive) return;
+    const rawDate = formData?.date || formData?.start_datetime;
+    if (!rawDate) return;
+    clearEndedEvent(currentEventId);
+  }, [currentEventId, formData?.date, formData?.start_datetime, isCurrentEventActive]);
+
+  React.useEffect(() => {
     if (!onMobileNavMetaChange) return;
     onMobileNavMetaChange({
       send: messageCapacityChartModel?.remainingMessages ?? 0,
-      reports: guestStatusSummary.pending ?? 0,
+      reports: isCurrentEventActive ? (guestStatusSummary.pending ?? 0) : 0,
     });
   }, [
     guestStatusSummary.pending,
+    isCurrentEventActive,
     messageCapacityChartModel?.remainingMessages,
     onMobileNavMetaChange,
   ]);
@@ -7355,7 +7394,7 @@ React.useEffect(()=>{
         </div>
       )}
 
-      {hasSession && currentEventId && mobileDashboardModel.showGuestPrimary && (
+      {hasSession && isCurrentEventActive && mobileDashboardModel.showGuestPrimary && (
         <section id="mobile-quick-guests" className="mx-auto mb-4 w-full max-w-md rounded-[1.75rem] border border-violet-300/25 bg-white/[0.06] p-4 text-right shadow-[0_14px_44px_rgba(0,0,0,0.36)] ring-1 ring-violet-400/20 backdrop-blur-2xl sm:hidden" dir="rtl">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0 flex-1">
@@ -7744,7 +7783,19 @@ React.useEffect(()=>{
         </div>
       )}
 
-      {hasSession && currentEventId && mobileEventCountdownModel.shouldShow && (
+      {hasSession && !isCurrentEventActive && !newEventStarted && (
+        <section className="mx-auto mb-4 w-full max-w-md rounded-[1.75rem] border border-white/15 bg-white/[0.06] p-4 text-center shadow-[0_14px_44px_rgba(0,0,0,0.36)] ring-1 ring-white/10 backdrop-blur-2xl sm:hidden" dir="rtl">
+          <div className="flex items-center justify-center gap-2">
+            <span className="text-2xl">📅</span>
+            <h3 className="text-lg font-bold text-slate-100">אין אירוע פעיל</h3>
+          </div>
+          <p className="mt-2 text-sm font-semibold text-slate-300">
+            אין אירוע פעיל במערכת. לחץ על &quot;צור אירוע חדש&quot; כדי להתחיל.
+          </p>
+        </section>
+      )}
+
+      {hasSession && isCurrentEventActive && mobileEventCountdownModel.shouldShow && (
         <div className="mx-auto mb-4 w-full max-w-md sm:hidden" dir="rtl">
           <div className="rounded-2xl border border-white/12 bg-white/[0.05] px-4 py-3 text-center">
             <div className="text-base font-black text-slate-100">
@@ -7943,7 +7994,7 @@ React.useEffect(()=>{
                 )}
               </div>
             )}
-            {currentEventId ? (
+            {currentEventId && isCurrentEventActive ? (
               <div className="bg-white/[0.055] border border-white/15 backdrop-blur-xl rounded-2xl p-4 sm:p-6 text-center shadow-[0_8px_40px_rgba(0,0,0,0.35)] ring-2 ring-indigo-400/30 w-full">
                 <div className="flex items-center justify-center gap-2 mb-2">
                   <span className="text-2xl">✅</span>
@@ -8227,7 +8278,7 @@ React.useEffect(()=>{
           )}
 
           {/* Third Column - Guest Status Summary */}
-          {currentEventId && (
+          {currentEventId && isCurrentEventActive && (
             <div className="w-full flex flex-col gap-6">
               {!mobileDashboardModel.showGuestPrimary && (
               <div className="sm:hidden rounded-3xl border border-white/15 bg-white/[0.055] p-4 text-center shadow-[0_8px_40px_rgba(0,0,0,0.35)] backdrop-blur-xl ring-2 ring-violet-400/25">

@@ -4,6 +4,42 @@ import { useRouter } from 'next/router';
 import { supabase } from '../lib/supabaseClient';
 import { ToastProvider } from '../components/Toast';
 
+const parseEventDateLocal = (str) => {
+  if (!str) return null;
+  const dateOnly = String(str).split(/[T ]/)[0];
+  const isoMatch = dateOnly.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (isoMatch) {
+    const [, year, month, day] = isoMatch;
+    return new Date(Number(year), Number(month) - 1, Number(day));
+  }
+  const match = dateOnly.match(/^(\d{1,2})[.\/-](\d{1,2})[.\/-](\d{4})$/);
+  if (match) {
+    const [, day, month, year] = match;
+    return new Date(Number(year), Number(month) - 1, Number(day));
+  }
+  const native = new Date(dateOnly);
+  if (!Number.isNaN(native.getTime())) return native;
+  return null;
+};
+
+const getEventDateFromDetails = (details) => {
+  if (!details || typeof details !== 'object') return null;
+  const raw = details.end_datetime || details.date || details.start_datetime || details.event_date || null;
+  return parseEventDateLocal(raw);
+};
+
+const isEventPast = (ev) => {
+  const details = typeof ev?.event_details === 'string'
+    ? (() => { try { return JSON.parse(ev.event_details); } catch (_) { return {}; } })()
+    : (ev?.event_details || {});
+  const eventDate = getEventDateFromDetails(details);
+  if (!eventDate) return false;
+  eventDate.setHours(0, 0, 0, 0);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return eventDate.getTime() < today.getTime();
+};
+
 function MyApp({ Component, pageProps }) {
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -143,18 +179,9 @@ function MyApp({ Component, pageProps }) {
         console.log('[auto-archive] Today local string:', todayStr);
 
         const toArchive = (data || []).filter((ev) => {
-          const d = ev?.event_details || {};
-          const endStr = d.end_datetime || d.date || d.start_datetime;
-          if (!endStr) return false;
-          
-          // Get event date string (YYYY-MM-DD format)
-          const eventDate = new Date(endStr);
-          const eventStr = eventDate.toLocaleDateString('en-CA'); // This gives YYYY-MM-DD format
-          
-          console.log('[auto-archive] Event ID:', ev.id, 'Date string:', endStr, 'Event date:', eventStr, 'Should archive:', eventStr < todayStr);
-          
-          // archive only if event date is before today (not today!)
-          return eventStr < todayStr;
+          const status = typeof ev?.status === 'string' ? ev.status.toLowerCase() : '';
+          if (status === 'archived') return false;
+          return isEventPast(ev);
         }).map((ev) => ev.id);
 
         if (toArchive.length === 0) return;
@@ -189,16 +216,17 @@ function MyApp({ Component, pageProps }) {
 
         const parseDate = (ev) => {
           const details = typeof ev.event_details === 'string' ? JSON.parse(ev.event_details) : ev.event_details || {};
-          const dateStr = details.end_datetime || details.date || details.start_datetime;
-          return dateStr ? new Date(dateStr) : null;
+          return getEventDateFromDetails(details);
         };
 
         let primary = data.find((ev) => {
           const dt = parseDate(ev);
           if (!dt) return false;
-          dt.setHours(23, 59, 59, 999);
-          return dt >= today;
-        }) || data[0];
+          dt.setHours(0, 0, 0, 0);
+          return dt.getTime() >= today.getTime();
+        });
+
+        if (!primary) return;
 
         const demoteIds = data.filter((ev) => ev.id !== primary.id && ev.status === 'active').map((e) => e.id);
         const promoteNeeded = primary.status !== 'active';
