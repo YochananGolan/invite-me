@@ -203,7 +203,7 @@ function isEventDateFuture(dateStr) {
   selectedDate.setHours(0, 0, 0, 0);
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  return selectedDate.getTime() > today.getTime();
+  return selectedDate.getTime() >= today.getTime();
 }
 
 function isEventDetailsCompleteForType(formData, selectedEventType) {
@@ -845,6 +845,25 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick, trig
     if (!dateValid) nextErrors.date = true;
     setFormErrors(nextErrors);
   }, [formData, selectedEventType, errorMsg, eventDetailsSubmitAttempted]);
+
+  // Clear stale date error as soon as the user picks a valid date (today or future).
+  React.useEffect(() => {
+    if (!showEventDetails || !eventDetailsSubmitAttempted) return;
+    if (!isEventDateFuture(formData?.date)) return;
+    setFormErrors((prev) => {
+      if (!prev.date) return prev;
+      const next = { ...prev };
+      delete next.date;
+      return next;
+    });
+    setErrorMsg((msg) => (
+      msg === 'תאריך האירוע לא יכול להיות בעבר.'
+      || msg === 'תאריך האירוע חייב להיות עתידי.'
+      || msg === 'נא לבחור תאריך אירוע.'
+        ? ''
+        : msg
+    ));
+  }, [formData?.date, showEventDetails, eventDetailsSubmitAttempted]);
 
   // --- Guest invitation state ---
   const [showGuestForm, setShowGuestForm] = useState(false);
@@ -1732,7 +1751,7 @@ const handleOpenAddonModal = React.useCallback(() => {
     if (!isEventDateFuture(formData.date)) {
       setFormErrors((prev) => ({ ...prev, date: true }));
       const msg = formData.date
-        ? 'תאריך האירוע חייב להיות עתידי.'
+        ? 'תאריך האירוע לא יכול להיות בעבר.'
         : 'נא לבחור תאריך אירוע.';
       setErrorMsg(msg);
       addToast?.(msg, 'error');
