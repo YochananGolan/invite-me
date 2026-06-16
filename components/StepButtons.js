@@ -198,12 +198,12 @@ function computeMissingDetails(formData, selectedEventType){
 }
 
 function isEventDateFuture(dateStr) {
-  if (!dateStr) return false;
+  const selectedDate = parseEventDate(dateStr);
+  if (!selectedDate) return false;
+  selectedDate.setHours(0, 0, 0, 0);
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const selectedDate = new Date(dateStr);
-  if (!Number.isFinite(selectedDate.getTime())) return false;
-  return selectedDate > today;
+  return selectedDate.getTime() > today.getTime();
 }
 
 function isEventDetailsCompleteForType(formData, selectedEventType) {
@@ -833,15 +833,16 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick, trig
   React.useEffect(() => {
     if (!eventDetailsSubmitAttempted || !errorMsg) return;
 
-    // Re-evaluate missing fields with the same rules used in handleSaveDetails
     const missing = computeMissingDetails(formData, selectedEventType);
-    if (missing.length === 0) {
+    const dateValid = isEventDateFuture(formData?.date);
+    if (missing.length === 0 && dateValid) {
       setErrorMsg('');
       setFormErrors({});
       return;
     }
 
     const nextErrors = missing.reduce((acc, [key]) => ({ ...acc, [key]: true }), {});
+    if (!dateValid) nextErrors.date = true;
     setFormErrors(nextErrors);
   }, [formData, selectedEventType, errorMsg, eventDetailsSubmitAttempted]);
 
@@ -1716,81 +1717,42 @@ const handleOpenAddonModal = React.useCallback(() => {
 
   const handleSaveDetails = async () => {
     setEventDetailsSubmitAttempted(true);
-    // Validate date is in the future (> today)
-    const today = new Date();
-    today.setHours(0,0,0,0);
-    const selectedDate = formData.date ? new Date(formData.date) : null;
-
-    if (selectedDate && selectedDate <= today) {
-      setFormErrors((prev)=>({...prev, date:true}));
-      setErrorMsg('תאריך האירוע חייב להיות עתידי.');
-      return;
-    }
-
-    // Hebrew labels for form keys (reused)
-    const labels = {
-      brideName: 'שם הכלה',
-      groomName: 'שם החתן',
-      brideParents: 'שם הורי הכלה',
-      groomParents: 'שם הורי החתן',
-      boyName: 'שם חתן בר מצווה',
-      boyParents: 'שם ההורים',
-      girlName: 'שם כלת בת מצווה',
-      girlParents: 'שם ההורים',
-      babyParents: 'שם ההורים',
-      birthdayName: 'שם החוגג/ת',
-      birthdayAge: 'גיל',
-      businessName: 'שם החברה',
-      businessContact: 'איש קשר',
-      date: 'תאריך האירוע',
-      time: 'שעת האירוע',
-      chuppahTime: 'שעת החופה',
-      hallName: 'שם האולם',
-      hallAddress: 'כתובת האולם',
-      hostName: 'שם המארחת',
-    };
-
-    function getMissingDetails() {
-      return Object.entries(formData).filter(([key, value]) => {
-        if (key === 'customEventDescription') return false; // שדה טקסט חופשי – לא חובה
-        if (key === 'chuppahTime' && selectedEventType !== 'חתונה') return false;
-        if (['groomName', 'brideName'].includes(key) && !['חתונה', 'חינה', 'מסיבת אירוסין'].includes(selectedEventType)) return false;
-        if (['brideParents', 'groomParents'].includes(key) && !['חתונה', 'חינה'].includes(selectedEventType)) return false;
-        if (['boyName', 'boyParents'].includes(key) && selectedEventType !== 'בר מצווה') return false;
-        if (['girlName', 'girlParents'].includes(key) && selectedEventType !== 'בת מצווה') return false;
-        if (['babyParents'].includes(key) && !['ברית','בריתה'].includes(selectedEventType)) return false;
-        if (['birthdayName', 'birthdayAge'].includes(key) && selectedEventType !== 'יום הולדת') return false;
-        if (['businessName', 'businessContact'].includes(key) && selectedEventType !== 'אירוע עסקי') return false;
-        if (key === 'hostName' && selectedEventType !== 'הפרשת חלה') return false;
-        const normalizedValue = typeof value === 'string'
-          ? value.trim()
-          : value === null || value === undefined
-            ? ''
-            : String(value).trim();
-        return !normalizedValue;
-      });
-    }
 
     const missing = computeMissingDetails(formData, selectedEventType);
     if (missing.length) {
       const errs = missing.reduce((acc, [key]) => ({ ...acc, [key]: true }), {});
       setFormErrors(errs);
       const missingLabels = missing.map(([key]) => fieldLabels[key] || key);
-      setErrorMsg(`נא למלא את השדות הבאים: ${missingLabels.join(', ')}`);
-    } else {
-      setFormErrors({});
-      setErrorMsg('');
-      setStepErrorMsg('');
-      setShowEventDetails(false);
-      setEventDetailsCompleted(true);
-      // Automatically proceed to step 3 – design chooser
-      setShowDesignChooser(true);
+      const msg = `נא למלא את השדות הבאים: ${missingLabels.join(', ')}`;
+      setErrorMsg(msg);
+      addToast?.(msg, 'error');
+      return;
     }
 
-    // Save draft event so summary component recognizes it
-    console.debug('[StepButtons] Calling saveEventToSupabase (draft)');
-    await saveEventToSupabase(null, selectedDesign);
-    console.debug('[StepButtons] saveEventToSupabase returned');
+    if (!isEventDateFuture(formData.date)) {
+      setFormErrors((prev) => ({ ...prev, date: true }));
+      const msg = formData.date
+        ? 'תאריך האירוע חייב להיות עתידי.'
+        : 'נא לבחור תאריך אירוע.';
+      setErrorMsg(msg);
+      addToast?.(msg, 'error');
+      return;
+    }
+
+    setFormErrors({});
+    setErrorMsg('');
+    setStepErrorMsg('');
+    setShowEventDetails(false);
+    setEventDetailsCompleted(true);
+    setShowDesignChooser(true);
+    try {
+      await saveEventToSupabase(null, selectedDesign);
+    } catch (err) {
+      console.error('Failed to save event details', err);
+      addToast?.('שמירת פרטי האירוע נכשלה. נסו שוב.', 'error');
+      setShowEventDetails(true);
+      setShowDesignChooser(false);
+    }
   };
 
   const handleSelectEvent = (type) => {
@@ -3200,6 +3162,7 @@ const handleOpenAddonModal = React.useCallback(() => {
       markStepDone(2);
     } catch (err) {
       console.error('Failed to save event', err);
+      throw err;
     }
   };
 
@@ -8785,8 +8748,11 @@ React.useEffect(()=>{
           </form>
           </div>
         </ModalBody>
-        <ModalFooter className="justify-center">
-          <button type="button" onClick={handleSaveDetails} className="w-full bg-gradient-to-br from-indigo-600 to-violet-600 shadow-[0_5px_22px_rgba(99,70,230,0.45)] text-white font-bold rounded-xl py-3 text-base hover:opacity-90 transition-opacity">
+        <ModalFooter className="justify-center flex-col gap-3">
+          {eventDetailsSubmitAttempted && errorMsg && (
+            <p className="w-full text-red-400 text-sm text-center bg-red-500/10 border border-red-400/30 rounded-xl p-2.5">{errorMsg}</p>
+          )}
+          <button type="button" onClick={handleSaveDetails} className="w-full bg-gradient-to-br from-indigo-600 to-violet-600 shadow-[0_5px_22px_rgba(99,70,230,0.45)] text-white font-bold rounded-xl py-3 text-base hover:opacity-90 transition-opacity touch-manipulation">
             שמור וסגור
           </button>
         </ModalFooter>
