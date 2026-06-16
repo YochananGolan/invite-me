@@ -661,8 +661,8 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick, trig
   const [showMobileQuickGuestListScreen, setShowMobileQuickGuestListScreen] = useState(false);
   const [mobileSummaryFilter, setMobileSummaryFilter] = useState('all');
   const [showMobileFirstSendSuccess, setShowMobileFirstSendSuccess] = useState(false);
-  const [showEndDashboardCharts, setShowEndDashboardCharts] = useState(false);
-  const [showEndDashboardDetails, setShowEndDashboardDetails] = useState(false);
+  const [showMobileChartsScreen, setShowMobileChartsScreen] = useState(false);
+  const [showMobileDetailsScreen, setShowMobileDetailsScreen] = useState(false);
   const [specialMealsSummary, setSpecialMealsSummary] = useState({ 
     veg: { adults: 0, children: 0, total: 0 },
     vegan: { adults: 0, children: 0, total: 0 },
@@ -7119,6 +7119,259 @@ React.useEffect(()=>{
     setShowMobileQuickGuestListScreen(false);
   }, []);
 
+  const renderGuestSummaryChartCard = () => (
+    <div className="bg-white/[0.055] border border-white/15 backdrop-blur-xl rounded-2xl p-4 sm:p-6 text-center shadow-[0_8px_40px_rgba(0,0,0,0.35)] ring-2 ring-indigo-400/30 w-full">
+      <div className="flex items-center justify-center gap-2 mb-2">
+        <span className="text-xl">👥</span>
+        <h3 className="text-lg font-bold text-indigo-300">סיכום כל האורחים המוזמנים</h3>
+      </div>
+      <div className="mt-1">
+        <div className="bg-white/5 border border-white/10 rounded-xl p-3">
+          {!shouldShowCharts ? (
+            <div className="py-10 text-sm text-slate-400 text-center">טוען נתונים...</div>
+          ) : hasGuestSummaryData ? (
+            <div>
+              <ResponsiveContainer width="100%" height={260}>
+                <BarChart data={guestSummaryChartData} margin={{ top: 16, right: 20, left: -10, bottom: 8 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                  <XAxis
+                    dataKey="name"
+                    stroke="#cbd5e1"
+                    tick={{ fontSize: isMobileView ? 11 : 13, fontWeight: 600, fill: isMobileView ? '#FDE68A' : '#cbd5e1' }}
+                    interval={0}
+                    tickFormatter={(value) => {
+                      if (value === 'adults') return 'מבוגרים';
+                      if (value === 'children') return 'ילדים';
+                      if (value === 'total') return 'סה"כ';
+                      return value;
+                    }}
+                    tickLine={false}
+                    axisLine={false}
+                    tickMargin={isMobileView ? 8 : 10}
+                  />
+                  <YAxis hide />
+                  <Tooltip content={() => null} active={false} cursor={false} />
+                  <Bar dataKey="value" radius={[8, 8, 0, 0]} maxBarSize={60} isAnimationActive={false}>
+                    {guestSummaryChartData.map((item) => (
+                      <Cell key={item.key} fill={item.color} />
+                    ))}
+                    <LabelList dataKey="value" content={renderGuestSummaryLabel} />
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          ) : (
+            <div className="py-10 text-sm text-slate-400 text-center">אין נתונים להצגה עדיין</div>
+          )}
+        </div>
+        <div className="grid grid-cols-3 gap-2 mt-3 text-base">
+          <div className="min-w-0 bg-white/5 border border-white/10 rounded-xl p-2 sm:p-3 text-right">
+            <div className="text-[11px] sm:text-base font-semibold text-emerald-300">מבוגרים</div>
+            <div className={`${previewMetricValueClass} text-2xl sm:text-3xl font-bold text-emerald-200`}>{guestSummary.adults}</div>
+          </div>
+          <div className="min-w-0 bg-white/5 border border-white/10 rounded-xl p-2 sm:p-3 text-right">
+            <div className="text-[11px] sm:text-base font-semibold text-orange-400">ילדים</div>
+            <div className={`${previewMetricValueClass} text-2xl sm:text-3xl font-bold text-orange-300`}>{guestSummary.children}</div>
+          </div>
+          <div className="min-w-0 bg-white/5 border border-white/10 rounded-xl p-2 sm:p-3 text-right">
+            <div className="text-[11px] sm:text-base font-semibold text-indigo-300">סה"כ</div>
+            <div className={`${previewMetricValueClass} text-2xl sm:text-3xl font-bold text-indigo-200`}>{guestSummary.adults + guestSummary.children}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderMessageCapacityChartCard = () => {
+    if (!messageCapacityChartModel) return null;
+    return (
+      <div className="bg-white/[0.055] border border-white/15 backdrop-blur-xl rounded-2xl p-4 sm:p-6 text-center shadow-[0_8px_40px_rgba(0,0,0,0.35)] ring-2 ring-amber-400/30 w-full">
+        <div className="flex items-center justify-center gap-2 mb-2">
+          <span className="text-xl">📈</span>
+          <h3 className="text-lg font-bold text-amber-300">יתרת הודעות</h3>
+        </div>
+        <div className="bg-white/5 border border-white/10 rounded-xl p-3">
+          {!shouldShowCharts ? (
+            <div className="py-10 text-sm text-slate-400 text-center">טוען נתונים...</div>
+          ) : messageCapacityChartModel.hasCapacityChartData ? (
+            <div>
+              <ResponsiveContainer width="100%" height={260}>
+                <BarChart data={messageCapacityChartModel.capacityChartData} margin={{ top: 16, right: 20, left: -10, bottom: 8 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                  <XAxis
+                    dataKey="name"
+                    stroke="#cbd5e1"
+                    tick={{ fontSize: isMobileView ? 11 : 13, fontWeight: 600, fill: isMobileView ? '#FDE68A' : '#cbd5e1' }}
+                    interval={0}
+                    tickLine={false}
+                    axisLine={false}
+                    tickMargin={isMobileView ? 8 : 10}
+                  />
+                  <YAxis hide />
+                  <Tooltip content={() => null} active={false} cursor={false} />
+                  <Bar dataKey="value" radius={[8, 8, 0, 0]} maxBarSize={60} isAnimationActive={false}>
+                    {messageCapacityChartModel.capacityChartData.map((item) => (
+                      <Cell key={item.key} fill={item.color} />
+                    ))}
+                    <LabelList dataKey="value" content={renderCapacityLabel} />
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          ) : (
+            <div className="py-10 text-sm text-slate-400 text-center">אין נתונים להצגה עדיין</div>
+          )}
+        </div>
+        <div className="grid grid-cols-3 gap-2 mt-3 text-base">
+          <div className="min-w-0 bg-white/5 border border-white/10 rounded-xl p-2 sm:p-3 text-right">
+            <div className="text-[11px] sm:text-base font-semibold text-amber-300">מגבלת הודעות</div>
+            <div className={`${previewMetricValueClass} text-2xl sm:text-3xl font-bold text-amber-200`}>{messageCapacityChartModel.messageLimit}</div>
+          </div>
+          <div className="min-w-0 bg-white/5 border border-white/10 rounded-xl p-2 sm:p-3 text-right">
+            <div className="text-[11px] sm:text-base font-semibold text-indigo-300">נשלחו</div>
+            <div className={`${previewMetricValueClass} text-2xl sm:text-3xl font-bold text-indigo-200`}>{messageCapacityChartModel.messagesSent}</div>
+          </div>
+          <div className={`min-w-0 bg-white/5 rounded-xl border ${messageCapacityChartModel.overMessages > 0 ? 'border-red-400/30' : 'border-emerald-400/30'} p-2 sm:p-3 text-right`}>
+            <div className={`text-[11px] sm:text-base font-semibold ${messageCapacityChartModel.overMessages > 0 ? 'text-red-400' : 'text-emerald-300'}`}>
+              {messageCapacityChartModel.overMessages > 0 ? 'חריגה' : 'יתרה'}
+            </div>
+            <div className={`${previewMetricValueClass} text-2xl sm:text-3xl font-bold ${messageCapacityChartModel.overMessages > 0 ? 'text-red-300' : 'text-emerald-200'}`}>
+              {messageCapacityChartModel.overMessages > 0 ? `-${messageCapacityChartModel.overMessages}` : messageCapacityChartModel.remainingMessages}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderDashboardDetailsCards = () => (
+    <>
+      {currentEventId && isCurrentEventActive ? (
+        <div className="bg-white/[0.055] border border-white/15 backdrop-blur-xl rounded-2xl p-4 sm:p-6 text-center shadow-[0_8px_40px_rgba(0,0,0,0.35)] ring-2 ring-indigo-400/30 w-full">
+          <div className="flex items-center justify-center gap-2 mb-2">
+            <span className="text-2xl">✅</span>
+            <h3 className="text-xl font-bold text-emerald-300">יש אירוע פעיל במערכת</h3>
+          </div>
+          <p className="text-slate-300"><strong>סוג האירוע:</strong> {selectedEventType || 'לא מוגדר'}</p>
+          {formData.date && (
+            <p className="text-slate-300"><strong>תאריך האירוע:</strong> {new Date(formData.date).toLocaleDateString('he-IL')}</p>
+          )}
+          {formData.hallName && (
+            <p className="text-slate-300"><strong>אולם:</strong> {formData.hallName}</p>
+          )}
+          {formData.date && (
+            <div className="bg-emerald-500/10 border border-emerald-400/30 rounded-lg p-3 mt-3 mb-2">
+              <p className="text-emerald-200 font-bold text-2xl text-center">
+                {(() => {
+                  const eventDate = new Date(formData.date);
+                  const today = new Date();
+                  const diffTime = eventDate.getTime() - today.getTime();
+                  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                  if (diffDays > 0) return `נותרו ${diffDays} ימים עד האירוע!`;
+                  if (diffDays === 0) return 'האירוע היום!';
+                  return `האירוע היה לפני ${Math.abs(diffDays)} ימים`;
+                })()}
+              </p>
+            </div>
+          )}
+          <p className="text-emerald-300 text-base mt-2 font-bold">האירוע מוכן לשליחת הזמנות ואישורי הגעה</p>
+        </div>
+      ) : newEventStarted ? (
+        <div className="bg-white/[0.055] border border-white/15 backdrop-blur-xl rounded-2xl p-4 text-center shadow-[0_8px_40px_rgba(0,0,0,0.35)] ring-2 ring-indigo-400/30 flex-1">
+          <div className="flex items-center justify-center gap-2 mb-2">
+            <span className="text-2xl">🚀</span>
+            <h3 className="text-lg font-bold text-indigo-300">מסלול פעיל – הזמן להתחיל אירוע חדש</h3>
+          </div>
+          <p className="text-slate-300 mb-2">
+            רכשת {getPlanDisplayName(selectedPlan) || 'מסלול'} בהצלחה. האירוע הקודם נסגר והמערכת מוכנה לאירוע חדש.
+          </p>
+          <p className="text-slate-300">התחל בשלב 1 כדי לבחור סוג אירוע ולהזין את הפרטים.</p>
+          <div className="flex justify-center gap-3 mt-4">
+            <button type="button" onClick={() => { setShowEventTypes(true); setStepErrorMsg(''); }} className="bg-primary text-white font-bold py-2 px-4 rounded-full hover:bg-primary/90 transition-all shadow">
+              עבור לשלב 1 – סוג אירוע
+            </button>
+            <button type="button" onClick={() => setShowPricingPlan(true)} className="border border-white/15 bg-transparent text-white font-semibold hover:border-indigo-300 hover:text-indigo-200 py-2 px-4 rounded-full transition-all">
+              בחר מסלול אחר
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="bg-white/[0.055] border border-white/15 backdrop-blur-xl rounded-2xl p-4 text-center shadow-lg flex-1">
+          <div className="flex items-center justify-center gap-2 mb-2">
+            <span className="text-2xl">📅</span>
+            <h3 className="text-lg font-bold text-slate-100">אין אירוע פעיל</h3>
+          </div>
+          <p className="text-slate-300">אין אירוע פעיל במערכת. לחץ על &quot;צור אירוע חדש&quot; כדי להתחיל.</p>
+        </div>
+      )}
+      {(planForDisplay || currentEventId) && (
+        <div className="bg-white/[0.055] border border-white/15 backdrop-blur-xl rounded-2xl p-4 sm:p-6 text-center shadow-[0_8px_40px_rgba(0,0,0,0.35)] ring-2 ring-amber-400/30 w-full" style={{ minHeight: 'min(280px, 50vh)' }}>
+          <div className="flex items-center justify-center gap-2 mb-2">
+            <span className="text-2xl">💰</span>
+            <h3 className="text-xl font-bold text-amber-300">מסלול פעיל</h3>
+          </div>
+          {tranzilaTerminalInfo && (
+            <div className="text-xs text-slate-400 mb-2 px-2">
+              מסוף טרנזילה: <strong>{tranzilaTerminalInfo.terminal}</strong>
+              {tranzilaTerminalInfo.isTestTerminal && <span className="text-orange-300 ml-1">(מסוף בדיקות)</span>}
+            </div>
+          )}
+          <div className="mt-3">
+            <div className="bg-white/5 border border-white/10 rounded-xl p-3 mb-3 space-y-3">
+              <div>
+                <div className="text-lg font-bold text-amber-300 mb-1">
+                  {displayPlanCode === 'basic' || displayPlanCode === 'free' ? 'מסלול א' :
+                   displayPlanCode === 'standard' ? 'מסלול ב' :
+                   displayPlanCode === 'premium' ? 'מסלול ג' :
+                   displayPlanCode === 'luxury' ? 'מסלול ד' :
+                   displayPlanCode === 'elite' ? 'מסלול ה' :
+                   displayPlanCode === 'supreme' ? 'מסלול ו' : 'מסלול א'}
+                </div>
+                <div className="text-base text-slate-300 font-semibold">
+                  {displayPlanCode === 'basic' || displayPlanCode === 'free' ? '₪1 - עד 50 הודעות' :
+                   displayPlanCode === 'standard' ? '149₪ - מ 51 עד 200 הודעות' :
+                   displayPlanCode === 'premium' ? '199₪ - מ 201 עד 350 הודעות' :
+                   displayPlanCode === 'luxury' ? '259₪ - מ 351 עד 500 הודעות' :
+                   displayPlanCode === 'elite' ? '349₪ - מ 501 עד 650 הודעות' :
+                   displayPlanCode === 'supreme' ? '499₪ - מ 651 עד 1000 הודעות' : '₪1 - עד 50 הודעות'}
+                </div>
+              </div>
+              <div className="bg-amber-500/10 border border-amber-400/30 rounded-lg p-3">
+                <div className="text-sm font-semibold text-amber-200 flex items-center justify-center gap-2 mb-2">
+                  <span className="text-lg">📦</span>
+                  <span>חבילות נוספות שנרכשו:</span>
+                </div>
+                {displayPackageEntries.length > 0 ? (
+                  <div className="flex flex-wrap justify-center gap-2 mb-3">
+                    {displayPackageEntries.map(({ id, label, count, extra }) => (
+                      <div key={id} className="flex items-center gap-2 bg-white/5 border border-amber-400/20 rounded-full px-3 py-1 shadow-sm">
+                        <span className="text-sm font-semibold text-amber-200">{label} × {count}</span>
+                        {extra > 0 && <span className="text-xs text-amber-300">+{extra} הודעות נוספות</span>}
+                      </div>
+                    ))}
+                  </div>
+                ) : displayAdditionalCapacityValue > 0 ? (
+                  <p className="text-sm text-slate-300 text-center">הקיבולת הוגדלה ב-{displayAdditionalCapacityValue} באמצעות חבילות הרחבה.</p>
+                ) : (
+                  <p className="text-sm text-slate-300 text-center">לא נרכשו חבילות נוספות</p>
+                )}
+                <div className="text-base font-bold text-amber-200">
+                  סה״כ כיסוי: {totalPlanCapacity} הודעות
+                  {additionalCapacity > 0 && <> (מתוכם {additionalCapacity} באמצעות חבילות הרחבה)</>}
+                </div>
+              </div>
+              {activePlanDescription && (
+                <div className="bg-white/5 border border-white/10 rounded-xl p-2">
+                  <div className="text-base text-slate-300 text-right leading-relaxed">{activePlanDescription}</div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+
   const renderMobileNextActionCard = ({
     stepLabel,
     title,
@@ -7733,6 +7986,50 @@ React.useEffect(()=>{
         </div>
       )}
 
+
+      {showMobileChartsScreen && (
+        <div className="fixed inset-0 z-[120] flex flex-col bg-[#08091a] sm:hidden" dir="rtl">
+          <div className="shrink-0 border-b border-white/10 bg-[#0d0f2b]/95 px-4 pb-4 pt-[max(1rem,env(safe-area-inset-top))] backdrop-blur-xl">
+            <div className="text-sm font-black text-indigo-200">דוחות וגרפים</div>
+            <h2 className="mt-1 text-3xl font-black text-white">הצג גרפים</h2>
+          </div>
+          <div className="flex-1 overflow-y-auto px-4 py-5 space-y-6">
+            {renderGuestSummaryChartCard()}
+            {renderMessageCapacityChartCard()}
+          </div>
+          <div className="shrink-0 border-t border-white/10 bg-[#0d0f2b]/95 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4 backdrop-blur-xl">
+            <button
+              type="button"
+              onClick={() => setShowMobileChartsScreen(false)}
+              className="w-full rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-600 px-4 py-4 text-lg font-black text-white shadow-[0_10px_24px_rgba(16,185,129,0.28)] transition-opacity active:opacity-85"
+            >
+              חזור
+            </button>
+          </div>
+        </div>
+      )}
+
+      {showMobileDetailsScreen && (
+        <div className="fixed inset-0 z-[120] flex flex-col bg-[#08091a] sm:hidden" dir="rtl">
+          <div className="shrink-0 border-b border-white/10 bg-[#0d0f2b]/95 px-4 pb-4 pt-[max(1rem,env(safe-area-inset-top))] backdrop-blur-xl">
+            <div className="text-sm font-black text-sky-200">פרטי אירוע ומסלול</div>
+            <h2 className="mt-1 text-3xl font-black text-white">פרטים נוספים</h2>
+          </div>
+          <div className="flex-1 overflow-y-auto px-4 py-5 space-y-6">
+            {renderDashboardDetailsCards()}
+          </div>
+          <div className="shrink-0 border-t border-white/10 bg-[#0d0f2b]/95 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4 backdrop-blur-xl">
+            <button
+              type="button"
+              onClick={() => setShowMobileDetailsScreen(false)}
+              className="w-full rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-600 px-4 py-4 text-lg font-black text-white shadow-[0_10px_24px_rgba(16,185,129,0.28)] transition-opacity active:opacity-85"
+            >
+              חזור
+            </button>
+          </div>
+        </div>
+      )}
+
       {showMobileFirstSendSuccess && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0d0f2b]/75 px-4 backdrop-blur-sm sm:hidden" dir="rtl">
           <div className="w-full max-w-md rounded-[1.75rem] border border-emerald-300/30 bg-[#12143a] p-6 text-center shadow-[0_20px_60px_rgba(0,0,0,0.45)] ring-1 ring-emerald-400/25">
@@ -7918,13 +8215,11 @@ React.useEffect(()=>{
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
-                  setShowEndDashboardCharts((prev) => !prev);
+                  setShowMobileChartsScreen(true);
                 }}
                 className="relative flex min-h-[4.75rem] w-full flex-col items-center justify-center gap-1.5 rounded-2xl border border-indigo-400/40 bg-indigo-500/15 py-4 px-5 text-center text-indigo-200 shadow-[0_2px_10px_rgba(99,102,241,0.25)] transition-all"
               >
-                <span className="text-center text-2xl font-black leading-tight">
-                  {showEndDashboardCharts ? 'הסתר גרפים' : 'הצג גרפים'}
-                </span>
+                <span className="text-center text-2xl font-black leading-tight">הצג גרפים</span>
               </button>
             )}
             {hasSession && (
@@ -7934,13 +8229,11 @@ React.useEffect(()=>{
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
-                  setShowEndDashboardDetails((prev) => !prev);
+                  setShowMobileDetailsScreen(true);
                 }}
                 className="relative flex min-h-[4.75rem] w-full flex-col items-center justify-center gap-1.5 rounded-2xl border border-sky-400/40 bg-sky-500/15 py-4 px-5 text-center text-sky-200 shadow-[0_2px_10px_rgba(14,165,233,0.25)] transition-all"
               >
-                <span className="text-center text-2xl font-black leading-tight">
-                  {showEndDashboardDetails ? 'הסתר פרטים נוספים' : 'פרטים נוספים'}
-                </span>
+                <span className="text-center text-2xl font-black leading-tight">פרטים נוספים</span>
               </button>
             )}
           </div>
@@ -8010,251 +8303,16 @@ React.useEffect(()=>{
                 )}
               </div>
             )}
-            <div className={showEndDashboardDetails ? 'contents' : 'hidden sm:contents'}>
-            {currentEventId && isCurrentEventActive ? (
-              <div className="bg-white/[0.055] border border-white/15 backdrop-blur-xl rounded-2xl p-4 sm:p-6 text-center shadow-[0_8px_40px_rgba(0,0,0,0.35)] ring-2 ring-indigo-400/30 w-full">
-                <div className="flex items-center justify-center gap-2 mb-2">
-                  <span className="text-2xl">✅</span>
-                  <h3 className="text-xl font-bold text-emerald-300">יש אירוע פעיל במערכת</h3>
-                </div>
-                <p className="text-slate-300">
-                  <strong>סוג האירוע:</strong> {selectedEventType || 'לא מוגדר'}
-                </p>
-                {formData.date && (
-                  <p className="text-slate-300">
-                    <strong>תאריך האירוע:</strong> {new Date(formData.date).toLocaleDateString('he-IL')}
-                  </p>
-                )}
-                {formData.hallName && (
-                  <p className="text-slate-300">
-                    <strong>אולם:</strong> {formData.hallName}
-                  </p>
-                )}
-                {formData.date && (
-                  <div className="bg-emerald-500/10 border border-emerald-400/30 rounded-lg p-3 mt-3 mb-2">
-                    <p className="text-emerald-200 font-bold text-2xl text-center">
-                      {(() => {
-                        const eventDate = new Date(formData.date);
-                        const today = new Date();
-                        const diffTime = eventDate.getTime() - today.getTime();
-                        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-                        
-                        if (diffDays > 0) {
-                          return `נותרו ${diffDays} ימים עד האירוע!`;
-                        } else if (diffDays === 0) {
-                          return "האירוע היום!";
-                        } else {
-                          return `האירוע היה לפני ${Math.abs(diffDays)} ימים`;
-                        }
-                      })()}
-                    </p>
-                  </div>
-                )}
-                <p className="text-emerald-300 text-base mt-2 font-bold">
-                  האירוע מוכן לשליחת הזמנות ואישורי הגעה
-                </p>
-              </div>
-            ) : newEventStarted ? (
-              <div className="bg-white/[0.055] border border-white/15 backdrop-blur-xl rounded-2xl p-4 text-center shadow-[0_8px_40px_rgba(0,0,0,0.35)] ring-2 ring-indigo-400/30 flex-1">
-                <div className="flex items-center justify-center gap-2 mb-2">
-                  <span className="text-2xl">🚀</span>
-                  <h3 className="text-lg font-bold text-indigo-300">מסלול פעיל – הזמן להתחיל אירוע חדש</h3>
-                </div>
-                <p className="text-slate-300 mb-2">
-                  רכשת {getPlanDisplayName(selectedPlan) || 'מסלול'} בהצלחה. האירוע הקודם נסגר והמערכת מוכנה לאירוע חדש.
-                </p>
-                <p className="text-slate-300">
-                  התחל בשלב 1 כדי לבחור סוג אירוע ולהזין את הפרטים.
-                </p>
-                <div className="flex justify-center gap-3 mt-4">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowEventTypes(true);
-                      setStepErrorMsg('');
-                    }}
-                    className="bg-primary text-white font-bold py-2 px-4 rounded-full hover:bg-primary/90 transition-all shadow"
-                  >
-                    עבור לשלב 1 – סוג אירוע
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setShowPricingPlan(true)}
-                    className="border border-white/15 bg-transparent text-white font-semibold hover:border-indigo-300 hover:text-indigo-200 py-2 px-4 rounded-full transition-all"
-                  >
-                    בחר מסלול אחר
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="bg-white/[0.055] border border-white/15 backdrop-blur-xl rounded-2xl p-4 text-center shadow-lg flex-1">
-                <div className="flex items-center justify-center gap-2 mb-2">
-                  <span className="text-2xl">📅</span>
-                  <h3 className="text-lg font-bold text-slate-100">אין אירוע פעיל</h3>
-                </div>
-                <p className="text-slate-300">
-                  אין אירוע פעיל במערכת. לחץ על "צור אירוע חדש" כדי להתחיל.
-                </p>
-              </div>
-            )}
-            {(planForDisplay || currentEventId) && (
-              <div className="bg-white/[0.055] border border-white/15 backdrop-blur-xl rounded-2xl p-4 sm:p-6 text-center shadow-[0_8px_40px_rgba(0,0,0,0.35)] ring-2 ring-amber-400/30 w-full" style={{ minHeight: 'min(280px, 50vh)' }}>
-                <div className="flex items-center justify-center gap-2 mb-2">
-                  <span className="text-2xl">💰</span>
-                  <h3 className="text-xl font-bold text-amber-300">מסלול פעיל</h3>
-                </div>
-                {/* Display Tranzila Terminal Info */}
-                {tranzilaTerminalInfo && (
-                  <div className="text-xs text-slate-400 mb-2 px-2">
-                    מסוף טרנזילה: <strong>{tranzilaTerminalInfo.terminal}</strong>
-                    {tranzilaTerminalInfo.isTestTerminal && (
-                      <span className="text-orange-300 ml-1">(מסוף בדיקות)</span>
-                    )}
-                  </div>
-                )}
-                <div className="mt-3">
-                  <div className="bg-white/5 border border-white/10 rounded-xl p-3 mb-3 space-y-3">
-                    <div>
-                      <div className="text-lg font-bold text-amber-300 mb-1">
-                        {displayPlanCode === 'basic' || displayPlanCode === 'free' ? 'מסלול א' : 
-                         displayPlanCode === 'standard' ? 'מסלול ב' : 
-                         displayPlanCode === 'premium' ? 'מסלול ג' : 
-                         displayPlanCode === 'luxury' ? 'מסלול ד' : 
-                         displayPlanCode === 'elite' ? 'מסלול ה' : 
-                         displayPlanCode === 'supreme' ? 'מסלול ו' : 'מסלול א'}
-                      </div>
-                      <div className="text-base text-slate-300 font-semibold">
-                        {displayPlanCode === 'basic' || displayPlanCode === 'free' ? '₪1 - עד 50 הודעות' :
-                         displayPlanCode === 'standard' ? '149₪ - מ 51 עד 200 הודעות' :
-                         displayPlanCode === 'premium' ? '199₪ - מ 201 עד 350 הודעות' :
-                         displayPlanCode === 'luxury' ? '259₪ - מ 351 עד 500 הודעות' :
-                         displayPlanCode === 'elite' ? '349₪ - מ 501 עד 650 הודעות' :
-                         displayPlanCode === 'supreme' ? '499₪ - מ 651 עד 1000 הודעות' : '₪1 - עד 50 הודעות'}
-                      </div>
-                    </div>
-                    <div className="bg-amber-500/10 border border-amber-400/30 rounded-lg p-3">
-                      <div className="text-sm font-semibold text-amber-200 flex items-center justify-center gap-2 mb-2">
-                        <span className="text-lg">📦</span>
-                        <span>חבילות נוספות שנרכשו:</span>
-                      </div>
-                      {displayPackageEntries.length > 0 ? (
-                        <div className="flex flex-wrap justify-center gap-2 mb-3">
-                          {displayPackageEntries.map(({ id, label, count, extra }) => (
-                            <div key={id} className="flex items-center gap-2 bg-white/5 border border-amber-400/20 rounded-full px-3 py-1 shadow-sm">
-                              <span className="text-sm font-semibold text-amber-200">
-                                {label} × {count}
-                              </span>
-                              {extra > 0 && (
-                                <span className="text-xs text-amber-300">
-                                  +{extra} הודעות נוספות
-                                </span>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      ) : displayAdditionalCapacityValue > 0 ? (
-                        <p className="text-sm text-slate-300 text-center">
-                          הקיבולת הוגדלה ב-{displayAdditionalCapacityValue} באמצעות חבילות הרחבה.
-                        </p>
-                      ) : (
-                        <p className="text-sm text-slate-300 text-center">לא נרכשו חבילות נוספות</p>
-                      )}
-                      <div className="text-base font-bold text-amber-200">
-                        סה״כ כיסוי: {totalPlanCapacity} הודעות
-                        {additionalCapacity > 0 && (
-                          <> (מתוכם {additionalCapacity} באמצעות חבילות הרחבה)</>
-                        )}
-                      </div>
-                    </div>
-                    {activePlanDescription && (
-                      <div className="bg-white/5 border border-white/10 rounded-xl p-2">
-                        <div className="text-base text-slate-300 text-right leading-relaxed">
-                          {activePlanDescription}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
+            <div className="hidden sm:contents">
+              {renderDashboardDetailsCards()}
             </div>
           </div>
 
           {/* Second Column - Guest Summary + Table Report */}
           {currentEventId && (
             <div className="w-full flex flex-col gap-6">
-              <div className={`bg-white/[0.055] border border-white/15 backdrop-blur-xl rounded-2xl p-4 sm:p-6 text-center shadow-[0_8px_40px_rgba(0,0,0,0.35)] ring-2 ring-indigo-400/30 w-full ${showEndDashboardCharts ? 'block' : 'hidden sm:block'}`}>
-                <div className="flex items-center justify-center gap-2 mb-2">
-                  <span className="text-xl">👥</span>
-                  <h3 className="text-lg font-bold text-indigo-300">סיכום כל האורחים המוזמנים</h3>
-                </div>
-                <div className="mt-1">
-                  <div className="bg-white/5 border border-white/10 rounded-xl p-3">
-                    {!shouldShowCharts ? (
-                      <div className="py-10 text-sm text-slate-400 text-center">טוען נתונים...</div>
-                    ) : hasGuestSummaryData ? (
-                      <div>
-                        <ResponsiveContainer width="100%" height={260}>
-                          <BarChart
-                            data={guestSummaryChartData}
-                            margin={{ top: 16, right: 20, left: -10, bottom: 8 }}
-                          >
-                            <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                            <XAxis
-                              dataKey="name"
-                              stroke="#cbd5e1"
-                              tick={{
-                                fontSize: isMobileView ? 11 : 13,
-                                fontWeight: 600,
-                                fill: isMobileView ? '#FDE68A' : '#cbd5e1',
-                              }}
-                              interval={0}
-                              tickFormatter={(value) => {
-                                if (value === 'adults') return 'מבוגרים';
-                                if (value === 'children') return 'ילדים';
-                                if (value === 'total') return "סה\"כ";
-                                return value;
-                              }}
-                              tickLine={false}
-                              axisLine={false}
-                              tickMargin={isMobileView ? 8 : 10}
-                            />
-                            <YAxis hide />
-                            <Tooltip content={() => null} active={false} cursor={false} />
-                            <Bar
-                              dataKey="value"
-                              radius={[8, 8, 0, 0]}
-                              maxBarSize={60}
-                              isAnimationActive={false}
-                            >
-                              {guestSummaryChartData.map((item) => (
-                                <Cell key={item.key} fill={item.color} />
-                              ))}
-                              <LabelList dataKey="value" content={renderGuestSummaryLabel} />
-                            </Bar>
-                          </BarChart>
-                        </ResponsiveContainer>
-                      </div>
-                    ) : (
-                      <div className="py-10 text-sm text-slate-400 text-center">אין נתונים להצגה עדיין</div>
-                    )}
-                  </div>
-
-                  <div className="grid grid-cols-3 gap-2 mt-3 text-base">
-                    <div className="min-w-0 bg-white/5 border border-white/10 rounded-xl p-2 sm:p-3 text-right">
-                      <div className="text-[11px] sm:text-base font-semibold text-emerald-300">מבוגרים</div>
-                      <div className={`${previewMetricValueClass} text-2xl sm:text-3xl font-bold text-emerald-200`}>{guestSummary.adults}</div>
-                    </div>
-                    <div className="min-w-0 bg-white/5 border border-white/10 rounded-xl p-2 sm:p-3 text-right">
-                      <div className="text-[11px] sm:text-base font-semibold text-orange-400">ילדים</div>
-                      <div className={`${previewMetricValueClass} text-2xl sm:text-3xl font-bold text-orange-300`}>{guestSummary.children}</div>
-                    </div>
-                    <div className="min-w-0 bg-white/5 border border-white/10 rounded-xl p-2 sm:p-3 text-right">
-                      <div className="text-[11px] sm:text-base font-semibold text-indigo-300">סה"כ</div>
-                      <div className={`${previewMetricValueClass} text-2xl sm:text-3xl font-bold text-indigo-200`}>{guestSummary.adults + guestSummary.children}</div>
-                    </div>
-                  </div>
-                </div>
+              <div className="hidden sm:block">
+                {renderGuestSummaryChartCard()}
               </div>
 
               {tableSummary.length > 0 && (
@@ -8487,72 +8545,9 @@ React.useEffect(()=>{
                 )}
               </div>
               {(planForDisplay || currentEventId) && messageCapacityChartModel && (
-                  <div className={`bg-white/[0.055] border border-white/15 backdrop-blur-xl rounded-2xl p-4 sm:p-6 text-center shadow-[0_8px_40px_rgba(0,0,0,0.35)] ring-2 ring-amber-400/30 w-full ${showEndDashboardCharts ? 'block' : 'hidden sm:block'}`}>
-                    <div className="flex items-center justify-center gap-2 mb-2">
-                      <span className="text-xl">📈</span>
-                      <h3 className="text-lg font-bold text-amber-300">יתרת הודעות</h3>
-                    </div>
-
-                    <div className="bg-white/5 border border-white/10 rounded-xl p-3">
-                      {!shouldShowCharts ? (
-                        <div className="py-10 text-sm text-slate-400 text-center">טוען נתונים...</div>
-                      ) : messageCapacityChartModel.hasCapacityChartData ? (
-                        <div>
-                          <ResponsiveContainer width="100%" height={260}>
-                            <BarChart
-                              data={messageCapacityChartModel.capacityChartData}
-                              margin={{ top: 16, right: 20, left: -10, bottom: 8 }}
-                            >
-                              <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                              <XAxis
-                                dataKey="name"
-                                stroke="#cbd5e1"
-                                tick={{ fontSize: isMobileView ? 11 : 13, fontWeight: 600, fill: isMobileView ? '#FDE68A' : '#cbd5e1' }}
-                                interval={0}
-                                tickLine={false}
-                                axisLine={false}
-                                tickMargin={isMobileView ? 8 : 10}
-                              />
-                              <YAxis hide />
-                              <Tooltip content={() => null} active={false} cursor={false} />
-                              <Bar
-                                dataKey="value"
-                                radius={[8, 8, 0, 0]}
-                                maxBarSize={60}
-                                isAnimationActive={false}
-                              >
-                                {messageCapacityChartModel.capacityChartData.map((item) => (
-                                  <Cell key={item.key} fill={item.color} />
-                                ))}
-                                <LabelList dataKey="value" content={renderCapacityLabel} />
-                              </Bar>
-                            </BarChart>
-                          </ResponsiveContainer>
-                        </div>
-                      ) : (
-                        <div className="py-10 text-sm text-slate-400 text-center">אין נתונים להצגה עדיין</div>
-                      )}
-                    </div>
-
-                    <div className="grid grid-cols-3 gap-2 mt-3 text-base">
-                      <div className="min-w-0 bg-white/5 border border-white/10 rounded-xl p-2 sm:p-3 text-right">
-                        <div className="text-[11px] sm:text-base font-semibold text-amber-300">מגבלת הודעות</div>
-                        <div className={`${previewMetricValueClass} text-2xl sm:text-3xl font-bold text-amber-200`}>{messageCapacityChartModel.messageLimit}</div>
-                      </div>
-                      <div className="min-w-0 bg-white/5 border border-white/10 rounded-xl p-2 sm:p-3 text-right">
-                        <div className="text-[11px] sm:text-base font-semibold text-indigo-300">נשלחו</div>
-                        <div className={`${previewMetricValueClass} text-2xl sm:text-3xl font-bold text-indigo-200`}>{messageCapacityChartModel.messagesSent}</div>
-                      </div>
-                      <div className={`min-w-0 bg-white/5 rounded-xl border ${messageCapacityChartModel.overMessages > 0 ? 'border-red-400/30' : 'border-emerald-400/30'} p-2 sm:p-3 text-right`}>
-                        <div className={`text-[11px] sm:text-base font-semibold ${messageCapacityChartModel.overMessages > 0 ? 'text-red-400' : 'text-emerald-300'}`}>
-                          {messageCapacityChartModel.overMessages > 0 ? 'חריגה' : 'יתרה'}
-                        </div>
-                        <div className={`${previewMetricValueClass} text-2xl sm:text-3xl font-bold ${messageCapacityChartModel.overMessages > 0 ? 'text-red-300' : 'text-emerald-200'}`}>
-                          {messageCapacityChartModel.overMessages > 0 ? `-${messageCapacityChartModel.overMessages}` : messageCapacityChartModel.remainingMessages}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+                <div className="hidden sm:block">
+                  {renderMessageCapacityChartCard()}
+                </div>
               )}
             </div>
           )}
