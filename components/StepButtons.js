@@ -24,8 +24,10 @@ import {
 import MobileChartPager from './mobile/MobileChartPager';
 import MobileFullScreenShell from './mobile/MobileFullScreenShell';
 import MobileScreenLoading from './mobile/MobileScreenLoading';
+import MobileStateMessage from './mobile/MobileStateMessage';
 
 const RADIAN = Math.PI / 180;
+const MOBILE_GUEST_LIST_PAGE_SIZE = 40;
 const previewMetricValueClass = 'max-w-full min-w-0 break-all tabular-nums leading-tight';
 const previewTableNumberClass = 'inline-block max-w-full min-w-0 break-all tabular-nums leading-tight';
 const invitationPreviewLineContainmentStyle = {
@@ -665,6 +667,8 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick, trig
   const [showMobileDetailsScreen, setShowMobileDetailsScreen] = useState(false);
   const [mobileChartsScreenReady, setMobileChartsScreenReady] = useState(false);
   const [mobileDetailsScreenReady, setMobileDetailsScreenReady] = useState(false);
+  const [mobileGuestListSearch, setMobileGuestListSearch] = useState('');
+  const [mobileGuestListVisibleLimit, setMobileGuestListVisibleLimit] = useState(MOBILE_GUEST_LIST_PAGE_SIZE);
   const [specialMealsSummary, setSpecialMealsSummary] = useState({ 
     veg: { adults: 0, children: 0, total: 0 },
     vegan: { adults: 0, children: 0, total: 0 },
@@ -692,6 +696,23 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick, trig
       return true;
     })
   ), [mobileSummaryFilter, mobileSummaryGuests]);
+  const mobileGuestFilterCounts = React.useMemo(() => {
+    const counts = { all: mobileSummaryGuests.length, approved: 0, pending: 0, rejected: 0 };
+    mobileSummaryGuests.forEach((guest) => {
+      const bucket = getGuestStatusBucket(guest.status);
+      counts[bucket] += 1;
+    });
+    return counts;
+  }, [mobileSummaryGuests]);
+  const mobileGuestListFilteredGuests = React.useMemo(() => {
+    const term = mobileGuestListSearch.trim();
+    if (!term) return mobileStatusFilteredGuests;
+    return mobileStatusFilteredGuests.filter((guest) => matchesGuestSearchTerm(guest, term));
+  }, [mobileGuestListSearch, mobileStatusFilteredGuests]);
+  const mobileGuestListVisibleGuests = React.useMemo(
+    () => mobileGuestListFilteredGuests.slice(0, mobileGuestListVisibleLimit),
+    [mobileGuestListFilteredGuests, mobileGuestListVisibleLimit],
+  );
   const mobileQuickGuestSearchResults = React.useMemo(() => {
     const term = mobileQuickGuestSearchQuery.trim();
     if (!term) return [];
@@ -7114,11 +7135,15 @@ React.useEffect(()=>{
   }, []);
 
   const openMobileQuickGuestListScreen = React.useCallback(() => {
+    setMobileGuestListSearch('');
+    setMobileGuestListVisibleLimit(MOBILE_GUEST_LIST_PAGE_SIZE);
     setShowMobileQuickGuestListScreen(true);
   }, []);
 
   const closeMobileQuickGuestListScreen = React.useCallback(() => {
     setShowMobileQuickGuestListScreen(false);
+    setMobileGuestListSearch('');
+    setMobileGuestListVisibleLimit(MOBILE_GUEST_LIST_PAGE_SIZE);
   }, []);
 
   React.useEffect(() => {
@@ -7737,7 +7762,7 @@ React.useEffect(()=>{
       )}
 
       {hasSession && isCurrentEventActive && mobileDashboardModel.showGuestPrimary && (
-        <section id="mobile-quick-guests" className="mx-auto mb-4 w-full max-w-md rounded-[1.75rem] border border-violet-300/25 bg-white/[0.06] p-4 text-right shadow-[0_14px_44px_rgba(0,0,0,0.36)] ring-1 ring-violet-400/20 backdrop-blur-2xl sm:hidden" dir="rtl">
+        <section id="mobile-quick-guests" data-testid="mobile-quick-guests" className="mx-auto mb-4 w-full max-w-md rounded-[1.75rem] border border-violet-300/25 bg-white/[0.06] p-4 text-right shadow-[0_14px_44px_rgba(0,0,0,0.36)] ring-1 ring-violet-400/20 backdrop-blur-2xl sm:hidden" dir="rtl">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0 flex-1">
               <h2 className="text-3xl font-black leading-tight text-white">ניהול אורחים מהיר</h2>
@@ -7834,7 +7859,10 @@ React.useEffect(()=>{
                       : 'border-white/10 bg-white/[0.04] text-slate-300'
                   }`}
                 >
-                  {label}
+                  <span className="block leading-tight">{label}</span>
+                  <span className="mt-0.5 block text-[10px] font-bold tabular-nums opacity-90">
+                    {mobileGuestFilterCounts[key] ?? 0}
+                  </span>
                 </button>
               ))}
             </div>
@@ -7845,9 +7873,14 @@ React.useEffect(()=>{
             type="button"
             onClick={openMobileQuickGuestListScreen}
             className="mt-3 w-full rounded-2xl border border-violet-300/30 bg-violet-500/15 px-4 py-3 text-base font-black text-violet-100 transition-colors active:bg-violet-500/25"
+            data-testid="mobile-open-guest-list"
           >
-            {`ראה רשימת אורחים : ${RSVP_FILTER_LABELS[mobileSummaryFilter] || RSVP_FILTER_LABELS.all}`}
+            {`ראה רשימת אורחים : ${RSVP_FILTER_LABELS[mobileSummaryFilter] || RSVP_FILTER_LABELS.all} (${mobileGuestFilterCounts[mobileSummaryFilter] ?? mobileGuestFilterCounts.all})`}
           </button>
+
+          <p className="mt-2 text-center text-[11px] font-semibold text-slate-400">
+            החליקו על כרטיס אורח ימינה לתזכורת או שמאלה ל-WhatsApp
+          </p>
 
           <form
             className="mt-3 flex min-w-0 items-center gap-1.5 rounded-2xl border border-white/10 bg-white/[0.055] p-1.5"
@@ -8026,21 +8059,36 @@ React.useEffect(()=>{
       )}
 
       {showMobileQuickGuestListScreen && (
-        <div className="fixed inset-0 z-[120] flex flex-col bg-[#08091a] sm:hidden" dir="rtl">
-          <div className="shrink-0 border-b border-white/10 bg-[#0d0f2b]/95 px-4 pb-4 pt-[max(1rem,env(safe-area-inset-top))] backdrop-blur-xl">
-            <div className="text-sm font-black text-violet-200">ניהול אורחים מהיר</div>
-            <h2 className="mt-1 text-3xl font-black text-white">
-              {`ראה רשימת אורחים : ${RSVP_FILTER_LABELS[mobileSummaryFilter] || RSVP_FILTER_LABELS.all}`}
-            </h2>
-            <p className="mt-2 text-base font-semibold text-slate-300">
-              {mobileStatusFilteredGuests.length} אורחים
-            </p>
-          </div>
-
+        <MobileFullScreenShell
+          testId="mobile-guest-list-screen"
+          eyebrow="ניהול אורחים מהיר"
+          title={`ראה רשימת אורחים : ${RSVP_FILTER_LABELS[mobileSummaryFilter] || RSVP_FILTER_LABELS.all}`}
+          onClose={closeMobileQuickGuestListScreen}
+          headerExtra={(
+            <>
+              <p className="mt-2 text-base font-semibold text-slate-300">
+                {mobileGuestListFilteredGuests.length} אורחים
+                {mobileGuestListSearch.trim() ? ` · חיפוש: ${mobileGuestListSearch.trim()}` : ''}
+              </p>
+              <label className="sr-only" htmlFor="mobile-guest-list-search">חיפוש ברשימת אורחים</label>
+              <input
+                id="mobile-guest-list-search"
+                type="search"
+                value={mobileGuestListSearch}
+                onChange={(event) => {
+                  setMobileGuestListSearch(event.target.value);
+                  setMobileGuestListVisibleLimit(MOBILE_GUEST_LIST_PAGE_SIZE);
+                }}
+                placeholder="חיפוש לפי שם או נייד"
+                className="mt-3 w-full rounded-full border border-white/10 bg-white/[0.055] px-4 py-2.5 text-right text-sm font-semibold text-slate-100 placeholder:text-slate-500 focus:border-violet-300 focus:outline-none"
+              />
+            </>
+          )}
+        >
           <div className="flex-1 overflow-y-auto px-4 py-5">
-            {mobileStatusFilteredGuests.length > 0 ? (
+            {mobileGuestListVisibleGuests.length > 0 ? (
               <div className="space-y-3">
-                {mobileStatusFilteredGuests.map((guest, idx) => {
+                {mobileGuestListVisibleGuests.map((guest, idx) => {
                   const statusMeta = getGuestStatusMeta(guest.status);
                   const guestName = [guest.first_name, guest.last_name].filter(Boolean).join(' ') || `אורח ${idx + 1}`;
                   const initials = guestName.split(' ').map((part) => part[0]).filter(Boolean).slice(0, 2).join('');
@@ -8057,28 +8105,25 @@ React.useEffect(()=>{
                     />
                   );
                 })}
+                {mobileGuestListVisibleGuests.length < mobileGuestListFilteredGuests.length && (
+                  <button
+                    type="button"
+                    onClick={() => setMobileGuestListVisibleLimit((prev) => prev + MOBILE_GUEST_LIST_PAGE_SIZE)}
+                    className="w-full rounded-2xl border border-violet-300/30 bg-violet-500/15 px-4 py-3 text-sm font-black text-violet-100"
+                  >
+                    {`טען עוד (${mobileGuestListFilteredGuests.length - mobileGuestListVisibleGuests.length} נותרו)`}
+                  </button>
+                )}
               </div>
             ) : (
-              <div className="flex min-h-[50vh] flex-col items-center justify-center rounded-[1.75rem] border border-white/10 bg-white/[0.04] px-6 py-12 text-center">
-                <div className="text-5xl">👥</div>
-                <div className="mt-4 text-2xl font-black text-white">אין אורחים להצגה</div>
-                <p className="mt-3 max-w-xs text-base font-semibold leading-7 text-slate-400">
-                  אין אורחים במסנן «{RSVP_FILTER_LABELS[mobileSummaryFilter] || RSVP_FILTER_LABELS.all}». נסו לשנות את המסנן.
-                </p>
-              </div>
+              <MobileStateMessage
+                variant="empty"
+                title="אין אורחים להצגה"
+                description={`אין אורחים במסנן «${RSVP_FILTER_LABELS[mobileSummaryFilter] || RSVP_FILTER_LABELS.all}». נסו לשנות את המסנן או את החיפוש.`}
+              />
             )}
           </div>
-
-          <div className="shrink-0 border-t border-white/10 bg-[#0d0f2b]/95 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4 backdrop-blur-xl">
-            <button
-              type="button"
-              onClick={closeMobileQuickGuestListScreen}
-              className="w-full rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-600 px-4 py-4 text-lg font-black text-white shadow-[0_10px_24px_rgba(16,185,129,0.28)] transition-opacity active:opacity-85"
-            >
-              חזור
-            </button>
-          </div>
-        </div>
+        </MobileFullScreenShell>
       )}
 
 
@@ -8096,18 +8141,18 @@ React.useEffect(()=>{
               {
                 id: 'guest-summary',
                 label: 'סיכום אורחים',
-                content: renderGuestSummaryChartCard(),
+                render: renderGuestSummaryChartCard,
               },
               {
                 id: 'rsvp-status',
                 label: 'סטטוס אישורי הגעה',
-                content: renderGuestStatusChartCard({ forMobileOverlay: true }),
+                render: () => renderGuestStatusChartCard({ forMobileOverlay: true }),
               },
               ...(messageCapacityChartModel
                 ? [{
                     id: 'message-capacity',
                     label: 'יתרת הודעות',
-                    content: renderMessageCapacityChartCard(),
+                    render: renderMessageCapacityChartCard,
                   }]
                 : []),
             ]}
@@ -8222,7 +8267,7 @@ React.useEffect(()=>{
         <h2 className="mb-2 px-2 text-center text-sm font-black text-violet-200 sm:mb-3 sm:text-base">
           שלבי יצירת הזמנה
         </h2>
-        <div className="flex flex-col gap-2 sm:hidden px-2">
+        <div className="flex flex-col gap-2 sm:hidden px-2" data-testid="mobile-step-bar">
           <div className="flex flex-col gap-2">
             {steps.slice(1, 4).map((step, idx) => {
               const realIdx = idx + 1;
@@ -8322,6 +8367,7 @@ React.useEffect(()=>{
                   setShowMobileChartsScreen(true);
                 }}
                 className="relative flex min-h-[4.75rem] w-full flex-col items-center justify-center gap-1.5 rounded-2xl border border-indigo-400/40 bg-indigo-500/15 py-4 px-5 text-center text-indigo-200 shadow-[0_2px_10px_rgba(99,102,241,0.25)] transition-all"
+                data-testid="mobile-open-charts"
               >
                 <span className="text-center text-2xl font-black leading-tight">הצג גרפים</span>
               </button>
@@ -8336,6 +8382,7 @@ React.useEffect(()=>{
                   setShowMobileDetailsScreen(true);
                 }}
                 className="relative flex min-h-[4.75rem] w-full flex-col items-center justify-center gap-1.5 rounded-2xl border border-sky-400/40 bg-sky-500/15 py-4 px-5 text-center text-sky-200 shadow-[0_2px_10px_rgba(14,165,233,0.25)] transition-all"
+                data-testid="mobile-open-details"
               >
                 <span className="text-center text-2xl font-black leading-tight">פרטים נוספים</span>
               </button>
@@ -8415,7 +8462,7 @@ React.useEffect(()=>{
           {/* Second Column - Guest Summary + Table Report */}
           {currentEventId && (
             <div className="w-full flex flex-col gap-6">
-              <div className="hidden sm:block">
+              <div className="hidden sm:block" data-testid="desktop-guest-summary-chart">
                 {renderGuestSummaryChartCard()}
               </div>
 

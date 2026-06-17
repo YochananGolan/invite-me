@@ -9,7 +9,9 @@
     "dev:clean-bat": "start-dev.bat",
     "free-port": "powershell -ExecutionPolicy Bypass -File ./free-port-3000.ps1",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "test:e2e": "playwright test",
+    "test:e2e:mobile": "playwright test tests/mobile-smoke.spec.js"
   },
   "dependencies": {
     "@radix-ui/react-slot": "^1.2.3",

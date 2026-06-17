@@ -1,6 +1,14 @@
 import React, { useRef, useState, useEffect } from 'react';
 import MobileStateMessage from './MobileStateMessage';
 
+function SlidePlaceholder({ label }) {
+  return (
+    <div className="flex min-h-[280px] items-center justify-center rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-10 text-center">
+      <p className="text-sm font-semibold text-slate-400">{label}</p>
+    </div>
+  );
+}
+
 export default function MobileChartPager({ slides = [], ready = false }) {
   const scrollRef = useRef(null);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -34,8 +42,13 @@ export default function MobileChartPager({ slides = [], ready = false }) {
     const target = scrollRef.current?.querySelector(`[data-chart-slide="${idx}"]`);
     target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
-  const canGoPrev = activeIndex > 0;
-  const canGoNext = activeIndex < slides.length - 1;
+
+  const renderSlideContent = (slide, idx) => {
+    const shouldRender = Math.abs(idx - activeIndex) <= 1;
+    if (!shouldRender) return <SlidePlaceholder label={slide.label} />;
+    if (typeof slide.render === 'function') return slide.render();
+    return slide.content ?? null;
+  };
 
   if (!ready) {
     return <MobileStateMessage variant="loading" title="טוען גרפים..." />;
@@ -52,6 +65,8 @@ export default function MobileChartPager({ slides = [], ready = false }) {
   }
 
   const activeSlide = slides[activeIndex] || slides[0];
+  const canGoPrev = activeIndex > 0;
+  const canGoNext = activeIndex < slides.length - 1;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -107,7 +122,7 @@ export default function MobileChartPager({ slides = [], ready = false }) {
             aria-label={slide.label}
             className="mb-6 min-h-[min(72vh,640px)] snap-start snap-always scroll-mt-1 last:mb-2"
           >
-            {slide.content}
+            {renderSlideContent(slide, idx)}
           </section>
         ))}
       </div>

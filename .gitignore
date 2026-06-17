@@ -9,6 +9,10 @@ node_modules/
 # Temp files
 NUL
 
+# Playwright
+test-results/
+playwright-report/
+
 # IDE and editor files
 .claude/
 .cursor/
