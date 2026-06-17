@@ -7908,22 +7908,6 @@ React.useEffect(()=>{
             {`ראה רשימת אורחים : ${RSVP_FILTER_LABELS[mobileSummaryFilter] || RSVP_FILTER_LABELS.all} (${mobileGuestFilterCounts[mobileSummaryFilter] ?? mobileGuestFilterCounts.all})`}
           </button>
 
-          {currentEventId && isCurrentEventActive && (
-            <button
-              type="button"
-              style={{ cursor: 'pointer', position: 'relative', zIndex: 21, pointerEvents: 'auto' }}
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                setShowMobileChartsScreen(true);
-              }}
-              className="mt-4 relative flex min-h-[4.75rem] w-full flex-col items-center justify-center gap-1.5 rounded-2xl border border-indigo-400/40 bg-indigo-500/15 py-4 px-5 text-center text-indigo-200 shadow-[0_2px_10px_rgba(99,102,241,0.25)] transition-all"
-              data-testid="mobile-open-charts"
-            >
-              <span className="text-center text-2xl font-black leading-tight">הצג גרפים</span>
-            </button>
-          )}
-
           <p className="mt-2 text-center text-[11px] font-semibold text-slate-400">
             החליקו על כרטיס אורח ימינה לתזכורת או שמאלה ל-WhatsApp
           </p>
@@ -7968,6 +7952,22 @@ React.useEffect(()=>{
               חפש
             </button>
           </form>
+
+          {currentEventId && isCurrentEventActive && (
+            <button
+              type="button"
+              style={{ cursor: 'pointer', position: 'relative', zIndex: 21, pointerEvents: 'auto' }}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setShowMobileChartsScreen(true);
+              }}
+              className="mt-4 relative flex min-h-[4.75rem] w-full flex-col items-center justify-center gap-1.5 rounded-2xl border border-indigo-400/40 bg-indigo-500/15 py-4 px-5 text-center text-indigo-200 shadow-[0_2px_10px_rgba(99,102,241,0.25)] transition-all"
+              data-testid="mobile-open-charts"
+            >
+              <span className="text-center text-2xl font-black leading-tight">הצג גרפים</span>
+            </button>
+          )}
 
           {mobileSummaryGuests.length > 4 && (
             <button
