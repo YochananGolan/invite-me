@@ -21,6 +21,8 @@ import {
   getGuestStatusMeta,
   getRsvpStatusLabel,
 } from '../lib/rsvpLabels';
+import MobileChartPager from './mobile/MobileChartPager';
+import MobileScreenLoading from './mobile/MobileScreenLoading';
 
 const RADIAN = Math.PI / 180;
 const previewMetricValueClass = 'max-w-full min-w-0 break-all tabular-nums leading-tight';
@@ -661,6 +663,7 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick, trig
   const [showMobileChartsScreen, setShowMobileChartsScreen] = useState(false);
   const [showMobileDetailsScreen, setShowMobileDetailsScreen] = useState(false);
   const [mobileChartsScreenReady, setMobileChartsScreenReady] = useState(false);
+  const [mobileDetailsScreenReady, setMobileDetailsScreenReady] = useState(false);
   const [specialMealsSummary, setSpecialMealsSummary] = useState({ 
     veg: { adults: 0, children: 0, total: 0 },
     vegan: { adults: 0, children: 0, total: 0 },
@@ -7132,6 +7135,21 @@ React.useEffect(()=>{
     };
   }, [showMobileChartsScreen]);
 
+  React.useEffect(() => {
+    if (!showMobileDetailsScreen) {
+      setMobileDetailsScreenReady(false);
+      return undefined;
+    }
+    let cancelled = false;
+    const raf = requestAnimationFrame(() => {
+      if (!cancelled) setMobileDetailsScreenReady(true);
+    });
+    return () => {
+      cancelled = true;
+      cancelAnimationFrame(raf);
+    };
+  }, [showMobileDetailsScreen]);
+
   const renderGuestSummaryChartCard = () => (
     <div className="bg-white/[0.055] border border-white/15 backdrop-blur-xl rounded-2xl p-4 sm:p-6 text-center shadow-[0_8px_40px_rgba(0,0,0,0.35)] ring-2 ring-indigo-400/30 w-full">
       <div className="flex items-center justify-center gap-2 mb-2">
@@ -8068,18 +8086,30 @@ React.useEffect(()=>{
           <div className="shrink-0 border-b border-white/10 bg-[#0d0f2b]/95 px-4 pb-4 pt-[max(1rem,env(safe-area-inset-top))] backdrop-blur-xl">
             <div className="text-sm font-black text-indigo-200">הצג גרפים</div>
             <h2 className="mt-1 text-3xl font-black text-white">דוחות וגרפים</h2>
+            <p className="mt-1 text-xs font-semibold text-slate-400">גלול או הקש על הנקודות למעבר בין הגרפים</p>
           </div>
-          <div className="flex-1 overflow-y-auto px-4 py-5 space-y-6">
-            {mobileChartsScreenReady ? (
-              <>
-                {renderGuestSummaryChartCard()}
-                {renderGuestStatusChartCard({ forMobileOverlay: true })}
-                {renderMessageCapacityChartCard()}
-              </>
-            ) : (
-              <div className="py-16 text-center text-sm font-semibold text-slate-400">טוען גרפים...</div>
-            )}
-          </div>
+          <MobileChartPager
+            ready={mobileChartsScreenReady}
+            slides={[
+              {
+                id: 'guest-summary',
+                label: 'סיכום אורחים',
+                content: renderGuestSummaryChartCard(),
+              },
+              {
+                id: 'rsvp-status',
+                label: 'סטטוס אישורי הגעה',
+                content: renderGuestStatusChartCard({ forMobileOverlay: true }),
+              },
+              ...(messageCapacityChartModel
+                ? [{
+                    id: 'message-capacity',
+                    label: 'יתרת הודעות',
+                    content: renderMessageCapacityChartCard(),
+                  }]
+                : []),
+            ]}
+          />
           <div className="shrink-0 border-t border-white/10 bg-[#0d0f2b]/95 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4 backdrop-blur-xl">
             <button
               type="button"
@@ -8098,8 +8128,14 @@ React.useEffect(()=>{
             <div className="text-sm font-black text-sky-200">פרטים נוספים</div>
             <h2 className="mt-1 text-3xl font-black text-white">אירוע ומסלול</h2>
           </div>
-          <div className="flex-1 overflow-y-auto px-4 py-5 space-y-6">
-            {renderDashboardDetailsCards()}
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+            {mobileDetailsScreenReady ? (
+              <div className="flex-1 overflow-y-auto px-4 py-5 space-y-6">
+                {renderDashboardDetailsCards()}
+              </div>
+            ) : (
+              <MobileScreenLoading message="טוען פרטים..." />
+            )}
           </div>
           <div className="shrink-0 border-t border-white/10 bg-[#0d0f2b]/95 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4 backdrop-blur-xl">
             <button
