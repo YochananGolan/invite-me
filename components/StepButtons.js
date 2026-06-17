@@ -7929,18 +7929,25 @@ React.useEffect(()=>{
           </p>
 
           <form
-            className="mt-3 flex min-w-0 flex-col gap-2 rounded-2xl border border-white/10 bg-white/[0.055] p-2"
+            className="mt-3 flex min-w-0 items-stretch gap-2 rounded-2xl border border-white/10 bg-white/[0.055] p-2"
             onSubmit={(event) => {
               event.preventDefault();
               handleMobileQuickGuestSearch();
             }}
           >
+            <button
+              type="button"
+              onClick={handleMobileQuickGuestSearchClear}
+              className="flex min-h-[4.75rem] shrink-0 items-center justify-center rounded-2xl border border-white/15 bg-white/[0.06] px-4 text-lg font-black text-slate-100 transition-colors active:bg-white/[0.12]"
+            >
+              נקה
+            </button>
             <label className="sr-only" htmlFor="mobile-quick-guest-search">חיפוש אורח</label>
-            <div className="relative min-w-0 w-full">
+            <div className="relative flex min-h-[4.75rem] min-w-0 flex-1 items-center">
               {!mobileQuickGuestSearchDraft && (
                 <span
                   aria-hidden="true"
-                  className="pointer-events-none absolute inset-y-0 right-1 flex items-center text-sm font-semibold text-white"
+                  className="pointer-events-none absolute inset-y-0 right-2 flex items-center text-sm font-semibold text-white"
                 >
                   חפש אורח לפי שם או נייד
                 </span>
@@ -7951,21 +7958,14 @@ React.useEffect(()=>{
                 value={mobileQuickGuestSearchDraft}
                 onChange={(event) => setMobileQuickGuestSearchDraft(event.target.value)}
                 placeholder=""
-                className="w-full border-0 bg-transparent px-1 py-1.5 text-right text-sm font-semibold text-slate-100 focus:outline-none"
+                className="h-full w-full border-0 bg-transparent px-2 text-right text-sm font-semibold text-slate-100 focus:outline-none"
               />
             </div>
             <button
               type="submit"
-              className="relative flex min-h-[4.75rem] w-full flex-col items-center justify-center gap-1.5 rounded-2xl border border-emerald-400/40 bg-emerald-500/15 py-4 px-5 text-center text-2xl font-black leading-tight text-emerald-100 shadow-[0_2px_10px_rgba(16,185,129,0.25)] transition-all active:opacity-85"
+              className="flex min-h-[4.75rem] shrink-0 items-center justify-center rounded-2xl border border-emerald-400/40 bg-emerald-500/15 px-5 text-2xl font-black leading-tight text-emerald-100 shadow-[0_2px_10px_rgba(16,185,129,0.25)] transition-all active:opacity-85"
             >
-              <span className="text-center text-2xl font-black leading-tight">חפש</span>
-            </button>
-            <button
-              type="button"
-              onClick={handleMobileQuickGuestSearchClear}
-              className="rounded-2xl border border-white/15 bg-white/[0.06] py-3 text-base font-black text-slate-100 transition-colors active:bg-white/[0.12]"
-            >
-              נקה
+              חפש
             </button>
           </form>
 
