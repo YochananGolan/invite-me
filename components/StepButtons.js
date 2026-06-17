@@ -7899,21 +7899,9 @@ React.useEffect(()=>{
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={openMobileQuickGuestListScreen}
-            className="mt-3 relative flex min-h-[4.75rem] w-full items-center justify-center rounded-2xl border border-violet-300/30 bg-violet-500/15 px-5 py-4 text-center text-2xl font-black leading-tight text-violet-100 transition-colors active:bg-violet-500/25"
-            data-testid="mobile-open-guest-list"
-          >
-            {`ראה רשימת אורחים : ${RSVP_FILTER_LABELS[mobileSummaryFilter] || RSVP_FILTER_LABELS.all} (${mobileGuestFilterCounts[mobileSummaryFilter] ?? mobileGuestFilterCounts.all})`}
-          </button>
-
-          <p className="mt-2 text-center text-[11px] font-semibold text-slate-400">
-            החליקו על כרטיס אורח ימינה לתזכורת או שמאלה ל-WhatsApp
-          </p>
-
+          <div className="mt-3 mb-2 text-sm font-black text-violet-200">חיפוש אורח</div>
           <form
-            className="mt-3 flex min-w-0 items-stretch gap-2 rounded-2xl border border-white/10 bg-white/[0.055] p-2"
+            className="flex min-w-0 items-stretch gap-2 rounded-2xl border border-white/10 bg-white/[0.055] p-2"
             onSubmit={(event) => {
               event.preventDefault();
               handleMobileQuickGuestSearch();
@@ -7962,12 +7950,25 @@ React.useEffect(()=>{
                 e.stopPropagation();
                 setShowMobileChartsScreen(true);
               }}
-              className="mt-4 relative flex min-h-[4.75rem] w-full flex-col items-center justify-center gap-1.5 rounded-2xl border border-indigo-400/40 bg-indigo-500/15 py-4 px-5 text-center text-indigo-200 shadow-[0_2px_10px_rgba(99,102,241,0.25)] transition-all"
+              className="mt-3 relative flex min-h-[4.75rem] w-full flex-col items-center justify-center gap-1.5 rounded-2xl border border-indigo-400/40 bg-indigo-500/15 py-4 px-5 text-center text-indigo-200 shadow-[0_2px_10px_rgba(99,102,241,0.25)] transition-all"
               data-testid="mobile-open-charts"
             >
               <span className="text-center text-2xl font-black leading-tight">הצג גרפים</span>
             </button>
           )}
+
+          <button
+            type="button"
+            onClick={openMobileQuickGuestListScreen}
+            className="mt-3 relative flex min-h-[4.75rem] w-full items-center justify-center rounded-2xl border border-violet-300/30 bg-violet-500/15 px-5 py-4 text-center text-2xl font-black leading-tight text-violet-100 transition-colors active:bg-violet-500/25"
+            data-testid="mobile-open-guest-list"
+          >
+            {`ראה רשימת אורחים : ${RSVP_FILTER_LABELS[mobileSummaryFilter] || RSVP_FILTER_LABELS.all} (${mobileGuestFilterCounts[mobileSummaryFilter] ?? mobileGuestFilterCounts.all})`}
+          </button>
+
+          <p className="mt-2 text-center text-[11px] font-semibold text-slate-400">
+            החליקו על כרטיס אורח ימינה לתזכורת או שמאלה ל-WhatsApp
+          </p>
 
           {mobileSummaryGuests.length > 4 && (
             <button
@@ -8617,6 +8618,15 @@ React.useEffect(()=>{
                     ))}
                   </div>
                 </div>
+
+                <button
+                  type="button"
+                  onClick={() => setShowMobileChartsScreen(true)}
+                  className="mt-3 relative flex min-h-[4.75rem] w-full flex-col items-center justify-center gap-1.5 rounded-2xl border border-indigo-400/40 bg-indigo-500/15 py-4 px-5 text-center text-indigo-200 shadow-[0_2px_10px_rgba(99,102,241,0.25)] transition-all sm:hidden"
+                  data-testid="mobile-open-charts-fallback"
+                >
+                  <span className="text-center text-2xl font-black leading-tight">הצג גרפים</span>
+                </button>
 
                 <div className="mt-3 space-y-2 text-right">
                   {mobileFilteredSummaryGuests.length > 0 ? mobileFilteredSummaryGuests.map((guest, idx) => {
