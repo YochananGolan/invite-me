@@ -938,6 +938,7 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick, trig
   const [searchResults, setSearchResults] = useState([]);
   const [searchError, setSearchError] = useState('');
   const [guestSearchAttempted, setGuestSearchAttempted] = useState(false);
+  const [showMobileStep123, setShowMobileStep123] = useState(true);
 
   React.useEffect(() => {
     setGuestSubmitAttempted(false);
@@ -954,6 +955,7 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick, trig
       setSearchResults([]);
     }
   }, [showSearchGuest]);
+
 
   // Archive events list modal
   const [showArchiveList,setShowArchiveList]=useState(false);
@@ -6986,6 +6988,16 @@ React.useEffect(()=>{
     selectedEventType,
   ]);
 
+  const hasMobileFirstSendCompleted = Boolean(
+    wizardStepCompletion[4] || invitationSent || sentGuests.length > 0
+  );
+
+  React.useEffect(() => {
+    if (hasMobileFirstSendCompleted) {
+      setShowMobileStep123(false);
+    }
+  }, [hasMobileFirstSendCompleted]);
+
   const getFirstIncompleteWizardStep = React.useCallback(() => {
     if (!wizardStepCompletion[1]) return 1;
     if (!wizardStepCompletion[2]) return 2;
@@ -8286,44 +8298,60 @@ React.useEffect(()=>{
           שלבי יצירת הזמנה
         </h2>
         <div className="flex flex-col gap-2 sm:hidden px-2" data-testid="mobile-step-bar">
-          <div className="flex flex-col gap-2">
-            {steps.slice(1, 4).map((step, idx) => {
-              const realIdx = idx + 1;
-              const isFinished = wizardStepCompletion[realIdx] || false;
-              const isDesign = realIdx === 3;
-              return (
-                <button
-                  key={realIdx}
-                  type="button"
-                  style={{ cursor: 'pointer', position: 'relative', zIndex: 21, pointerEvents: 'auto' }}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    tryOpenWizardStep(realIdx);
-                  }}
-                  className={`relative flex min-h-[4.75rem] w-full flex-col items-center justify-center gap-1.5 rounded-2xl py-4 px-5 text-center transition-all ${
-                    isFinished
-                      ? 'bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-[0_4px_14px_rgba(99,70,230,0.45)]'
-                      : isDesign
-                        ? 'bg-violet-500/15 text-violet-100 border border-violet-400/40 shadow-[0_2px_10px_rgba(139,92,246,0.25)]'
-                        : 'bg-white/[0.06] text-slate-100 border border-white/15 hover:bg-white/[0.10] hover:border-indigo-400/40'
-                  }`}
-                >
-                  {isFinished && (
-                    <span className="absolute left-4 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-white/20 text-lg font-black text-white">
-                      ✓
+          {hasMobileFirstSendCompleted && (
+            <button
+              type="button"
+              style={{ cursor: 'pointer', position: 'relative', zIndex: 21, pointerEvents: 'auto' }}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setShowMobileStep123((prev) => !prev);
+              }}
+              className="w-full rounded-2xl border border-violet-300/35 bg-violet-500/15 px-4 py-3 text-center text-sm font-black text-violet-100 transition-all active:bg-violet-500/25"
+            >
+              לשינוי פרטי אירוע ועיצוב לחץ כאן.
+            </button>
+          )}
+          {(!hasMobileFirstSendCompleted || showMobileStep123) && (
+            <div className="flex flex-col gap-2">
+              {steps.slice(1, 4).map((step, idx) => {
+                const realIdx = idx + 1;
+                const isFinished = wizardStepCompletion[realIdx] || false;
+                const isDesign = realIdx === 3;
+                return (
+                  <button
+                    key={realIdx}
+                    type="button"
+                    style={{ cursor: 'pointer', position: 'relative', zIndex: 21, pointerEvents: 'auto' }}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      tryOpenWizardStep(realIdx);
+                    }}
+                    className={`relative flex min-h-[4.75rem] w-full flex-col items-center justify-center gap-1.5 rounded-2xl py-4 px-5 text-center transition-all ${
+                      isFinished
+                        ? 'bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-[0_4px_14px_rgba(99,70,230,0.45)]'
+                        : isDesign
+                          ? 'bg-violet-500/15 text-violet-100 border border-violet-400/40 shadow-[0_2px_10px_rgba(139,92,246,0.25)]'
+                          : 'bg-white/[0.06] text-slate-100 border border-white/15 hover:bg-white/[0.10] hover:border-indigo-400/40'
+                    }`}
+                  >
+                    {isFinished && (
+                      <span className="absolute left-4 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-white/20 text-lg font-black text-white">
+                        ✓
+                      </span>
+                    )}
+                    <span className="text-sm font-bold leading-none text-slate-400">
+                      שלב {realIdx}
                     </span>
-                  )}
-                  <span className="text-sm font-bold leading-none text-slate-400">
-                    שלב {realIdx}
-                  </span>
-                  <span className="text-center text-2xl font-black leading-tight text-slate-100">
-                    {stepsMobile[realIdx]}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
+                    <span className="text-center text-2xl font-black leading-tight text-slate-100">
+                      {stepsMobile[realIdx]}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
           <div className="flex flex-col gap-2">
             {steps.slice(4).map((step, idx) => {
               const realIdx = idx + 4;
