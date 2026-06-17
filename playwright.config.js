@@ -14,7 +14,7 @@ module.exports = defineConfig({
   projects: [
     {
       name: 'mobile-chrome',
-      testMatch: /.*mobile-smoke\.spec\.js/,
+      testMatch: /.*(mobile-smoke|mobile-guest-flows)\.spec\.js/,
       use: { ...devices['Pixel 5'] },
     },
     {

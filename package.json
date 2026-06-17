@@ -11,7 +11,7 @@
     "build": "next build",
     "start": "next start",
     "test:e2e": "playwright test",
-    "test:e2e:mobile": "playwright test tests/mobile-smoke.spec.js",
+    "test:e2e:mobile": "playwright test --project=mobile-chrome",
     "test:e2e:desktop": "playwright test tests/desktop-smoke.spec.js"
   },
   "dependencies": {
