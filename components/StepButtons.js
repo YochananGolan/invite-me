@@ -7953,6 +7953,22 @@ React.useEffect(()=>{
             </button>
           </form>
 
+          {currentEventId && isCurrentEventActive && (
+            <button
+              type="button"
+              style={{ cursor: 'pointer', position: 'relative', zIndex: 21, pointerEvents: 'auto' }}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setShowMobileChartsScreen(true);
+              }}
+              className="mt-3 relative flex min-h-[4.75rem] w-full flex-col items-center justify-center gap-1.5 rounded-2xl border border-indigo-400/40 bg-indigo-500/15 py-4 px-5 text-center text-indigo-200 shadow-[0_2px_10px_rgba(99,102,241,0.25)] transition-all"
+              data-testid="mobile-open-charts"
+            >
+              <span className="text-center text-2xl font-black leading-tight">הצג גרפים</span>
+            </button>
+          )}
+
           {mobileSummaryGuests.length > 4 && (
             <button
               type="button"
@@ -8403,21 +8419,6 @@ React.useEffect(()=>{
             >
               <span className="text-center text-2xl font-black leading-tight">צור/עדכן קבוצת וואטסאפ</span>
             </button>
-            {currentEventId && isCurrentEventActive && (
-              <button
-                type="button"
-                style={{ cursor: 'pointer', position: 'relative', zIndex: 21, pointerEvents: 'auto' }}
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  setShowMobileChartsScreen(true);
-                }}
-                className="relative flex min-h-[4.75rem] w-full flex-col items-center justify-center gap-1.5 rounded-2xl border border-indigo-400/40 bg-indigo-500/15 py-4 px-5 text-center text-indigo-200 shadow-[0_2px_10px_rgba(99,102,241,0.25)] transition-all"
-                data-testid="mobile-open-charts"
-              >
-                <span className="text-center text-2xl font-black leading-tight">הצג גרפים</span>
-              </button>
-            )}
             {hasSession && (
               <button
                 type="button"
