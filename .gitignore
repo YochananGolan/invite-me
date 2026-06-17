@@ -12,6 +12,7 @@ NUL
 # Playwright
 test-results/
 playwright-report/
+.auth/
 
 # IDE and editor files
 .claude/
