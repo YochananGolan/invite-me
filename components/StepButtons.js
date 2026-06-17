@@ -22,6 +22,7 @@ import {
   getRsvpStatusLabel,
 } from '../lib/rsvpLabels';
 import MobileChartPager from './mobile/MobileChartPager';
+import MobileBackHandler from './mobile/MobileBackHandler';
 import MobileFullScreenShell from './mobile/MobileFullScreenShell';
 import MobileScreenLoading from './mobile/MobileScreenLoading';
 import MobileStateMessage from './mobile/MobileStateMessage';
@@ -7984,6 +7985,7 @@ React.useEffect(()=>{
 
       {mobileQuickGuestSearchSubmitted && (
         <div className="fixed inset-0 z-[120] flex flex-col bg-[#08091a] sm:hidden" dir="rtl">
+          <MobileBackHandler onClose={handleMobileQuickGuestSearchBack} />
           <div className="shrink-0 border-b border-white/10 bg-[#0d0f2b]/95 px-4 pb-4 pt-[max(1rem,env(safe-area-inset-top))] backdrop-blur-xl">
             <div className="text-sm font-black text-violet-200">ניהול אורחים מהיר</div>
             <h2 className="mt-1 text-3xl font-black text-white">תוצאות חיפוש</h2>
@@ -8228,6 +8230,7 @@ React.useEffect(()=>{
 
       {showMobileFirstSendSuccess && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0d0f2b]/75 px-4 backdrop-blur-sm sm:hidden" dir="rtl">
+          <MobileBackHandler onClose={() => setShowMobileFirstSendSuccess(false)} />
           <div className="w-full max-w-md rounded-[1.75rem] border border-emerald-300/30 bg-[#12143a] p-6 text-center shadow-[0_20px_60px_rgba(0,0,0,0.45)] ring-1 ring-emerald-400/25">
             <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full border border-emerald-300/35 bg-emerald-500/20 text-4xl text-emerald-200">
               ✓

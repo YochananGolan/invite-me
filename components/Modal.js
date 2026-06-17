@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { useMobileOverlayBack } from './mobile/useMobileOverlayBack';
 
 const SIZES = {
   sm: 'max-w-sm',
@@ -10,6 +11,8 @@ const SIZES = {
 };
 
 export default function Modal({ open, onClose, size = 'md', children, className = '', landscape = false }) {
+  useMobileOverlayBack(open, onClose);
+
   useEffect(() => {
     if (!open) return;
     const prev = document.body.style.overflow;

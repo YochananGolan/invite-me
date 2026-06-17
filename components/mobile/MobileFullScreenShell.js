@@ -1,3 +1,5 @@
+import { useMobileOverlayBack } from './useMobileOverlayBack';
+
 export default function MobileFullScreenShell({
   testId,
   eyebrow,
@@ -7,6 +9,8 @@ export default function MobileFullScreenShell({
   headerExtra,
   children,
 }) {
+  useMobileOverlayBack(true, onClose);
+
   return (
     <div
       className="fixed inset-0 z-[120] flex flex-col bg-[#08091a] sm:hidden"
