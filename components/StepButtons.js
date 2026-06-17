@@ -7871,38 +7871,35 @@ React.useEffect(()=>{
           </div>
 
           <div className="mt-3">
-            <div className="mb-2 text-sm font-black text-violet-200">צפייה ברשימות אורחים</div>
-            <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-3">
-            <div className="grid grid-cols-4 gap-2">
-              {[
-                ['all', RSVP_FILTER_LABELS.all],
-                ['approved', RSVP_STATUS_LABELS_COMPACT.approved],
-                ['pending', RSVP_STATUS_LABELS.pending],
-                ['rejected', RSVP_STATUS_LABELS.rejected],
-              ].map(([key, label]) => (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => setMobileSummaryFilter(key)}
-                  className={`rounded-full border px-2 py-2 text-xs font-black transition-all ${
-                    mobileSummaryFilter === key
-                      ? 'border-amber-300/70 bg-amber-500/30 text-white'
-                      : 'border-white/10 bg-white/[0.04] text-slate-300'
-                  }`}
-                >
-                  <span className="block leading-tight">{label}</span>
-                  <span className="mt-0.5 block text-[10px] font-bold tabular-nums opacity-90">
-                    {mobileGuestFilterCounts[key] ?? 0}
-                  </span>
-                </button>
-              ))}
-            </div>
-            </div>
-          </div>
-
-          <div className="mt-3">
-            <div className="mb-2 text-sm font-black text-violet-200">חיפוש אורח</div>
             <div className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.04]">
+              <div className="border-b border-white/10 px-4 pb-4 pt-4">
+                <div className="mb-3 text-lg font-black text-violet-200">צפיה וחיפוש ברשימות אורחים</div>
+                <div className="grid grid-cols-4 gap-2.5">
+                  {[
+                    ['all', RSVP_FILTER_LABELS.all],
+                    ['approved', RSVP_STATUS_LABELS_COMPACT.approved],
+                    ['pending', RSVP_STATUS_LABELS.pending],
+                    ['rejected', RSVP_STATUS_LABELS.rejected],
+                  ].map(([key, label]) => (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => setMobileSummaryFilter(key)}
+                      className={`rounded-full border px-2.5 py-3 text-center transition-all ${
+                        mobileSummaryFilter === key
+                          ? 'border-amber-300/70 bg-amber-500/30 text-white'
+                          : 'border-white/10 bg-white/[0.04] text-slate-300'
+                      }`}
+                    >
+                      <span className="block text-sm font-black leading-tight">{label}</span>
+                      <span className="mt-1 block text-xs font-bold tabular-nums opacity-95">
+                        {mobileGuestFilterCounts[key] ?? 0}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               <button
                 type="button"
                 onClick={openMobileQuickGuestListScreen}
@@ -7911,6 +7908,10 @@ React.useEffect(()=>{
               >
                 {`ראה רשימת אורחים : ${RSVP_FILTER_LABELS[mobileSummaryFilter] || RSVP_FILTER_LABELS.all} (${mobileGuestFilterCounts[mobileSummaryFilter] ?? mobileGuestFilterCounts.all})`}
               </button>
+
+              <div className="border-b border-white/10 px-4 py-3">
+                <div className="text-lg font-black text-violet-200">חיפוש אורח</div>
+              </div>
               <form
                 className="flex min-w-0 items-stretch gap-2 bg-white/[0.055] p-2"
                 onSubmit={(event) => {
