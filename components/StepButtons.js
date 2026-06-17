@@ -7954,21 +7954,19 @@ React.useEffect(()=>{
                 className="w-full border-0 bg-transparent px-1 py-1.5 text-right text-sm font-semibold text-slate-100 focus:outline-none"
               />
             </div>
-            <div className="grid w-full grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={handleMobileQuickGuestSearchClear}
-                className="rounded-2xl border border-white/15 bg-white/[0.06] py-4 text-lg font-black text-slate-100 transition-colors active:bg-white/[0.12]"
-              >
-                נקה
-              </button>
-              <button
-                type="submit"
-                className="rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-600 py-4 text-2xl font-black text-white shadow-[0_6px_18px_rgba(16,185,129,0.28)] transition-opacity active:opacity-85"
-              >
-                חפש
-              </button>
-            </div>
+            <button
+              type="submit"
+              className="relative flex min-h-[4.75rem] w-full flex-col items-center justify-center gap-1.5 rounded-2xl border border-emerald-400/40 bg-emerald-500/15 py-4 px-5 text-center text-2xl font-black leading-tight text-emerald-100 shadow-[0_2px_10px_rgba(16,185,129,0.25)] transition-all active:opacity-85"
+            >
+              <span className="text-center text-2xl font-black leading-tight">חפש</span>
+            </button>
+            <button
+              type="button"
+              onClick={handleMobileQuickGuestSearchClear}
+              className="rounded-2xl border border-white/15 bg-white/[0.06] py-3 text-base font-black text-slate-100 transition-colors active:bg-white/[0.12]"
+            >
+              נקה
+            </button>
           </form>
 
           {mobileSummaryGuests.length > 4 && (
