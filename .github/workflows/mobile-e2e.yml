@@ -1,0 +1,41 @@
+name: Mobile E2E
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  mobile-e2e:
+    runs-on: ubuntu-latest
+    env:
+      CI: true
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+      E2E_MOBILE_EMAIL: ${{ secrets.E2E_MOBILE_EMAIL }}
+      E2E_MOBILE_PASSWORD: ${{ secrets.E2E_MOBILE_PASSWORD }}
+      PLAYWRIGHT_BASE_URL: ${{ secrets.PLAYWRIGHT_BASE_URL }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Build app
+        if: env.PLAYWRIGHT_BASE_URL == ''
+        run: npm run build
+
+      - name: Run mobile E2E
+        run: npm run test:e2e:mobile

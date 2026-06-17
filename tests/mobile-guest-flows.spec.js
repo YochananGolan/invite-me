@@ -3,6 +3,7 @@ const {
   hasMobileAuthCredentials,
   loginMobileTestUser,
   ensureQuickGuestsVisible,
+  swipeGuestCardRight,
 } = require('./helpers/mobile-e2e-auth');
 
 test.describe('mobile guest flows (anonymous)', () => {
@@ -47,5 +48,33 @@ test.describe('mobile guest flows (authenticated)', () => {
     await page.getByTestId('mobile-guest-search-back').click();
     await expect(page.getByTestId('mobile-guest-search-screen')).toBeHidden();
     await expect(page.getByTestId('mobile-quick-guests')).toBeVisible();
+  });
+
+  test('charts button opens pager and closes back to quick guests', async ({ page }) => {
+    await page.getByTestId('mobile-open-charts').click();
+    await expect(page.getByTestId('mobile-charts-screen')).toBeVisible();
+    await expect(page.getByTestId('mobile-chart-pager')).toBeVisible();
+    await expect(page.getByText('דוחות וגרפים')).toBeVisible();
+    await page.getByTestId('mobile-charts-screen-close').click();
+    await expect(page.getByTestId('mobile-charts-screen')).toBeHidden();
+    await expect(page.getByTestId('mobile-quick-guests')).toBeVisible();
+  });
+
+  test('swipe right on guest card opens reminder send step', async ({ page }) => {
+    await page.getByTestId('mobile-open-guest-list').click();
+    await expect(page.getByTestId('mobile-guest-list-screen')).toBeVisible();
+
+    const guestCard = page.getByTestId('mobile-swipe-guest-card').first();
+    await expect(guestCard).toBeVisible();
+    await swipeGuestCardRight(guestCard);
+
+    await expect(page.getByRole('heading', { name: 'שליחת הזמנות' })).toBeVisible({ timeout: 15000 });
+  });
+
+  test('reminder action behind swipe card opens send step', async ({ page }) => {
+    await page.getByTestId('mobile-open-guest-list').click();
+    const reminderAction = page.getByTestId('mobile-swipe-action-reminder').first();
+    await reminderAction.click({ force: true });
+    await expect(page.getByRole('heading', { name: 'שליחת הזמנות' })).toBeVisible({ timeout: 15000 });
   });
 });

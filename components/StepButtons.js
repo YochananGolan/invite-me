@@ -25,7 +25,7 @@ import { getGuestIdentityKey } from '../lib/guestIdentity';
 import MobileQuickGuestsCard from './mobile/MobileQuickGuestsCard';
 import MobileQuickGuestListScreen, { MOBILE_GUEST_LIST_PAGE_SIZE } from './mobile/MobileQuickGuestListScreen';
 import MobileQuickGuestSearchOverlay from './mobile/MobileQuickGuestSearchOverlay';
-import MobileChartPager from './mobile/MobileChartPager';
+import MobileChartsScreen from './mobile/MobileChartsScreen';
 import MobileBackHandler from './mobile/MobileBackHandler';
 import MobileFullScreenShell from './mobile/MobileFullScreenShell';
 import MobileScreenLoading from './mobile/MobileScreenLoading';
@@ -573,7 +573,6 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick, trig
   const [showMobileFirstSendSuccess, setShowMobileFirstSendSuccess] = useState(false);
   const [showMobileChartsScreen, setShowMobileChartsScreen] = useState(false);
   const [showMobileDetailsScreen, setShowMobileDetailsScreen] = useState(false);
-  const [mobileChartsScreenReady, setMobileChartsScreenReady] = useState(false);
   const [mobileDetailsScreenReady, setMobileDetailsScreenReady] = useState(false);
   const [mobileGuestListSearch, setMobileGuestListSearch] = useState('');
   const [mobileGuestListVisibleLimit, setMobileGuestListVisibleLimit] = useState(MOBILE_GUEST_LIST_PAGE_SIZE);
@@ -7067,21 +7066,6 @@ React.useEffect(()=>{
   }, []);
 
   React.useEffect(() => {
-    if (!showMobileChartsScreen) {
-      setMobileChartsScreenReady(false);
-      return undefined;
-    }
-    let cancelled = false;
-    const raf = requestAnimationFrame(() => {
-      if (!cancelled) setMobileChartsScreenReady(true);
-    });
-    return () => {
-      cancelled = true;
-      cancelAnimationFrame(raf);
-    };
-  }, [showMobileChartsScreen]);
-
-  React.useEffect(() => {
     if (!showMobileDetailsScreen) {
       setMobileDetailsScreenReady(false);
       return undefined;
@@ -7735,36 +7719,28 @@ React.useEffect(()=>{
 
 
       {showMobileChartsScreen && (
-        <MobileFullScreenShell
-          testId="mobile-charts-screen"
-          eyebrow="הצג גרפים"
-          title="דוחות וגרפים"
+        <MobileChartsScreen
           onClose={() => setShowMobileChartsScreen(false)}
-          headerExtra={<p className="mt-1 text-xs font-semibold text-slate-400">גלול או הקש על הנקודות למעבר בין הגרפים</p>}
-        >
-          <MobileChartPager
-            ready={mobileChartsScreenReady}
-            slides={[
-              {
-                id: 'guest-summary',
-                label: 'סיכום אורחים',
-                render: renderGuestSummaryChartCard,
-              },
-              {
-                id: 'rsvp-status',
-                label: 'סטטוס אישורי הגעה',
-                render: () => renderGuestStatusChartCard({ forMobileOverlay: true }),
-              },
-              ...(messageCapacityChartModel
-                ? [{
-                    id: 'message-capacity',
-                    label: 'יתרת הודעות',
-                    render: renderMessageCapacityChartCard,
-                  }]
-                : []),
-            ]}
-          />
-        </MobileFullScreenShell>
+          slides={[
+            {
+              id: 'guest-summary',
+              label: 'סיכום אורחים',
+              render: renderGuestSummaryChartCard,
+            },
+            {
+              id: 'rsvp-status',
+              label: 'סטטוס אישורי הגעה',
+              render: () => renderGuestStatusChartCard({ forMobileOverlay: true }),
+            },
+            ...(messageCapacityChartModel
+              ? [{
+                  id: 'message-capacity',
+                  label: 'יתרת הודעות',
+                  render: renderMessageCapacityChartCard,
+                }]
+              : []),
+          ]}
+        />
       )}
 
       {showMobileDetailsScreen && (

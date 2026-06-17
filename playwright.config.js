@@ -1,5 +1,8 @@
 const { defineConfig, devices } = require('@playwright/test');
 
+const baseURL = process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:3000';
+const useExternalBase = Boolean(process.env.PLAYWRIGHT_BASE_URL);
+
 module.exports = defineConfig({
   testDir: './tests',
   fullyParallel: true,
@@ -8,7 +11,7 @@ module.exports = defineConfig({
   workers: process.env.CI ? 1 : undefined,
   reporter: 'list',
   use: {
-    baseURL: process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:3000',
+    baseURL,
     trace: 'on-first-retry',
   },
   projects: [
@@ -23,10 +26,10 @@ module.exports = defineConfig({
       use: { ...devices['Desktop Chrome'] },
     },
   ],
-  webServer: process.env.CI
+  webServer: useExternalBase
     ? undefined
     : {
-        command: 'npm run start',
+        command: process.env.CI ? 'npm run start' : 'npm run start',
         url: 'http://localhost:3000',
         reuseExistingServer: !process.env.CI,
         timeout: 120000,

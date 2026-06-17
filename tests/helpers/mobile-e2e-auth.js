@@ -41,10 +41,55 @@ function hasMobileAuthCredentials() {
   return Boolean(process.env.E2E_MOBILE_EMAIL && process.env.E2E_MOBILE_PASSWORD);
 }
 
+async function swipeGuestCardRight(cardLocator) {
+  await cardLocator.evaluate((card) => {
+    const surface = card.querySelector('.touch-pan-y');
+    if (!surface) return;
+    const rect = surface.getBoundingClientRect();
+    const y = rect.top + rect.height / 2;
+    const startX = rect.left + 12;
+    const endX = rect.right - 12;
+
+    const touch = (clientX) => new Touch({
+      identifier: 1,
+      target: surface,
+      clientX,
+      clientY: y,
+      pageX: clientX,
+      pageY: y,
+      screenX: clientX,
+      screenY: y,
+    });
+
+    surface.dispatchEvent(new TouchEvent('touchstart', {
+      bubbles: true,
+      cancelable: true,
+      touches: [touch(startX)],
+      targetTouches: [touch(startX)],
+      changedTouches: [touch(startX)],
+    }));
+    surface.dispatchEvent(new TouchEvent('touchmove', {
+      bubbles: true,
+      cancelable: true,
+      touches: [touch(endX)],
+      targetTouches: [touch(endX)],
+      changedTouches: [touch(endX)],
+    }));
+    surface.dispatchEvent(new TouchEvent('touchend', {
+      bubbles: true,
+      cancelable: true,
+      touches: [],
+      targetTouches: [],
+      changedTouches: [touch(endX)],
+    }));
+  });
+}
+
 module.exports = {
   AUTH_STATE_PATH,
   hasMobileAuthCredentials,
   loginMobileTestUser,
   ensureQuickGuestsVisible,
   saveMobileAuthState,
+  swipeGuestCardRight,
 };

@@ -69,7 +69,7 @@ export default function MobileChartPager({ slides = [], ready = false }) {
   const canGoNext = activeIndex < slides.length - 1;
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
+    <div className="flex min-h-0 flex-1 flex-col" data-testid="mobile-chart-pager">
       <div className="shrink-0 px-4 pb-3 pt-1">
         <div className="flex items-center justify-center gap-2" role="tablist" aria-label="גרפים">
           {slides.map((slide, idx) => (

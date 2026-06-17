@@ -43,11 +43,12 @@ export default function MobileSwipeGuestCard({
   };
 
   return (
-    <div className="relative overflow-hidden rounded-2xl">
+    <div className="relative overflow-hidden rounded-2xl" data-testid="mobile-swipe-guest-card">
       <div className="absolute inset-0 flex">
         <button
           type="button"
           onClick={onReminder}
+          data-testid="mobile-swipe-action-reminder"
           className="flex flex-1 items-center justify-center bg-amber-500/25 text-sm font-black text-amber-100"
         >
           ◷ תזכורת
@@ -55,6 +56,7 @@ export default function MobileSwipeGuestCard({
         <button
           type="button"
           onClick={onWhatsApp}
+          data-testid="mobile-swipe-action-whatsapp"
           className="flex flex-1 items-center justify-center bg-emerald-500/25 text-sm font-black text-emerald-100"
         >
           WhatsApp
