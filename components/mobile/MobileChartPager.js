@@ -1,4 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react';
+import MobileStateMessage from './MobileStateMessage';
 
 export default function MobileChartPager({ slides = [], ready = false }) {
   const scrollRef = useRef(null);
@@ -33,26 +34,20 @@ export default function MobileChartPager({ slides = [], ready = false }) {
     const target = scrollRef.current?.querySelector(`[data-chart-slide="${idx}"]`);
     target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
+  const canGoPrev = activeIndex > 0;
+  const canGoNext = activeIndex < slides.length - 1;
 
   if (!ready) {
-    return (
-      <div className="flex flex-1 flex-col items-center justify-center py-16">
-        <div
-          className="h-10 w-10 animate-spin rounded-full border-2 border-indigo-400/30 border-t-indigo-300"
-          aria-hidden="true"
-        />
-        <p className="mt-4 text-sm font-semibold text-slate-400">טוען גרפים...</p>
-      </div>
-    );
+    return <MobileStateMessage variant="loading" title="טוען גרפים..." />;
   }
 
   if (slides.length === 0) {
     return (
-      <div className="flex flex-1 flex-col items-center justify-center px-6 py-16 text-center">
-        <div className="text-4xl" aria-hidden="true">📊</div>
-        <p className="mt-3 text-base font-bold text-slate-200">אין גרפים להצגה</p>
-        <p className="mt-2 text-sm font-semibold text-slate-400">הנתונים יופיעו לאחר יצירת אירוע והזנת אורחים.</p>
-      </div>
+      <MobileStateMessage
+        variant="empty"
+        title="אין גרפים להצגה"
+        description="הנתונים יופיעו לאחר יצירת אירוע והזנת אורחים."
+      />
     );
   }
 
@@ -80,6 +75,24 @@ export default function MobileChartPager({ slides = [], ready = false }) {
           {activeIndex + 1} מתוך {slides.length} · {activeSlide.label}
           {activeIndex < slides.length - 1 ? ' · גלול לגרף הבא' : ''}
         </p>
+        <div className="mt-3 flex items-center justify-center gap-2">
+          <button
+            type="button"
+            onClick={() => canGoPrev && scrollToSlide(activeIndex - 1)}
+            disabled={!canGoPrev}
+            className="rounded-full border border-white/15 bg-white/[0.05] px-3 py-1 text-xs font-bold text-slate-200 transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            לגרף קודם
+          </button>
+          <button
+            type="button"
+            onClick={() => canGoNext && scrollToSlide(activeIndex + 1)}
+            disabled={!canGoNext}
+            className="rounded-full border border-indigo-400/45 bg-indigo-500/20 px-3 py-1 text-xs font-bold text-indigo-100 transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            לגרף הבא
+          </button>
+        </div>
       </div>
 
       <div

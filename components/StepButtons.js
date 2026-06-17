@@ -22,6 +22,7 @@ import {
   getRsvpStatusLabel,
 } from '../lib/rsvpLabels';
 import MobileChartPager from './mobile/MobileChartPager';
+import MobileFullScreenShell from './mobile/MobileFullScreenShell';
 import MobileScreenLoading from './mobile/MobileScreenLoading';
 
 const RADIAN = Math.PI / 180;
@@ -8082,12 +8083,13 @@ React.useEffect(()=>{
 
 
       {showMobileChartsScreen && (
-        <div className="fixed inset-0 z-[120] flex flex-col bg-[#08091a] sm:hidden" dir="rtl">
-          <div className="shrink-0 border-b border-white/10 bg-[#0d0f2b]/95 px-4 pb-4 pt-[max(1rem,env(safe-area-inset-top))] backdrop-blur-xl">
-            <div className="text-sm font-black text-indigo-200">הצג גרפים</div>
-            <h2 className="mt-1 text-3xl font-black text-white">דוחות וגרפים</h2>
-            <p className="mt-1 text-xs font-semibold text-slate-400">גלול או הקש על הנקודות למעבר בין הגרפים</p>
-          </div>
+        <MobileFullScreenShell
+          testId="mobile-charts-screen"
+          eyebrow="הצג גרפים"
+          title="דוחות וגרפים"
+          onClose={() => setShowMobileChartsScreen(false)}
+          headerExtra={<p className="mt-1 text-xs font-semibold text-slate-400">גלול או הקש על הנקודות למעבר בין הגרפים</p>}
+        >
           <MobileChartPager
             ready={mobileChartsScreenReady}
             slides={[
@@ -8110,24 +8112,16 @@ React.useEffect(()=>{
                 : []),
             ]}
           />
-          <div className="shrink-0 border-t border-white/10 bg-[#0d0f2b]/95 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4 backdrop-blur-xl">
-            <button
-              type="button"
-              onClick={() => setShowMobileChartsScreen(false)}
-              className="w-full rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-600 px-4 py-4 text-lg font-black text-white shadow-[0_10px_24px_rgba(16,185,129,0.28)] transition-opacity active:opacity-85"
-            >
-              חזור
-            </button>
-          </div>
-        </div>
+        </MobileFullScreenShell>
       )}
 
       {showMobileDetailsScreen && (
-        <div className="fixed inset-0 z-[120] flex flex-col bg-[#08091a] sm:hidden" dir="rtl">
-          <div className="shrink-0 border-b border-white/10 bg-[#0d0f2b]/95 px-4 pb-4 pt-[max(1rem,env(safe-area-inset-top))] backdrop-blur-xl">
-            <div className="text-sm font-black text-sky-200">פרטים נוספים</div>
-            <h2 className="mt-1 text-3xl font-black text-white">אירוע ומסלול</h2>
-          </div>
+        <MobileFullScreenShell
+          testId="mobile-details-screen"
+          eyebrow="פרטים נוספים"
+          title="אירוע ומסלול"
+          onClose={() => setShowMobileDetailsScreen(false)}
+        >
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
             {mobileDetailsScreenReady ? (
               <div className="flex-1 overflow-y-auto px-4 py-5 space-y-6">
@@ -8137,16 +8131,7 @@ React.useEffect(()=>{
               <MobileScreenLoading message="טוען פרטים..." />
             )}
           </div>
-          <div className="shrink-0 border-t border-white/10 bg-[#0d0f2b]/95 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4 backdrop-blur-xl">
-            <button
-              type="button"
-              onClick={() => setShowMobileDetailsScreen(false)}
-              className="w-full rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-600 px-4 py-4 text-lg font-black text-white shadow-[0_10px_24px_rgba(16,185,129,0.28)] transition-opacity active:opacity-85"
-            >
-              חזור
-            </button>
-          </div>
-        </div>
+        </MobileFullScreenShell>
       )}
 
       {showMobileFirstSendSuccess && (
