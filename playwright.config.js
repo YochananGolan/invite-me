@@ -14,7 +14,13 @@ module.exports = defineConfig({
   projects: [
     {
       name: 'mobile-chrome',
+      testMatch: /.*mobile-smoke\.spec\.js/,
       use: { ...devices['Pixel 5'] },
+    },
+    {
+      name: 'desktop-chrome',
+      testMatch: /.*desktop-smoke\.spec\.js/,
+      use: { ...devices['Desktop Chrome'] },
     },
   ],
   webServer: process.env.CI
