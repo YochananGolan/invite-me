@@ -7917,7 +7917,7 @@ React.useEffect(()=>{
                 e.stopPropagation();
                 setShowMobileChartsScreen(true);
               }}
-              className="mt-3 relative flex min-h-[4.75rem] w-full flex-col items-center justify-center gap-1.5 rounded-2xl border border-indigo-400/40 bg-indigo-500/15 py-4 px-5 text-center text-indigo-200 shadow-[0_2px_10px_rgba(99,102,241,0.25)] transition-all"
+              className="mt-4 relative flex min-h-[4.75rem] w-full flex-col items-center justify-center gap-1.5 rounded-2xl border border-indigo-400/40 bg-indigo-500/15 py-4 px-5 text-center text-indigo-200 shadow-[0_2px_10px_rgba(99,102,241,0.25)] transition-all"
               data-testid="mobile-open-charts"
             >
               <span className="text-center text-2xl font-black leading-tight">הצג גרפים</span>
