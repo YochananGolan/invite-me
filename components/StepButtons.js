@@ -8294,7 +8294,7 @@ React.useEffect(()=>{
           setStepBarTransform('translate3d(0, 0, 0)');
         }}
       >
-        <h2 className="mb-2 px-2 text-center text-sm font-black text-violet-200 sm:mb-3 sm:text-base">
+        <h2 className="mb-2 px-2 text-center text-base font-black text-violet-200 sm:mb-3 sm:text-base">
           שלבי יצירת הזמנה
         </h2>
         <div className="flex flex-col gap-2 sm:hidden px-2" data-testid="mobile-step-bar">
@@ -8307,7 +8307,7 @@ React.useEffect(()=>{
                 e.stopPropagation();
                 setShowMobileStep123((prev) => !prev);
               }}
-              className="w-full rounded-2xl border border-violet-300/35 bg-violet-500/15 px-4 py-3 text-center text-sm font-black text-violet-100 transition-all active:bg-violet-500/25"
+              className="w-full rounded-2xl border border-violet-300/35 bg-violet-500/15 px-5 py-4 text-center text-base font-black text-violet-100 transition-all active:bg-violet-500/25"
             >
               לשינוי פרטי אירוע ועיצוב לחץ כאן.
             </button>
