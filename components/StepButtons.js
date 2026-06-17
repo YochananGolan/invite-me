@@ -7900,6 +7900,15 @@ React.useEffect(()=>{
             </div>
           </div>
 
+          <button
+            type="button"
+            onClick={openMobileQuickGuestListScreen}
+            className="mt-3 relative flex min-h-[4.75rem] w-full items-center justify-center rounded-2xl border border-violet-300/30 bg-violet-500/15 px-5 py-4 text-center text-2xl font-black leading-tight text-violet-100 transition-colors active:bg-violet-500/25"
+            data-testid="mobile-open-guest-list"
+          >
+            {`ראה רשימת אורחים : ${RSVP_FILTER_LABELS[mobileSummaryFilter] || RSVP_FILTER_LABELS.all} (${mobileGuestFilterCounts[mobileSummaryFilter] ?? mobileGuestFilterCounts.all})`}
+          </button>
+
           <div className="mt-3 mb-2 text-sm font-black text-violet-200">חיפוש אורח</div>
           <form
             className="flex min-w-0 items-stretch gap-2 rounded-2xl border border-white/10 bg-white/[0.055] p-2"
@@ -7957,15 +7966,6 @@ React.useEffect(()=>{
               <span className="text-center text-2xl font-black leading-tight">הצג גרפים</span>
             </button>
           )}
-
-          <button
-            type="button"
-            onClick={openMobileQuickGuestListScreen}
-            className="mt-3 relative flex min-h-[4.75rem] w-full items-center justify-center rounded-2xl border border-violet-300/30 bg-violet-500/15 px-5 py-4 text-center text-2xl font-black leading-tight text-violet-100 transition-colors active:bg-violet-500/25"
-            data-testid="mobile-open-guest-list"
-          >
-            {`ראה רשימת אורחים : ${RSVP_FILTER_LABELS[mobileSummaryFilter] || RSVP_FILTER_LABELS.all} (${mobileGuestFilterCounts[mobileSummaryFilter] ?? mobileGuestFilterCounts.all})`}
-          </button>
 
           <p className="mt-2 text-center text-[11px] font-semibold text-slate-400">
             החליקו על כרטיס אורח ימינה לתזכורת או שמאלה ל-WhatsApp
