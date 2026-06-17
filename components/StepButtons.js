@@ -7870,56 +7870,18 @@ React.useEffect(()=>{
             </div>
           </div>
 
-          <div className="mt-3 space-y-3">
+          <div className="mt-3 space-y-4">
             <div className="text-center text-xl font-black leading-snug text-violet-100">צפיה וחיפוש ברשימות אורחים</div>
 
             <div
-              className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.04]"
-              data-testid="mobile-guest-filter-frame"
-            >
-              <div className="px-4 pb-4 pt-4">
-                <div className="grid grid-cols-4 gap-3">
-                  {[
-                    ['all', RSVP_FILTER_LABELS.all],
-                    ['approved', RSVP_STATUS_LABELS_COMPACT.approved],
-                    ['pending', RSVP_STATUS_LABELS.pending],
-                    ['rejected', RSVP_STATUS_LABELS.rejected],
-                  ].map(([key, label]) => (
-                    <button
-                      key={key}
-                      type="button"
-                      onClick={() => setMobileSummaryFilter(key)}
-                      className={`min-h-[4.25rem] rounded-full border px-2 py-3.5 text-center transition-all ${
-                        mobileSummaryFilter === key
-                          ? 'border-amber-300/70 bg-amber-500/30 text-white'
-                          : 'border-white/10 bg-white/[0.04] text-slate-300'
-                      }`}
-                    >
-                      <span className="block text-base font-black leading-tight">{label}</span>
-                      <span className="mt-1 block text-sm font-bold tabular-nums opacity-95">
-                        {mobileGuestFilterCounts[key] ?? 0}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <button
-                type="button"
-                onClick={openMobileQuickGuestListScreen}
-                className="relative flex min-h-[4.75rem] w-full items-center justify-center rounded-none border-0 border-t border-white/10 bg-violet-500/15 px-5 py-4 text-center text-2xl font-black leading-tight text-violet-100 transition-colors active:bg-violet-500/25"
-                data-testid="mobile-open-guest-list"
-              >
-                {`ראה רשימת אורחים : ${RSVP_FILTER_LABELS[mobileSummaryFilter] || RSVP_FILTER_LABELS.all} (${mobileGuestFilterCounts[mobileSummaryFilter] ?? mobileGuestFilterCounts.all})`}
-              </button>
-            </div>
-
-            <div
-              className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.04] p-2"
+              className="overflow-hidden rounded-2xl border-2 border-white/15 bg-white/[0.06] shadow-[0_8px_28px_rgba(0,0,0,0.22)] ring-1 ring-violet-400/20"
               data-testid="mobile-guest-search-frame"
             >
+              <div className="border-b border-white/10 bg-white/[0.04] px-4 py-2.5 text-center text-base font-black text-violet-200">
+                חיפוש אורח
+              </div>
               <form
-                className="flex min-w-0 items-stretch gap-2"
+                className="flex min-w-0 items-stretch gap-2 p-2"
                 onSubmit={(event) => {
                   event.preventDefault();
                   handleMobileQuickGuestSearch();
@@ -7958,6 +7920,50 @@ React.useEffect(()=>{
                   חפש
                 </button>
               </form>
+            </div>
+
+            <div
+              className="overflow-hidden rounded-2xl border-2 border-white/15 bg-white/[0.06] shadow-[0_8px_28px_rgba(0,0,0,0.22)] ring-1 ring-violet-400/20"
+              data-testid="mobile-guest-filter-frame"
+            >
+              <div className="border-b border-white/10 bg-white/[0.04] px-4 py-2.5 text-center text-base font-black text-violet-200">
+                סינון וצפייה ברשימה
+              </div>
+              <div className="px-4 pb-4 pt-4">
+                <div className="grid grid-cols-4 gap-3">
+                  {[
+                    ['all', RSVP_FILTER_LABELS.all],
+                    ['approved', RSVP_STATUS_LABELS_COMPACT.approved],
+                    ['pending', RSVP_STATUS_LABELS.pending],
+                    ['rejected', RSVP_STATUS_LABELS.rejected],
+                  ].map(([key, label]) => (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => setMobileSummaryFilter(key)}
+                      className={`min-h-[4.25rem] rounded-full border px-2 py-3.5 text-center transition-all ${
+                        mobileSummaryFilter === key
+                          ? 'border-amber-300/70 bg-amber-500/30 text-white'
+                          : 'border-white/10 bg-white/[0.04] text-slate-300'
+                      }`}
+                    >
+                      <span className="block text-base font-black leading-tight">{label}</span>
+                      <span className="mt-1 block text-sm font-bold tabular-nums opacity-95">
+                        {mobileGuestFilterCounts[key] ?? 0}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={openMobileQuickGuestListScreen}
+                className="relative flex min-h-[4.75rem] w-full items-center justify-center rounded-none border-0 border-t border-white/10 bg-violet-500/15 px-5 py-4 text-center text-2xl font-black leading-tight text-violet-100 transition-colors active:bg-violet-500/25"
+                data-testid="mobile-open-guest-list"
+              >
+                {`ראה רשימת אורחים : ${RSVP_FILTER_LABELS[mobileSummaryFilter] || RSVP_FILTER_LABELS.all} (${mobileGuestFilterCounts[mobileSummaryFilter] ?? mobileGuestFilterCounts.all})`}
+              </button>
             </div>
           </div>
 
