@@ -7873,8 +7873,8 @@ React.useEffect(()=>{
           <div className="mt-3">
             <div className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.04]">
               <div className="border-b border-white/10 px-4 pb-4 pt-4">
-                <div className="mb-3 text-lg font-black text-violet-200">צפיה וחיפוש ברשימות אורחים</div>
-                <div className="grid grid-cols-4 gap-2.5">
+                <div className="mb-3 text-center text-xl font-black leading-snug text-violet-100">צפיה וחיפוש ברשימות אורחים</div>
+                <div className="grid grid-cols-4 gap-3">
                   {[
                     ['all', RSVP_FILTER_LABELS.all],
                     ['approved', RSVP_STATUS_LABELS_COMPACT.approved],
@@ -7885,14 +7885,14 @@ React.useEffect(()=>{
                       key={key}
                       type="button"
                       onClick={() => setMobileSummaryFilter(key)}
-                      className={`rounded-full border px-2.5 py-3 text-center transition-all ${
+                      className={`min-h-[4.25rem] rounded-full border px-2 py-3.5 text-center transition-all ${
                         mobileSummaryFilter === key
                           ? 'border-amber-300/70 bg-amber-500/30 text-white'
                           : 'border-white/10 bg-white/[0.04] text-slate-300'
                       }`}
                     >
-                      <span className="block text-sm font-black leading-tight">{label}</span>
-                      <span className="mt-1 block text-xs font-bold tabular-nums opacity-95">
+                      <span className="block text-base font-black leading-tight">{label}</span>
+                      <span className="mt-1 block text-sm font-bold tabular-nums opacity-95">
                         {mobileGuestFilterCounts[key] ?? 0}
                       </span>
                     </button>
@@ -7909,9 +7909,6 @@ React.useEffect(()=>{
                 {`ראה רשימת אורחים : ${RSVP_FILTER_LABELS[mobileSummaryFilter] || RSVP_FILTER_LABELS.all} (${mobileGuestFilterCounts[mobileSummaryFilter] ?? mobileGuestFilterCounts.all})`}
               </button>
 
-              <div className="border-b border-white/10 px-4 py-3">
-                <div className="text-lg font-black text-violet-200">חיפוש אורח</div>
-              </div>
               <form
                 className="flex min-w-0 items-stretch gap-2 bg-white/[0.055] p-2"
                 onSubmit={(event) => {
