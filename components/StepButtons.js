@@ -7902,7 +7902,7 @@ React.useEffect(()=>{
           <button
             type="button"
             onClick={openMobileQuickGuestListScreen}
-            className="mt-3 w-full rounded-2xl border border-violet-300/30 bg-violet-500/15 px-4 py-3 text-base font-black text-violet-100 transition-colors active:bg-violet-500/25"
+            className="mt-3 relative flex min-h-[4.75rem] w-full items-center justify-center rounded-2xl border border-violet-300/30 bg-violet-500/15 px-5 py-4 text-center text-2xl font-black leading-tight text-violet-100 transition-colors active:bg-violet-500/25"
             data-testid="mobile-open-guest-list"
           >
             {`ראה רשימת אורחים : ${RSVP_FILTER_LABELS[mobileSummaryFilter] || RSVP_FILTER_LABELS.all} (${mobileGuestFilterCounts[mobileSummaryFilter] ?? mobileGuestFilterCounts.all})`}
@@ -7929,21 +7929,14 @@ React.useEffect(()=>{
           </p>
 
           <form
-            className="mt-3 flex min-w-0 items-center gap-1.5 rounded-2xl border border-white/10 bg-white/[0.055] p-1.5"
+            className="mt-3 flex min-w-0 flex-col gap-2 rounded-2xl border border-white/10 bg-white/[0.055] p-2"
             onSubmit={(event) => {
               event.preventDefault();
               handleMobileQuickGuestSearch();
             }}
           >
-            <button
-              type="button"
-              onClick={handleMobileQuickGuestSearchClear}
-              className="shrink-0 rounded-lg border border-white/15 bg-white/[0.06] px-2 py-1.5 text-xs font-black text-slate-200 transition-colors active:bg-white/[0.12]"
-            >
-              נקה
-            </button>
             <label className="sr-only" htmlFor="mobile-quick-guest-search">חיפוש אורח</label>
-            <div className="relative min-w-0 flex-1">
+            <div className="relative min-w-0 w-full">
               {!mobileQuickGuestSearchDraft && (
                 <span
                   aria-hidden="true"
@@ -7961,12 +7954,21 @@ React.useEffect(()=>{
                 className="w-full border-0 bg-transparent px-1 py-1.5 text-right text-sm font-semibold text-slate-100 focus:outline-none"
               />
             </div>
-            <button
-              type="submit"
-              className="shrink-0 rounded-lg bg-gradient-to-br from-emerald-500 to-emerald-600 px-2.5 py-1.5 text-xs font-black text-white shadow-[0_6px_18px_rgba(16,185,129,0.28)] transition-opacity active:opacity-85"
-            >
-              חפש
-            </button>
+            <div className="grid w-full grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={handleMobileQuickGuestSearchClear}
+                className="rounded-2xl border border-white/15 bg-white/[0.06] py-4 text-lg font-black text-slate-100 transition-colors active:bg-white/[0.12]"
+              >
+                נקה
+              </button>
+              <button
+                type="submit"
+                className="rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-600 py-4 text-2xl font-black text-white shadow-[0_6px_18px_rgba(16,185,129,0.28)] transition-opacity active:opacity-85"
+              >
+                חפש
+              </button>
+            </div>
           </form>
 
           {mobileSummaryGuests.length > 4 && (
