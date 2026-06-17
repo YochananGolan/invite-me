@@ -7900,56 +7900,59 @@ React.useEffect(()=>{
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={openMobileQuickGuestListScreen}
-            className="mt-3 relative flex min-h-[4.75rem] w-full items-center justify-center rounded-2xl border border-violet-300/30 bg-violet-500/15 px-5 py-4 text-center text-2xl font-black leading-tight text-violet-100 transition-colors active:bg-violet-500/25"
-            data-testid="mobile-open-guest-list"
-          >
-            {`ראה רשימת אורחים : ${RSVP_FILTER_LABELS[mobileSummaryFilter] || RSVP_FILTER_LABELS.all} (${mobileGuestFilterCounts[mobileSummaryFilter] ?? mobileGuestFilterCounts.all})`}
-          </button>
-
-          <div className="mt-3 mb-2 text-sm font-black text-violet-200">חיפוש אורח</div>
-          <form
-            className="flex min-w-0 items-stretch gap-2 rounded-2xl border border-white/10 bg-white/[0.055] p-2"
-            onSubmit={(event) => {
-              event.preventDefault();
-              handleMobileQuickGuestSearch();
-            }}
-          >
-            <button
-              type="button"
-              onClick={handleMobileQuickGuestSearchClear}
-              className="flex min-h-[4.75rem] shrink-0 items-center justify-center rounded-2xl border border-white/15 bg-white/[0.06] px-4 text-lg font-black text-slate-100 transition-colors active:bg-white/[0.12]"
-            >
-              נקה
-            </button>
-            <label className="sr-only" htmlFor="mobile-quick-guest-search">חיפוש אורח</label>
-            <div className="relative flex min-h-[4.75rem] min-w-0 flex-1 items-center">
-              {!mobileQuickGuestSearchDraft && (
-                <span
-                  aria-hidden="true"
-                  className="pointer-events-none absolute inset-y-0 right-2 flex items-center text-sm font-semibold text-white"
+          <div className="mt-3">
+            <div className="mb-2 text-sm font-black text-violet-200">חיפוש אורח</div>
+            <div className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.04]">
+              <button
+                type="button"
+                onClick={openMobileQuickGuestListScreen}
+                className="relative flex min-h-[4.75rem] w-full items-center justify-center rounded-none border-0 border-b border-white/10 bg-violet-500/15 px-5 py-4 text-center text-2xl font-black leading-tight text-violet-100 transition-colors active:bg-violet-500/25"
+                data-testid="mobile-open-guest-list"
+              >
+                {`ראה רשימת אורחים : ${RSVP_FILTER_LABELS[mobileSummaryFilter] || RSVP_FILTER_LABELS.all} (${mobileGuestFilterCounts[mobileSummaryFilter] ?? mobileGuestFilterCounts.all})`}
+              </button>
+              <form
+                className="flex min-w-0 items-stretch gap-2 bg-white/[0.055] p-2"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  handleMobileQuickGuestSearch();
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={handleMobileQuickGuestSearchClear}
+                  className="flex min-h-[4.75rem] shrink-0 items-center justify-center rounded-2xl border border-white/15 bg-white/[0.06] px-4 text-lg font-black text-slate-100 transition-colors active:bg-white/[0.12]"
                 >
-                  חפש אורח לפי שם או נייד
-                </span>
-              )}
-              <input
-                id="mobile-quick-guest-search"
-                type="search"
-                value={mobileQuickGuestSearchDraft}
-                onChange={(event) => setMobileQuickGuestSearchDraft(event.target.value)}
-                placeholder=""
-                className="h-full w-full border-0 bg-transparent px-2 text-right text-sm font-semibold text-slate-100 focus:outline-none"
-              />
+                  נקה
+                </button>
+                <label className="sr-only" htmlFor="mobile-quick-guest-search">חיפוש אורח</label>
+                <div className="relative flex min-h-[4.75rem] min-w-0 flex-1 items-center">
+                  {!mobileQuickGuestSearchDraft && (
+                    <span
+                      aria-hidden="true"
+                      className="pointer-events-none absolute inset-y-0 right-2 flex items-center text-sm font-semibold text-white"
+                    >
+                      חפש אורח לפי שם או נייד
+                    </span>
+                  )}
+                  <input
+                    id="mobile-quick-guest-search"
+                    type="search"
+                    value={mobileQuickGuestSearchDraft}
+                    onChange={(event) => setMobileQuickGuestSearchDraft(event.target.value)}
+                    placeholder=""
+                    className="h-full w-full border-0 bg-transparent px-2 text-right text-sm font-semibold text-slate-100 focus:outline-none"
+                  />
+                </div>
+                <button
+                  type="submit"
+                  className="flex min-h-[4.75rem] shrink-0 items-center justify-center rounded-2xl border border-emerald-400/40 bg-emerald-500/15 px-5 text-2xl font-black leading-tight text-emerald-100 shadow-[0_2px_10px_rgba(16,185,129,0.25)] transition-all active:opacity-85"
+                >
+                  חפש
+                </button>
+              </form>
             </div>
-            <button
-              type="submit"
-              className="flex min-h-[4.75rem] shrink-0 items-center justify-center rounded-2xl border border-emerald-400/40 bg-emerald-500/15 px-5 text-2xl font-black leading-tight text-emerald-100 shadow-[0_2px_10px_rgba(16,185,129,0.25)] transition-all active:opacity-85"
-            >
-              חפש
-            </button>
-          </form>
+          </div>
 
           {currentEventId && isCurrentEventActive && (
             <button
