@@ -177,9 +177,27 @@ function getPendingGuestsFromRows(guests = []) {
 // Register Hebrew locale for datepicker
 registerLocale('he', he);
 
+// Keys stored inside event_details JSON but not shown in the event-details form
+const EVENT_DETAILS_METADATA_KEYS = new Set([
+  'pricing_plan',
+  'invitation_text',
+  'custom_invitation_text',
+  'invitation_text_lines',
+  'line_styles',
+  'font',
+  'font_css',
+  'template_src',
+  'status',
+  'progress_step',
+  'whatsapp_group',
+  'start_datetime',
+  'selected_plan',
+]);
+
 // Helper to check missing details based on selectedEventType
 function computeMissingDetails(formData, selectedEventType){
   return Object.entries(formData).filter(([key,value])=>{
+    if (EVENT_DETAILS_METADATA_KEYS.has(key)) return false;
     if(key==='customEventDescription') return false;
     if(key==='chuppahTime' && selectedEventType!=='חתונה') return false;
     if(['groomName','brideName'].includes(key) && !['חתונה','חינה','מסיבת אירוסין'].includes(selectedEventType)) return false;
@@ -3016,7 +3034,7 @@ const handleOpenAddonModal = React.useCallback(() => {
         template_src: templateSrc || selectedDesign || null,
         status: templateSrc ? 'active' : 'draft',
         progress_step: progress,
-        pricing_plan: selectedPlan,
+        pricing_plan: selectedPlan || planForDisplay || userPlanSettings?.plan || formData.pricing_plan || null,
       };
       
       // If currentEventId exists, update existing event; otherwise insert new one
