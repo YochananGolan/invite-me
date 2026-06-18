@@ -1000,7 +1000,7 @@ const [hasWhatsAppGroup, setHasWhatsAppGroup] = useState(false);
     switch(plan) {
       case 'free':
       case 'basic':
-        return 50;
+        return 1;
       case 'standard':
         return 200;
       case 'premium':
@@ -1014,7 +1014,7 @@ const [hasWhatsAppGroup, setHasWhatsAppGroup] = useState(false);
       case 'addon':
         return 100;
       default:
-        return 50;
+        return 1;
     }
   },[]);
 
@@ -1434,7 +1434,7 @@ const displayPlanCode =
   null;
 const activePlanDescription =
   displayPlanCode === 'basic' || displayPlanCode === 'free'
-    ? 'מסלול א - ₪1 לאירועים קטנים עם כל הפיצ\'רים הבסיסיים'
+    ? 'מסלול א - 1 הודעה ב-1 ש״ח לאירועים קטנים עם כל הפיצ\'רים הבסיסיים'
     : displayPlanCode === 'standard'
       ? 'מסלול ב - מקצועי עם תמיכה מלאה ועיצובים מתקדמים'
       : displayPlanCode === 'premium'
@@ -4854,7 +4854,7 @@ React.useEffect(() => {
     switch(plan) {
       case 'free':
       case 'basic':
-        return 'מסלול א - ₪1';
+        return 'מסלול א - 1 הודעה · 1 ש״ח';
       case 'standard':
         return 'מסלול ב - 149₪';
       case 'premium':
@@ -4871,7 +4871,7 @@ React.useEffect(() => {
     switch(plan) {
       case 'free':
       case 'basic':
-        return 50;
+        return 1;
       case 'standard':
         return 200;
       case 'premium':
@@ -4879,7 +4879,7 @@ React.useEffect(() => {
       case 'luxury':
         return 500;
       default:
-        return 50;
+        return 1;
     }
   };
 
@@ -7368,12 +7368,12 @@ React.useEffect(()=>{
                    displayPlanCode === 'supreme' ? 'מסלול ו' : 'מסלול א'}
                 </div>
                 <div className="text-base text-slate-300 font-semibold">
-                  {displayPlanCode === 'basic' || displayPlanCode === 'free' ? '₪1 - עד 50 הודעות' :
-                   displayPlanCode === 'standard' ? '149₪ - מ 51 עד 200 הודעות' :
+                  {displayPlanCode === 'basic' || displayPlanCode === 'free' ? '1 ש״ח - 1 הודעה' :
+                   displayPlanCode === 'standard' ? '149₪ - מ 2 עד 200 הודעות' :
                    displayPlanCode === 'premium' ? '199₪ - מ 201 עד 350 הודעות' :
                    displayPlanCode === 'luxury' ? '259₪ - מ 351 עד 500 הודעות' :
                    displayPlanCode === 'elite' ? '349₪ - מ 501 עד 650 הודעות' :
-                   displayPlanCode === 'supreme' ? '499₪ - מ 651 עד 1000 הודעות' : '₪1 - עד 50 הודעות'}
+                   displayPlanCode === 'supreme' ? '499₪ - מ 651 עד 1000 הודעות' : '1 ש״ח - 1 הודעה'}
                 </div>
               </div>
               <div className="bg-amber-500/10 border border-amber-400/30 rounded-lg p-3">
@@ -10742,8 +10742,8 @@ React.useEffect(()=>{
                   <div className="space-y-2">
                     <p className="text-slate-300 text-base leading-relaxed">בשלב זה תבחר את המסלול המתאים לאירוע שלך:</p>
                     <ul className="list-disc list-inside space-y-1.5 mr-3 text-base">
-                      <li><strong>מסלול א (1₪)</strong> - עד 50 הודעות</li>
-                      <li><strong>מסלול ב (149₪)</strong> - מ 51 עד 200 הודעות</li>
+                      <li><strong>מסלול א (1 ש״ח)</strong> - 1 הודעה</li>
+                      <li><strong>מסלול ב (149₪)</strong> - מ 2 עד 200 הודעות</li>
                       <li><strong>מסלול ג (199₪)</strong> - מ 201 עד 350 הודעות</li>
                       <li><strong>מסלול ד (259₪)</strong> - מ 351 עד 500 הודעות</li>
                     </ul>
@@ -10904,8 +10904,8 @@ React.useEffect(()=>{
           {/* Plan cards */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 mb-6 shrink-0">
             {[
-              { key: 'free',     id: 'א', subtitle: 'אירועים קטנים',    range: 'עד 50 הודעות',        price: '1',   recommended: false },
-              { key: 'standard', id: 'ב', subtitle: 'מתאים לרוב',       range: 'מ־51 עד 200 הודעות',  price: '149', recommended: true  },
+              { key: 'free',     id: 'א', subtitle: 'אירועים קטנים',    range: '1 הודעה · 1 ש״ח',        price: '1',   recommended: false },
+              { key: 'standard', id: 'ב', subtitle: 'מתאים לרוב',       range: 'מ־2 עד 200 הודעות',  price: '149', recommended: true  },
               { key: 'premium',  id: 'ג', subtitle: 'אירועים גדולים',   range: 'מ־201 עד 350 הודעות', price: '199', recommended: false },
               { key: 'luxury',   id: 'ד', subtitle: 'אירועים גדולים מאוד', range: 'מ־351 עד 500 הודעות', price: '259', recommended: false },
             ].map((plan) => (

@@ -166,10 +166,10 @@ const buildActiveReportSummary = (eventRecord, guests = []) => {
   );
 
   const planBaseLimits = {
-    free: 50, basic: 50, standard: 200, premium: 350,
+    free: 1, basic: 1, standard: 200, premium: 350,
     luxury: 500, elite: 650, supreme: 1000,
   };
-  const planBase = planBaseLimits[eventRecord?.selected_plan] ?? 50; // default 50 matches getPlanBaseLimit's default
+  const planBase = planBaseLimits[eventRecord?.selected_plan] ?? 1; // default 1 matches getPlanBaseLimit's default
   const addonCount = toNonNegativeNumber(eventRecord?.additional_packages);
   const invitationLimit = planBase + addonCount * 100;
   const totalInvited = guests.length;

@@ -1,8 +1,8 @@
 import Modal, { ModalHeader, ModalBody, ModalFooter } from './Modal';
 
 const PLANS = [
-  { id: 'א', range: 'עד 50 הודעות', price: 1, desc: 'מתאים לאירועים קטנים' },
-  { id: 'ב', range: 'מ־51 עד 200 הודעות', price: 149, desc: 'מתאים לרוב האירועים' },
+  { id: 'א', range: '1 הודעה · 1 ש״ח', price: 1, desc: 'מתאים לאירועים קטנים' },
+  { id: 'ב', range: 'מ־2 עד 200 הודעות', price: 149, desc: 'מתאים לרוב האירועים' },
   { id: 'ג', range: 'מ־201 עד 350 הודעות', price: 199, desc: 'לאירועים גדולים' },
   { id: 'ד', range: 'מ־351 עד 500 הודעות', price: 259, desc: 'לאירועים גדולים מאוד' },
   { id: 'הרחבה', range: '100 הודעות נוספות', price: 100, desc: 'חבילת הרחבה' },
