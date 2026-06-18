@@ -1115,6 +1115,8 @@ const derivePlanFromRecord = React.useCallback((record) => {
 const [userPlanSettings, setUserPlanSettings] = useState({ plan: null, addonCount: 0, eventWizardStarted: false });
 /** נכון אחרי ש־loadUserPlanSettings סיים (כולל שגיאה) — לא לאפס מסלול מ-localStorage לפני כן */
 const userPlanSettingsHydratedRef = useRef(false);
+/** שלב 1 נפתח אוטומטית פעם אחת לסשן — לא לכפות מחדש אחרי שהמשתמש סגר ב-X */
+const wizardStep1AutoOpenedRef = useRef(false);
 const persistUserPlanSettings = React.useCallback(async (planCode, addonCount, eventWizardStartedOverride = undefined) => {
   try {
     const user = await resolveCurrentUserForSync();
@@ -1290,7 +1292,6 @@ const loadUserPlanSettings = React.useCallback(async () => {
       setShowGuestListModal(false);
       setShowReportsOptions(false);
       setShowReportModal(false);
-      setShowEventTypes(true);
       setStepErrorMsg('');
     }
     return settings;
@@ -1395,6 +1396,7 @@ const noEventLoggedRef = useRef(false);
   React.useEffect(() => {
     if (!session) {
       userPlanSettingsHydratedRef.current = false;
+      wizardStep1AutoOpenedRef.current = false;
       setSelectedPlan(null);
       setEventAllowedGuests(null);
       setUserPlanSettings((prev) => {
@@ -1440,11 +1442,13 @@ const noEventLoggedRef = useRef(false);
     setShowGuestListModal(false);
     setShowReportsOptions(false);
     setShowReportModal(false);
-    if (!showEventTypes) {
+    setStepErrorMsg('');
+
+    if (!wizardStep1AutoOpenedRef.current) {
+      wizardStep1AutoOpenedRef.current = true;
       setShowEventTypes(true);
     }
-    setStepErrorMsg('');
-  }, [session, userPlanSettings, showEventTypes]);
+  }, [session, userPlanSettings?.plan, userPlanSettings?.eventWizardStarted]);
 
   React.useEffect(() => {
     if (currentEventId) return;
@@ -5208,6 +5212,7 @@ React.useEffect(() => {
           setShowPaymentResultModal(true);
           // Prepare wizard for brand new event creation
           setFinishedSteps([]);
+          wizardStep1AutoOpenedRef.current = true;
           setShowEventTypes(true);
           setStepErrorMsg('');
           try { localStorage.removeItem('finishedSteps'); } catch (e) {}
@@ -7288,12 +7293,27 @@ React.useEffect(()=>{
     return null;
   }, [wizardStepCompletion]);
 
+  const closeEventTypesModal = React.useCallback(() => {
+    wizardStep1AutoOpenedRef.current = true;
+    setShowEventTypes(false);
+    setStepErrorMsg('');
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }, []);
+
+  const openEventTypesModal = React.useCallback(() => {
+    wizardStep1AutoOpenedRef.current = true;
+    setShowEventTypes(true);
+    setStepErrorMsg('');
+  }, []);
+
   const redirectToWizardStep = React.useCallback((stepNumber) => {
     setShowEventTypes(false);
     setShowEventDetails(false);
     setShowDesignChooser(false);
     setShowGuestForm(false);
-    if (stepNumber === 1) setShowEventTypes(true);
+    if (stepNumber === 1) openEventTypesModal();
     else if (stepNumber === 2) setShowEventDetails(true);
     else if (stepNumber === 3) setShowDesignChooser(true);
     else if (stepNumber === 4) setShowGuestForm(true);
@@ -7301,7 +7321,7 @@ React.useEffect(()=>{
       setShowReportsOptions(true);
       setShowGuestListModal(false);
     }
-  }, []);
+  }, [openEventTypesModal]);
 
   const tryOpenWizardStep = React.useCallback((stepNumber) => {
     const wizardSessionActive = Boolean(
@@ -8661,8 +8681,8 @@ React.useEffect(()=>{
         </div>
       </div>
 
-      <Modal open={showEventTypes} onClose={() => setShowEventTypes(false)} size="md">
-        <ModalHeader onClose={() => setShowEventTypes(false)}>בחר סוג אירוע</ModalHeader>
+      <Modal open={showEventTypes} onClose={closeEventTypesModal} size="md">
+        <ModalHeader onClose={closeEventTypesModal}>בחר סוג אירוע</ModalHeader>
         <ModalBody>
           {renderMobileNextActionCard({
             stepLabel: 'שלב 1 מתוך 5',
