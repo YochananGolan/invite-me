@@ -26,6 +26,7 @@ import MobileQuickGuestsCard from './mobile/MobileQuickGuestsCard';
 import MobileQuickGuestListScreen, { MOBILE_GUEST_LIST_PAGE_SIZE } from './mobile/MobileQuickGuestListScreen';
 import MobileQuickGuestSearchOverlay from './mobile/MobileQuickGuestSearchOverlay';
 import MobileChartsScreen from './mobile/MobileChartsScreen';
+import MobileStepErrorScreen from './mobile/MobileStepErrorScreen';
 import MobileBackHandler from './mobile/MobileBackHandler';
 import MobileFullScreenShell from './mobile/MobileFullScreenShell';
 import MobileScreenLoading from './mobile/MobileScreenLoading';
@@ -7658,16 +7659,22 @@ React.useEffect(()=>{
 
       {/* הודעה כשהמשתמש לוחץ על שלב 1–5 בלי ליצור אירוע ולבחור מסלול */}
       {showStepError && (
-        <div className="fixed left-4 right-4 bottom-24 z-30 max-w-2xl mx-auto bg-amber-500/10 border border-amber-400/30 backdrop-blur-xl rounded-xl shadow-2xl shadow-amber-950/30 p-4 flex flex-col gap-3">
-          <p className="text-amber-100 font-semibold text-center text-lg">{stepErrorMsg}</p>
-          <button
-            type="button"
-            onClick={() => { setShowStepError(false); setStepErrorMsg(''); }}
-            className="bg-amber-500/20 hover:bg-amber-500/30 text-amber-100 border border-amber-300/30 font-bold py-2 px-6 rounded-full mx-auto transition-colors"
-          >
-            הבנתי
-          </button>
-        </div>
+        <>
+          <MobileStepErrorScreen
+            message={stepErrorMsg}
+            onClose={() => { setShowStepError(false); setStepErrorMsg(''); }}
+          />
+          <div className="fixed left-4 right-4 bottom-24 z-30 hidden max-w-2xl flex-col gap-3 rounded-xl border border-amber-400/30 bg-amber-500/10 p-4 shadow-2xl shadow-amber-950/30 backdrop-blur-xl sm:mx-auto sm:flex">
+            <p className="text-center text-lg font-semibold text-amber-100">{stepErrorMsg}</p>
+            <button
+              type="button"
+              onClick={() => { setShowStepError(false); setStepErrorMsg(''); }}
+              className="mx-auto rounded-full border border-amber-300/30 bg-amber-500/20 px-6 py-2 font-bold text-amber-100 transition-colors hover:bg-amber-500/30"
+            >
+              הבנתי
+            </button>
+          </div>
+        </>
       )}
 
       {hasSession && isCurrentEventActive && mobileDashboardModel.showGuestPrimary && (
