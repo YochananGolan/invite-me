@@ -2556,11 +2556,12 @@ const handleOpenAddonModal = React.useCallback(() => {
         };
 
         if (error || !data) {
-          if (
+          const wizardFlowActive = Boolean(
             userPlanSettingsRef.current?.eventWizardStarted
-            || newEventStarted
             || showEventDetails
-          ) {
+            || (typeof window !== 'undefined' && localStorage.getItem('newEventStarted') === '1')
+          );
+          if (wizardFlowActive) {
             return;
           }
           clearEventDetails();
@@ -2608,7 +2609,7 @@ const handleOpenAddonModal = React.useCallback(() => {
         console.error('Failed to restore latest event details', err);
       }
     })();
-  }, [eventRefreshKey, resetCapacityWarningGuests, syncFinishedStepsFromEvent, newEventStarted, showEventDetails]);
+  }, [eventRefreshKey, resetCapacityWarningGuests, syncFinishedStepsFromEvent, showEventDetails]);
 
   // restore details
   React.useEffect(()=>{
