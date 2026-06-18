@@ -891,7 +891,10 @@ const [hasWhatsAppGroup, setHasWhatsAppGroup] = useState(false);
   const wizardAutoResumeCompletedRef = useRef(false);
   const wizardAutoOpenBlockedRef = useRef(false);
   const wizardDismissedHydratedRef = useRef(false);
+  const wizardProgrammaticOpenAllowedRef = useRef(false);
   const wizardSuppressedStepsRef = useRef(new Set());
+
+  const WIZARD_AUTO_RESUME_KEY = 'wizardAutoResumeAttempted';
 
   const readWizardDismissedSteps = React.useCallback(() => {
     if (typeof window === 'undefined') return new Set();
@@ -927,22 +930,68 @@ const [hasWhatsAppGroup, setHasWhatsAppGroup] = useState(false);
       try {
         sessionStorage.removeItem('wizardDismissedSteps');
         sessionStorage.removeItem('wizardAutoOpenBlocked');
+        sessionStorage.removeItem(WIZARD_AUTO_RESUME_KEY);
       } catch (_) {}
+    }
+  }, []);
+
+  const markWizardAutoResumeAttempted = React.useCallback(() => {
+    wizardAutoResumeCompletedRef.current = true;
+    if (typeof window !== 'undefined') {
+      try { sessionStorage.setItem(WIZARD_AUTO_RESUME_KEY, '1'); } catch (_) {}
+    }
+  }, []);
+
+  const hasWizardAutoResumeAttempted = React.useCallback(() => {
+    if (wizardAutoResumeCompletedRef.current) return true;
+    if (typeof window === 'undefined') return false;
+    try {
+      return sessionStorage.getItem(WIZARD_AUTO_RESUME_KEY) === '1';
+    } catch (_) {
+      return false;
     }
   }, []);
 
   const blockWizardAutoOpen = React.useCallback(() => {
     wizardAutoOpenBlockedRef.current = true;
-    wizardAutoResumeCompletedRef.current = true;
+    markWizardAutoResumeAttempted();
     if (typeof window !== 'undefined') {
       try { sessionStorage.setItem('wizardAutoOpenBlocked', '1'); } catch (_) {}
     }
-  }, []);
+  }, [markWizardAutoResumeAttempted]);
 
   const unblockWizardAutoOpen = React.useCallback(() => {
     wizardAutoOpenBlockedRef.current = false;
     if (typeof window !== 'undefined') {
       try { sessionStorage.removeItem('wizardAutoOpenBlocked'); } catch (_) {}
+    }
+  }, []);
+
+  const resetWizardDismissForUserProgress = React.useCallback(() => {
+    wizardAutoOpenBlockedRef.current = false;
+    wizardAutoResumeCompletedRef.current = false;
+    if (typeof window !== 'undefined') {
+      try {
+        sessionStorage.removeItem('wizardAutoOpenBlocked');
+        sessionStorage.removeItem(WIZARD_AUTO_RESUME_KEY);
+      } catch (_) {}
+    }
+  }, []);
+
+  const allowWizardProgrammaticOpen = React.useCallback((openFn) => {
+    wizardProgrammaticOpenAllowedRef.current = true;
+    try {
+      openFn();
+    } finally {
+      if (typeof queueMicrotask === 'function') {
+        queueMicrotask(() => {
+          wizardProgrammaticOpenAllowedRef.current = false;
+        });
+      } else {
+        window.setTimeout(() => {
+          wizardProgrammaticOpenAllowedRef.current = false;
+        }, 0);
+      }
     }
   }, []);
 
@@ -1496,10 +1545,11 @@ const noEventLoggedRef = useRef(false);
     if (!wizardDismissedHydratedRef.current) {
       wizardSuppressedStepsRef.current = readWizardDismissedSteps();
       wizardAutoOpenBlockedRef.current = readWizardAutoOpenBlocked();
+      wizardAutoResumeCompletedRef.current = hasWizardAutoResumeAttempted();
       wizardDismissedHydratedRef.current = true;
     }
     loadUserPlanSettings();
-  }, [session, loadUserPlanSettings, clearWizardDismissedSteps, readWizardDismissedSteps, readWizardAutoOpenBlocked]);
+  }, [session, loadUserPlanSettings, clearWizardDismissedSteps, readWizardDismissedSteps, readWizardAutoOpenBlocked, hasWizardAutoResumeAttempted]);
 
   React.useEffect(() => {
     if (!session) return undefined;
@@ -1538,11 +1588,14 @@ const noEventLoggedRef = useRef(false);
     if (
       !wizardSuppressedStepsRef.current.has(1) &&
       !finishedStepsRef.current.includes(0) &&
-      !wizardAutoOpenBlockedRef.current
+      !isWizardAutoOpenBlocked()
     ) {
-      setShowEventTypes(true);
+      allowWizardProgrammaticOpen(() => {
+        setShowEventTypes(true);
+        setStepErrorMsg('');
+      });
     }
-  }, [session, userPlanSettings?.plan, userPlanSettings?.eventWizardStarted]);
+  }, [session, userPlanSettings?.plan, userPlanSettings?.eventWizardStarted, allowWizardProgrammaticOpen, isWizardAutoOpenBlocked]);
 
   React.useEffect(() => {
     if (currentEventId) return;
@@ -1884,11 +1937,8 @@ const handleOpenAddonModal = React.useCallback(() => {
     setEventDetailsCompleted(true);
     wizardSuppressedStepsRef.current.delete(3);
     writeWizardDismissedSteps(wizardSuppressedStepsRef.current);
-    wizardAutoOpenBlockedRef.current = false;
-    if (typeof window !== 'undefined') {
-      try { sessionStorage.removeItem('wizardAutoOpenBlocked'); } catch (_) {}
-    }
-    setShowDesignChooser(true);
+    resetWizardDismissForUserProgress();
+    allowWizardProgrammaticOpen(() => setShowDesignChooser(true));
     try {
       await saveEventToSupabase(null, selectedDesign);
     } catch (err) {
@@ -3419,11 +3469,8 @@ const handleOpenAddonModal = React.useCallback(() => {
       setShowDesignChooser(false);
       wizardSuppressedStepsRef.current.delete(4);
       writeWizardDismissedSteps(wizardSuppressedStepsRef.current);
-      wizardAutoOpenBlockedRef.current = false;
-      if (typeof window !== 'undefined') {
-        try { sessionStorage.removeItem('wizardAutoOpenBlocked'); } catch (_) {}
-      }
-      setShowGuestForm(true);
+      resetWizardDismissForUserProgress();
+      allowWizardProgrammaticOpen(() => setShowGuestForm(true));
       // Note: progress_step column may not exist in all schemas, so we skip it if it fails
   if (currentEventId && progressStepSupportedRef.current) { 
         try {
@@ -5139,13 +5186,11 @@ React.useEffect(() => {
         setNewEventStarted(true);
         try { localStorage.setItem('newEventStarted', '1'); } catch(e){}
         setShowPricingPlan(false);
-        wizardAutoOpenBlockedRef.current = false;
-        wizardAutoResumeCompletedRef.current = false;
-        if (typeof window !== 'undefined') {
-          try { sessionStorage.removeItem('wizardAutoOpenBlocked'); } catch (_) {}
-        }
-        setShowEventTypes(true);
-        setStepErrorMsg('');
+        resetWizardDismissForUserProgress();
+        allowWizardProgrammaticOpen(() => {
+          setShowEventTypes(true);
+          setStepErrorMsg('');
+        });
         setInvitationResult({
           type: 'success',
           message: settings.plan === plan
@@ -5360,13 +5405,11 @@ React.useEffect(() => {
           setFinishedSteps([]);
           wizardSuppressedStepsRef.current.delete(1);
           writeWizardDismissedSteps(wizardSuppressedStepsRef.current);
-          wizardAutoOpenBlockedRef.current = false;
-          wizardAutoResumeCompletedRef.current = false;
-          if (typeof window !== 'undefined') {
-            try { sessionStorage.removeItem('wizardAutoOpenBlocked'); } catch (_) {}
-          }
-          setShowEventTypes(true);
-          setStepErrorMsg('');
+          resetWizardDismissForUserProgress();
+          allowWizardProgrammaticOpen(() => {
+            setShowEventTypes(true);
+            setStepErrorMsg('');
+          });
           try { localStorage.removeItem('finishedSteps'); } catch (e) {}
           try { localStorage.removeItem('savedEventDetails'); } catch (e) {}
           try { localStorage.removeItem('selectedDesign'); } catch (e) {}
@@ -6065,13 +6108,11 @@ React.useEffect(() => {
 
     if (hasClearedExistingEvent) {
       await handleNewEvent();
-      wizardAutoOpenBlockedRef.current = false;
-      wizardAutoResumeCompletedRef.current = false;
-      if (typeof window !== 'undefined') {
-        try { sessionStorage.removeItem('wizardAutoOpenBlocked'); } catch (_) {}
-      }
-      setShowEventTypes(true);
-      setStepErrorMsg('');
+      resetWizardDismissForUserProgress();
+      allowWizardProgrammaticOpen(() => {
+        setShowEventTypes(true);
+        setStepErrorMsg('');
+      });
       return;
     }
 
@@ -7488,12 +7529,15 @@ React.useEffect(()=>{
     const type = resolveDisplayEventType(selectedEventTypeRef.current || selectedEventType);
     if (!type) {
       setShowEventDetails(false);
-      setShowEventTypes(true);
+      if (!isWizardAutoOpenBlocked() && !isWizardStepSuppressed(1)) {
+        setShowEventTypes(true);
+      }
       setStepErrorMsg('יש לבחור סוג אירוע לפני מילוי הפרטים.');
       return;
     }
+    if (isWizardAutoOpenBlocked() || isWizardStepSuppressed(2)) return;
     setShowEventDetails(true);
-  }, [selectedEventType]);
+  }, [selectedEventType, isWizardAutoOpenBlocked, isWizardStepSuppressed]);
 
   const closeEventDetailsModal = React.useCallback(() => {
     suppressWizardStep(2);
@@ -7510,14 +7554,16 @@ React.useEffect(()=>{
   }, [suppressWizardStep, scrollWizardHome]);
 
   const openEventTypesModal = React.useCallback(() => {
+    if (isWizardAutoOpenBlocked() || isWizardStepSuppressed(1)) return;
     setShowEventTypes(true);
     setStepErrorMsg('');
-  }, []);
+  }, [isWizardAutoOpenBlocked, isWizardStepSuppressed]);
 
   const openDesignChooserModal = React.useCallback(() => {
+    if (isWizardAutoOpenBlocked() || isWizardStepSuppressed(3)) return;
     setShowDesignChooser(true);
     setStepErrorMsg('');
-  }, []);
+  }, [isWizardAutoOpenBlocked, isWizardStepSuppressed]);
 
   const closeDesignChooserModal = React.useCallback(() => {
     suppressWizardStep(3);
@@ -7530,9 +7576,10 @@ React.useEffect(()=>{
   }, [suppressWizardStep, scrollWizardHome]);
 
   const openGuestFormModal = React.useCallback(() => {
+    if (isWizardAutoOpenBlocked() || isWizardStepSuppressed(4)) return;
     setShowGuestForm(true);
     setStepErrorMsg('');
-  }, []);
+  }, [isWizardAutoOpenBlocked, isWizardStepSuppressed]);
 
   const closeGuestFormModal = React.useCallback(() => {
     suppressWizardStep(4);
@@ -7542,10 +7589,11 @@ React.useEffect(()=>{
   }, [suppressWizardStep, scrollWizardHome]);
 
   const openReportsOptionsModal = React.useCallback(() => {
+    if (isWizardAutoOpenBlocked() || isWizardStepSuppressed(5)) return;
     setShowReportsOptions(true);
     setShowGuestListModal(false);
     setStepErrorMsg('');
-  }, []);
+  }, [isWizardAutoOpenBlocked, isWizardStepSuppressed]);
 
   const closeReportsOptionsModal = React.useCallback(() => {
     suppressWizardStep(5);
@@ -7596,7 +7644,7 @@ React.useEffect(()=>{
     }
     if (userInitiated) {
       unsuppressWizardStep(stepNumber);
-      unblockWizardAutoOpen();
+      resetWizardDismissForUserProgress();
     }
 
     const wizardSessionActive = Boolean(
@@ -7622,7 +7670,7 @@ React.useEffect(()=>{
           }
           setStepErrorMsg(WIZARD_STEP_BLOCK_MESSAGES[requiredStep]);
           setShowStepError(true);
-          redirectToWizardStep(requiredStep);
+          allowWizardProgrammaticOpen(() => redirectToWizardStep(requiredStep, { force: true }));
           scrollToWizardSection();
           return false;
         }
@@ -7631,7 +7679,7 @@ React.useEffect(()=>{
 
     setStepErrorMsg('');
     setShowStepError(false);
-    redirectToWizardStep(stepNumber);
+    allowWizardProgrammaticOpen(() => redirectToWizardStep(stepNumber, { force: userInitiated }));
     return true;
   }, [
     currentEventId,
@@ -7644,7 +7692,8 @@ React.useEffect(()=>{
     isWizardStepSuppressed,
     isWizardAutoOpenBlocked,
     unsuppressWizardStep,
-    unblockWizardAutoOpen,
+    resetWizardDismissForUserProgress,
+    allowWizardProgrammaticOpen,
   ]);
 
   React.useEffect(() => {
@@ -7655,9 +7704,9 @@ React.useEffect(()=>{
 
   React.useEffect(() => {
     if (!session) return undefined;
-    if (wizardAutoResumeCompletedRef.current) return undefined;
+    if (hasWizardAutoResumeAttempted()) return undefined;
     if (isWizardAutoOpenBlocked()) {
-      wizardAutoResumeCompletedRef.current = true;
+      markWizardAutoResumeAttempted();
       return undefined;
     }
     const flowStarted = Boolean(
@@ -7671,32 +7720,76 @@ React.useEffect(()=>{
 
     const firstIncomplete = getFirstIncompleteWizardStepRef.current?.();
     if (!firstIncomplete) {
-      wizardAutoResumeCompletedRef.current = true;
+      markWizardAutoResumeAttempted();
       return undefined;
     }
 
     if (isWizardStepSuppressed(firstIncomplete) || isWizardAutoOpenBlocked()) {
-      wizardAutoResumeCompletedRef.current = true;
+      markWizardAutoResumeAttempted();
       return undefined;
     }
 
     const timer = window.setTimeout(() => {
-      wizardAutoResumeCompletedRef.current = true;
-      if (isWizardStepSuppressed(firstIncomplete) || isWizardAutoOpenBlocked()) return;
-      scrollToWizardSectionRef.current?.();
-      tryOpenWizardStepRef.current?.(firstIncomplete);
-      setStepErrorMsg('');
+      if (isWizardStepSuppressed(firstIncomplete) || isWizardAutoOpenBlocked()) {
+        markWizardAutoResumeAttempted();
+        return;
+      }
+      markWizardAutoResumeAttempted();
+      allowWizardProgrammaticOpen(() => {
+        scrollToWizardSectionRef.current?.();
+        tryOpenWizardStepRef.current?.(firstIncomplete);
+        setStepErrorMsg('');
+      });
     }, 450);
     return () => window.clearTimeout(timer);
   }, [
+    allowWizardProgrammaticOpen,
     currentEventId,
     finishedSteps.length,
+    hasWizardAutoResumeAttempted,
     isWizardAutoOpenBlocked,
     isWizardStepSuppressed,
+    markWizardAutoResumeAttempted,
     newEventStarted,
     userPlanSettings?.eventWizardStarted,
     selectedEventType,
     session,
+  ]);
+
+  React.useEffect(() => {
+    if (!isWizardAutoOpenBlocked()) return;
+    if (wizardProgrammaticOpenAllowedRef.current) return;
+    if (showEventTypes) setShowEventTypes(false);
+    if (showEventDetails) setShowEventDetails(false);
+    if (showDesignChooser) {
+      setShowDesignChooser(false);
+      setShowLightbox(false);
+      setShowColorPalette(false);
+      setShowAdvancedEdit(null);
+    }
+    if (showGuestForm) setShowGuestForm(false);
+    if (showReportsOptions || showStep5Options || showApprovedReport || showRejectedReport || showPendingReport || showSearchGuest || showArchiveList) {
+      setShowReportsOptions(false);
+      setShowStep5Options(false);
+      setShowApprovedReport(false);
+      setShowRejectedReport(false);
+      setShowPendingReport(false);
+      setShowSearchGuest(false);
+      setShowArchiveList(false);
+    }
+  }, [
+    showApprovedReport,
+    showArchiveList,
+    showDesignChooser,
+    showEventDetails,
+    showEventTypes,
+    showGuestForm,
+    showPendingReport,
+    showRejectedReport,
+    showReportsOptions,
+    showSearchGuest,
+    showStep5Options,
+    isWizardAutoOpenBlocked,
   ]);
 
   React.useEffect(() => {
@@ -7708,9 +7801,10 @@ React.useEffect(()=>{
       finishedSteps.length > 0
     );
     if (wizardActive) return;
+    if (isWizardAutoOpenBlocked()) return;
     wizardAutoResumeCompletedRef.current = false;
     clearWizardDismissedSteps();
-  }, [clearWizardDismissedSteps, currentEventId, finishedSteps.length, newEventStarted, selectedEventType, userPlanSettings?.eventWizardStarted]);
+  }, [clearWizardDismissedSteps, currentEventId, finishedSteps.length, isWizardAutoOpenBlocked, newEventStarted, selectedEventType, userPlanSettings?.eventWizardStarted]);
 
   const openMobileResumeStep = React.useCallback((stepNumber) => {
     tryOpenWizardStep(stepNumber, { userInitiated: true });
