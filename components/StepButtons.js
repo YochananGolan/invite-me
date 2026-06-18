@@ -888,8 +888,37 @@ const [hasWhatsAppGroup, setHasWhatsAppGroup] = useState(false);
   const isStep2CompleteRef = useRef(isStep2Complete);
   const isStep3CompleteRef = useRef(false);
   const getFirstIncompleteWizardStepRef = useRef(() => null);
-  const wizardAutoResumedRef = useRef(false);
+  const wizardAutoResumeCompletedRef = useRef(false);
   const wizardSuppressedStepsRef = useRef(new Set());
+
+  const readWizardDismissedSteps = React.useCallback(() => {
+    if (typeof window === 'undefined') return new Set();
+    try {
+      const raw = sessionStorage.getItem('wizardDismissedSteps');
+      const parsed = raw ? JSON.parse(raw) : [];
+      return new Set(Array.isArray(parsed) ? parsed : []);
+    } catch (_) {
+      return new Set();
+    }
+  }, []);
+
+  const writeWizardDismissedSteps = React.useCallback((stepsSet) => {
+    if (typeof window === 'undefined') return;
+    try {
+      sessionStorage.setItem('wizardDismissedSteps', JSON.stringify([...stepsSet]));
+    } catch (_) {}
+  }, []);
+
+  const clearWizardDismissedSteps = React.useCallback(() => {
+    wizardSuppressedStepsRef.current = new Set();
+    if (typeof window !== 'undefined') {
+      try { sessionStorage.removeItem('wizardDismissedSteps'); } catch (_) {}
+    }
+  }, []);
+
+  const isWizardStepSuppressed = React.useCallback((stepNumber) => (
+    wizardSuppressedStepsRef.current.has(stepNumber)
+  ), []);
   const stepBarRef = useRef(null);
   const reportsSectionRef = useRef(null);
 
@@ -1409,7 +1438,8 @@ const noEventLoggedRef = useRef(false);
   React.useEffect(() => {
     if (!session) {
       userPlanSettingsHydratedRef.current = false;
-      wizardSuppressedStepsRef.current = new Set();
+      wizardAutoResumeCompletedRef.current = false;
+      clearWizardDismissedSteps();
       setSelectedPlan(null);
       setEventAllowedGuests(null);
       setUserPlanSettings((prev) => {
@@ -1420,8 +1450,9 @@ const noEventLoggedRef = useRef(false);
       });
       return;
     }
+    wizardSuppressedStepsRef.current = readWizardDismissedSteps();
     loadUserPlanSettings();
-  }, [session, loadUserPlanSettings]);
+  }, [session, loadUserPlanSettings, clearWizardDismissedSteps, readWizardDismissedSteps]);
 
   React.useEffect(() => {
     if (!session) return undefined;
@@ -1457,7 +1488,7 @@ const noEventLoggedRef = useRef(false);
     setShowReportModal(false);
     setStepErrorMsg('');
 
-    if (!wizardSuppressedStepsRef.current.has(1)) {
+    if (!wizardSuppressedStepsRef.current.has(1) && !finishedStepsRef.current.includes(0)) {
       setShowEventTypes(true);
     }
   }, [session, userPlanSettings?.plan, userPlanSettings?.eventWizardStarted]);
@@ -1801,6 +1832,7 @@ const handleOpenAddonModal = React.useCallback(() => {
     setShowEventDetails(false);
     setEventDetailsCompleted(true);
     wizardSuppressedStepsRef.current.delete(3);
+    writeWizardDismissedSteps(wizardSuppressedStepsRef.current);
     setShowDesignChooser(true);
     try {
       await saveEventToSupabase(null, selectedDesign);
@@ -2649,17 +2681,17 @@ const handleOpenAddonModal = React.useCallback(() => {
     },
     openSendStep: () => {
       scrollToWizardSectionRef.current?.();
-      tryOpenWizardStepRef.current?.(4);
+      tryOpenWizardStepRef.current?.(4, { userInitiated: true });
     },
     openReportsStep: () => {
       scrollToWizardSectionRef.current?.();
-      tryOpenWizardStepRef.current?.(5);
+      tryOpenWizardStepRef.current?.(5, { userInitiated: true });
     },
     openResumeWizardStep: () => {
       scrollToWizardSectionRef.current?.();
       const firstIncomplete = getFirstIncompleteWizardStepRef.current?.();
       if (firstIncomplete) {
-        tryOpenWizardStepRef.current?.(firstIncomplete);
+        tryOpenWizardStepRef.current?.(firstIncomplete, { userInitiated: true });
       }
     },
     createNewEvent: async () => {
@@ -3329,6 +3361,7 @@ const handleOpenAddonModal = React.useCallback(() => {
       setShowLightbox(false);
       setShowDesignChooser(false);
       wizardSuppressedStepsRef.current.delete(4);
+      writeWizardDismissedSteps(wizardSuppressedStepsRef.current);
       setShowGuestForm(true);
       // Note: progress_step column may not exist in all schemas, so we skip it if it fails
   if (currentEventId && progressStepSupportedRef.current) { 
@@ -5258,6 +5291,7 @@ React.useEffect(() => {
           // Prepare wizard for brand new event creation
           setFinishedSteps([]);
           wizardSuppressedStepsRef.current.delete(1);
+          writeWizardDismissedSteps(wizardSuppressedStepsRef.current);
           setShowEventTypes(true);
           setStepErrorMsg('');
           try { localStorage.removeItem('finishedSteps'); } catch (e) {}
@@ -7347,12 +7381,14 @@ React.useEffect(()=>{
 
   const suppressWizardStep = React.useCallback((stepNumber) => {
     wizardSuppressedStepsRef.current.add(stepNumber);
-    wizardAutoResumedRef.current = true;
-  }, []);
+    writeWizardDismissedSteps(wizardSuppressedStepsRef.current);
+    wizardAutoResumeCompletedRef.current = true;
+  }, [writeWizardDismissedSteps]);
 
   const unsuppressWizardStep = React.useCallback((stepNumber) => {
     wizardSuppressedStepsRef.current.delete(stepNumber);
-  }, []);
+    writeWizardDismissedSteps(wizardSuppressedStepsRef.current);
+  }, [writeWizardDismissedSteps]);
 
   const scrollWizardHome = React.useCallback(() => {
     if (typeof window !== 'undefined') {
@@ -7368,9 +7404,8 @@ React.useEffect(()=>{
       setStepErrorMsg('יש לבחור סוג אירוע לפני מילוי הפרטים.');
       return;
     }
-    unsuppressWizardStep(2);
     setShowEventDetails(true);
-  }, [selectedEventType, unsuppressWizardStep]);
+  }, [selectedEventType]);
 
   const closeEventDetailsModal = React.useCallback(() => {
     suppressWizardStep(2);
@@ -7387,16 +7422,14 @@ React.useEffect(()=>{
   }, [suppressWizardStep, scrollWizardHome]);
 
   const openEventTypesModal = React.useCallback(() => {
-    unsuppressWizardStep(1);
     setShowEventTypes(true);
     setStepErrorMsg('');
-  }, [unsuppressWizardStep]);
+  }, []);
 
   const openDesignChooserModal = React.useCallback(() => {
-    unsuppressWizardStep(3);
     setShowDesignChooser(true);
     setStepErrorMsg('');
-  }, [unsuppressWizardStep]);
+  }, []);
 
   const closeDesignChooserModal = React.useCallback(() => {
     suppressWizardStep(3);
@@ -7409,10 +7442,9 @@ React.useEffect(()=>{
   }, [suppressWizardStep, scrollWizardHome]);
 
   const openGuestFormModal = React.useCallback(() => {
-    unsuppressWizardStep(4);
     setShowGuestForm(true);
     setStepErrorMsg('');
-  }, [unsuppressWizardStep]);
+  }, []);
 
   const closeGuestFormModal = React.useCallback(() => {
     suppressWizardStep(4);
@@ -7422,11 +7454,10 @@ React.useEffect(()=>{
   }, [suppressWizardStep, scrollWizardHome]);
 
   const openReportsOptionsModal = React.useCallback(() => {
-    unsuppressWizardStep(5);
     setShowReportsOptions(true);
     setShowGuestListModal(false);
     setStepErrorMsg('');
-  }, [unsuppressWizardStep]);
+  }, []);
 
   const closeReportsOptionsModal = React.useCallback(() => {
     suppressWizardStep(5);
@@ -7456,7 +7487,14 @@ React.useEffect(()=>{
     openReportsOptionsModal,
   ]);
 
-  const tryOpenWizardStep = React.useCallback((stepNumber) => {
+  const tryOpenWizardStep = React.useCallback((stepNumber, { userInitiated = false } = {}) => {
+    if (!userInitiated && isWizardStepSuppressed(stepNumber)) {
+      return false;
+    }
+    if (userInitiated) {
+      unsuppressWizardStep(stepNumber);
+    }
+
     const wizardSessionActive = Boolean(
       newEventStarted ||
       userPlanSettings?.eventWizardStarted ||
@@ -7499,6 +7537,8 @@ React.useEffect(()=>{
     redirectToWizardStep,
     scrollToWizardSection,
     wizardStepCompletion,
+    isWizardStepSuppressed,
+    unsuppressWizardStep,
   ]);
 
   React.useEffect(() => {
@@ -7509,7 +7549,7 @@ React.useEffect(()=>{
 
   React.useEffect(() => {
     if (!session) return undefined;
-    if (wizardAutoResumedRef.current) return undefined;
+    if (wizardAutoResumeCompletedRef.current) return undefined;
     const flowStarted = Boolean(
       currentEventId ||
       newEventStarted ||
@@ -7520,18 +7560,21 @@ React.useEffect(()=>{
     if (!flowStarted) return undefined;
 
     const firstIncomplete = getFirstIncompleteWizardStep();
-    if (!firstIncomplete) return undefined;
-
-    if (wizardSuppressedStepsRef.current.has(firstIncomplete)) {
-      wizardAutoResumedRef.current = true;
+    if (!firstIncomplete) {
+      wizardAutoResumeCompletedRef.current = true;
       return undefined;
     }
 
-    wizardAutoResumedRef.current = true;
+    if (isWizardStepSuppressed(firstIncomplete)) {
+      wizardAutoResumeCompletedRef.current = true;
+      return undefined;
+    }
+
     const timer = window.setTimeout(() => {
-      if (wizardSuppressedStepsRef.current.has(firstIncomplete)) return;
+      wizardAutoResumeCompletedRef.current = true;
+      if (isWizardStepSuppressed(firstIncomplete)) return;
       scrollToWizardSection();
-      redirectToWizardStep(firstIncomplete);
+      tryOpenWizardStep(firstIncomplete);
       setStepErrorMsg('');
     }, 450);
     return () => window.clearTimeout(timer);
@@ -7539,9 +7582,10 @@ React.useEffect(()=>{
     currentEventId,
     finishedSteps.length,
     getFirstIncompleteWizardStep,
+    isWizardStepSuppressed,
     newEventStarted,
+    tryOpenWizardStep,
     userPlanSettings?.eventWizardStarted,
-    redirectToWizardStep,
     scrollToWizardSection,
     selectedEventType,
     session,
@@ -7549,13 +7593,13 @@ React.useEffect(()=>{
 
   React.useEffect(() => {
     if (!currentEventId && !newEventStarted && !selectedEventType && finishedSteps.length === 0) {
-      wizardAutoResumedRef.current = false;
-      wizardSuppressedStepsRef.current = new Set();
+      wizardAutoResumeCompletedRef.current = false;
+      clearWizardDismissedSteps();
     }
-  }, [currentEventId, finishedSteps.length, newEventStarted, selectedEventType]);
+  }, [clearWizardDismissedSteps, currentEventId, finishedSteps.length, newEventStarted, selectedEventType]);
 
   const openMobileResumeStep = React.useCallback((stepNumber) => {
-    tryOpenWizardStep(stepNumber);
+    tryOpenWizardStep(stepNumber, { userInitiated: true });
   }, [tryOpenWizardStep]);
 
   const openMobilePendingReport = React.useCallback(() => {
@@ -7568,7 +7612,7 @@ React.useEffect(()=>{
   const openMobileReminderFlow = React.useCallback(() => {
     setShowReportsOptions(false);
     setStepErrorMsg('');
-    tryOpenWizardStep(4);
+    tryOpenWizardStep(4, { userInitiated: true });
   }, [tryOpenWizardStep]);
 
   const openMobileReminderForGuest = React.useCallback((guest) => {
@@ -7585,7 +7629,7 @@ React.useEffect(()=>{
     setMobileQuickGuestSearchSubmitted(false);
     setShowReportsOptions(false);
     setStepErrorMsg('');
-    tryOpenWizardStep(4);
+    tryOpenWizardStep(4, { userInitiated: true });
   }, [tryOpenWizardStep]);
 
   const openMobileGuestWhatsApp = React.useCallback((phone) => {
@@ -8475,7 +8519,7 @@ React.useEffect(()=>{
                     onClick={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
-                      tryOpenWizardStep(realIdx);
+                      tryOpenWizardStep(realIdx, { userInitiated: true });
                     }}
                     className={`relative flex min-h-[4.75rem] w-full flex-col items-center justify-center gap-1.5 rounded-2xl py-4 px-5 text-center transition-all ${
                       isFinished
@@ -8517,8 +8561,8 @@ React.useEffect(()=>{
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    if (realIdx === 4) tryOpenWizardStep(4);
-                    else if (realIdx === 5) tryOpenWizardStep(5);
+                    if (realIdx === 4) tryOpenWizardStep(4, { userInitiated: true });
+                    else if (realIdx === 5) tryOpenWizardStep(5, { userInitiated: true });
                   }}
                   className={`relative flex min-h-[4.75rem] w-full flex-col items-center justify-center gap-1.5 rounded-2xl py-4 px-5 text-center transition-all ${
                     isFinished
@@ -8584,7 +8628,7 @@ React.useEffect(()=>{
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
-                  tryOpenWizardStep(realIdx);
+                  tryOpenWizardStep(realIdx, { userInitiated: true });
                 }}
                 className={`${
                   isFinished
@@ -11110,7 +11154,7 @@ React.useEffect(()=>{
                     scrollToWizardSectionRef.current?.();
                     const firstIncomplete = getFirstIncompleteWizardStepRef.current?.();
                     if (firstIncomplete) {
-                      tryOpenWizardStepRef.current?.(firstIncomplete);
+                      tryOpenWizardStepRef.current?.(firstIncomplete, { userInitiated: true });
                     }
                   }
                 }}
