@@ -889,6 +889,8 @@ const [hasWhatsAppGroup, setHasWhatsAppGroup] = useState(false);
   const isStep3CompleteRef = useRef(false);
   const getFirstIncompleteWizardStepRef = useRef(() => null);
   const wizardAutoResumeCompletedRef = useRef(false);
+  const wizardAutoOpenBlockedRef = useRef(false);
+  const wizardDismissedHydratedRef = useRef(false);
   const wizardSuppressedStepsRef = useRef(new Set());
 
   const readWizardDismissedSteps = React.useCallback(() => {
@@ -902,6 +904,15 @@ const [hasWhatsAppGroup, setHasWhatsAppGroup] = useState(false);
     }
   }, []);
 
+  const readWizardAutoOpenBlocked = React.useCallback(() => {
+    if (typeof window === 'undefined') return false;
+    try {
+      return sessionStorage.getItem('wizardAutoOpenBlocked') === '1';
+    } catch (_) {
+      return false;
+    }
+  }, []);
+
   const writeWizardDismissedSteps = React.useCallback((stepsSet) => {
     if (typeof window === 'undefined') return;
     try {
@@ -911,13 +922,44 @@ const [hasWhatsAppGroup, setHasWhatsAppGroup] = useState(false);
 
   const clearWizardDismissedSteps = React.useCallback(() => {
     wizardSuppressedStepsRef.current = new Set();
+    wizardAutoOpenBlockedRef.current = false;
     if (typeof window !== 'undefined') {
-      try { sessionStorage.removeItem('wizardDismissedSteps'); } catch (_) {}
+      try {
+        sessionStorage.removeItem('wizardDismissedSteps');
+        sessionStorage.removeItem('wizardAutoOpenBlocked');
+      } catch (_) {}
     }
   }, []);
 
+  const blockWizardAutoOpen = React.useCallback(() => {
+    wizardAutoOpenBlockedRef.current = true;
+    wizardAutoResumeCompletedRef.current = true;
+    if (typeof window !== 'undefined') {
+      try { sessionStorage.setItem('wizardAutoOpenBlocked', '1'); } catch (_) {}
+    }
+  }, []);
+
+  const unblockWizardAutoOpen = React.useCallback(() => {
+    wizardAutoOpenBlockedRef.current = false;
+    if (typeof window !== 'undefined') {
+      try { sessionStorage.removeItem('wizardAutoOpenBlocked'); } catch (_) {}
+    }
+  }, []);
+
+  const isWizardAutoOpenBlocked = React.useCallback(() => (
+    wizardAutoOpenBlockedRef.current || readWizardAutoOpenBlocked()
+  ), [readWizardAutoOpenBlocked]);
+
   const isWizardStepSuppressed = React.useCallback((stepNumber) => (
     wizardSuppressedStepsRef.current.has(stepNumber)
+  ), []);
+
+  const isWizardFlowProtected = React.useCallback(() => (
+    isWizardAutoOpenBlocked() || wizardSuppressedStepsRef.current.size > 0
+  ), [isWizardAutoOpenBlocked]);
+
+  const shouldAllowWizardAutoOpen = React.useCallback((stepNumber) => (
+    !wizardAutoOpenBlockedRef.current && !wizardSuppressedStepsRef.current.has(stepNumber)
   ), []);
   const stepBarRef = useRef(null);
   const reportsSectionRef = useRef(null);
@@ -1438,6 +1480,7 @@ const noEventLoggedRef = useRef(false);
   React.useEffect(() => {
     if (!session) {
       userPlanSettingsHydratedRef.current = false;
+      wizardDismissedHydratedRef.current = false;
       wizardAutoResumeCompletedRef.current = false;
       clearWizardDismissedSteps();
       setSelectedPlan(null);
@@ -1450,9 +1493,13 @@ const noEventLoggedRef = useRef(false);
       });
       return;
     }
-    wizardSuppressedStepsRef.current = readWizardDismissedSteps();
+    if (!wizardDismissedHydratedRef.current) {
+      wizardSuppressedStepsRef.current = readWizardDismissedSteps();
+      wizardAutoOpenBlockedRef.current = readWizardAutoOpenBlocked();
+      wizardDismissedHydratedRef.current = true;
+    }
     loadUserPlanSettings();
-  }, [session, loadUserPlanSettings, clearWizardDismissedSteps, readWizardDismissedSteps]);
+  }, [session, loadUserPlanSettings, clearWizardDismissedSteps, readWizardDismissedSteps, readWizardAutoOpenBlocked]);
 
   React.useEffect(() => {
     if (!session) return undefined;
@@ -1488,7 +1535,11 @@ const noEventLoggedRef = useRef(false);
     setShowReportModal(false);
     setStepErrorMsg('');
 
-    if (!wizardSuppressedStepsRef.current.has(1) && !finishedStepsRef.current.includes(0)) {
+    if (
+      !wizardSuppressedStepsRef.current.has(1) &&
+      !finishedStepsRef.current.includes(0) &&
+      !wizardAutoOpenBlockedRef.current
+    ) {
       setShowEventTypes(true);
     }
   }, [session, userPlanSettings?.plan, userPlanSettings?.eventWizardStarted]);
@@ -1833,6 +1884,10 @@ const handleOpenAddonModal = React.useCallback(() => {
     setEventDetailsCompleted(true);
     wizardSuppressedStepsRef.current.delete(3);
     writeWizardDismissedSteps(wizardSuppressedStepsRef.current);
+    wizardAutoOpenBlockedRef.current = false;
+    if (typeof window !== 'undefined') {
+      try { sessionStorage.removeItem('wizardAutoOpenBlocked'); } catch (_) {}
+    }
     setShowDesignChooser(true);
     try {
       await saveEventToSupabase(null, selectedDesign);
@@ -2589,8 +2644,10 @@ const handleOpenAddonModal = React.useCallback(() => {
         if (error || !data) {
           const wizardFlowActive = Boolean(
             userPlanSettingsRef.current?.eventWizardStarted
+            || wizardAutoOpenBlockedRef.current
+            || wizardSuppressedStepsRef.current.size > 0
             || showEventDetails
-            || showDesignChooser
+            || showEventTypes
             || showGuestForm
             || showReportsOptions
             || (typeof window !== 'undefined' && localStorage.getItem('newEventStarted') === '1')
@@ -3362,6 +3419,10 @@ const handleOpenAddonModal = React.useCallback(() => {
       setShowDesignChooser(false);
       wizardSuppressedStepsRef.current.delete(4);
       writeWizardDismissedSteps(wizardSuppressedStepsRef.current);
+      wizardAutoOpenBlockedRef.current = false;
+      if (typeof window !== 'undefined') {
+        try { sessionStorage.removeItem('wizardAutoOpenBlocked'); } catch (_) {}
+      }
       setShowGuestForm(true);
       // Note: progress_step column may not exist in all schemas, so we skip it if it fails
   if (currentEventId && progressStepSupportedRef.current) { 
@@ -4021,13 +4082,13 @@ React.useEffect(() => {
         return { exportFn: exportReportXlsx, closeFn: () => setShowReportModal(false) };
       }
       if (showApprovedReport) {
-        return { exportFn: exportApprovedXlsx, closeFn: () => { setShowApprovedReport(false); setShowReportsOptions(true); } };
+        return { exportFn: exportApprovedXlsx, closeFn: () => { setShowApprovedReport(false); if (!wizardAutoOpenBlockedRef.current && !wizardSuppressedStepsRef.current.has(5)) setShowReportsOptions(true); } };
       }
       if (showRejectedReport) {
-        return { exportFn: exportRejectedXlsx, closeFn: () => { setShowRejectedReport(false); setShowReportsOptions(true); } };
+        return { exportFn: exportRejectedXlsx, closeFn: () => { setShowRejectedReport(false); if (!wizardAutoOpenBlockedRef.current && !wizardSuppressedStepsRef.current.has(5)) setShowReportsOptions(true); } };
       }
       if (showPendingReport) {
-        return { exportFn: exportPendingXlsx, closeFn: () => { setShowPendingReport(false); setShowReportsOptions(true); } };
+        return { exportFn: exportPendingXlsx, closeFn: () => { setShowPendingReport(false); if (!wizardAutoOpenBlockedRef.current && !wizardSuppressedStepsRef.current.has(5)) setShowReportsOptions(true); } };
       }
       return null;
     };
@@ -4986,8 +5047,10 @@ React.useEffect(() => {
       try { localStorage.setItem('newEventStarted', '1'); } catch (_) {}
       setShowGuestListModal(false);
       setShowReportsOptions(false);
-      setShowEventTypes(true);
-      setStepErrorMsg('');
+      if (shouldAllowWizardAutoOpen(1)) {
+        setShowEventTypes(true);
+        setStepErrorMsg('');
+      }
     }
 
     if (showDeletionMessage && (eventWasDeleted || deletionCompleted)) {
@@ -5076,6 +5139,11 @@ React.useEffect(() => {
         setNewEventStarted(true);
         try { localStorage.setItem('newEventStarted', '1'); } catch(e){}
         setShowPricingPlan(false);
+        wizardAutoOpenBlockedRef.current = false;
+        wizardAutoResumeCompletedRef.current = false;
+        if (typeof window !== 'undefined') {
+          try { sessionStorage.removeItem('wizardAutoOpenBlocked'); } catch (_) {}
+        }
         setShowEventTypes(true);
         setStepErrorMsg('');
         setInvitationResult({
@@ -5292,6 +5360,11 @@ React.useEffect(() => {
           setFinishedSteps([]);
           wizardSuppressedStepsRef.current.delete(1);
           writeWizardDismissedSteps(wizardSuppressedStepsRef.current);
+          wizardAutoOpenBlockedRef.current = false;
+          wizardAutoResumeCompletedRef.current = false;
+          if (typeof window !== 'undefined') {
+            try { sessionStorage.removeItem('wizardAutoOpenBlocked'); } catch (_) {}
+          }
           setShowEventTypes(true);
           setStepErrorMsg('');
           try { localStorage.removeItem('finishedSteps'); } catch (e) {}
@@ -5960,8 +6033,10 @@ React.useEffect(() => {
       if (draftWizard) {
         setNewEventStarted(true);
         try { localStorage.setItem('newEventStarted', '1'); } catch (_) {}
-        setShowEventTypes(true);
-        setStepErrorMsg('');
+        if (shouldAllowWizardAutoOpen(1)) {
+          setShowEventTypes(true);
+          setStepErrorMsg('');
+        }
       }
       setSelectedPlan(plan);
       try { localStorage.setItem('selectedPlan', plan); } catch (_) {}
@@ -5971,7 +6046,7 @@ React.useEffect(() => {
       console.error('syncPurchasedPlanFromServer threw', err);
       return null;
     }
-  }, [loadUserPlanSettings, persistUserPlanSettings]);
+  }, [loadUserPlanSettings, persistUserPlanSettings, shouldAllowWizardAutoOpen]);
 
   const beginCreateNewEventFlow = React.useCallback(async () => {
     setSelectedFlowStep(null);
@@ -5990,6 +6065,11 @@ React.useEffect(() => {
 
     if (hasClearedExistingEvent) {
       await handleNewEvent();
+      wizardAutoOpenBlockedRef.current = false;
+      wizardAutoResumeCompletedRef.current = false;
+      if (typeof window !== 'undefined') {
+        try { sessionStorage.removeItem('wizardAutoOpenBlocked'); } catch (_) {}
+      }
       setShowEventTypes(true);
       setStepErrorMsg('');
       return;
@@ -6473,8 +6553,10 @@ React.useEffect(() => {
             setSelectedEventType('');
             setNewEventStarted(true);
             try { localStorage.setItem('newEventStarted', '1'); } catch (e) {}
-            setShowEventTypes(true);
-            setStepErrorMsg('');
+            if (shouldAllowWizardAutoOpen(1)) {
+              setShowEventTypes(true);
+              setStepErrorMsg('');
+            }
           }
           syncFinishedStepsFromEvent(
             isWizardPlaceholderEventType(ev.event_type) ? '' : (ev.event_type || ''),
@@ -6616,8 +6698,10 @@ React.useEffect(() => {
                 try { localStorage.setItem('newEventStarted', '1'); } catch(e){}
                 setShowGuestListModal(false);
                 setShowReportsOptions(false);
-                setShowEventTypes(true);
-                setStepErrorMsg('');
+                if (shouldAllowWizardAutoOpen(1)) {
+                  setShowEventTypes(true);
+                  setStepErrorMsg('');
+                }
                 await ensureWizardDraftEvent(settings.plan, settings.addonCount ?? 0);
               }
             } else if (settings.plan) {
@@ -6792,8 +6876,10 @@ React.useEffect(() => {
           if (settings?.eventWizardStarted && settings?.plan) {
             setNewEventStarted(true);
             try { localStorage.setItem('newEventStarted', '1'); } catch (e) {}
-            setShowEventTypes(true);
-            setStepErrorMsg('');
+            if (shouldAllowWizardAutoOpen(1)) {
+              setShowEventTypes(true);
+              setStepErrorMsg('');
+            }
             await ensureWizardDraftEvent(settings.plan, settings.addonCount ?? 0);
           }
           const ac = settings?.addonCount ?? 0;
@@ -6821,8 +6907,10 @@ React.useEffect(() => {
             setSelectedEventType('');
             setNewEventStarted(true);
             try { localStorage.setItem('newEventStarted', '1'); } catch (e) {}
-            setShowEventTypes(true);
-            setStepErrorMsg('');
+            if (shouldAllowWizardAutoOpen(1)) {
+              setShowEventTypes(true);
+              setStepErrorMsg('');
+            }
           }
           setEventMessagesSentCount(messagesSent);
           setEventReminderSentAt(ev?.reminder_sent_at ?? null);
@@ -7382,8 +7470,8 @@ React.useEffect(()=>{
   const suppressWizardStep = React.useCallback((stepNumber) => {
     wizardSuppressedStepsRef.current.add(stepNumber);
     writeWizardDismissedSteps(wizardSuppressedStepsRef.current);
-    wizardAutoResumeCompletedRef.current = true;
-  }, [writeWizardDismissedSteps]);
+    blockWizardAutoOpen();
+  }, [writeWizardDismissedSteps, blockWizardAutoOpen]);
 
   const unsuppressWizardStep = React.useCallback((stepNumber) => {
     wizardSuppressedStepsRef.current.delete(stepNumber);
@@ -7463,11 +7551,24 @@ React.useEffect(()=>{
     suppressWizardStep(5);
     setShowReportsOptions(false);
     setShowStep5Options(false);
+    setShowApprovedReport(false);
+    setShowRejectedReport(false);
+    setShowPendingReport(false);
+    setShowSearchGuest(false);
+    setShowArchiveList(false);
     setStepErrorMsg('');
     scrollWizardHome();
   }, [suppressWizardStep, scrollWizardHome]);
 
-  const redirectToWizardStep = React.useCallback((stepNumber) => {
+  const returnToReportsOptionsIfAllowed = React.useCallback(() => {
+    if (!shouldAllowWizardAutoOpen(5)) return;
+    setShowReportsOptions(true);
+  }, [shouldAllowWizardAutoOpen]);
+
+  const redirectToWizardStep = React.useCallback((stepNumber, { force = false } = {}) => {
+    if (!force && (isWizardAutoOpenBlocked() || isWizardStepSuppressed(stepNumber))) {
+      return;
+    }
     setShowEventTypes(false);
     setShowEventDetails(false);
     setShowDesignChooser(false);
@@ -7485,14 +7586,17 @@ React.useEffect(()=>{
     openDesignChooserModal,
     openGuestFormModal,
     openReportsOptionsModal,
+    isWizardAutoOpenBlocked,
+    isWizardStepSuppressed,
   ]);
 
   const tryOpenWizardStep = React.useCallback((stepNumber, { userInitiated = false } = {}) => {
-    if (!userInitiated && isWizardStepSuppressed(stepNumber)) {
+    if (!userInitiated && (isWizardAutoOpenBlocked() || isWizardStepSuppressed(stepNumber))) {
       return false;
     }
     if (userInitiated) {
       unsuppressWizardStep(stepNumber);
+      unblockWizardAutoOpen();
     }
 
     const wizardSessionActive = Boolean(
@@ -7538,7 +7642,9 @@ React.useEffect(()=>{
     scrollToWizardSection,
     wizardStepCompletion,
     isWizardStepSuppressed,
+    isWizardAutoOpenBlocked,
     unsuppressWizardStep,
+    unblockWizardAutoOpen,
   ]);
 
   React.useEffect(() => {
@@ -7550,6 +7656,10 @@ React.useEffect(()=>{
   React.useEffect(() => {
     if (!session) return undefined;
     if (wizardAutoResumeCompletedRef.current) return undefined;
+    if (isWizardAutoOpenBlocked()) {
+      wizardAutoResumeCompletedRef.current = true;
+      return undefined;
+    }
     const flowStarted = Boolean(
       currentEventId ||
       newEventStarted ||
@@ -7559,44 +7669,48 @@ React.useEffect(()=>{
     );
     if (!flowStarted) return undefined;
 
-    const firstIncomplete = getFirstIncompleteWizardStep();
+    const firstIncomplete = getFirstIncompleteWizardStepRef.current?.();
     if (!firstIncomplete) {
       wizardAutoResumeCompletedRef.current = true;
       return undefined;
     }
 
-    if (isWizardStepSuppressed(firstIncomplete)) {
+    if (isWizardStepSuppressed(firstIncomplete) || isWizardAutoOpenBlocked()) {
       wizardAutoResumeCompletedRef.current = true;
       return undefined;
     }
 
     const timer = window.setTimeout(() => {
       wizardAutoResumeCompletedRef.current = true;
-      if (isWizardStepSuppressed(firstIncomplete)) return;
-      scrollToWizardSection();
-      tryOpenWizardStep(firstIncomplete);
+      if (isWizardStepSuppressed(firstIncomplete) || isWizardAutoOpenBlocked()) return;
+      scrollToWizardSectionRef.current?.();
+      tryOpenWizardStepRef.current?.(firstIncomplete);
       setStepErrorMsg('');
     }, 450);
     return () => window.clearTimeout(timer);
   }, [
     currentEventId,
     finishedSteps.length,
-    getFirstIncompleteWizardStep,
+    isWizardAutoOpenBlocked,
     isWizardStepSuppressed,
     newEventStarted,
-    tryOpenWizardStep,
     userPlanSettings?.eventWizardStarted,
-    scrollToWizardSection,
     selectedEventType,
     session,
   ]);
 
   React.useEffect(() => {
-    if (!currentEventId && !newEventStarted && !selectedEventType && finishedSteps.length === 0) {
-      wizardAutoResumeCompletedRef.current = false;
-      clearWizardDismissedSteps();
-    }
-  }, [clearWizardDismissedSteps, currentEventId, finishedSteps.length, newEventStarted, selectedEventType]);
+    const wizardActive = Boolean(
+      currentEventId ||
+      newEventStarted ||
+      userPlanSettings?.eventWizardStarted ||
+      selectedEventType ||
+      finishedSteps.length > 0
+    );
+    if (wizardActive) return;
+    wizardAutoResumeCompletedRef.current = false;
+    clearWizardDismissedSteps();
+  }, [clearWizardDismissedSteps, currentEventId, finishedSteps.length, newEventStarted, selectedEventType, userPlanSettings?.eventWizardStarted]);
 
   const openMobileResumeStep = React.useCallback((stepNumber) => {
     tryOpenWizardStep(stepNumber, { userInitiated: true });
@@ -7930,7 +8044,7 @@ React.useEffect(()=>{
           </p>
           <p className="text-slate-300">התחל בשלב 1 כדי לבחור סוג אירוע ולהזין את הפרטים.</p>
           <div className="flex justify-center gap-3 mt-4">
-            <button type="button" onClick={() => { setShowEventTypes(true); setStepErrorMsg(''); }} className="bg-emerald-600 text-white font-bold py-2 px-4 rounded-full hover:bg-emerald-700 transition-all shadow">
+            <button type="button" onClick={() => tryOpenWizardStep(1, { userInitiated: true })} className="bg-emerald-600 text-white font-bold py-2 px-4 rounded-full hover:bg-emerald-700 transition-all shadow">
               עבור לשלב 1 – סוג אירוע
             </button>
             <button type="button" onClick={() => setShowPricingPlan(true)} className="border border-white/15 bg-transparent text-white font-semibold hover:border-indigo-300 hover:text-indigo-200 py-2 px-4 rounded-full transition-all">
@@ -8440,7 +8554,7 @@ React.useEffect(()=>{
           </p>
           <button
             type="button"
-            onClick={() => { setShowEventTypes(true); setStepErrorMsg(''); }}
+            onClick={() => tryOpenWizardStep(1, { userInitiated: true })}
             className="mt-4 w-full rounded-2xl bg-emerald-600 px-4 py-3 text-base font-black text-white shadow hover:bg-emerald-700 transition-all"
           >
             עבור לשלב 1 – סוג אירוע
@@ -9786,8 +9900,8 @@ React.useEffect(()=>{
 
       {/* Step 5 - choose action modal */}
       {showStep5Options && (
-        <Modal open={showStep5Options} onClose={() => setShowStep5Options(false)} size="sm">
-          <ModalHeader onClose={() => setShowStep5Options(false)}>בחר דוח</ModalHeader>
+        <Modal open={showStep5Options} onClose={closeReportsOptionsModal} size="sm">
+          <ModalHeader onClose={closeReportsOptionsModal}>בחר דוח</ModalHeader>
           <ModalBody>
             <div className="space-y-4">
             {renderMobileNextActionCard({
@@ -10944,8 +11058,8 @@ React.useEffect(()=>{
       </Modal>
 
       {/* Approved report modal */}
-      <Modal open={showApprovedReport} onClose={()=>{setShowApprovedReport(false);setShowReportsOptions(true);}} size="full" landscape>
-        <ModalHeader onClose={()=>{setShowApprovedReport(false);setShowReportsOptions(true);}}>דוח אורחים שאישרו הגעה</ModalHeader>
+      <Modal open={showApprovedReport} onClose={()=>{setShowApprovedReport(false);returnToReportsOptionsIfAllowed();}} size="full" landscape>
+        <ModalHeader onClose={()=>{setShowApprovedReport(false);returnToReportsOptionsIfAllowed();}}>דוח אורחים שאישרו הגעה</ModalHeader>
         <ModalBody className="overflow-x-auto">
               <table className="w-full text-right border border-collapse" style={{fontSize: '11px'}}>
                 <thead>
@@ -11001,13 +11115,13 @@ React.useEffect(()=>{
                   </tr>
                 </tfoot>
               </table>
-              {renderReportActions(exportApprovedXlsx, () => { setShowApprovedReport(false); setShowReportsOptions(true); })}
+              {renderReportActions(exportApprovedXlsx, () => { setShowApprovedReport(false); returnToReportsOptionsIfAllowed(); })}
         </ModalBody>
       </Modal>
 
       {/* Rejected report modal */}
-      <Modal open={showRejectedReport} onClose={()=>{setShowRejectedReport(false);setShowReportsOptions(true);}} size="full" landscape>
-        <ModalHeader onClose={()=>{setShowRejectedReport(false);setShowReportsOptions(true);}}>דוח אורחים שלא מגיעים</ModalHeader>
+      <Modal open={showRejectedReport} onClose={()=>{setShowRejectedReport(false);returnToReportsOptionsIfAllowed();}} size="full" landscape>
+        <ModalHeader onClose={()=>{setShowRejectedReport(false);returnToReportsOptionsIfAllowed();}}>דוח אורחים שלא מגיעים</ModalHeader>
         <ModalBody className="overflow-x-auto">
               <table className="w-full text-right border border-white/10 border-collapse" style={{fontSize: '11px'}}>
                 <thead>
@@ -11034,13 +11148,13 @@ React.useEffect(()=>{
                   </tr>
                 </tfoot>
               </table>
-              {renderReportActions(exportRejectedXlsx, () => { setShowRejectedReport(false); setShowReportsOptions(true); })}
+              {renderReportActions(exportRejectedXlsx, () => { setShowRejectedReport(false); returnToReportsOptionsIfAllowed(); })}
         </ModalBody>
       </Modal>
 
       {/* Pending report modal */}
-      <Modal open={showPendingReport} onClose={()=>{setShowPendingReport(false);setShowReportsOptions(true);}} size="full" landscape>
-        <ModalHeader onClose={()=>{setShowPendingReport(false);setShowReportsOptions(true);}}>דוח אורחים שטרם הגיבו</ModalHeader>
+      <Modal open={showPendingReport} onClose={()=>{setShowPendingReport(false);returnToReportsOptionsIfAllowed();}} size="full" landscape>
+        <ModalHeader onClose={()=>{setShowPendingReport(false);returnToReportsOptionsIfAllowed();}}>דוח אורחים שטרם הגיבו</ModalHeader>
         <ModalBody className="overflow-x-auto">
               <table className="w-full text-right border border-white/10 border-collapse" style={{fontSize: '11px'}}>
                 <thead>
@@ -11067,13 +11181,13 @@ React.useEffect(()=>{
                   </tr>
                 </tfoot>
               </table>
-              {renderReportActions(exportPendingXlsx, () => { setShowPendingReport(false); setShowReportsOptions(true); })}
+              {renderReportActions(exportPendingXlsx, () => { setShowPendingReport(false); returnToReportsOptionsIfAllowed(); })}
         </ModalBody>
       </Modal>
 
       {/* Guest status query modal */}
-      <Modal open={showSearchGuest} onClose={()=>{setShowSearchGuest(false); setShowReportsOptions(true);}} size="lg" landscape>
-        <ModalHeader onClose={()=>{setShowSearchGuest(false); setShowReportsOptions(true);}}>חיפוש אורח</ModalHeader>
+      <Modal open={showSearchGuest} onClose={()=>{setShowSearchGuest(false); returnToReportsOptionsIfAllowed();}} size="lg" landscape>
+        <ModalHeader onClose={()=>{setShowSearchGuest(false); returnToReportsOptionsIfAllowed();}}>חיפוש אורח</ModalHeader>
         <ModalBody>
             <div className="flex justify-center gap-2 mb-4 px-1">
               <input
@@ -11114,7 +11228,7 @@ React.useEffect(()=>{
             )}
         </ModalBody>
         <ModalFooter>
-          <button onClick={()=>{setShowSearchGuest(false); setShowReportsOptions(true);}} className="bg-primary text-white border border-primary rounded-full px-6 sm:px-8 py-2 sm:py-3 font-medium hover:bg-primary/90 transition-all text-sm sm:text-base">סגור</button>
+          <button onClick={()=>{setShowSearchGuest(false); returnToReportsOptionsIfAllowed();}} className="bg-primary text-white border border-primary rounded-full px-6 sm:px-8 py-2 sm:py-3 font-medium hover:bg-primary/90 transition-all text-sm sm:text-base">סגור</button>
         </ModalFooter>
       </Modal>
 
@@ -11145,8 +11259,7 @@ React.useEffect(()=>{
                 onClick={() => {
                   setShowExistingEventWarning(false);
                   if (userPlanSettings?.eventWizardStarted || newEventStarted) {
-                    setShowEventTypes(true);
-                    setStepErrorMsg('');
+                    tryOpenWizardStepRef.current?.(1, { userInitiated: true });
                     scrollToWizardSectionRef.current?.();
                     return;
                   }
@@ -11236,7 +11349,7 @@ React.useEffect(()=>{
               onClick={() => {
                 setShowDeletionSuccess(false);
                 setSelectedFlowStep(null);
-                setShowEventTypes(true);
+                tryOpenWizardStep(1, { userInitiated: true });
               }}
               className="bg-emerald-600 text-white border border-emerald-400/50 rounded-full px-8 py-3 font-bold text-lg hover:bg-emerald-700 transition-all"
             >
@@ -11632,10 +11745,10 @@ React.useEffect(()=>{
                       if (typeof window !== 'undefined') {
                         try { localStorage.removeItem('pendingCreateEvent'); } catch(e){}
                       }
-                      setShowEventTypes(true);
+                      tryOpenWizardStep(1, { userInitiated: true });
                     } else {
                       // רכישת חבילת הרחבה – חזרה למסך שליחת הזמנות
-                      setShowGuestForm(true);
+                      tryOpenWizardStep(4, { userInitiated: true });
                     }
                   }}
                   className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-lg md:text-xl py-4 px-8 rounded-full transition-all shadow-lg transform hover:scale-105"
@@ -11777,8 +11890,8 @@ React.useEffect(()=>{
       </Modal>
 
       {/* Archive events list modal */}
-      <Modal open={showArchiveList} onClose={()=>{setShowArchiveList(false);setShowReportsOptions(true);}} size="xl" landscape>
-        <ModalHeader onClose={()=>{setShowArchiveList(false);setShowReportsOptions(true);}}>אירועים מהעבר (ארכיון)</ModalHeader>
+      <Modal open={showArchiveList} onClose={()=>{setShowArchiveList(false);returnToReportsOptionsIfAllowed();}} size="xl" landscape>
+        <ModalHeader onClose={()=>{setShowArchiveList(false);returnToReportsOptionsIfAllowed();}}>אירועים מהעבר (ארכיון)</ModalHeader>
         <ModalBody className="text-center space-y-4">
             {archiveLoading ? (
               <p className="text-slate-400">טוען אירועים...</p>
@@ -11795,7 +11908,7 @@ React.useEffect(()=>{
                       // Only use selectedEventForReport for viewing reports from archive
                       setShowArchiveList(false);
                       setSelectedEventForReport(ev);
-                      setShowReportsOptions(true);
+                      tryOpenWizardStep(5, { userInitiated: true });
                     }}>
                       <span className="font-bold text-lg text-primary mb-1">{ev.event_type||'אירוע'}</span>
                       <span className="text-sm font-medium text-slate-300">{date}</span>
