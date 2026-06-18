@@ -2468,6 +2468,8 @@ const handleOpenAddonModal = React.useCallback(() => {
     '/images/background-09.png',
     '/images/background-10.png',
   ];
+  /** תבנית ברירת מחדל — הראשונה מימין ברשת (RTL) */
+  const defaultDesignTemplateSrc = designImages[0] || null;
 
   const [selectedDesign, setSelectedDesign] = useState(null);
   const isStep3Complete = React.useMemo(
@@ -2665,9 +2667,10 @@ const handleOpenAddonModal = React.useCallback(() => {
     setCustomInvitationText('');
   }, [selectedEventType]);
 
-  // When design chooser opens the first time, prefill the textarea with default text and default line styles
+  // When design chooser opens the first time, prefill text/styles and default background (desktop + mobile)
   React.useEffect(() => {
-    if (showDesignChooser && !customInvitationText) {
+    if (!showDesignChooser) return;
+    if (!customInvitationText) {
       setCustomInvitationText(invitationTextDefault);
       if (normalizeType(selectedEventType) === 'חתונה') {
         setLineStyles(defaultLineStylesForWedding);
@@ -2688,7 +2691,11 @@ const handleOpenAddonModal = React.useCallback(() => {
         setLineStyles(defaultStyles);
       }
     }
-  }, [showDesignChooser, invitationTextDefault, customInvitationText, selectedEventType]);
+    if (!selectedDesign && defaultDesignTemplateSrc) {
+      setSelectedDesign(defaultDesignTemplateSrc);
+      try { localStorage.setItem('selectedDesign', defaultDesignTemplateSrc); } catch (_) {}
+    }
+  }, [showDesignChooser, invitationTextDefault, customInvitationText, selectedEventType, selectedDesign, defaultDesignTemplateSrc]);
 
   React.useEffect(()=>{
     (async () => {
