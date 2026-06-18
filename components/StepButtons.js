@@ -467,6 +467,7 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick, trig
   const [showEventEndedNotice, setShowEventEndedNotice] = useState(false);
   
   // Keep session ref updated
+  const hadSessionRef = useRef(false);
   useEffect(() => {
     sessionRef.current = session;
   }, [session]);
@@ -1598,6 +1599,18 @@ const noEventLoggedRef = useRef(false);
     }
     loadUserPlanSettings();
   }, [session, loadUserPlanSettings, clearWizardDismissedSteps, readWizardDismissedSteps, readWizardAutoOpenBlocked, hasWizardAutoResumeAttempted, readWizardDismissedEventId]);
+
+  // אחרי התחברות מחדש — אפשר ניסיון resume לאשף (אלא אם המשתמש סגר ב-X)
+  React.useEffect(() => {
+    const hasSession = Boolean(session);
+    if (!hadSessionRef.current && hasSession && !readWizardAutoOpenBlocked()) {
+      wizardAutoResumeCompletedRef.current = false;
+      if (typeof window !== 'undefined') {
+        try { sessionStorage.removeItem(WIZARD_AUTO_RESUME_KEY); } catch (_) {}
+      }
+    }
+    hadSessionRef.current = hasSession;
+  }, [session, readWizardAutoOpenBlocked]);
 
   React.useEffect(() => {
     if (!session) return undefined;
@@ -6412,6 +6425,13 @@ React.useEffect(() => {
     }
   }, [currentEventId, newEventStarted, showEventEndedNotice, isWizardEventSessionProtected]);
 
+  // אל תשאיר באנר שגיאת שלב ריק (רק כפתור "הבנתי")
+  React.useEffect(() => {
+    if (showStepError && !String(stepErrorMsg || '').trim()) {
+      setShowStepError(false);
+    }
+  }, [showStepError, stepErrorMsg]);
+
   // Auto-save invitation text and styles to database when they change (with debounce)
   useEffect(() => {
     if (!currentEventId || !selectedDesign) return;
@@ -7894,6 +7914,8 @@ React.useEffect(()=>{
       markWizardAutoResumeAttempted();
       return undefined;
     }
+    if (currentEventId && !eventDataLoaded) return undefined;
+
     const flowStarted = Boolean(
       currentEventId ||
       newEventStarted ||
@@ -7919,17 +7941,19 @@ React.useEffect(()=>{
         markWizardAutoResumeAttempted();
         return;
       }
-      markWizardAutoResumeAttempted();
-      allowWizardProgrammaticOpen(() => {
+      const opened = tryOpenWizardStepRef.current?.(firstIncomplete);
+      if (opened) {
         scrollToWizardSectionRef.current?.();
-        tryOpenWizardStepRef.current?.(firstIncomplete);
         setStepErrorMsg('');
-      });
+        setShowStepError(false);
+        markWizardAutoResumeAttempted();
+      }
     }, 450);
     return () => window.clearTimeout(timer);
   }, [
     allowWizardProgrammaticOpen,
     currentEventId,
+    eventDataLoaded,
     finishedSteps.length,
     hasWizardAutoResumeAttempted,
     isWizardAutoOpenBlocked,
@@ -8659,7 +8683,7 @@ React.useEffect(()=>{
       )}
 
       {/* הודעה כשהמשתמש לוחץ על שלב 1–5 בלי ליצור אירוע ולבחור מסלול */}
-      {showStepError && (
+      {showStepError && stepErrorMsg ? (
         <>
           <MobileStepErrorScreen
             message={stepErrorMsg}
@@ -8676,7 +8700,7 @@ React.useEffect(()=>{
             </button>
           </div>
         </>
-      )}
+      ) : null}
 
       {hasSession && isCurrentEventActive && mobileDashboardModel.showGuestPrimary && (
         <MobileQuickGuestsCard
