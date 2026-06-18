@@ -460,7 +460,7 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick, trig
         setShowExistingEventWarning(true);
         return;
       }
-      const planReady = selectedPlanRef.current || userPlanSettingsRef.current?.plan;
+      const planReady = await syncPurchasedPlanFromServerRef.current?.();
       if (!planReady) {
         setShowPricingPlan(true);
         setPlanAddOnMode(false);
@@ -876,6 +876,8 @@ const [hasWhatsAppGroup, setHasWhatsAppGroup] = useState(false);
   const [stepBarHeight, setStepBarHeight] = useState(null);
   const stepBarAnchorRef = useRef(null);
   const tryOpenWizardStepRef = useRef(null);
+  const syncPurchasedPlanFromServerRef = useRef(null);
+  const beginCreateNewEventFlowRef = useRef(null);
   const scrollToWizardSectionRef = useRef(null);
   const selectedEventTypeRef = useRef(selectedEventType);
   const finishedStepsRef = useRef(finishedSteps);
@@ -1086,13 +1088,8 @@ const derivePlanFromRecord = React.useCallback((record) => {
     if (detailsPlan && typeof detailsPlan === 'string') {
       return detailsPlan;
     }
-    const rawStatusForDbPlan = typeof record.status === 'string' ? record.status : detailsStatus;
-    const normalizedStatusForDbPlan =
-      typeof rawStatusForDbPlan === 'string' ? rawStatusForDbPlan.toLowerCase() : null;
-    if (normalizedStatusForDbPlan && (normalizedStatusForDbPlan === 'draft' || normalizedStatusForDbPlan === 'pending' || normalizedStatusForDbPlan === 'pending_payment')) {
-      return null;
-    }
-    return dbPlan;
+    const normalizedDbPlan = typeof dbPlan === 'string' ? dbPlan.trim() : String(dbPlan).trim();
+    return normalizedDbPlan || null;
   }
 
   if (detailsPlan) return detailsPlan;
@@ -1254,6 +1251,7 @@ const loadUserPlanSettings = React.useCallback(async () => {
     userPlanSettingsHydratedRef.current = true;
   }
 }, [persistUserPlanSettings]);
+
 const [additionalPackages, setAdditionalPackages] = useState([]);
 const [dbAddonCount, setDbAddonCount] = useState(null);
 const [eventDataLoaded, setEventDataLoaded] = useState(false);
@@ -1358,6 +1356,25 @@ const noEventLoggedRef = useRef(false);
       return;
     }
     loadUserPlanSettings();
+  }, [session, loadUserPlanSettings]);
+
+  React.useEffect(() => {
+    if (!session) return undefined;
+    const refreshRemoteState = () => {
+      loadUserPlanSettings();
+      setEventRefreshKey((key) => key + 1);
+    };
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        refreshRemoteState();
+      }
+    };
+    window.addEventListener('focus', refreshRemoteState);
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => {
+      window.removeEventListener('focus', refreshRemoteState);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
   }, [session, loadUserPlanSettings]);
 
   React.useEffect(() => {
@@ -2519,30 +2536,7 @@ const handleOpenAddonModal = React.useCallback(() => {
     },
     createNewEvent: async () => {
       try {
-        setSelectedFlowStep(null);
-        let hasSession = !!sessionRef.current;
-        if (!hasSession) {
-          const user = await resolveCurrentUserForSync();
-          hasSession = !!user;
-        }
-        if (!hasSession) {
-          setShowPricingPlan(true);
-          setPlanAddOnMode(false);
-          return;
-        }
-        setStepErrorMsg('');
-        const hasActive = await checkActiveEventExists();
-        if (hasActive) {
-          setShowExistingEventWarning(true);
-          return;
-        }
-        const planReady = selectedPlanRef.current || userPlanSettingsRef.current?.plan;
-        if (!planReady) {
-          setShowPricingPlan(true);
-          setPlanAddOnMode(false);
-          return;
-        }
-        await handleNewEvent();
+        await beginCreateNewEventFlowRef.current?.();
       } catch (err) {
         console.error('createNewEvent error', err);
         setShowPricingPlan(true);
@@ -5598,9 +5592,102 @@ React.useEffect(() => {
         ev = evData;
       }
       if(!ev) return false;
-      return isEventRecordActive(ev);
+      if (isEventRecordActive(ev)) return true;
+      const status = typeof ev.status === 'string' ? ev.status.toLowerCase() : '';
+      if (status === 'archived') return false;
+      const rawDate = getRawEventDateFromDetails(getEventDetailsFromRecord(ev));
+      if (!rawDate) return true;
+      return false;
     }catch(e){ console.error('checkActiveEventExists err', e); return false; }
   }
+
+  const extractPlanFromEventRecord = (record) => {
+    if (!record) return null;
+    if (record.selected_plan) {
+      const normalized = String(record.selected_plan).trim();
+      if (normalized) return normalized;
+    }
+    const details = getEventDetailsFromRecord(record);
+    if (details?.pricing_plan) {
+      const normalized = String(details.pricing_plan).trim();
+      if (normalized) return normalized;
+    }
+    return null;
+  };
+
+  const syncPurchasedPlanFromServer = React.useCallback(async () => {
+    const settings = await loadUserPlanSettings();
+    let plan = settings?.plan || selectedPlanRef.current || userPlanSettingsRef.current?.plan || null;
+    if (plan) return plan;
+
+    try {
+      const user = await resolveCurrentUserForSync();
+      if (!user) return null;
+
+      const { data: ev, error } = await supabase
+        .from('events')
+        .select('selected_plan, additional_packages, event_details, status')
+        .eq('user_id', user.id)
+        .or('status.neq.archived,status.is.null')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (error) {
+        console.error('syncPurchasedPlanFromServer event lookup failed', error);
+        return null;
+      }
+
+      plan = extractPlanFromEventRecord(ev);
+      if (!plan) return null;
+
+      const addonCount = parseNonNegativeInt(ev?.additional_packages);
+      await persistUserPlanSettings(plan, addonCount);
+      setSelectedPlan(plan);
+      try { localStorage.setItem('selectedPlan', plan); } catch (_) {}
+      try { localStorage.setItem('user_plan_code', plan); } catch (_) {}
+      return plan;
+    } catch (err) {
+      console.error('syncPurchasedPlanFromServer threw', err);
+      return null;
+    }
+  }, [loadUserPlanSettings, persistUserPlanSettings]);
+
+  const beginCreateNewEventFlow = React.useCallback(async () => {
+    setSelectedFlowStep(null);
+    setStepErrorMsg('');
+
+    let hasSession = !!sessionRef.current;
+    if (!hasSession) {
+      const user = await resolveCurrentUserForSync();
+      hasSession = !!user;
+    }
+    if (!hasSession) {
+      setShowPricingPlan(true);
+      setPlanAddOnMode(false);
+      return;
+    }
+
+    const hasActive = await checkActiveEventExists();
+    if (hasActive) {
+      setShowExistingEventWarning(true);
+      return;
+    }
+
+    const planReady = await syncPurchasedPlanFromServer();
+    if (!planReady) {
+      setShowPricingPlan(true);
+      setPlanAddOnMode(false);
+      return;
+    }
+
+    await handleNewEvent();
+  }, [syncPurchasedPlanFromServer, handleNewEvent]);
+
+  React.useEffect(() => {
+    syncPurchasedPlanFromServerRef.current = syncPurchasedPlanFromServer;
+    beginCreateNewEventFlowRef.current = beginCreateNewEventFlow;
+  }, [syncPurchasedPlanFromServer, beginCreateNewEventFlow]);
 
   // Persist formData whenever step 1 completed
   React.useEffect(()=>{
@@ -10846,30 +10933,7 @@ React.useEffect(()=>{
                 onClick={async () => {
                   setShowFlowDiagram(false);
                   try {
-                    setSelectedFlowStep(null);
-                    let hasSession = !!sessionRef.current;
-                    if (!hasSession) {
-                      const user = await resolveCurrentUserForSync();
-                      hasSession = !!user;
-                    }
-                    if (!hasSession) {
-                      setShowPricingPlan(true);
-                      setPlanAddOnMode(false);
-                      return;
-                    }
-                    setStepErrorMsg('');
-                    const hasActive = await checkActiveEventExists();
-                    if (hasActive) {
-                      setShowExistingEventWarning(true);
-                      return;
-                    }
-                    const planReady = selectedPlanRef.current || userPlanSettingsRef.current?.plan;
-                    if (!planReady) {
-                      setShowPricingPlan(true);
-                      setPlanAddOnMode(false);
-                      return;
-                    }
-                    await handleNewEvent();
+                    await beginCreateNewEventFlowRef.current?.();
                   } catch (err) {
                     console.error('createNewEvent error', err);
                     setShowPricingPlan(true);
