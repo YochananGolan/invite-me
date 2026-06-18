@@ -6912,7 +6912,7 @@ React.useEffect(()=>{
 
   const tryOpenWizardStep = React.useCallback((stepNumber) => {
     const mustStartFirst = !currentEventId && !newEventStarted && !planForDisplay;
-    if (stepNumber >= 1 && stepNumber <= 4 && mustStartFirst) {
+    if (stepNumber >= 1 && stepNumber <= 5 && mustStartFirst) {
       setStepErrorMsg('\u05D9\u05E9 \u05EA\u05D7\u05D9\u05DC\u05D4 \u05DC\u05D9\u05E6\u05D5\u05E8 \u05D0\u05D9\u05E8\u05D5\u05E2 \u05D5\u05DC\u05D1\u05D7\u05D5\u05E8 \u05DE\u05E1\u05DC\u05D5\u05DC \u05EA\u05E9\u05DC\u05D5\u05DD.');
       setShowStepError(true);
       return false;
@@ -6922,6 +6922,11 @@ React.useEffect(()=>{
       for (let requiredStep = 1; requiredStep < stepNumber; requiredStep += 1) {
         if (requiredStep > 4) break;
         if (!wizardStepCompletion[requiredStep]) {
+          if (mustStartFirst) {
+            setStepErrorMsg('\u05D9\u05E9 \u05EA\u05D7\u05D9\u05DC\u05D4 \u05DC\u05D9\u05E6\u05D5\u05E8 \u05D0\u05D9\u05E8\u05D5\u05E2 \u05D5\u05DC\u05D1\u05D7\u05D5\u05E8 \u05DE\u05E1\u05DC\u05D5\u05DC \u05EA\u05E9\u05DC\u05D5\u05DD.');
+            setShowStepError(true);
+            return false;
+          }
           setStepErrorMsg(WIZARD_STEP_BLOCK_MESSAGES[requiredStep]);
           setShowStepError(true);
           redirectToWizardStep(requiredStep);
@@ -7651,7 +7656,7 @@ React.useEffect(()=>{
         </div>
       )}
 
-      {/* הודעה כשהמשתמש לוחץ על שלב 1–4 בלי ליצור אירוע ולבחור מסלול */}
+      {/* הודעה כשהמשתמש לוחץ על שלב 1–5 בלי ליצור אירוע ולבחור מסלול */}
       {showStepError && (
         <div className="fixed left-4 right-4 bottom-24 z-30 max-w-2xl mx-auto bg-amber-500/10 border border-amber-400/30 backdrop-blur-xl rounded-xl shadow-2xl shadow-amber-950/30 p-4 flex flex-col gap-3">
           <p className="text-amber-100 font-semibold text-center text-lg">{stepErrorMsg}</p>
