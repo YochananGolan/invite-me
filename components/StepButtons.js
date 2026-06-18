@@ -322,6 +322,20 @@ const isWizardPlaceholderEventType = (eventType) => (
   typeof eventType === 'string' && eventType.trim() === WIZARD_DRAFT_EVENT_TYPE
 );
 
+const resolveDisplayEventType = (eventType) => {
+  if (eventType == null || eventType === '') return '';
+  const normalized = typeof eventType === 'string' ? eventType.trim() : String(eventType).trim();
+  if (!normalized || isWizardPlaceholderEventType(normalized)) return '';
+  return normalized;
+};
+
+const shouldApplyEventTypeFromRecord = (recordType, currentType) => {
+  const fromRecord = resolveDisplayEventType(recordType);
+  if (!fromRecord) return false;
+  const current = resolveDisplayEventType(currentType);
+  return !current || current === fromRecord;
+};
+
 /** אירוע בתהליך יצירה (ללא תאריך עדיין) — לא למחוק בארכיון */
 const isEventWizardDraft = (record) => {
   if (!record) return false;
@@ -1801,6 +1815,7 @@ const handleOpenAddonModal = React.useCallback(() => {
 
   const handleSelectEvent = (type) => {
     const normalizedType = normalizeType(type);
+    selectedEventTypeRef.current = normalizedType;
     setSelectedEventType(normalizedType);
     try { localStorage.setItem('selectedEventType', normalizedType); } catch(e){}
     setEventDetailsCompleted(false);
@@ -2541,7 +2556,29 @@ const handleOpenAddonModal = React.useCallback(() => {
         };
 
         if (error || !data) {
+          if (
+            userPlanSettingsRef.current?.eventWizardStarted
+            || newEventStarted
+            || showEventDetails
+          ) {
+            return;
+          }
           clearEventDetails();
+          return;
+        }
+
+        if (isEventWizardDraft(data)) {
+          setCurrentEventId(data.id);
+          setEventDataLoaded(true);
+          const details = typeof data.event_details === 'string'
+            ? JSON.parse(data.event_details)
+            : (data.event_details || {});
+          if (shouldApplyEventTypeFromRecord(data.event_type, selectedEventTypeRef.current)) {
+            setSelectedEventType(resolveDisplayEventType(data.event_type));
+          }
+          if (details && typeof details === 'object') {
+            setFormData((prev) => ({ ...prev, ...details }));
+          }
           return;
         }
 
@@ -2554,11 +2591,13 @@ const handleOpenAddonModal = React.useCallback(() => {
         const details = data.event_details || {};
         const capFromRow = parseNonNegativeInt(data?.allowed_guests);
         setEventAllowedGuests(capFromRow > 0 ? capFromRow : null);
-        setSelectedEventType(data.event_type || '');
-        syncFinishedStepsFromEvent(data.event_type || '', details || {});
+        if (shouldApplyEventTypeFromRecord(data.event_type, selectedEventTypeRef.current)) {
+          setSelectedEventType(resolveDisplayEventType(data.event_type));
+        }
+        syncFinishedStepsFromEvent(resolveDisplayEventType(data.event_type) || selectedEventTypeRef.current || '', details || {});
         setFormData((prev)=>({ ...prev, ...(details || {}) }));
         const mergedDetails = { ...initialFormState, ...(details || {}) };
-        if (isEventDetailsCompleteForType(mergedDetails, data.event_type || '')) {
+        if (isEventDetailsCompleteForType(mergedDetails, resolveDisplayEventType(data.event_type) || selectedEventTypeRef.current || '')) {
           setEventDetailsCompleted(true);
           markStepDone(1);
         } else {
@@ -2569,7 +2608,7 @@ const handleOpenAddonModal = React.useCallback(() => {
         console.error('Failed to restore latest event details', err);
       }
     })();
-  }, [eventRefreshKey, resetCapacityWarningGuests, syncFinishedStepsFromEvent]);
+  }, [eventRefreshKey, resetCapacityWarningGuests, syncFinishedStepsFromEvent, newEventStarted, showEventDetails]);
 
   // restore details
   React.useEffect(()=>{
@@ -5612,8 +5651,13 @@ React.useEffect(() => {
           }
         }
         const details=typeof ev.event_details==='string'?JSON.parse(ev.event_details):ev.event_details||{};
-        if (ev.event_type) setSelectedEventType(ev.event_type);
-        syncFinishedStepsFromEvent(ev.event_type || selectedEventType, details);
+        if (shouldApplyEventTypeFromRecord(ev.event_type, selectedEventTypeRef.current)) {
+          setSelectedEventType(resolveDisplayEventType(ev.event_type));
+        }
+        syncFinishedStepsFromEvent(
+          resolveDisplayEventType(ev.event_type) || resolveDisplayEventType(selectedEventTypeRef.current) || '',
+          details,
+        );
         const dateStr=details.date||details.start_datetime;
         const retentionDate = computePlanRetentionDate(dateStr);
         if (retentionDate) {
@@ -7113,14 +7157,16 @@ React.useEffect(()=>{
   // Robust date parsing for event date strings that may use DD-MM-YYYY, DD.MM.YYYY or DD/MM/YYYY formats.
   // Reset form and steps when no active event exists AND no new event started
   React.useEffect(()=>{
-    if(currentEventId || newEventStarted) return; // Don't reset if new event is in progress
+    if (currentEventId || newEventStarted || userPlanSettings?.eventWizardStarted) return;
+    if (showEventDetails || showEventTypes) return;
+    if (selectedEventType || finishedSteps.length > 0) return;
     // No active event – reset wizard
     setFormData(initialFormState);
     setFinishedSteps([]);
-    setSelectedEventType(null);
+    setSelectedEventType('');
     setNewEventStarted(false);
     try{ localStorage.removeItem('draftEvent'); localStorage.removeItem('newEventStarted'); localStorage.removeItem('savedEventDetails'); }catch{}
-  },[currentEventId, newEventStarted]);
+  },[currentEventId, newEventStarted, userPlanSettings?.eventWizardStarted, showEventDetails, showEventTypes, selectedEventType, finishedSteps.length]);
 
   const MOBILE_REMINDER_DAYS_BEFORE = 5;
 
@@ -7293,6 +7339,17 @@ React.useEffect(()=>{
     return null;
   }, [wizardStepCompletion]);
 
+  const openEventDetailsModal = React.useCallback(() => {
+    const type = resolveDisplayEventType(selectedEventTypeRef.current || selectedEventType);
+    if (!type) {
+      setShowEventDetails(false);
+      setShowEventTypes(true);
+      setStepErrorMsg('יש לבחור סוג אירוע לפני מילוי הפרטים.');
+      return;
+    }
+    setShowEventDetails(true);
+  }, [selectedEventType]);
+
   const closeEventTypesModal = React.useCallback(() => {
     wizardStep1AutoOpenedRef.current = true;
     setShowEventTypes(false);
@@ -7314,14 +7371,14 @@ React.useEffect(()=>{
     setShowDesignChooser(false);
     setShowGuestForm(false);
     if (stepNumber === 1) openEventTypesModal();
-    else if (stepNumber === 2) setShowEventDetails(true);
+    else if (stepNumber === 2) openEventDetailsModal();
     else if (stepNumber === 3) setShowDesignChooser(true);
     else if (stepNumber === 4) setShowGuestForm(true);
     else if (stepNumber === 5) {
       setShowReportsOptions(true);
       setShowGuestListModal(false);
     }
-  }, [openEventTypesModal]);
+  }, [openEventTypesModal, openEventDetailsModal]);
 
   const tryOpenWizardStep = React.useCallback((stepNumber) => {
     const wizardSessionActive = Boolean(
@@ -7879,6 +7936,10 @@ React.useEffect(()=>{
       )}
     </div>
   );
+
+  const eventDetailsModalTitle = resolveDisplayEventType(selectedEventType)
+    ? `פרטי האירוע - ${resolveDisplayEventType(selectedEventType)}`
+    : 'פרטי האירוע';
 
   if (!session) {
     return (
@@ -8697,7 +8758,7 @@ React.useEffect(()=>{
                 try { localStorage.removeItem('savedEventDetails'); } catch(e){}
                 eventDetailsOpenedRef.current = true;
               }
-              setShowEventDetails(true);
+              openEventDetailsModal();
               markStepDone(0);
             } : undefined,
             helpText: 'הבחירה כאן קובעת אילו פרטים נבקש בשלב הבא, למשל חתן וכלה בחתונה או שם חוגג ביום הולדת.',
@@ -8759,7 +8820,7 @@ React.useEffect(()=>{
                 try { localStorage.removeItem('savedEventDetails'); } catch(e){}
                 eventDetailsOpenedRef.current = true; // Mark as opened so we don't reset on reopen
               }
-              setShowEventDetails(true);
+              openEventDetailsModal();
               markStepDone(0); // Mark step 1 as completed when saving
               console.log('markStepDone(0) called');
             }}
@@ -8772,7 +8833,7 @@ React.useEffect(()=>{
       </Modal>
 
       <Modal open={showEventDetails} onClose={() => setShowEventDetails(false)} size="xl">
-        <ModalHeader onClose={() => setShowEventDetails(false)}>{`פרטי האירוע - ${selectedEventType}`}</ModalHeader>
+        <ModalHeader onClose={() => setShowEventDetails(false)}>{eventDetailsModalTitle}</ModalHeader>
         <ModalBody>
           <div dir="rtl">
           {renderMobileNextActionCard({
