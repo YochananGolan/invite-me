@@ -1131,6 +1131,8 @@ const [userPlanSettings, setUserPlanSettings] = useState({ plan: null, addonCoun
 const userPlanSettingsHydratedRef = useRef(false);
 /** שלב 1 נפתח אוטומטית פעם אחת לסשן — לא לכפות מחדש אחרי שהמשתמש סגר ב-X */
 const wizardStep1AutoOpenedRef = useRef(false);
+/** שלב 2 נסגר ב-X — לא לפתוח מחדש אוטומטית */
+const wizardStep2UserDismissedRef = useRef(false);
 const persistUserPlanSettings = React.useCallback(async (planCode, addonCount, eventWizardStartedOverride = undefined) => {
   try {
     const user = await resolveCurrentUserForSync();
@@ -1411,6 +1413,7 @@ const noEventLoggedRef = useRef(false);
     if (!session) {
       userPlanSettingsHydratedRef.current = false;
       wizardStep1AutoOpenedRef.current = false;
+      wizardStep2UserDismissedRef.current = false;
       setSelectedPlan(null);
       setEventAllowedGuests(null);
       setUserPlanSettings((prev) => {
@@ -2560,6 +2563,8 @@ const handleOpenAddonModal = React.useCallback(() => {
             userPlanSettingsRef.current?.eventWizardStarted
             || showEventDetails
             || (typeof window !== 'undefined' && localStorage.getItem('newEventStarted') === '1')
+            || resolveDisplayEventType(selectedEventTypeRef.current)
+            || (finishedStepsRef.current && finishedStepsRef.current.length > 0)
           );
           if (wizardFlowActive) {
             return;
@@ -7348,8 +7353,19 @@ React.useEffect(()=>{
       setStepErrorMsg('יש לבחור סוג אירוע לפני מילוי הפרטים.');
       return;
     }
+    wizardStep2UserDismissedRef.current = false;
     setShowEventDetails(true);
   }, [selectedEventType]);
+
+  const closeEventDetailsModal = React.useCallback(() => {
+    wizardStep2UserDismissedRef.current = true;
+    wizardAutoResumedRef.current = true;
+    setShowEventDetails(false);
+    setStepErrorMsg('');
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }, []);
 
   const closeEventTypesModal = React.useCallback(() => {
     wizardStep1AutoOpenedRef.current = true;
@@ -7447,8 +7463,18 @@ React.useEffect(()=>{
     const firstIncomplete = getFirstIncompleteWizardStep();
     if (!firstIncomplete) return undefined;
 
+    if (firstIncomplete === 1 && wizardStep1AutoOpenedRef.current) {
+      wizardAutoResumedRef.current = true;
+      return undefined;
+    }
+    if (firstIncomplete === 2 && wizardStep2UserDismissedRef.current) {
+      wizardAutoResumedRef.current = true;
+      return undefined;
+    }
+
     wizardAutoResumedRef.current = true;
     const timer = window.setTimeout(() => {
+      if (firstIncomplete === 2 && wizardStep2UserDismissedRef.current) return;
       scrollToWizardSection();
       redirectToWizardStep(firstIncomplete);
       setStepErrorMsg('');
@@ -7456,7 +7482,7 @@ React.useEffect(()=>{
     return () => window.clearTimeout(timer);
   }, [
     currentEventId,
-    finishedSteps,
+    finishedSteps.length,
     getFirstIncompleteWizardStep,
     newEventStarted,
     userPlanSettings?.eventWizardStarted,
@@ -7464,12 +7490,12 @@ React.useEffect(()=>{
     scrollToWizardSection,
     selectedEventType,
     session,
-    wizardStepCompletion,
   ]);
 
   React.useEffect(() => {
     if (!currentEventId && !newEventStarted && !selectedEventType && finishedSteps.length === 0) {
       wizardAutoResumedRef.current = false;
+      wizardStep2UserDismissedRef.current = false;
     }
   }, [currentEventId, finishedSteps.length, newEventStarted, selectedEventType]);
 
@@ -8833,8 +8859,8 @@ React.useEffect(()=>{
         </ModalFooter>
       </Modal>
 
-      <Modal open={showEventDetails} onClose={() => setShowEventDetails(false)} size="xl">
-        <ModalHeader onClose={() => setShowEventDetails(false)}>{eventDetailsModalTitle}</ModalHeader>
+      <Modal open={showEventDetails} onClose={closeEventDetailsModal} size="xl">
+        <ModalHeader onClose={closeEventDetailsModal}>{eventDetailsModalTitle}</ModalHeader>
         <ModalBody>
           <div dir="rtl">
           {renderMobileNextActionCard({
