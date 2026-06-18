@@ -892,6 +892,7 @@ const [hasWhatsAppGroup, setHasWhatsAppGroup] = useState(false);
   const wizardAutoOpenBlockedRef = useRef(false);
   const wizardDismissedHydratedRef = useRef(false);
   const wizardProgrammaticOpenAllowedRef = useRef(false);
+  const clearEndedEventInFlightRef = useRef(null);
   const wizardSuppressedStepsRef = useRef(new Set());
 
   const WIZARD_AUTO_RESUME_KEY = 'wizardAutoResumeAttempted';
@@ -1006,6 +1007,15 @@ const [hasWhatsAppGroup, setHasWhatsAppGroup] = useState(false);
   const isWizardFlowProtected = React.useCallback(() => (
     isWizardAutoOpenBlocked() || wizardSuppressedStepsRef.current.size > 0
   ), [isWizardAutoOpenBlocked]);
+
+  /** מונע ארכיון/הודעת "האירוע הסתיים" בזמן אשף פעיל (כולל אחרי סגירה ב-X) */
+  const isWizardEventSessionProtected = React.useCallback(() => Boolean(
+    isWizardFlowProtected()
+    || userPlanSettingsRef.current?.eventWizardStarted
+    || (typeof window !== 'undefined' && localStorage.getItem('newEventStarted') === '1')
+    || (finishedStepsRef.current && finishedStepsRef.current.length > 0)
+    || Boolean(resolveDisplayEventType(selectedEventTypeRef.current))
+  ), [isWizardFlowProtected]);
 
   const shouldAllowWizardAutoOpen = React.useCallback((stepNumber) => (
     !wizardAutoOpenBlockedRef.current && !wizardSuppressedStepsRef.current.has(stepNumber)
@@ -2726,8 +2736,22 @@ const handleOpenAddonModal = React.useCallback(() => {
           return;
         }
 
-        if (!isEventRecordActive(data)) {
+        if (!isEventRecordActive(data) && !isEventWizardDraft(data) && !isWizardEventSessionProtected()) {
           await clearEndedEvent(data.id);
+          return;
+        }
+        if (!isEventRecordActive(data) && (isEventWizardDraft(data) || isWizardEventSessionProtected())) {
+          setCurrentEventId(data.id);
+          setEventDataLoaded(true);
+          const draftDetails = typeof data.event_details === 'string'
+            ? JSON.parse(data.event_details)
+            : (data.event_details || {});
+          if (shouldApplyEventTypeFromRecord(data.event_type, selectedEventTypeRef.current)) {
+            setSelectedEventType(resolveDisplayEventType(data.event_type));
+          }
+          if (draftDetails && typeof draftDetails === 'object') {
+            setFormData((prev) => ({ ...prev, ...draftDetails }));
+          }
           return;
         }
 
@@ -4760,28 +4784,37 @@ React.useEffect(() => {
 
   const clearEndedEvent = async (eventId) => {
     if (!eventId) return;
+    if (isWizardEventSessionProtected()) return;
+    if (clearEndedEventInFlightRef.current === eventId) return;
+    clearEndedEventInFlightRef.current = eventId;
     try {
-      let { error } = await supabase
-        .from('events')
-        .update({ status: 'archived', selected_plan: null, additional_packages: 0 })
-        .eq('id', eventId);
-      if (error && (error.message || '').toLowerCase().includes('column')) {
-        ({ error } = await supabase
+      try {
+        let { error } = await supabase
           .from('events')
-          .update({ status: 'archived' })
-          .eq('id', eventId));
+          .update({ status: 'archived', selected_plan: null, additional_packages: 0 })
+          .eq('id', eventId);
+        if (error && (error.message || '').toLowerCase().includes('column')) {
+          ({ error } = await supabase
+            .from('events')
+            .update({ status: 'archived' })
+            .eq('id', eventId));
+        }
+        if (error) {
+          console.error('Failed to clear ended event:', error);
+        }
+      } catch (err) {
+        console.error('Failed to clear ended event:', err);
       }
-      if (error) {
-        console.error('Failed to clear ended event:', error);
-      }
-    } catch (err) {
-      console.error('Failed to clear ended event:', err);
-    }
 
-    clearCarryPlanAfterManualDelete();
-    await clearPlanState();
-    await resetWizardStateForNoEvent();
-    setShowEventEndedNotice(true);
+      clearCarryPlanAfterManualDelete();
+      await clearPlanState();
+      await resetWizardStateForNoEvent();
+      setShowEventEndedNotice(true);
+    } finally {
+      if (clearEndedEventInFlightRef.current === eventId) {
+        clearEndedEventInFlightRef.current = null;
+      }
+    }
   };
 
   const handleNewEvent = async (showDeletionMessage = false) => {
@@ -5735,6 +5768,9 @@ React.useEffect(() => {
           messagesSent = ev?.messages_sent_count ?? 0;
         }
         if (!ev || (typeof ev.status === 'string' && ev.status.toLowerCase() === 'archived')) {
+          if (currentEventId && isWizardEventSessionProtected()) {
+            return;
+          }
           setEventAllowedGuests(null);
           if (currentEventId) {
             setCurrentEventId(null);
@@ -5760,7 +5796,7 @@ React.useEffect(() => {
           });
           return;
         }
-        if (hasEventEnded(ev)) {
+        if (hasEventEnded(ev) && !isEventWizardDraft(ev) && !isWizardEventSessionProtected()) {
           await clearEndedEvent(ev.id);
           return;
         }
@@ -5825,7 +5861,7 @@ React.useEffect(() => {
           today.setHours(0, 0, 0, 0);
           const eventDate = new Date(parsedDate);
           eventDate.setHours(0, 0, 0, 0);
-          if (eventDate < today) {
+          if (eventDate < today && !isWizardEventSessionProtected()) {
             await clearEndedEvent(ev.id);
             return;
           }
@@ -5846,6 +5882,7 @@ React.useEffect(() => {
           const ev = payload.new || payload.old || {};
           const rowStatus = typeof ev.status === 'string' ? ev.status.toLowerCase() : '';
           if (payload.eventType === 'DELETE' || rowStatus === 'archived') {
+            if (isWizardEventSessionProtected()) return;
             setCurrentEventId(null);
             setEventAllowedGuests(null);
             setEventDataLoaded(false);
@@ -6271,12 +6308,12 @@ React.useEffect(() => {
     };
   }, [currentEventId]);
 
-  // Hide "event ended" notice once user starts/has an event again.
+  // Hide "event ended" notice once user starts/has an event again (or wizard session is active).
   React.useEffect(() => {
-    if ((currentEventId || newEventStarted) && showEventEndedNotice) {
+    if (showEventEndedNotice && (currentEventId || newEventStarted || isWizardEventSessionProtected())) {
       setShowEventEndedNotice(false);
     }
-  }, [currentEventId, newEventStarted, showEventEndedNotice]);
+  }, [currentEventId, newEventStarted, showEventEndedNotice, isWizardEventSessionProtected]);
 
   // Auto-save invitation text and styles to database when they change (with debounce)
   useEffect(() => {
@@ -6518,6 +6555,8 @@ React.useEffect(() => {
 
         if (eventDate >= today) return;
 
+        if (isWizardEventSessionProtected()) return;
+
         await clearEndedEvent(currentEventId);
       } catch (err) {
         console.error('auto-archive fetch failed', err);
@@ -6569,7 +6608,7 @@ React.useEffect(() => {
         if (ev) {
           noEventLoggedRef.current = false;
 
-          if (!isEventRecordActive(ev) && !isEventWizardDraft(ev)) {
+          if (!isEventRecordActive(ev) && !isEventWizardDraft(ev) && !isWizardEventSessionProtected()) {
             if (lastRestoredEventIdRef.current !== 'ended') {
               console.log('Event found but has ended, clearing active event');
               lastRestoredEventIdRef.current = 'ended';
@@ -6934,7 +6973,7 @@ React.useEffect(() => {
           isInitialLoadRef.current = false;
           return;
         }
-        if (ev && !isEventRecordActive(ev) && !isEventWizardDraft(ev)) {
+        if (ev && !isEventRecordActive(ev) && !isEventWizardDraft(ev) && !isWizardEventSessionProtected()) {
           await clearEndedEvent(ev.id);
           isInitialLoadRef.current = false;
           return;
@@ -7434,10 +7473,11 @@ React.useEffect(()=>{
 
   React.useEffect(() => {
     if (!currentEventId || isCurrentEventActive) return;
+    if (isWizardEventSessionProtected()) return;
     const rawDate = formData?.date || formData?.start_datetime;
     if (!rawDate) return;
     clearEndedEvent(currentEventId);
-  }, [currentEventId, formData?.date, formData?.start_datetime, isCurrentEventActive]);
+  }, [currentEventId, formData?.date, formData?.start_datetime, isCurrentEventActive, isWizardEventSessionProtected]);
 
   React.useEffect(() => {
     if (!onMobileNavMetaChange) return;
