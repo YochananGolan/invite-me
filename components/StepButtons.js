@@ -894,8 +894,11 @@ const [hasWhatsAppGroup, setHasWhatsAppGroup] = useState(false);
   const wizardProgrammaticOpenAllowedRef = useRef(false);
   const clearEndedEventInFlightRef = useRef(null);
   const wizardSuppressedStepsRef = useRef(new Set());
+  const wizardDismissedEventIdRef = useRef(null);
+  const currentEventIdRef = useRef(null);
 
   const WIZARD_AUTO_RESUME_KEY = 'wizardAutoResumeAttempted';
+  const WIZARD_DISMISSED_EVENT_KEY = 'wizardDismissedEventId';
 
   const readWizardDismissedSteps = React.useCallback(() => {
     if (typeof window === 'undefined') return new Set();
@@ -917,6 +920,33 @@ const [hasWhatsAppGroup, setHasWhatsAppGroup] = useState(false);
     }
   }, []);
 
+  const readWizardDismissedEventId = React.useCallback(() => {
+    if (typeof window === 'undefined') return null;
+    try {
+      const raw = sessionStorage.getItem(WIZARD_DISMISSED_EVENT_KEY);
+      return raw && String(raw).trim() ? String(raw).trim() : null;
+    } catch (_) {
+      return null;
+    }
+  }, []);
+
+  const markWizardDismissedEvent = React.useCallback((eventId) => {
+    if (!eventId) return;
+    const normalized = String(eventId).trim();
+    if (!normalized) return;
+    wizardDismissedEventIdRef.current = normalized;
+    if (typeof window !== 'undefined') {
+      try { sessionStorage.setItem(WIZARD_DISMISSED_EVENT_KEY, normalized); } catch (_) {}
+    }
+  }, []);
+
+  const clearWizardDismissedEvent = React.useCallback(() => {
+    wizardDismissedEventIdRef.current = null;
+    if (typeof window !== 'undefined') {
+      try { sessionStorage.removeItem(WIZARD_DISMISSED_EVENT_KEY); } catch (_) {}
+    }
+  }, []);
+
   const writeWizardDismissedSteps = React.useCallback((stepsSet) => {
     if (typeof window === 'undefined') return;
     try {
@@ -927,6 +957,7 @@ const [hasWhatsAppGroup, setHasWhatsAppGroup] = useState(false);
   const clearWizardDismissedSteps = React.useCallback(() => {
     wizardSuppressedStepsRef.current = new Set();
     wizardAutoOpenBlockedRef.current = false;
+    clearWizardDismissedEvent();
     if (typeof window !== 'undefined') {
       try {
         sessionStorage.removeItem('wizardDismissedSteps');
@@ -934,7 +965,7 @@ const [hasWhatsAppGroup, setHasWhatsAppGroup] = useState(false);
         sessionStorage.removeItem(WIZARD_AUTO_RESUME_KEY);
       } catch (_) {}
     }
-  }, []);
+  }, [clearWizardDismissedEvent]);
 
   const markWizardAutoResumeAttempted = React.useCallback(() => {
     wizardAutoResumeCompletedRef.current = true;
@@ -971,13 +1002,14 @@ const [hasWhatsAppGroup, setHasWhatsAppGroup] = useState(false);
   const resetWizardDismissForUserProgress = React.useCallback(() => {
     wizardAutoOpenBlockedRef.current = false;
     wizardAutoResumeCompletedRef.current = false;
+    clearWizardDismissedEvent();
     if (typeof window !== 'undefined') {
       try {
         sessionStorage.removeItem('wizardAutoOpenBlocked');
         sessionStorage.removeItem(WIZARD_AUTO_RESUME_KEY);
       } catch (_) {}
     }
-  }, []);
+  }, [clearWizardDismissedEvent]);
 
   const allowWizardProgrammaticOpen = React.useCallback((openFn) => {
     wizardProgrammaticOpenAllowedRef.current = true;
@@ -1011,11 +1043,13 @@ const [hasWhatsAppGroup, setHasWhatsAppGroup] = useState(false);
   /** מונע ארכיון/הודעת "האירוע הסתיים" בזמן אשף פעיל (כולל אחרי סגירה ב-X) */
   const isWizardEventSessionProtected = React.useCallback(() => Boolean(
     isWizardFlowProtected()
+    || wizardDismissedEventIdRef.current
+    || readWizardDismissedEventId()
     || userPlanSettingsRef.current?.eventWizardStarted
     || (typeof window !== 'undefined' && localStorage.getItem('newEventStarted') === '1')
     || (finishedStepsRef.current && finishedStepsRef.current.length > 0)
     || Boolean(resolveDisplayEventType(selectedEventTypeRef.current))
-  ), [isWizardFlowProtected]);
+  ), [isWizardFlowProtected, readWizardDismissedEventId]);
 
   const shouldAllowWizardAutoOpen = React.useCallback((stepNumber) => (
     !wizardAutoOpenBlockedRef.current && !wizardSuppressedStepsRef.current.has(stepNumber)
@@ -1458,6 +1492,9 @@ const [eventMessagesSentCount, setEventMessagesSentCount] = useState(0);
 const [eventReminderSentAt, setEventReminderSentAt] = useState(null);
 const [invitedGuestsCount, setInvitedGuestsCount] = useState(0);
 const [currentEventId,setCurrentEventId]=useState(null);
+React.useEffect(() => {
+  currentEventIdRef.current = currentEventId;
+}, [currentEventId]);
 const [eventRefreshKey, setEventRefreshKey] = useState(0);
 /** מכסת הודעות כפי שנשמרה ב־DB (allowed_guests) — לזיהוי מסלול תצוגה כש־selected_plan חסר */
 const [eventAllowedGuests, setEventAllowedGuests] = useState(null);
@@ -1556,10 +1593,11 @@ const noEventLoggedRef = useRef(false);
       wizardSuppressedStepsRef.current = readWizardDismissedSteps();
       wizardAutoOpenBlockedRef.current = readWizardAutoOpenBlocked();
       wizardAutoResumeCompletedRef.current = hasWizardAutoResumeAttempted();
+      wizardDismissedEventIdRef.current = readWizardDismissedEventId();
       wizardDismissedHydratedRef.current = true;
     }
     loadUserPlanSettings();
-  }, [session, loadUserPlanSettings, clearWizardDismissedSteps, readWizardDismissedSteps, readWizardAutoOpenBlocked, hasWizardAutoResumeAttempted]);
+  }, [session, loadUserPlanSettings, clearWizardDismissedSteps, readWizardDismissedSteps, readWizardAutoOpenBlocked, hasWizardAutoResumeAttempted, readWizardDismissedEventId]);
 
   React.useEffect(() => {
     if (!session) return undefined;
@@ -1703,7 +1741,7 @@ const additionalPackageCounts = React.useMemo(() => {
   }
   return counts;
 }, [additionalPackages, addonCountForDisplay]);
-const canRenderCharts = Boolean(currentEventId && eventDataLoaded);
+const canRenderCharts = Boolean(currentEventId && (eventDataLoaded || isWizardEventSessionProtected()));
 const [chartsReady, setChartsReady] = useState(false);
 useEffect(() => {
   if (!canRenderCharts) {
@@ -2644,13 +2682,34 @@ const handleOpenAddonModal = React.useCallback(() => {
       try {
         const user = await resolveCurrentUserForSync();
         if (!user) return;
-        const { data, error } = await supabase
-          .from('events')
-          .select('id, event_type, event_details, invitation_path, status, allowed_guests')
-          .eq('user_id', user.id)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
+        const pinnedEventId =
+          wizardDismissedEventIdRef.current
+          || readWizardDismissedEventId()
+          || (isWizardEventSessionProtected() && currentEventIdRef.current ? currentEventIdRef.current : null);
+        let data = null;
+        let error = null;
+        if (pinnedEventId) {
+          const pinnedRes = await supabase
+            .from('events')
+            .select('id, event_type, event_details, invitation_path, status, allowed_guests')
+            .eq('user_id', user.id)
+            .eq('id', pinnedEventId)
+            .maybeSingle();
+          data = pinnedRes.data;
+          error = pinnedRes.error;
+        }
+        if (!data) {
+          const latestRes = await supabase
+            .from('events')
+            .select('id, event_type, event_details, invitation_path, status, allowed_guests')
+            .eq('user_id', user.id)
+            .or('status.neq.archived,status.is.null')
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          data = latestRes.data;
+          error = latestRes.error;
+        }
 
         const clearEventDetails = () => {
           setSelectedEventType('');
@@ -2706,6 +2765,8 @@ const handleOpenAddonModal = React.useCallback(() => {
             userPlanSettingsRef.current?.eventWizardStarted
             || wizardAutoOpenBlockedRef.current
             || wizardSuppressedStepsRef.current.size > 0
+            || wizardDismissedEventIdRef.current
+            || readWizardDismissedEventId()
             || showEventDetails
             || showEventTypes
             || showGuestForm
@@ -2718,6 +2779,14 @@ const handleOpenAddonModal = React.useCallback(() => {
             return;
           }
           clearEventDetails();
+          return;
+        }
+
+        if (
+          typeof data.status === 'string'
+          && data.status.toLowerCase() === 'archived'
+          && isWizardEventSessionProtected()
+        ) {
           return;
         }
 
@@ -2759,6 +2828,7 @@ const handleOpenAddonModal = React.useCallback(() => {
         const details = data.event_details || {};
         const capFromRow = parseNonNegativeInt(data?.allowed_guests);
         setEventAllowedGuests(capFromRow > 0 ? capFromRow : null);
+        setEventDataLoaded(true);
         if (shouldApplyEventTypeFromRecord(data.event_type, selectedEventTypeRef.current)) {
           setSelectedEventType(resolveDisplayEventType(data.event_type));
         }
@@ -5747,28 +5817,51 @@ React.useEffect(() => {
         if(!user) return;
         let ev = null;
         let messagesSent = 0;
-        const { data: evData, error: evError } = await supabase
-          .from('events')
-          .select('id,event_type,event_details,allowed_guests,messages_sent_count,reminder_sent_at,additional_packages,selected_plan,status')
-          .eq('user_id',user.id)
-          .order('created_at',{ascending:false})
-          .limit(1)
-          .maybeSingle();
-        if (evError && (evError.message || '').toLowerCase().includes('column')) {
-          const { data: evF } = await supabase
+        const pinnedEventId =
+          wizardDismissedEventIdRef.current
+          || readWizardDismissedEventId()
+          || (isWizardEventSessionProtected() && currentEventId ? currentEventId : null);
+        if (pinnedEventId) {
+          const { data: pinnedEv, error: pinnedErr } = await supabase
             .from('events')
-            .select('id,event_type,event_details,allowed_guests')
+            .select('id,event_type,event_details,allowed_guests,messages_sent_count,reminder_sent_at,additional_packages,selected_plan,status')
+            .eq('user_id', user.id)
+            .eq('id', pinnedEventId)
+            .maybeSingle();
+          if (!pinnedErr && pinnedEv) {
+            ev = pinnedEv;
+            messagesSent = pinnedEv?.messages_sent_count ?? 0;
+          }
+        }
+        if (!ev) {
+          const { data: evData, error: evError } = await supabase
+            .from('events')
+            .select('id,event_type,event_details,allowed_guests,messages_sent_count,reminder_sent_at,additional_packages,selected_plan,status')
             .eq('user_id',user.id)
+            .or('status.neq.archived,status.is.null')
             .order('created_at',{ascending:false})
             .limit(1)
             .maybeSingle();
-          ev = evF;
-        } else {
-          ev = evData;
-          messagesSent = ev?.messages_sent_count ?? 0;
+          if (evError && (evError.message || '').toLowerCase().includes('column')) {
+            const { data: evF } = await supabase
+              .from('events')
+              .select('id,event_type,event_details,allowed_guests')
+              .eq('user_id',user.id)
+              .or('status.neq.archived,status.is.null')
+              .order('created_at',{ascending:false})
+              .limit(1)
+              .maybeSingle();
+            ev = evF;
+          } else {
+            ev = evData;
+            messagesSent = ev?.messages_sent_count ?? 0;
+          }
         }
         if (!ev || (typeof ev.status === 'string' && ev.status.toLowerCase() === 'archived')) {
           if (currentEventId && isWizardEventSessionProtected()) {
+            return;
+          }
+          if (wizardDismissedEventIdRef.current || readWizardDismissedEventId()) {
             return;
           }
           setEventAllowedGuests(null);
@@ -5799,6 +5892,9 @@ React.useEffect(() => {
         if (hasEventEnded(ev) && !isEventWizardDraft(ev) && !isWizardEventSessionProtected()) {
           await clearEndedEvent(ev.id);
           return;
+        }
+        if (currentEventId !== ev.id) {
+          setCurrentEventId(ev.id);
         }
         setEventMessagesSentCount(messagesSent);
         setEventReminderSentAt(ev?.reminder_sent_at ?? null);
@@ -5883,6 +5979,7 @@ React.useEffect(() => {
           const rowStatus = typeof ev.status === 'string' ? ev.status.toLowerCase() : '';
           if (payload.eventType === 'DELETE' || rowStatus === 'archived') {
             if (isWizardEventSessionProtected()) return;
+            if (wizardDismissedEventIdRef.current || readWizardDismissedEventId()) return;
             setCurrentEventId(null);
             setEventAllowedGuests(null);
             setEventDataLoaded(false);
@@ -6596,14 +6693,35 @@ React.useEffect(() => {
 
         await loadUserPlanSettings();
 
-        const { data: ev } = await supabase
-          .from('events')
-          .select('id, event_type, event_details, allowed_guests, messages_sent_count, reminder_sent_at, additional_packages, selected_plan, status')
-          .eq('user_id', user.id)
-          .or('status.neq.archived,status.is.null')
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
+        const pinnedEventId =
+          wizardDismissedEventIdRef.current
+          || readWizardDismissedEventId();
+        let ev = null;
+        if (pinnedEventId) {
+          const { data: pinnedEv } = await supabase
+            .from('events')
+            .select('id, event_type, event_details, allowed_guests, messages_sent_count, reminder_sent_at, additional_packages, selected_plan, status')
+            .eq('user_id', user.id)
+            .eq('id', pinnedEventId)
+            .maybeSingle();
+          if (
+            pinnedEv
+            && !(typeof pinnedEv.status === 'string' && pinnedEv.status.toLowerCase() === 'archived')
+          ) {
+            ev = pinnedEv;
+          }
+        }
+        if (!ev) {
+          const { data: latestEv } = await supabase
+            .from('events')
+            .select('id, event_type, event_details, allowed_guests, messages_sent_count, reminder_sent_at, additional_packages, selected_plan, status')
+            .eq('user_id', user.id)
+            .or('status.neq.archived,status.is.null')
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          ev = latestEv;
+        }
 
         if (ev) {
           noEventLoggedRef.current = false;
@@ -6914,32 +7032,58 @@ React.useEffect(() => {
         await loadUserPlanSettings();
         let ev = null;
         let messagesSent = 0;
-        const { data: evData, error: evError } = await supabase
-          .from('events')
-          .select('id,event_type,status,event_details,allowed_guests,messages_sent_count,reminder_sent_at,additional_packages,selected_plan')
-          .eq('user_id', user.id)
-          .order('created_at',{ascending:false})
-          .limit(1)
-          .maybeSingle();
-        if (evError && (evError.message || '').toLowerCase().includes('column')) {
-          const { data: evFallback } = await supabase
+        const pinnedEventId =
+          wizardDismissedEventIdRef.current
+          || readWizardDismissedEventId();
+        if (pinnedEventId) {
+          const { data: pinnedEv } = await supabase
             .from('events')
-            .select('id,event_type,event_details,allowed_guests')
+            .select('id,event_type,status,event_details,allowed_guests,messages_sent_count,reminder_sent_at,additional_packages,selected_plan')
             .eq('user_id', user.id)
+            .eq('id', pinnedEventId)
+            .maybeSingle();
+          if (
+            pinnedEv
+            && !(typeof pinnedEv.status === 'string' && pinnedEv.status.toLowerCase() === 'archived')
+          ) {
+            ev = pinnedEv;
+            messagesSent = pinnedEv?.messages_sent_count ?? 0;
+          }
+        }
+        if (!ev) {
+          const { data: evData, error: evError } = await supabase
+            .from('events')
+            .select('id,event_type,status,event_details,allowed_guests,messages_sent_count,reminder_sent_at,additional_packages,selected_plan')
+            .eq('user_id', user.id)
+            .or('status.neq.archived,status.is.null')
             .order('created_at',{ascending:false})
             .limit(1)
             .maybeSingle();
-          ev = evFallback;
-          messagesSent = 0;
-        } else {
-          ev = evData;
-          messagesSent = ev?.messages_sent_count ?? 0;
+          if (evError && (evError.message || '').toLowerCase().includes('column')) {
+            const { data: evFallback } = await supabase
+              .from('events')
+              .select('id,event_type,event_details,allowed_guests')
+              .eq('user_id', user.id)
+              .or('status.neq.archived,status.is.null')
+              .order('created_at',{ascending:false})
+              .limit(1)
+              .maybeSingle();
+            ev = evFallback;
+            messagesSent = 0;
+          } else {
+            ev = evData;
+            messagesSent = ev?.messages_sent_count ?? 0;
+          }
         }
         const evIsArchived =
           ev &&
           typeof ev.status === 'string' &&
           ev.status.toLowerCase() === 'archived';
         if (evIsArchived) {
+          if (isWizardEventSessionProtected() || wizardDismissedEventIdRef.current || readWizardDismissedEventId()) {
+            isInitialLoadRef.current = false;
+            return;
+          }
           setCurrentEventId(null);
           setGuestStatusSummary({ approved: 0, rejected: 0, pending: 0 });
           setGuestSummary({ approved: 0, adults: 0, children: 0 });
@@ -7552,7 +7696,8 @@ React.useEffect(()=>{
     wizardSuppressedStepsRef.current.add(stepNumber);
     writeWizardDismissedSteps(wizardSuppressedStepsRef.current);
     blockWizardAutoOpen();
-  }, [writeWizardDismissedSteps, blockWizardAutoOpen]);
+    markWizardDismissedEvent(currentEventIdRef.current);
+  }, [writeWizardDismissedSteps, blockWizardAutoOpen, markWizardDismissedEvent]);
 
   const unsuppressWizardStep = React.useCallback((stepNumber) => {
     wizardSuppressedStepsRef.current.delete(stepNumber);
@@ -8137,7 +8282,7 @@ React.useEffect(()=>{
 
   const renderDashboardDetailsCards = () => (
     <>
-      {currentEventId && isCurrentEventActive ? (
+      {currentEventId && (isCurrentEventActive || isWizardEventSessionProtected()) ? (
         <div className="bg-white/[0.055] border border-white/15 backdrop-blur-xl rounded-2xl p-4 sm:p-6 text-center shadow-[0_8px_40px_rgba(0,0,0,0.35)] ring-2 ring-indigo-400/30 w-full">
           <div className="flex items-center justify-center gap-2 mb-2">
             <span className="text-2xl">✅</span>
