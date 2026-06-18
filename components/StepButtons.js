@@ -315,6 +315,16 @@ const isEventRecordActive = (record) => {
   return isEventDateOnOrAfterToday(rawDate);
 };
 
+/** אירוע בתהליך יצירה (ללא תאריך עדיין) — לא למחוק בארכיון */
+const isEventWizardDraft = (record) => {
+  if (!record) return false;
+  const status = typeof record.status === 'string' ? record.status.toLowerCase() : '';
+  if (status === 'archived') return false;
+  if (isEventRecordActive(record)) return false;
+  const rawDate = getRawEventDateFromDetails(getEventDetailsFromRecord(record));
+  return !rawDate;
+};
+
 const computePlanRetentionDate = (rawDate) => {
   const parsed = parseEventDate(rawDate);
   if (!parsed) return null;
@@ -1122,35 +1132,54 @@ const derivePlanFromRecord = React.useCallback((record) => {
   }
   return derivedPlan;
 }, [computePlanFromCapacity]);
-const [userPlanSettings, setUserPlanSettings] = useState({ plan: null, addonCount: 0 });
+const [userPlanSettings, setUserPlanSettings] = useState({ plan: null, addonCount: 0, eventWizardStarted: false });
 /** נכון אחרי ש־loadUserPlanSettings סיים (כולל שגיאה) — לא לאפס מסלול מ-localStorage לפני כן */
 const userPlanSettingsHydratedRef = useRef(false);
-const persistUserPlanSettings = React.useCallback(async (planCode, addonCount) => {
+const persistUserPlanSettings = React.useCallback(async (planCode, addonCount, eventWizardStartedOverride = undefined) => {
   try {
     const user = await resolveCurrentUserForSync();
     if (!user) return;
     const safePlan = planCode || null;
     const parsedAddon = Number(addonCount);
     const safeAddon = Number.isFinite(parsedAddon) ? Math.max(0, Math.floor(parsedAddon)) : 0;
-    const { error } = await supabase
+    const eventWizardStarted = eventWizardStartedOverride !== undefined
+      ? Boolean(eventWizardStartedOverride)
+      : Boolean(userPlanSettingsRef.current?.eventWizardStarted);
+    const upsertPayload = {
+      user_id: user.id,
+      plan_code: safePlan,
+      addon_balance: safeAddon,
+      event_wizard_started: eventWizardStarted,
+    };
+    let { error } = await supabase
       .from('user_settings')
-      .upsert(
-        {
-          user_id: user.id,
-          plan_code: safePlan,
-          addon_balance: safeAddon,
-        },
-        { onConflict: 'user_id' },
-      );
+      .upsert(upsertPayload, { onConflict: 'user_id' });
+    if (error && String(error.message || '').includes('event_wizard_started')) {
+      ({ error } = await supabase
+        .from('user_settings')
+        .upsert(
+          {
+            user_id: user.id,
+            plan_code: safePlan,
+            addon_balance: safeAddon,
+          },
+          { onConflict: 'user_id' },
+        ));
+    }
     if (error) {
       console.error('persistUserPlanSettings failed', error);
       return;
     }
     setUserPlanSettings((prev) => {
-      if (prev && prev.plan === safePlan && prev.addonCount === safeAddon) {
+      if (
+        prev
+        && prev.plan === safePlan
+        && (prev.addonCount ?? 0) === safeAddon
+        && Boolean(prev.eventWizardStarted) === eventWizardStarted
+      ) {
         return prev;
       }
-      return { plan: safePlan, addonCount: safeAddon };
+      return { plan: safePlan, addonCount: safeAddon, eventWizardStarted };
     });
     if (safePlan) {
       clearCarryPlanAfterManualDelete();
@@ -1182,19 +1211,26 @@ const loadUserPlanSettings = React.useCallback(async () => {
     const userId = user?.id ?? sessionRef.current?.user?.id ?? null;
     if (!userId) {
       setUserPlanSettings((prev) => {
-        if (prev && prev.plan === null && (prev.addonCount ?? 0) === 0) {
+        if (prev && prev.plan === null && (prev.addonCount ?? 0) === 0 && !prev.eventWizardStarted) {
           return prev;
         }
-        return { plan: null, addonCount: 0 };
+        return { plan: null, addonCount: 0, eventWizardStarted: false };
       });
       setSelectedPlan(null);
-      return { plan: null, addonCount: 0 };
+      return { plan: null, addonCount: 0, eventWizardStarted: false };
     }
-    const { data, error } = await supabase
+    let { data, error } = await supabase
       .from('user_settings')
-      .select('plan_code, addon_balance')
+      .select('plan_code, addon_balance, event_wizard_started')
       .eq('user_id', userId)
       .maybeSingle();
+    if (error && String(error.message || '').includes('event_wizard_started')) {
+      ({ data, error } = await supabase
+        .from('user_settings')
+        .select('plan_code, addon_balance')
+        .eq('user_id', userId)
+        .maybeSingle());
+    }
     if (error) {
       console.error('loadUserPlanSettings failed', error);
       return null;
@@ -1208,12 +1244,12 @@ const loadUserPlanSettings = React.useCallback(async () => {
       try { localStorage.removeItem('user_plan_code'); } catch (e) {}
       try { localStorage.removeItem('additionalPackages_global'); } catch (e) {}
       setUserPlanSettings((prev) => {
-        if (prev && prev.plan === null && (prev.addonCount ?? 0) === 0) {
+        if (prev && prev.plan === null && (prev.addonCount ?? 0) === 0 && !prev.eventWizardStarted) {
           return prev;
         }
-        return { plan: null, addonCount: 0 };
+        return { plan: null, addonCount: 0, eventWizardStarted: false };
       });
-      return { plan: null, addonCount: 0 };
+      return { plan: null, addonCount: 0, eventWizardStarted: false };
     }
     let plan =
       typeof data.plan_code === 'string'
@@ -1221,9 +1257,15 @@ const loadUserPlanSettings = React.useCallback(async () => {
         : data.plan_code || null;
     const parsedAddon = Number(data.addon_balance);
     let addonCount = Number.isFinite(parsedAddon) ? Math.max(0, Math.floor(parsedAddon)) : 0;
-    const settings = { plan, addonCount };
+    const eventWizardStarted = Boolean(data.event_wizard_started);
+    const settings = { plan, addonCount, eventWizardStarted };
     setUserPlanSettings((prev) => {
-      if (prev && prev.plan === settings.plan && (prev.addonCount ?? 0) === settings.addonCount) {
+      if (
+        prev
+        && prev.plan === settings.plan
+        && (prev.addonCount ?? 0) === settings.addonCount
+        && Boolean(prev.eventWizardStarted) === eventWizardStarted
+      ) {
         return prev;
       }
       return settings;
@@ -1348,10 +1390,10 @@ const noEventLoggedRef = useRef(false);
       setSelectedPlan(null);
       setEventAllowedGuests(null);
       setUserPlanSettings((prev) => {
-        if (prev && prev.plan === null && (prev.addonCount ?? 0) === 0) {
+        if (prev && prev.plan === null && (prev.addonCount ?? 0) === 0 && !prev.eventWizardStarted) {
           return prev;
         }
-        return { plan: null, addonCount: 0 };
+        return { plan: null, addonCount: 0, eventWizardStarted: false };
       });
       return;
     }
@@ -1376,6 +1418,26 @@ const noEventLoggedRef = useRef(false);
       document.removeEventListener('visibilitychange', handleVisibility);
     };
   }, [session, loadUserPlanSettings]);
+
+  React.useEffect(() => {
+    if (!session) return;
+    if (currentEventId) return;
+    if (!userPlanSettingsHydratedRef.current) return;
+
+    const plan = userPlanSettings?.plan;
+    if (!plan || !userPlanSettings?.eventWizardStarted) return;
+
+    setNewEventStarted(true);
+    try { localStorage.setItem('newEventStarted', '1'); } catch (_) {}
+    try { localStorage.setItem('selectedPlan', plan); } catch (_) {}
+    setShowGuestListModal(false);
+    setShowReportsOptions(false);
+    setShowReportModal(false);
+    if (!showEventTypes) {
+      setShowEventTypes(true);
+    }
+    setStepErrorMsg('');
+  }, [session, currentEventId, userPlanSettings, showEventTypes]);
 
   React.useEffect(() => {
     if (currentEventId) return;
@@ -3054,6 +3116,7 @@ const handleOpenAddonModal = React.useCallback(() => {
               active_event_id: currentEventId,
               plan_code: selectedPlan || planForDisplay || userPlanSettings?.plan || null,
               addon_balance: addonCountForDb,
+              event_wizard_started: false,
             },
             { onConflict: 'user_id' },
           );
@@ -3098,6 +3161,7 @@ const handleOpenAddonModal = React.useCallback(() => {
                 active_event_id: inserted.id,
                 plan_code: selectedPlan || planForDisplay || userPlanSettings?.plan || null,
                 addon_balance: addonCountForDb,
+                event_wizard_started: false,
               },
               { onConflict: 'user_id' },
             );
@@ -4416,14 +4480,14 @@ React.useEffect(() => {
       setEventAllowedGuests(null);
       setAdditionalPackages([]);
       setDbAddonCount(0);
-      setUserPlanSettings({ plan: null, addonCount: 0 });
+      setUserPlanSettings({ plan: null, addonCount: 0, eventWizardStarted: false });
       setNewEventStarted(false);
     planRetentionUntilRef.current = null;
       try { localStorage.removeItem('selectedPlan'); } catch (_) {}
       try { localStorage.removeItem('user_plan_code'); } catch (_) {}
       try { localStorage.removeItem('additionalPackages_global'); } catch (_) {}
       try { localStorage.removeItem('newEventStarted'); } catch (_) {}
-      await persistUserPlanSettings(null, 0);
+      await persistUserPlanSettings(null, 0, false);
     } finally {
       isClearingPlanRef.current = false;
     }
@@ -4775,7 +4839,7 @@ React.useEffect(() => {
       try { localStorage.removeItem('additionalPackages_global'); } catch (_) {}
       if (archivedByRetention) {
         try {
-          await persistUserPlanSettings(null, 0);
+          await persistUserPlanSettings(null, 0, false);
         } catch (_) {}
         setUserPlanSettings((prev) => {
           if (prev && prev.plan === null && (prev.addonCount ?? 0) === 0) {
@@ -4814,8 +4878,17 @@ React.useEffect(() => {
       setShowPricingPlan(true);
       setPlanAddOnMode(false); // Ensure we're in plan selection mode, not addon mode
     }
-    await persistUserPlanSettings(planToCarryForward, addonCountBeforeReset);
+    await persistUserPlanSettings(planToCarryForward, addonCountBeforeReset, Boolean(planToCarryForward));
     setEventRefreshKey((key) => key + 1);
+
+    if (planToCarryForward && !(showDeletionMessage && (eventWasDeleted || deletionCompleted))) {
+      setNewEventStarted(true);
+      try { localStorage.setItem('newEventStarted', '1'); } catch (_) {}
+      setShowGuestListModal(false);
+      setShowReportsOptions(false);
+      setShowEventTypes(true);
+      setStepErrorMsg('');
+    }
 
     if (showDeletionMessage && (eventWasDeleted || deletionCompleted)) {
       // סימון ש"ניקינו" את האירוע הקודם – כדי לא לבקש מחיקה שוב בכל לחיצה על "צור אירוע חדש"
@@ -5067,7 +5140,7 @@ React.useEffect(() => {
             userPlanSettings?.addonCount ?? 0,
             Array.isArray(additionalPackages) ? additionalPackages.filter((p) => p === 'addon').length : 0
           );
-          await persistUserPlanSettings(effectivePlan, currentAddonBalance);
+          await persistUserPlanSettings(effectivePlan, currentAddonBalance, !eventIdForPlan);
           if (eventIdForPlan) {
             supabase.from('events').update({ selected_plan: effectivePlan }).eq('id', eventIdForPlan).then(({ error }) => {
               if (error) console.error('Failed to persist selected_plan to DB', error);
@@ -5465,7 +5538,7 @@ React.useEffect(() => {
           setSelectedPlan(planToUse);
           selectionSourceRef.current = 'event';
           try { localStorage.setItem('selectedPlan', planToUse); } catch(e){}
-          await persistUserPlanSettings(planToUse, addonCount);
+          await persistUserPlanSettings(planToUse, addonCount, false);
           if (
             parseNonNegativeInt(ev.additional_packages) !== addonCount ||
             parseNonNegativeInt(ev.allowed_guests) !== repairedAllowedGuests
@@ -6099,7 +6172,7 @@ React.useEffect(() => {
         if (ev) {
           noEventLoggedRef.current = false;
 
-          if (!isEventRecordActive(ev)) {
+          if (!isEventRecordActive(ev) && !isEventWizardDraft(ev)) {
             if (lastRestoredEventIdRef.current !== 'ended') {
               console.log('Event found but has ended, clearing active event');
               lastRestoredEventIdRef.current = 'ended';
@@ -6145,7 +6218,7 @@ React.useEffect(() => {
           if (planToUse) {
             setSelectedPlan(planToUse);
             try { localStorage.setItem('selectedPlan', planToUse); } catch(e){}
-            await persistUserPlanSettings(planToUse, restoreAddonCount);
+            await persistUserPlanSettings(planToUse, restoreAddonCount, false);
             if (
               parseNonNegativeInt(ev.additional_packages) !== restoreAddonCount ||
               parseNonNegativeInt(ev.allowed_guests) !== repairedAllowedGuests
@@ -6247,9 +6320,15 @@ React.useEffect(() => {
             const canCarryPlan = shouldRespectCarryPlanAfterManualDelete();
             if (settings.plan && canCarryPlan) {
               setSelectedPlan(settings.plan);
-              // Keep the purchased/retained plan ready, but do NOT start the wizard automatically.
-              // The user should explicitly click "צור אירוע חדש" before seeing step modals.
               try { localStorage.setItem('selectedPlan', settings.plan); } catch(e){}
+              if (settings.eventWizardStarted) {
+                setNewEventStarted(true);
+                try { localStorage.setItem('newEventStarted', '1'); } catch(e){}
+                setShowGuestListModal(false);
+                setShowReportsOptions(false);
+                setShowEventTypes(true);
+                setStepErrorMsg('');
+              }
             } else if (settings.plan) {
               await clearPlanState();
             } else {
@@ -6429,12 +6508,12 @@ React.useEffect(() => {
           isInitialLoadRef.current = false;
           return;
         }
-        if (ev && !isEventRecordActive(ev)) {
+        if (ev && !isEventRecordActive(ev) && !isEventWizardDraft(ev)) {
           await clearEndedEvent(ev.id);
           isInitialLoadRef.current = false;
           return;
         }
-        if(ev && isEventRecordActive(ev)){
+        if (ev && (isEventRecordActive(ev) || isEventWizardDraft(ev))) {
           setCurrentEventId(ev.id);
           if (ev.event_type) {
             setSelectedEventType(ev.event_type);
@@ -6459,7 +6538,7 @@ React.useEffect(() => {
           if (planToUse) {
             setSelectedPlan(planToUse);
             try { localStorage.setItem('selectedPlan', planToUse); } catch(e){}
-            await persistUserPlanSettings(planToUse, addonCount);
+            await persistUserPlanSettings(planToUse, addonCount, false);
             if (
               parseNonNegativeInt(ev.additional_packages) !== addonCount ||
               parseNonNegativeInt(ev.allowed_guests) !== repairedAllowedGuests
