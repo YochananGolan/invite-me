@@ -2,10 +2,10 @@ import Modal, { ModalHeader, ModalBody, ModalFooter } from './Modal';
 
 const PLANS = [
   { id: 'א', range: '1 הודעה · 1 ש״ח', price: 1, desc: 'מתאים לאירועים קטנים' },
-  { id: 'ב', range: 'מ־2 עד 200 הודעות', price: 149, desc: 'מתאים לרוב האירועים' },
-  { id: 'ג', range: 'מ־201 עד 350 הודעות', price: 199, desc: 'לאירועים גדולים' },
-  { id: 'ד', range: 'מ־351 עד 500 הודעות', price: 259, desc: 'לאירועים גדולים מאוד' },
-  { id: 'הרחבה', range: '100 הודעות נוספות', price: 100, desc: 'חבילת הרחבה' },
+  { id: 'ב', range: 'מ־2 עד 200 הודעות · 1 ש״ח', price: 1, desc: 'מתאים לרוב האירועים' },
+  { id: 'ג', range: 'מ־201 עד 350 הודעות · 1 ש״ח', price: 1, desc: 'לאירועים גדולים' },
+  { id: 'ד', range: 'מ־351 עד 500 הודעות · 1 ש״ח', price: 1, desc: 'לאירועים גדולים מאוד' },
+  { id: 'הרחבה', range: '100 הודעות נוספות · 1 ש״ח', price: 1, desc: 'חבילת הרחבה' },
 ];
 
 export default function PricingTableModal({ isOpen, onClose }) {
@@ -56,7 +56,7 @@ export default function PricingTableModal({ isOpen, onClose }) {
           * המחירים הם חד פעמיים לכל אירוע
         </p>
         <p className="text-center text-indigo-300 text-sm mt-2">
-          💡 ניתן לרכוש חבילות הרחבה של 100 הודעות נוספות ב־100 ₪
+          💡 ניתן לרכוש חבילות הרחבה של 100 הודעות נוספות ב־1 ₪
         </p>
       </ModalBody>
 

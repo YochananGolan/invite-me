@@ -4901,16 +4901,15 @@ React.useEffect(() => {
 
   // Get price for each plan
   const getPlanPrice = (plan) => {
-    switch(plan) {
+    switch (plan) {
       case 'free':
       case 'basic':
-        return 1;
       case 'standard':
-        return 149;
       case 'premium':
-        return 199;
       case 'luxury':
-        return 259;
+      case 'elite':
+      case 'supreme':
+        return 1;
       default:
         return 1;
     }
@@ -4918,16 +4917,20 @@ React.useEffect(() => {
 
   // Get plan display name
   const getPlanDisplayName = (plan) => {
-    switch(plan) {
+    switch (plan) {
       case 'free':
       case 'basic':
         return 'מסלול א - 1 הודעה · 1 ש״ח';
       case 'standard':
-        return 'מסלול ב - 149₪';
+        return 'מסלול ב - מ 2 עד 200 הודעות · 1 ש״ח';
       case 'premium':
-        return 'מסלול ג - 199₪';
+        return 'מסלול ג - מ 201 עד 350 הודעות · 1 ש״ח';
       case 'luxury':
-        return 'מסלול ד - 259₪';
+        return 'מסלול ד - מ 351 עד 500 הודעות · 1 ש״ח';
+      case 'elite':
+        return 'מסלול ה - מ 501 עד 650 הודעות · 1 ש״ח';
+      case 'supreme':
+        return 'מסלול ו - מ 651 עד 1000 הודעות · 1 ש״ח';
       default:
         return plan;
     }
@@ -5019,17 +5022,17 @@ React.useEffect(() => {
     }
   };
 
-  // Helper function to get addon package price (100 guests for 100 shekel)
+  // Helper function to get addon package price (100 messages per package)
   const getAddonPrice = () => {
-    return 100;
+    return 1;
   };
 
   // Helper function to get addon display name
   const getAddonDisplayName = () => {
-    return 'חבילת הרחבה - 100 הודעות נוספות';
+    return 'חבילת הרחבה - 100 הודעות · 1 ש״ח';
   };
 
-  // Purchase addon: הלקוח בחר כמה חבילות (100 הודעות כל אחת), 100₪ לחבילה
+  // Purchase addon: הלקוח בחר כמה חבילות (100 הודעות כל אחת), 1 ש״ח לחבילה
   const handlePurchaseAddon = () => {
     if (!session) {
       setInvitationResult({ type: 'error', message: 'עליך להתחבר כדי לרכוש חבילה' });
@@ -5041,7 +5044,8 @@ React.useEffect(() => {
     }
 
     const numPackages = Math.max(1, pendingAddonCount);
-    const totalCost = numPackages * 100;
+    const addonUnitPrice = getAddonPrice();
+    const totalCost = numPackages * addonUnitPrice;
 
     setPendingPlan('addon');
     setPaymentAmount(totalCost);
@@ -5084,7 +5088,7 @@ React.useEffect(() => {
         transactionData?.Price ??
         null;
       const paidAmount = parseAmount(rawAmount);
-      const addonUnitPrice = getAddonPrice ? getAddonPrice() : 100;
+      const addonUnitPrice = getAddonPrice ? getAddonPrice() : 1;
       const expectedAddonAmount =
         addonCount && addonUnitPrice ? addonCount * addonUnitPrice : null;
       const planPrice = plan ? getPlanPrice(plan) : null;
@@ -5206,7 +5210,7 @@ React.useEffect(() => {
           setShowPaymentResultModal(true);
         }
       }
-      // Handle addon packages (100 guests for 100 shekel each)
+      // Handle addon packages (100 messages per package, 1 shekel each)
       else if (effectivePlan === 'addon') {
         try {
           let existingAddonCount = Math.max(
@@ -5288,8 +5292,8 @@ React.useEffect(() => {
           try { localStorage.setItem('additionalPackages_' + (eventIdForSave || 'global'), JSON.stringify(newAddonTotal)); } catch (_) {}
           setPlanSelectionError('');
 
-          const totalMessagesAdded = addonCount * 100;
-          const totalPaid = addonCount * 100;
+          const totalMessagesAdded = addonCount * (getPlanBaseLimit('addon') || 100);
+          const totalPaid = addonCount * getAddonPrice();
           const msg = addonCount === 1
             ? 'נרכשה חבילה של 100 והמכסה עודכנה.'
             : `נרכשו ${addonCount} חבילות (${totalMessagesAdded} הודעות) בסכום ₪${totalPaid} והמכסה עודכנה.`;
@@ -7535,11 +7539,11 @@ React.useEffect(()=>{
                 </div>
                 <div className="text-base text-slate-300 font-semibold">
                   {displayPlanCode === 'basic' || displayPlanCode === 'free' ? '1 ש״ח - 1 הודעה' :
-                   displayPlanCode === 'standard' ? '149₪ - מ 2 עד 200 הודעות' :
-                   displayPlanCode === 'premium' ? '199₪ - מ 201 עד 350 הודעות' :
-                   displayPlanCode === 'luxury' ? '259₪ - מ 351 עד 500 הודעות' :
-                   displayPlanCode === 'elite' ? '349₪ - מ 501 עד 650 הודעות' :
-                   displayPlanCode === 'supreme' ? '499₪ - מ 651 עד 1000 הודעות' : '1 ש״ח - 1 הודעה'}
+                   displayPlanCode === 'standard' ? '1 ש״ח - מ 2 עד 200 הודעות' :
+                   displayPlanCode === 'premium' ? '1 ש״ח - מ 201 עד 350 הודעות' :
+                   displayPlanCode === 'luxury' ? '1 ש״ח - מ 351 עד 500 הודעות' :
+                   displayPlanCode === 'elite' ? '1 ש״ח - מ 501 עד 650 הודעות' :
+                   displayPlanCode === 'supreme' ? '1 ש״ח - מ 651 עד 1000 הודעות' : '1 ש״ח - 1 הודעה'}
                 </div>
               </div>
               <div className="bg-amber-500/10 border border-amber-400/30 rounded-lg p-3">
@@ -7724,7 +7728,8 @@ React.useEffect(()=>{
             const addonUnit = getPlanBaseLimit('addon') || 100;
             const numPackages = Math.max(1, pendingAddonCount);
             const totalMessages = numPackages * addonUnit;
-            const totalCost = numPackages * 100;
+            const addonUnitPrice = getAddonPrice();
+            const totalCost = numPackages * addonUnitPrice;
 
             return (
               <div className="text-center">
@@ -7751,7 +7756,7 @@ React.useEffect(()=>{
                   </div>
 
                   <div className="bg-emerald-500/20 border border-emerald-400/30 rounded-xl p-3 mb-3">
-                    <h3 className="text-base font-bold text-emerald-300 mb-1">💰 חבילות הרחבה – 100 הודעות / ₪100</h3>
+                    <h3 className="text-base font-bold text-emerald-300 mb-1">💰 חבילות הרחבה – 100 הודעות · 1 ש״ח</h3>
                     <p className="text-xs text-slate-300 font-semibold mb-2">בחר כמה חבילות לרכוש:</p>
                     <div className="flex flex-wrap justify-center gap-1.5 mb-2">
                       {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => (
@@ -10909,9 +10914,9 @@ React.useEffect(()=>{
                     <p className="text-slate-300 text-base leading-relaxed">בשלב זה תבחר את המסלול המתאים לאירוע שלך:</p>
                     <ul className="list-disc list-inside space-y-1.5 mr-3 text-base">
                       <li><strong>מסלול א (1 ש״ח)</strong> - 1 הודעה</li>
-                      <li><strong>מסלול ב (149₪)</strong> - מ 2 עד 200 הודעות</li>
-                      <li><strong>מסלול ג (199₪)</strong> - מ 201 עד 350 הודעות</li>
-                      <li><strong>מסלול ד (259₪)</strong> - מ 351 עד 500 הודעות</li>
+                      <li><strong>מסלול ב (1 ש״ח)</strong> - מ 2 עד 200 הודעות</li>
+                      <li><strong>מסלול ג (1 ש״ח)</strong> - מ 201 עד 350 הודעות</li>
+                      <li><strong>מסלול ד (1 ש״ח)</strong> - מ 351 עד 500 הודעות</li>
                     </ul>
                     <p className="text-slate-400 text-sm mt-2">המחירים הם חד פעמיים לכל אירוע</p>
                   </div>
@@ -11048,9 +11053,9 @@ React.useEffect(()=>{
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 mb-6 shrink-0">
             {[
               { key: 'free',     id: 'א', subtitle: 'אירועים קטנים',    range: '1 הודעה · 1 ש״ח',        price: '1',   recommended: false },
-              { key: 'standard', id: 'ב', subtitle: 'מתאים לרוב',       range: 'מ־2 עד 200 הודעות',  price: '149', recommended: true  },
-              { key: 'premium',  id: 'ג', subtitle: 'אירועים גדולים',   range: 'מ־201 עד 350 הודעות', price: '199', recommended: false },
-              { key: 'luxury',   id: 'ד', subtitle: 'אירועים גדולים מאוד', range: 'מ־351 עד 500 הודעות', price: '259', recommended: false },
+              { key: 'standard', id: 'ב', subtitle: 'מתאים לרוב',       range: 'מ־2 עד 200 הודעות · 1 ש״ח',  price: '1', recommended: true  },
+              { key: 'premium',  id: 'ג', subtitle: 'אירועים גדולים',   range: 'מ־201 עד 350 הודעות · 1 ש״ח', price: '1', recommended: false },
+              { key: 'luxury',   id: 'ד', subtitle: 'אירועים גדולים מאוד', range: 'מ־351 עד 500 הודעות · 1 ש״ח', price: '1', recommended: false },
             ].map((plan) => (
               <div
                 key={plan.key}
@@ -11120,7 +11125,7 @@ React.useEffect(()=>{
           <div className="mt-5 flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0">
             <span className="text-base text-slate-400">* המחירים הם חד פעמיים לאירוע</span>
             <div className="bg-indigo-500/20 border-2 border-indigo-400/60 rounded-xl px-6 py-4 text-xl font-black text-indigo-100 shadow-[0_0_20px_rgba(99,70,230,0.3)]">
-              💡 הרחבה: 100 הודעות נוספות ב-100 ₪
+              💡 הרחבה: 100 הודעות נוספות ב-1 ש״ח
             </div>
           </div>
         </ModalBody>
@@ -11183,8 +11188,13 @@ React.useEffect(()=>{
                       const n = Math.max(1, lastAddonCountForRetry);
                       setPendingPlan('addon');
                       setPendingAddonCount(n);
-                      setPaymentAmount(n * 100);
-                      setPaymentPlanName(n === 1 ? 'חבילת הרחבה - 100 הודעות נוספות' : `${n} חבילות הרחבה - ${n * 100} הודעות (₪${n * 100})`);
+                      const addonUnitPrice = getAddonPrice();
+                      setPaymentAmount(n * addonUnitPrice);
+                      setPaymentPlanName(
+                        n === 1
+                          ? getAddonDisplayName()
+                          : `${n} חבילות הרחבה - ${n * (getPlanBaseLimit('addon') || 100)} הודעות (₪${n * addonUnitPrice})`,
+                      );
                       setShowPaymentModal(true);
                       setPaymentFailureWasAddon(false);
                     } else {
