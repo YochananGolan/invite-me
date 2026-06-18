@@ -315,14 +315,31 @@ const isEventRecordActive = (record) => {
   return isEventDateOnOrAfterToday(rawDate);
 };
 
+/** סוג אירוע זמני ב-DB עד שהמשתמש בוחר סוג אמיתי בשלב 1 */
+const WIZARD_DRAFT_EVENT_TYPE = 'טיוטה';
+
+const isWizardPlaceholderEventType = (eventType) => (
+  typeof eventType === 'string' && eventType.trim() === WIZARD_DRAFT_EVENT_TYPE
+);
+
 /** אירוע בתהליך יצירה (ללא תאריך עדיין) — לא למחוק בארכיון */
 const isEventWizardDraft = (record) => {
   if (!record) return false;
   const status = typeof record.status === 'string' ? record.status.toLowerCase() : '';
   if (status === 'archived') return false;
   if (isEventRecordActive(record)) return false;
-  const rawDate = getRawEventDateFromDetails(getEventDetailsFromRecord(record));
+  const details = getEventDetailsFromRecord(record);
+  if (details?.wizard_draft === true) return true;
+  if (isWizardPlaceholderEventType(record.event_type)) return true;
+  const rawDate = getRawEventDateFromDetails(details);
   return !rawDate;
+};
+
+/** שמירת דגל אשף בשרת — לא לאפס אחרי שחזור טיוטה או מעבר מכשיר */
+const shouldKeepEventWizardStarted = (record, settings = null) => {
+  if (isEventWizardDraft(record)) return true;
+  if (settings?.eventWizardStarted) return true;
+  return false;
 };
 
 const computePlanRetentionDate = (rawDate) => {
@@ -364,6 +381,13 @@ function shouldRespectCarryPlanAfterManualDelete() {
   } catch (_) {
     return false;
   }
+}
+
+/** מסלול ששולם ואשף יצירת אירוע בתהליך — לא לאפס אחרי יציאה/רענון */
+function shouldRestorePaidPlanFromSettings(settings) {
+  if (!settings?.plan) return false;
+  if (settings.eventWizardStarted) return true;
+  return shouldRespectCarryPlanAfterManualDelete();
 }
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -440,50 +464,6 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick, trig
     // לא לאפס selectedPlan כאן ב־!session — גורם לריצה לפני שהסשן מוכן ומוחק מסלול מ־localStorage; איפוס רק באפקט session למטה
   }, [session]);
 
-  // כשהדף מעלה triggerCreateEvent – מריצים זרימת יצירת אירוע (בלי תלות ב-ref)
-  useEffect(() => {
-    if (!triggerCreateEvent) return;
-    onConsumedCreateTrigger?.();
-    let hasSession = !!sessionRef.current;
-    const run = async () => {
-      if (!hasSession) {
-        const user = await resolveCurrentUserForSync();
-        hasSession = !!user;
-      }
-      if (!hasSession) {
-        setShowPricingPlan(true);
-        setPlanAddOnMode(false);
-        return;
-      }
-      setSelectedFlowStep(null);
-      setStepErrorMsg('');
-      // אם כבר בוצעה מחיקה מוצלחת של האירוע הקיים בסשן הזה – אין צורך לבקש מחיקה שוב.
-      if (hasClearedExistingEvent) {
-        await handleNewEvent();
-        // אחרי שמתחילים אירוע חדש אחרי מחיקה – לפתוח מיד את שלב 1 (בחירת סוג אירוע)
-        setShowEventTypes(true);
-        return;
-      }
-      // קודם: אם יש אירוע פעיל – להציג אזהרה/ארכיון, לא מסך מסלולים (גם כש־selectedPlan ריק ברגע)
-      const hasActive = await checkActiveEventExists();
-      if (hasActive) {
-        setShowExistingEventWarning(true);
-        return;
-      }
-      const planReady = await syncPurchasedPlanFromServerRef.current?.();
-      if (!planReady) {
-        setShowPricingPlan(true);
-        setPlanAddOnMode(false);
-        return;
-      }
-      await handleNewEvent();
-    };
-    run().catch((err) => {
-      console.error('createNewEvent error', err);
-      setShowPricingPlan(true);
-      setPlanAddOnMode(false);
-    });
-  }, [triggerCreateEvent, hasClearedExistingEvent]);
   const steps = ['צור אירוע חדש', '📅 שלב 1 - סוג אירוע', '📝 שלב 2 - פרטי האירוע', '🎨 שלב 3 - עיצוב הזמנה', '📤 שלב 4 - שליחת הזמנה לאורח', '📊 שלב 5 - דוחו"ת בקרה'];
   const stepsMobile = ['', 'סוג אירוע', 'פרטי האירוע', 'עיצוב', 'שליחה', 'דוחות בקרה'];
   const eventTypes = ['חתונה', 'חינה', 'מסיבת אירוסין', 'בר מצווה', 'בת מצווה', 'ברית', 'בריתה', 'יום הולדת', 'אירוע עסקי', 'הפרשת חלה'];
@@ -1257,7 +1237,25 @@ const loadUserPlanSettings = React.useCallback(async () => {
         : data.plan_code || null;
     const parsedAddon = Number(data.addon_balance);
     let addonCount = Number.isFinite(parsedAddon) ? Math.max(0, Math.floor(parsedAddon)) : 0;
-    const eventWizardStarted = Boolean(data.event_wizard_started);
+    let eventWizardStarted = Boolean(data.event_wizard_started);
+    if (plan && !eventWizardStarted) {
+      try {
+        const { data: latestEv } = await supabase
+          .from('events')
+          .select('id, event_type, event_details, status')
+          .eq('user_id', userId)
+          .or('status.neq.archived,status.is.null')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (isEventWizardDraft(latestEv)) {
+          eventWizardStarted = true;
+          await persistUserPlanSettings(plan, addonCount, true);
+        }
+      } catch (repairErr) {
+        console.warn('wizard draft flag repair skipped', repairErr);
+      }
+    }
     const settings = { plan, addonCount, eventWizardStarted };
     setUserPlanSettings((prev) => {
       if (
@@ -1285,6 +1283,16 @@ const loadUserPlanSettings = React.useCallback(async () => {
       try { localStorage.setItem('additionalPackages_global', String(addonCount)); } catch (e) {}
     }
     selectionSourceRef.current = plan ? 'persistent' : 'manual';
+    if (plan && eventWizardStarted) {
+      setNewEventStarted(true);
+      try { localStorage.setItem('newEventStarted', '1'); } catch (e) {}
+      try { localStorage.setItem('selectedPlan', plan); } catch (e) {}
+      setShowGuestListModal(false);
+      setShowReportsOptions(false);
+      setShowReportModal(false);
+      setShowEventTypes(true);
+      setStepErrorMsg('');
+    }
     return settings;
   } catch (err) {
     console.error('loadUserPlanSettings threw', err);
@@ -1421,7 +1429,6 @@ const noEventLoggedRef = useRef(false);
 
   React.useEffect(() => {
     if (!session) return;
-    if (currentEventId) return;
     if (!userPlanSettingsHydratedRef.current) return;
 
     const plan = userPlanSettings?.plan;
@@ -1437,7 +1444,7 @@ const noEventLoggedRef = useRef(false);
       setShowEventTypes(true);
     }
     setStepErrorMsg('');
-  }, [session, currentEventId, userPlanSettings, showEventTypes]);
+  }, [session, userPlanSettings, showEventTypes]);
 
   React.useEffect(() => {
     if (currentEventId) return;
@@ -1800,9 +1807,20 @@ const handleOpenAddonModal = React.useCallback(() => {
     if (currentEventId) {
       (async () => {
         try {
+          const { data: existing } = await supabase
+            .from('events')
+            .select('event_details')
+            .eq('id', currentEventId)
+            .maybeSingle();
+          const prevDetails = typeof existing?.event_details === 'string'
+            ? JSON.parse(existing.event_details)
+            : (existing?.event_details || {});
           await supabase
             .from('events')
-            .update({ event_type: normalizedType })
+            .update({
+              event_type: normalizedType,
+              event_details: { ...prevDetails, wizard_draft: false, wizard_step: 2 },
+            })
             .eq('id', currentEventId);
         } catch (e) {
           console.error('Failed to update event_type for current event', e);
@@ -4969,6 +4987,25 @@ React.useEffect(() => {
     }
 
     try {
+      const settings = await loadUserPlanSettings();
+      if (settings?.plan && settings.eventWizardStarted) {
+        setSelectedPlan(settings.plan);
+        try { localStorage.setItem('selectedPlan', settings.plan); } catch(e){}
+        setNewEventStarted(true);
+        try { localStorage.setItem('newEventStarted', '1'); } catch(e){}
+        setShowPricingPlan(false);
+        setShowEventTypes(true);
+        setStepErrorMsg('');
+        setInvitationResult({
+          type: 'success',
+          message: settings.plan === plan
+            ? 'המסלול כבר שולם. ממשיכים ליצירת האירוע.'
+            : `כבר שולמת עבור ${getPlanDisplayName(settings.plan)}. ממשיכים ליצירת האירוע.`,
+        });
+        setShowInvitationResultModal(true);
+        return;
+      }
+
       const user = await resolveCurrentUserForSync();
       if (user) {
         const { data: ev } = await supabase
@@ -5145,6 +5182,9 @@ React.useEffect(() => {
             Array.isArray(additionalPackages) ? additionalPackages.filter((p) => p === 'addon').length : 0
           );
           await persistUserPlanSettings(effectivePlan, currentAddonBalance, !eventIdForPlan);
+          if (!eventIdForPlan) {
+            await ensureWizardDraftEvent(effectivePlan, currentAddonBalance);
+          }
           if (eventIdForPlan) {
             supabase.from('events').update({ selected_plan: effectivePlan }).eq('id', eventIdForPlan).then(({ error }) => {
               if (error) console.error('Failed to persist selected_plan to DB', error);
@@ -5398,6 +5438,7 @@ React.useEffect(() => {
     return Boolean(
       currentEventId ||
       newEventStarted ||
+      userPlanSettings?.eventWizardStarted ||
       finishedSteps.length > 0 ||
       selectedEventType ||
       formDataHasMeaningfulValues
@@ -5429,6 +5470,7 @@ React.useEffect(() => {
 
   React.useEffect(() => {
     if (!sessionRef.current) return;
+    if (!userPlanSettingsHydratedRef.current) return;
     const hasEvent =
       Boolean(currentEventId) ||
       Boolean(newEventStarted) ||
@@ -5442,6 +5484,7 @@ React.useEffect(() => {
       (Array.isArray(additionalPackages) && additionalPackages.length > 0) ||
       (dbAddonCount ?? 0) > 0;
     if (!hasPlanData) return;
+    if (userPlanSettings?.eventWizardStarted) return;
 
     if (!shouldRespectCarryPlanAfterManualDelete()) {
       void clearPlanState();
@@ -5451,6 +5494,7 @@ React.useEffect(() => {
     newEventStarted,
     selectedPlan,
     userPlanSettings?.plan,
+    userPlanSettings?.eventWizardStarted,
     additionalPackages,
     dbAddonCount,
     clearPlanState,
@@ -5542,7 +5586,11 @@ React.useEffect(() => {
           setSelectedPlan(planToUse);
           selectionSourceRef.current = 'event';
           try { localStorage.setItem('selectedPlan', planToUse); } catch(e){}
-          await persistUserPlanSettings(planToUse, addonCount, false);
+          await persistUserPlanSettings(
+            planToUse,
+            addonCount,
+            shouldKeepEventWizardStarted(ev, userPlanSettingsRef.current),
+          );
           if (
             parseNonNegativeInt(ev.additional_packages) !== addonCount ||
             parseNonNegativeInt(ev.allowed_guests) !== repairedAllowedGuests
@@ -5642,11 +5690,104 @@ React.useEffect(() => {
     };
   }, [currentEventId, derivePlanFromRecord, persistUserPlanSettings]);
 
+  const ensureWizardDraftEvent = React.useCallback(async (plan, addonCount = 0) => {
+    try {
+      const user = await resolveCurrentUserForSync();
+      if (!user || !plan) return null;
+
+      const { data: ev } = await supabase
+        .from('events')
+        .select('id, event_type, event_details, status')
+        .eq('user_id', user.id)
+        .or('status.neq.archived,status.is.null')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (ev) {
+        if (isEventRecordActive(ev)) return ev.id;
+        if (isEventWizardDraft(ev)) {
+          setCurrentEventId(ev.id);
+          setEventDataLoaded(true);
+          lastRestoredEventIdRef.current = ev.id;
+          return ev.id;
+        }
+      }
+
+      const safeAddon = Number.isFinite(addonCount) ? Math.max(0, Math.floor(addonCount)) : 0;
+      const allowedGuests = (getPlanBaseLimit(plan) || 0) + safeAddon * (getPlanBaseLimit('addon') || 100);
+      const { data: inserted, error } = await supabase
+        .from('events')
+        .insert({
+          user_id: user.id,
+          event_type: WIZARD_DRAFT_EVENT_TYPE,
+          event_details: { wizard_draft: true, wizard_step: 1 },
+          status: 'draft',
+          selected_plan: plan,
+          allowed_guests: allowedGuests > 0 ? allowedGuests : 1,
+          additional_packages: safeAddon,
+        })
+        .select('id')
+        .single();
+
+      if (error) {
+        console.error('ensureWizardDraftEvent insert failed', error);
+        return null;
+      }
+      if (inserted?.id) {
+        setCurrentEventId(inserted.id);
+        setEventDataLoaded(true);
+        lastRestoredEventIdRef.current = inserted.id;
+        await supabase
+          .from('user_settings')
+          .upsert(
+            {
+              user_id: user.id,
+              active_event_id: inserted.id,
+              plan_code: plan,
+              addon_balance: safeAddon,
+              event_wizard_started: true,
+            },
+            { onConflict: 'user_id' },
+          );
+        return inserted.id;
+      }
+      return null;
+    } catch (err) {
+      console.error('ensureWizardDraftEvent threw', err);
+      return null;
+    }
+  }, [getPlanBaseLimit]);
+
+  React.useEffect(() => {
+    if (!session) return;
+    if (!userPlanSettingsHydratedRef.current) return;
+    const plan = userPlanSettings?.plan;
+    if (!plan || !userPlanSettings?.eventWizardStarted) return;
+    if (currentEventId) return;
+    void ensureWizardDraftEvent(plan, userPlanSettings?.addonCount ?? 0);
+  }, [session, userPlanSettings, currentEventId, ensureWizardDraftEvent]);
+
   const checkActiveEventExists = async () => {
     try{
       if (currentEventId || newEventStarted) return true;
+      if (userPlanSettingsRef.current?.plan && userPlanSettingsRef.current?.eventWizardStarted) {
+        return true;
+      }
       const user = await resolveCurrentUserForSync();
       if(!user) return false;
+      const { data: userSettingsRow, error: userSettingsError } = await supabase
+        .from('user_settings')
+        .select('plan_code, event_wizard_started')
+        .eq('user_id', user.id)
+        .maybeSingle();
+      if (
+        !userSettingsError
+        && userSettingsRow?.plan_code
+        && userSettingsRow.event_wizard_started
+      ) {
+        return true;
+      }
       let ev = null;
       const { data: evData, error: evError } = await supabase
         .from('events')
@@ -5695,7 +5836,13 @@ React.useEffect(() => {
   const syncPurchasedPlanFromServer = React.useCallback(async () => {
     const settings = await loadUserPlanSettings();
     let plan = settings?.plan || selectedPlanRef.current || userPlanSettingsRef.current?.plan || null;
-    if (plan) return plan;
+    if (plan) {
+      if (settings?.eventWizardStarted) {
+        setNewEventStarted(true);
+        try { localStorage.setItem('newEventStarted', '1'); } catch (_) {}
+      }
+      return plan;
+    }
 
     try {
       const user = await resolveCurrentUserForSync();
@@ -5719,7 +5866,14 @@ React.useEffect(() => {
       if (!plan) return null;
 
       const addonCount = parseNonNegativeInt(ev?.additional_packages);
-      await persistUserPlanSettings(plan, addonCount);
+      const draftWizard = isEventWizardDraft(ev);
+      await persistUserPlanSettings(plan, addonCount, draftWizard ? true : undefined);
+      if (draftWizard) {
+        setNewEventStarted(true);
+        try { localStorage.setItem('newEventStarted', '1'); } catch (_) {}
+        setShowEventTypes(true);
+        setStepErrorMsg('');
+      }
       setSelectedPlan(plan);
       try { localStorage.setItem('selectedPlan', plan); } catch (_) {}
       try { localStorage.setItem('user_plan_code', plan); } catch (_) {}
@@ -5740,8 +5894,15 @@ React.useEffect(() => {
       hasSession = !!user;
     }
     if (!hasSession) {
-      setShowPricingPlan(true);
       setPlanAddOnMode(false);
+      setShowPricingPlan(true);
+      return;
+    }
+
+    if (hasClearedExistingEvent) {
+      await handleNewEvent();
+      setShowEventTypes(true);
+      setStepErrorMsg('');
       return;
     }
 
@@ -5753,13 +5914,33 @@ React.useEffect(() => {
 
     const planReady = await syncPurchasedPlanFromServer();
     if (!planReady) {
-      setShowPricingPlan(true);
+      const settings = await loadUserPlanSettings();
+      if (settings?.plan && settings.eventWizardStarted) {
+        setShowExistingEventWarning(true);
+        return;
+      }
       setPlanAddOnMode(false);
+      setShowPricingPlan(true);
       return;
     }
 
     await handleNewEvent();
-  }, [syncPurchasedPlanFromServer, handleNewEvent]);
+  }, [
+    hasClearedExistingEvent,
+    syncPurchasedPlanFromServer,
+    loadUserPlanSettings,
+    handleNewEvent,
+  ]);
+
+  React.useEffect(() => {
+    if (!triggerCreateEvent) return;
+    onConsumedCreateTrigger?.();
+    beginCreateNewEventFlow().catch((err) => {
+      console.error('createNewEvent error', err);
+      setPlanAddOnMode(false);
+      setShowPricingPlan(true);
+    });
+  }, [triggerCreateEvent, beginCreateNewEventFlow, onConsumedCreateTrigger]);
 
   React.useEffect(() => {
     syncPurchasedPlanFromServerRef.current = syncPurchasedPlanFromServer;
@@ -6164,6 +6345,8 @@ React.useEffect(() => {
         const user = await resolveCurrentUserForSync();
         if (!user) return;
 
+        await loadUserPlanSettings();
+
         const { data: ev } = await supabase
           .from('events')
           .select('id, event_type, event_details, allowed_guests, messages_sent_count, reminder_sent_at, additional_packages, selected_plan, status')
@@ -6194,11 +6377,21 @@ React.useEffect(() => {
             lastRestoredEventIdRef.current = ev.id;
           }
           setCurrentEventId(ev.id);
-          if (ev.event_type) {
+          const isDraftWizard = isEventWizardDraft(ev);
+          if (ev.event_type && !isWizardPlaceholderEventType(ev.event_type)) {
             setSelectedEventType(ev.event_type);
+          } else if (isDraftWizard) {
+            setSelectedEventType('');
+            setNewEventStarted(true);
+            try { localStorage.setItem('newEventStarted', '1'); } catch (e) {}
+            setShowEventTypes(true);
+            setStepErrorMsg('');
           }
-          syncFinishedStepsFromEvent(ev.event_type || '', details || {});
-          if (newEventStarted) {
+          syncFinishedStepsFromEvent(
+            isWizardPlaceholderEventType(ev.event_type) ? '' : (ev.event_type || ''),
+            details || {},
+          );
+          if (newEventStarted && !isDraftWizard) {
             setNewEventStarted(false);
             try { localStorage.removeItem('newEventStarted'); } catch(e){}
           }
@@ -6222,7 +6415,11 @@ React.useEffect(() => {
           if (planToUse) {
             setSelectedPlan(planToUse);
             try { localStorage.setItem('selectedPlan', planToUse); } catch(e){}
-            await persistUserPlanSettings(planToUse, restoreAddonCount, false);
+            await persistUserPlanSettings(
+              planToUse,
+              restoreAddonCount,
+              shouldKeepEventWizardStarted(ev, userPlanSettingsRef.current),
+            );
             if (
               parseNonNegativeInt(ev.additional_packages) !== restoreAddonCount ||
               parseNonNegativeInt(ev.allowed_guests) !== repairedAllowedGuests
@@ -6321,8 +6518,8 @@ React.useEffect(() => {
 
           const settings = await loadUserPlanSettings();
           if (settings) {
-            const canCarryPlan = shouldRespectCarryPlanAfterManualDelete();
-            if (settings.plan && canCarryPlan) {
+            const canRestorePlan = shouldRestorePaidPlanFromSettings(settings);
+            if (settings.plan && canRestorePlan) {
               setSelectedPlan(settings.plan);
               try { localStorage.setItem('selectedPlan', settings.plan); } catch(e){}
               if (settings.eventWizardStarted) {
@@ -6332,6 +6529,7 @@ React.useEffect(() => {
                 setShowReportsOptions(false);
                 setShowEventTypes(true);
                 setStepErrorMsg('');
+                await ensureWizardDraftEvent(settings.plan, settings.addonCount ?? 0);
               }
             } else if (settings.plan) {
               await clearPlanState();
@@ -6340,7 +6538,7 @@ React.useEffect(() => {
               try { localStorage.removeItem('user_plan_code'); } catch(e){}
               try { localStorage.removeItem('selectedPlan'); } catch(e){}
             }
-            const addonToApply = settings.plan && canCarryPlan ? (settings.addonCount ?? 0) : 0;
+            const addonToApply = settings.plan && canRestorePlan ? (settings.addonCount ?? 0) : 0;
             setDbAddonCount(addonToApply);
             setAdditionalPackages((prev) => {
               const prevCount = Array.isArray(prev) ? prev.length : 0;
@@ -6395,7 +6593,7 @@ React.useEffect(() => {
         isInitialLoadRef.current = false;
       }
     })();
-  }, [currentEventId, newEventStarted, eventRefreshKey, derivePlanFromRecord, persistUserPlanSettings, loadUserPlanSettings, syncFinishedStepsFromEvent]);
+  }, [currentEventId, newEventStarted, eventRefreshKey, derivePlanFromRecord, persistUserPlanSettings, loadUserPlanSettings, syncFinishedStepsFromEvent, ensureWizardDraftEvent]);
 
   // ---- Close modals when no active event ----
   React.useEffect(() => {
@@ -6460,6 +6658,7 @@ React.useEffect(() => {
       try{
         const user = await resolveCurrentUserForSync();
         if(!user) return;
+        await loadUserPlanSettings();
         let ev = null;
         let messagesSent = 0;
         const { data: evData, error: evError } = await supabase
@@ -6501,6 +6700,13 @@ React.useEffect(() => {
             try { localStorage.setItem('selectedPlan', settings.plan); } catch (e) {}
             try { localStorage.setItem('user_plan_code', settings.plan); } catch (e) {}
           }
+          if (settings?.eventWizardStarted && settings?.plan) {
+            setNewEventStarted(true);
+            try { localStorage.setItem('newEventStarted', '1'); } catch (e) {}
+            setShowEventTypes(true);
+            setStepErrorMsg('');
+            await ensureWizardDraftEvent(settings.plan, settings.addonCount ?? 0);
+          }
           const ac = settings?.addonCount ?? 0;
           setDbAddonCount(ac);
           setAdditionalPackages((prev) => {
@@ -6518,9 +6724,16 @@ React.useEffect(() => {
           return;
         }
         if (ev && (isEventRecordActive(ev) || isEventWizardDraft(ev))) {
+          const isDraftWizard = isEventWizardDraft(ev);
           setCurrentEventId(ev.id);
-          if (ev.event_type) {
+          if (ev.event_type && !isWizardPlaceholderEventType(ev.event_type)) {
             setSelectedEventType(ev.event_type);
+          } else if (isDraftWizard) {
+            setSelectedEventType('');
+            setNewEventStarted(true);
+            try { localStorage.setItem('newEventStarted', '1'); } catch (e) {}
+            setShowEventTypes(true);
+            setStepErrorMsg('');
           }
           setEventMessagesSentCount(messagesSent);
           setEventReminderSentAt(ev?.reminder_sent_at ?? null);
@@ -6542,7 +6755,11 @@ React.useEffect(() => {
           if (planToUse) {
             setSelectedPlan(planToUse);
             try { localStorage.setItem('selectedPlan', planToUse); } catch(e){}
-            await persistUserPlanSettings(planToUse, addonCount, false);
+            await persistUserPlanSettings(
+              planToUse,
+              addonCount,
+              shouldKeepEventWizardStarted(ev, userPlanSettingsRef.current),
+            );
             if (
               parseNonNegativeInt(ev.additional_packages) !== addonCount ||
               parseNonNegativeInt(ev.allowed_guests) !== repairedAllowedGuests
@@ -6560,7 +6777,10 @@ React.useEffect(() => {
           const details = typeof ev.event_details === 'string' 
             ? JSON.parse(ev.event_details) 
             : ev.event_details;
-          syncFinishedStepsFromEvent(ev.event_type || '', details || {});
+          syncFinishedStepsFromEvent(
+            isWizardPlaceholderEventType(ev.event_type) ? '' : (ev.event_type || ''),
+            details || {},
+          );
           const tpl = details?.template_src || null;
           if(tpl){
             setSelectedDesign(tpl);
@@ -6969,6 +7189,7 @@ React.useEffect(()=>{
     const dashboardActive = Boolean(
       (currentEventId && isCurrentEventActive) ||
       newEventStarted ||
+      userPlanSettings?.eventWizardStarted ||
       selectedEventType ||
       formDataHasMeaningfulValues ||
       selectedDesign
@@ -6986,6 +7207,7 @@ React.useEffect(()=>{
     invitedCount,
     isCurrentEventActive,
     newEventStarted,
+    userPlanSettings?.eventWizardStarted,
     selectedDesign,
     selectedEventType,
   ]);
@@ -7082,7 +7304,12 @@ React.useEffect(()=>{
   }, []);
 
   const tryOpenWizardStep = React.useCallback((stepNumber) => {
-    const mustStartFirst = !currentEventId && !newEventStarted && !planForDisplay;
+    const wizardSessionActive = Boolean(
+      newEventStarted ||
+      userPlanSettings?.eventWizardStarted ||
+      planForDisplay
+    );
+    const mustStartFirst = !currentEventId && !wizardSessionActive;
     if (stepNumber >= 1 && stepNumber <= 5 && mustStartFirst) {
       setStepErrorMsg('\u05D9\u05E9 \u05EA\u05D7\u05D9\u05DC\u05D4 \u05DC\u05D9\u05E6\u05D5\u05E8 \u05D0\u05D9\u05E8\u05D5\u05E2 \u05D5\u05DC\u05D1\u05D7\u05D5\u05E8 \u05DE\u05E1\u05DC\u05D5\u05DC \u05EA\u05E9\u05DC\u05D5\u05DD.');
       setShowStepError(true);
@@ -7114,6 +7341,7 @@ React.useEffect(()=>{
   }, [
     currentEventId,
     newEventStarted,
+    userPlanSettings?.eventWizardStarted,
     planForDisplay,
     redirectToWizardStep,
     scrollToWizardSection,
@@ -7132,6 +7360,7 @@ React.useEffect(()=>{
     const flowStarted = Boolean(
       currentEventId ||
       newEventStarted ||
+      userPlanSettings?.eventWizardStarted ||
       selectedEventType ||
       finishedSteps.length > 0
     );
@@ -7152,6 +7381,7 @@ React.useEffect(()=>{
     finishedSteps,
     getFirstIncompleteWizardStep,
     newEventStarted,
+    userPlanSettings?.eventWizardStarted,
     redirectToWizardStep,
     scrollToWizardSection,
     selectedEventType,
@@ -7486,7 +7716,7 @@ React.useEffect(()=>{
           )}
           <p className="text-emerald-300 text-base mt-2 font-bold">האירוע מוכן לשליחת הזמנות ואישורי הגעה</p>
         </div>
-      ) : newEventStarted ? (
+      ) : (newEventStarted || userPlanSettings?.eventWizardStarted) ? (
         <div className="bg-white/[0.055] border border-white/15 backdrop-blur-xl rounded-2xl p-4 text-center shadow-[0_8px_40px_rgba(0,0,0,0.35)] ring-2 ring-indigo-400/30 flex-1">
           <div className="flex items-center justify-center gap-2 mb-2">
             <span className="text-2xl">🚀</span>
@@ -7980,7 +8210,7 @@ React.useEffect(()=>{
         </div>
       )}
 
-      {hasSession && !isCurrentEventActive && !newEventStarted && (
+      {hasSession && !isCurrentEventActive && !newEventStarted && !userPlanSettings?.eventWizardStarted && (
         <section className="mx-auto mb-4 w-full max-w-md rounded-[1.75rem] border border-white/15 bg-white/[0.06] p-4 text-center shadow-[0_14px_44px_rgba(0,0,0,0.36)] ring-1 ring-white/10 backdrop-blur-2xl sm:hidden" dir="rtl">
           <div className="flex items-center justify-center gap-2">
             <span className="text-2xl">📅</span>
@@ -7989,6 +8219,25 @@ React.useEffect(()=>{
           <p className="mt-2 text-sm font-semibold text-slate-300">
             אין אירוע פעיל במערכת. לחץ על &quot;צור אירוע חדש&quot; כדי להתחיל.
           </p>
+        </section>
+      )}
+
+      {hasSession && !currentEventId && (newEventStarted || userPlanSettings?.eventWizardStarted) && (
+        <section className="mx-auto mb-4 w-full max-w-md rounded-[1.75rem] border border-indigo-400/30 bg-indigo-500/10 p-4 text-center shadow-[0_14px_44px_rgba(0,0,0,0.36)] ring-1 ring-indigo-400/20 backdrop-blur-2xl sm:hidden" dir="rtl">
+          <div className="flex items-center justify-center gap-2">
+            <span className="text-2xl">🚀</span>
+            <h3 className="text-lg font-bold text-indigo-200">מסלול שולם – המשך יצירת אירוע</h3>
+          </div>
+          <p className="mt-2 text-sm font-semibold text-slate-300">
+            {getPlanDisplayName(selectedPlan || userPlanSettings?.plan) || 'המסלול שלך'} מוכן. המשך בשלב 1 לבחירת סוג האירוע.
+          </p>
+          <button
+            type="button"
+            onClick={() => { setShowEventTypes(true); setStepErrorMsg(''); }}
+            className="mt-4 w-full rounded-2xl bg-primary px-4 py-3 text-base font-black text-white shadow"
+          >
+            עבור לשלב 1 – סוג אירוע
+          </button>
         </section>
       )}
 
@@ -10686,7 +10935,22 @@ React.useEffect(()=>{
         </ModalBody>
         <ModalFooter className="flex-col">
               <button
-                onClick={() => setShowExistingEventWarning(false)}
+                onClick={() => {
+                  setShowExistingEventWarning(false);
+                  if (userPlanSettings?.eventWizardStarted || newEventStarted) {
+                    setShowEventTypes(true);
+                    setStepErrorMsg('');
+                    scrollToWizardSectionRef.current?.();
+                    return;
+                  }
+                  if (currentEventId) {
+                    scrollToWizardSectionRef.current?.();
+                    const firstIncomplete = getFirstIncompleteWizardStepRef.current?.();
+                    if (firstIncomplete) {
+                      tryOpenWizardStepRef.current?.(firstIncomplete);
+                    }
+                  }
+                }}
                 className="w-full bg-emerald-600 text-white border border-emerald-400/50 rounded-full px-6 py-3 font-bold hover:bg-emerald-700 transition-all"
               >
                 חזור לאירוע הקיים
