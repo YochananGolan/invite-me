@@ -7747,7 +7747,7 @@ React.useEffect(()=>{
           </p>
           <p className="text-slate-300">התחל בשלב 1 כדי לבחור סוג אירוע ולהזין את הפרטים.</p>
           <div className="flex justify-center gap-3 mt-4">
-            <button type="button" onClick={() => { setShowEventTypes(true); setStepErrorMsg(''); }} className="bg-primary text-white font-bold py-2 px-4 rounded-full hover:bg-primary/90 transition-all shadow">
+            <button type="button" onClick={() => { setShowEventTypes(true); setStepErrorMsg(''); }} className="bg-emerald-600 text-white font-bold py-2 px-4 rounded-full hover:bg-emerald-700 transition-all shadow">
               עבור לשלב 1 – סוג אירוע
             </button>
             <button type="button" onClick={() => setShowPricingPlan(true)} className="border border-white/15 bg-transparent text-white font-semibold hover:border-indigo-300 hover:text-indigo-200 py-2 px-4 rounded-full transition-all">
@@ -8254,7 +8254,7 @@ React.useEffect(()=>{
           <button
             type="button"
             onClick={() => { setShowEventTypes(true); setStepErrorMsg(''); }}
-            className="mt-4 w-full rounded-2xl bg-primary px-4 py-3 text-base font-black text-white shadow"
+            className="mt-4 w-full rounded-2xl bg-emerald-600 px-4 py-3 text-base font-black text-white shadow hover:bg-emerald-700 transition-all"
           >
             עבור לשלב 1 – סוג אירוע
           </button>
