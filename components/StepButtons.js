@@ -889,6 +889,7 @@ const [hasWhatsAppGroup, setHasWhatsAppGroup] = useState(false);
   const isStep3CompleteRef = useRef(false);
   const getFirstIncompleteWizardStepRef = useRef(() => null);
   const wizardAutoResumedRef = useRef(false);
+  const wizardSuppressedStepsRef = useRef(new Set());
   const stepBarRef = useRef(null);
   const reportsSectionRef = useRef(null);
 
@@ -1129,10 +1130,6 @@ const derivePlanFromRecord = React.useCallback((record) => {
 const [userPlanSettings, setUserPlanSettings] = useState({ plan: null, addonCount: 0, eventWizardStarted: false });
 /** נכון אחרי ש־loadUserPlanSettings סיים (כולל שגיאה) — לא לאפס מסלול מ-localStorage לפני כן */
 const userPlanSettingsHydratedRef = useRef(false);
-/** שלב 1 נפתח אוטומטית פעם אחת לסשן — לא לכפות מחדש אחרי שהמשתמש סגר ב-X */
-const wizardStep1AutoOpenedRef = useRef(false);
-/** שלב 2 נסגר ב-X — לא לפתוח מחדש אוטומטית */
-const wizardStep2UserDismissedRef = useRef(false);
 const persistUserPlanSettings = React.useCallback(async (planCode, addonCount, eventWizardStartedOverride = undefined) => {
   try {
     const user = await resolveCurrentUserForSync();
@@ -1412,8 +1409,7 @@ const noEventLoggedRef = useRef(false);
   React.useEffect(() => {
     if (!session) {
       userPlanSettingsHydratedRef.current = false;
-      wizardStep1AutoOpenedRef.current = false;
-      wizardStep2UserDismissedRef.current = false;
+      wizardSuppressedStepsRef.current = new Set();
       setSelectedPlan(null);
       setEventAllowedGuests(null);
       setUserPlanSettings((prev) => {
@@ -1461,8 +1457,7 @@ const noEventLoggedRef = useRef(false);
     setShowReportModal(false);
     setStepErrorMsg('');
 
-    if (!wizardStep1AutoOpenedRef.current) {
-      wizardStep1AutoOpenedRef.current = true;
+    if (!wizardSuppressedStepsRef.current.has(1)) {
       setShowEventTypes(true);
     }
   }, [session, userPlanSettings?.plan, userPlanSettings?.eventWizardStarted]);
@@ -1805,6 +1800,7 @@ const handleOpenAddonModal = React.useCallback(() => {
     setStepErrorMsg('');
     setShowEventDetails(false);
     setEventDetailsCompleted(true);
+    wizardSuppressedStepsRef.current.delete(3);
     setShowDesignChooser(true);
     try {
       await saveEventToSupabase(null, selectedDesign);
@@ -2562,6 +2558,9 @@ const handleOpenAddonModal = React.useCallback(() => {
           const wizardFlowActive = Boolean(
             userPlanSettingsRef.current?.eventWizardStarted
             || showEventDetails
+            || showDesignChooser
+            || showGuestForm
+            || showReportsOptions
             || (typeof window !== 'undefined' && localStorage.getItem('newEventStarted') === '1')
             || resolveDisplayEventType(selectedEventTypeRef.current)
             || (finishedStepsRef.current && finishedStepsRef.current.length > 0)
@@ -2614,7 +2613,7 @@ const handleOpenAddonModal = React.useCallback(() => {
         console.error('Failed to restore latest event details', err);
       }
     })();
-  }, [eventRefreshKey, resetCapacityWarningGuests, syncFinishedStepsFromEvent, showEventDetails]);
+  }, [eventRefreshKey, resetCapacityWarningGuests, syncFinishedStepsFromEvent, showEventDetails, showDesignChooser, showGuestForm, showReportsOptions]);
 
   // restore details
   React.useEffect(()=>{
@@ -3329,6 +3328,7 @@ const handleOpenAddonModal = React.useCallback(() => {
       setStepErrorMsg('');
       setShowLightbox(false);
       setShowDesignChooser(false);
+      wizardSuppressedStepsRef.current.delete(4);
       setShowGuestForm(true);
       // Note: progress_step column may not exist in all schemas, so we skip it if it fails
   if (currentEventId && progressStepSupportedRef.current) { 
@@ -5257,7 +5257,7 @@ React.useEffect(() => {
           setShowPaymentResultModal(true);
           // Prepare wizard for brand new event creation
           setFinishedSteps([]);
-          wizardStep1AutoOpenedRef.current = true;
+          wizardSuppressedStepsRef.current.delete(1);
           setShowEventTypes(true);
           setStepErrorMsg('');
           try { localStorage.removeItem('finishedSteps'); } catch (e) {}
@@ -7164,7 +7164,7 @@ React.useEffect(()=>{
   // Reset form and steps when no active event exists AND no new event started
   React.useEffect(()=>{
     if (currentEventId || newEventStarted || userPlanSettings?.eventWizardStarted) return;
-    if (showEventDetails || showEventTypes) return;
+    if (showEventDetails || showEventTypes || showDesignChooser || showGuestForm || showReportsOptions) return;
     if (selectedEventType || finishedSteps.length > 0) return;
     // No active event – reset wizard
     setFormData(initialFormState);
@@ -7172,7 +7172,7 @@ React.useEffect(()=>{
     setSelectedEventType('');
     setNewEventStarted(false);
     try{ localStorage.removeItem('draftEvent'); localStorage.removeItem('newEventStarted'); localStorage.removeItem('savedEventDetails'); }catch{}
-  },[currentEventId, newEventStarted, userPlanSettings?.eventWizardStarted, showEventDetails, showEventTypes, selectedEventType, finishedSteps.length]);
+  },[currentEventId, newEventStarted, userPlanSettings?.eventWizardStarted, showEventDetails, showEventTypes, showDesignChooser, showGuestForm, showReportsOptions, selectedEventType, finishedSteps.length]);
 
   const MOBILE_REMINDER_DAYS_BEFORE = 5;
 
@@ -7345,6 +7345,21 @@ React.useEffect(()=>{
     return null;
   }, [wizardStepCompletion]);
 
+  const suppressWizardStep = React.useCallback((stepNumber) => {
+    wizardSuppressedStepsRef.current.add(stepNumber);
+    wizardAutoResumedRef.current = true;
+  }, []);
+
+  const unsuppressWizardStep = React.useCallback((stepNumber) => {
+    wizardSuppressedStepsRef.current.delete(stepNumber);
+  }, []);
+
+  const scrollWizardHome = React.useCallback(() => {
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }, []);
+
   const openEventDetailsModal = React.useCallback(() => {
     const type = resolveDisplayEventType(selectedEventTypeRef.current || selectedEventType);
     if (!type) {
@@ -7353,49 +7368,93 @@ React.useEffect(()=>{
       setStepErrorMsg('יש לבחור סוג אירוע לפני מילוי הפרטים.');
       return;
     }
-    wizardStep2UserDismissedRef.current = false;
+    unsuppressWizardStep(2);
     setShowEventDetails(true);
-  }, [selectedEventType]);
+  }, [selectedEventType, unsuppressWizardStep]);
 
   const closeEventDetailsModal = React.useCallback(() => {
-    wizardStep2UserDismissedRef.current = true;
-    wizardAutoResumedRef.current = true;
+    suppressWizardStep(2);
     setShowEventDetails(false);
     setStepErrorMsg('');
-    if (typeof window !== 'undefined') {
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
-  }, []);
+    scrollWizardHome();
+  }, [suppressWizardStep, scrollWizardHome]);
 
   const closeEventTypesModal = React.useCallback(() => {
-    wizardStep1AutoOpenedRef.current = true;
+    suppressWizardStep(1);
     setShowEventTypes(false);
     setStepErrorMsg('');
-    if (typeof window !== 'undefined') {
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
-  }, []);
+    scrollWizardHome();
+  }, [suppressWizardStep, scrollWizardHome]);
 
   const openEventTypesModal = React.useCallback(() => {
-    wizardStep1AutoOpenedRef.current = true;
+    unsuppressWizardStep(1);
     setShowEventTypes(true);
     setStepErrorMsg('');
-  }, []);
+  }, [unsuppressWizardStep]);
+
+  const openDesignChooserModal = React.useCallback(() => {
+    unsuppressWizardStep(3);
+    setShowDesignChooser(true);
+    setStepErrorMsg('');
+  }, [unsuppressWizardStep]);
+
+  const closeDesignChooserModal = React.useCallback(() => {
+    suppressWizardStep(3);
+    setShowDesignChooser(false);
+    setShowLightbox(false);
+    setShowColorPalette(false);
+    setShowAdvancedEdit(null);
+    setStepErrorMsg('');
+    scrollWizardHome();
+  }, [suppressWizardStep, scrollWizardHome]);
+
+  const openGuestFormModal = React.useCallback(() => {
+    unsuppressWizardStep(4);
+    setShowGuestForm(true);
+    setStepErrorMsg('');
+  }, [unsuppressWizardStep]);
+
+  const closeGuestFormModal = React.useCallback(() => {
+    suppressWizardStep(4);
+    setShowGuestForm(false);
+    setStepErrorMsg('');
+    scrollWizardHome();
+  }, [suppressWizardStep, scrollWizardHome]);
+
+  const openReportsOptionsModal = React.useCallback(() => {
+    unsuppressWizardStep(5);
+    setShowReportsOptions(true);
+    setShowGuestListModal(false);
+    setStepErrorMsg('');
+  }, [unsuppressWizardStep]);
+
+  const closeReportsOptionsModal = React.useCallback(() => {
+    suppressWizardStep(5);
+    setShowReportsOptions(false);
+    setShowStep5Options(false);
+    setStepErrorMsg('');
+    scrollWizardHome();
+  }, [suppressWizardStep, scrollWizardHome]);
 
   const redirectToWizardStep = React.useCallback((stepNumber) => {
     setShowEventTypes(false);
     setShowEventDetails(false);
     setShowDesignChooser(false);
     setShowGuestForm(false);
+    setShowReportsOptions(false);
+    setShowStep5Options(false);
     if (stepNumber === 1) openEventTypesModal();
     else if (stepNumber === 2) openEventDetailsModal();
-    else if (stepNumber === 3) setShowDesignChooser(true);
-    else if (stepNumber === 4) setShowGuestForm(true);
-    else if (stepNumber === 5) {
-      setShowReportsOptions(true);
-      setShowGuestListModal(false);
-    }
-  }, [openEventTypesModal, openEventDetailsModal]);
+    else if (stepNumber === 3) openDesignChooserModal();
+    else if (stepNumber === 4) openGuestFormModal();
+    else if (stepNumber === 5) openReportsOptionsModal();
+  }, [
+    openEventTypesModal,
+    openEventDetailsModal,
+    openDesignChooserModal,
+    openGuestFormModal,
+    openReportsOptionsModal,
+  ]);
 
   const tryOpenWizardStep = React.useCallback((stepNumber) => {
     const wizardSessionActive = Boolean(
@@ -7463,18 +7522,14 @@ React.useEffect(()=>{
     const firstIncomplete = getFirstIncompleteWizardStep();
     if (!firstIncomplete) return undefined;
 
-    if (firstIncomplete === 1 && wizardStep1AutoOpenedRef.current) {
-      wizardAutoResumedRef.current = true;
-      return undefined;
-    }
-    if (firstIncomplete === 2 && wizardStep2UserDismissedRef.current) {
+    if (wizardSuppressedStepsRef.current.has(firstIncomplete)) {
       wizardAutoResumedRef.current = true;
       return undefined;
     }
 
     wizardAutoResumedRef.current = true;
     const timer = window.setTimeout(() => {
-      if (firstIncomplete === 2 && wizardStep2UserDismissedRef.current) return;
+      if (wizardSuppressedStepsRef.current.has(firstIncomplete)) return;
       scrollToWizardSection();
       redirectToWizardStep(firstIncomplete);
       setStepErrorMsg('');
@@ -7495,7 +7550,7 @@ React.useEffect(()=>{
   React.useEffect(() => {
     if (!currentEventId && !newEventStarted && !selectedEventType && finishedSteps.length === 0) {
       wizardAutoResumedRef.current = false;
-      wizardStep2UserDismissedRef.current = false;
+      wizardSuppressedStepsRef.current = new Set();
     }
   }, [currentEventId, finishedSteps.length, newEventStarted, selectedEventType]);
 
@@ -9030,8 +9085,8 @@ React.useEffect(()=>{
         style={{ display: 'none' }}
       />
 
-      <Modal open={showGuestForm} onClose={() => setShowGuestForm(false)} size="lg">
-        <ModalHeader onClose={() => setShowGuestForm(false)}>שליחת הזמנות</ModalHeader>
+      <Modal open={showGuestForm} onClose={closeGuestFormModal} size="lg">
+        <ModalHeader onClose={closeGuestFormModal}>שליחת הזמנות</ModalHeader>
         <ModalBody>
           {renderMobileNextActionCard({
             stepLabel: 'שלב 4 מתוך 5',
@@ -9862,8 +9917,8 @@ React.useEffect(()=>{
 
       {/* Step 3 - Design chooser */}
       {/* ─── Design Chooser — full-screen centered modal ─── */}
-      <Modal open={showDesignChooser} onClose={() => setShowDesignChooser(false)} size="full">
-        <ModalHeader onClose={() => setShowDesignChooser(false)} subtitle="עצב את הטקסט, צפה בתצוגה מקדימה ובחר תבנית">
+      <Modal open={showDesignChooser} onClose={closeDesignChooserModal} size="full">
+        <ModalHeader onClose={closeDesignChooserModal} subtitle="עצב את הטקסט, צפה בתצוגה מקדימה ובחר תבנית">
           🎨 עיצוב הזמנה
         </ModalHeader>
 
@@ -10624,8 +10679,8 @@ React.useEffect(()=>{
         </ModalBody>
       </Modal>
       {/* Reports menu modal */}
-      <Modal open={typeof showReportsOptions !== 'undefined' && showReportsOptions} onClose={() => setShowReportsOptions(false)} size="lg">
-        <ModalHeader onClose={() => setShowReportsOptions(false)}>בחר דו"ח להצגה</ModalHeader>
+      <Modal open={typeof showReportsOptions !== 'undefined' && showReportsOptions} onClose={closeReportsOptionsModal} size="lg">
+        <ModalHeader onClose={closeReportsOptionsModal}>בחר דו"ח להצגה</ModalHeader>
         <ModalBody className="text-center space-y-4">
             {renderMobileNextActionCard({
               stepLabel: 'שלב 5 מתוך 5',
