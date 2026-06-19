@@ -22,7 +22,7 @@ import {
   getRsvpStatusLabel,
 } from '../lib/rsvpLabels';
 import { getGuestIdentityKey } from '../lib/guestIdentity';
-import { buildGuestRsvpStats, dedupeGuestsByIdentity } from '../lib/guestStats';
+import { buildGuestRsvpStats, buildApprovedGuestsByTableReportRows, buildTableSummaryFromGuests, dedupeGuestsByIdentity, filterGuestsByStatusBucket } from '../lib/guestStats';
 import MobileQuickGuestsCard from './mobile/MobileQuickGuestsCard';
 import MobileQuickGuestListScreen, { MOBILE_GUEST_LIST_PAGE_SIZE } from './mobile/MobileQuickGuestListScreen';
 import MobileQuickGuestSearchOverlay from './mobile/MobileQuickGuestSearchOverlay';
@@ -744,13 +744,28 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick, trig
   // Reports menu visibility
   const [showReportsOptions, setShowReportsOptions] = useState(false);
   const [showApprovedReport, setShowApprovedReport] = useState(false);
-  const [approvedGuests, setApprovedGuests] = useState([]);
   const [showRejectedReport, setShowRejectedReport] = useState(false);
-  const [rejectedGuests, setRejectedGuests] = useState([]);
   const [showPendingReport, setShowPendingReport] = useState(false);
-  const [pendingGuests, setPendingGuests] = useState([]);
-  // Selected event context for reports
+  const [eventGuestRows, setEventGuestRows] = useState([]);
+  const [archivedEventGuestRows, setArchivedEventGuestRows] = useState([]);
   const [selectedEventForReport,setSelectedEventForReport]=useState(null);
+  const reportGuestRows = selectedEventForReport ? archivedEventGuestRows : eventGuestRows;
+  const approvedGuests = React.useMemo(
+    () => filterGuestsByStatusBucket(reportGuestRows, 'approved'),
+    [reportGuestRows],
+  );
+  const rejectedGuests = React.useMemo(
+    () => filterGuestsByStatusBucket(reportGuestRows, 'rejected'),
+    [reportGuestRows],
+  );
+  const pendingGuests = React.useMemo(
+    () => filterGuestsByStatusBucket(reportGuestRows, 'pending'),
+    [reportGuestRows],
+  );
+  const tableSummary = React.useMemo(
+    () => buildTableSummaryFromGuests(eventGuestRows),
+    [eventGuestRows],
+  );
 
   // Keep details validation visible only after Save, and clear it once fixed.
   React.useEffect(() => {
@@ -2741,9 +2756,8 @@ const handleOpenAddonModal = React.useCallback(() => {
           setDbGuests([]);
           setSentGuests([]);
           setReportGuests([]);
-          setApprovedGuests([]);
-          setRejectedGuests([]);
-          setPendingGuests([]);
+          setEventGuestRows([]);
+          setArchivedEventGuestRows([]);
           setShowGuestListModal(false);
           setShowReportModal(false);
           setSelectedEventForReport(null);
@@ -3631,9 +3645,7 @@ const handleOpenAddonModal = React.useCallback(() => {
 
     setDbGuests((prev) => filterByIds(prev));
     setReportGuests((prev) => filterByIds(prev));
-    setApprovedGuests((prev) => filterByIds(prev));
-    setRejectedGuests((prev) => filterByIds(prev));
-    setPendingGuests((prev) => filterByIds(prev));
+    setEventGuestRows((prev) => filterByIds(prev));
     setSentGuests((prev) =>
       Array.isArray(prev)
         ? prev.filter((item) => {
@@ -3645,9 +3657,6 @@ const handleOpenAddonModal = React.useCallback(() => {
     setGuestSummaryRefreshKey((key) => key + 1);
   }, [supabase, currentEventId]);
 
-  // --- Table summary state ---
-  const [tableSummary, setTableSummary] = useState([]);
-  
   // --- Plan limit warning state ---
   const [showPlanLimitWarning, setShowPlanLimitWarning] = useState(false);
 React.useEffect(() => {
@@ -5541,9 +5550,8 @@ React.useEffect(() => {
           setDbGuests([]);
           setSentGuests([]);
           setReportGuests([]);
-          setApprovedGuests([]);
-          setRejectedGuests([]);
-          setPendingGuests([]);
+          setEventGuestRows([]);
+          setArchivedEventGuestRows([]);
           setShowGuestListModal(false);
           setShowReportsOptions(false);
           setShowReportModal(false);
@@ -6504,85 +6512,26 @@ React.useEffect(() => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [customInvitationText, invitationText, lineStyles, selectedDesign, selectedFontCss, currentEventId]);
 
-  // fetch approved guests when report opens
   React.useEffect(() => {
-    if (!showApprovedReport) return;
+    if (!selectedEventForReport?.id) {
+      setArchivedEventGuestRows([]);
+      return;
+    }
+
     (async () => {
       try {
-        const user = await resolveCurrentUserForSync();
-        if (!user) return;
-
-        // Use selectedEventForReport for archived events, otherwise use currentEventId
-        const eventIdToUse = selectedEventForReport?.id || currentEventId;
-        if (!eventIdToUse) {
-          setApprovedGuests([]);
-          return;
-        }
-
-        const { data } = await supabase
+        const { data, error } = await supabase
           .from('invited_guests')
           .select('*')
-          .eq('event_id', eventIdToUse)
-          .eq('status', 'approved');
-        setApprovedGuests(data || []);
+          .eq('event_id', selectedEventForReport.id);
+        if (error) throw error;
+        setArchivedEventGuestRows(data || []);
       } catch (e) {
-        console.error('fetch approved guests failed', e);
+        console.error('fetch archived report guests failed', e);
+        setArchivedEventGuestRows([]);
       }
     })();
-  }, [showApprovedReport, currentEventId, selectedEventForReport, guestSummaryRefreshKey]);
-
-  // fetch rejected guests
-  React.useEffect(() => {
-    if (!showRejectedReport) return;
-    (async () => {
-      try {
-        const user = await resolveCurrentUserForSync();
-        if (!user) return;
-        
-        // Use selectedEventForReport for archived events, otherwise use currentEventId
-        const eventIdToUse = selectedEventForReport?.id || currentEventId;
-        if (!eventIdToUse) {
-          setRejectedGuests([]);
-          return;
-        }
-        
-        const { data } = await supabase
-          .from('invited_guests')
-          .select('*')
-          .eq('event_id', eventIdToUse)
-          .eq('status', 'rejected');
-        setRejectedGuests(data || []);
-      } catch (e) {
-        console.error('fetch rejected guests failed', e);
-      }
-    })();
-  }, [showRejectedReport, currentEventId, selectedEventForReport, guestSummaryRefreshKey]);
-
-  // fetch pending guests
-  React.useEffect(() => {
-    if (!showPendingReport) return;
-    (async () => {
-      try {
-        const user = await resolveCurrentUserForSync();
-        if (!user) return;
-        
-        // Use selectedEventForReport for archived events, otherwise use currentEventId
-        const eventIdToUse = selectedEventForReport?.id || currentEventId;
-        if (!eventIdToUse) {
-          setPendingGuests([]);
-          return;
-        }
-        
-        const { data } = await supabase
-          .from('invited_guests')
-          .select('*')
-          .eq('event_id', eventIdToUse);
-        setPendingGuests(getPendingGuestsFromRows(data || []));
-      } catch (e) {
-        console.error('fetch pending guests failed', e);
-      }
-    })();
-  }, [showPendingReport, currentEventId, selectedEventForReport, guestSummaryRefreshKey]);
+  }, [selectedEventForReport, guestSummaryRefreshKey]);
 
   // Refresh report modal data when RSVP changes (guestSummaryRefreshKey) and modal is open
   React.useEffect(() => {
@@ -6591,42 +6540,21 @@ React.useEffect(() => {
     if (!eventIdToUse || reportTitle.includes('אין אירוע נבחר')) return;
     (async () => {
       try {
+        const { data } = await supabase.from('invited_guests').select('*').eq('event_id', eventIdToUse);
+        const guests = data || [];
         if (reportTitle === 'אורחים מגיעים' || reportTitle === 'אורחים מגיעים ממוינים לפי שולחן') {
-          const { data } = await supabase.from('invited_guests').select('*').eq('event_id', eventIdToUse).eq('status', 'approved');
-          if (reportTitle === 'אורחים מגיעים ממוינים לפי שולחן' && data?.length) {
-            const byTable = {};
-            data.forEach(g => {
-              const t = g.table_number || 'ללא שולחן';
-              if (!byTable[t]) byTable[t] = [];
-              byTable[t].push(g);
-            });
-            const tables = Object.keys(byTable).sort((a, b) => (a === 'ללא שולחן' ? 1 : b === 'ללא שולחן' ? -1 : String(a).localeCompare(String(b))));
-            const dataWithSummaries = [];
-            tables.forEach(table => {
-              byTable[table].forEach(g => dataWithSummaries.push(g));
-              const rows = byTable[table];
-              const tableTotalAdults = rows.reduce((s, g) => s + (g.adults || 0), 0);
-              const tableTotalChildren = rows.reduce((s, g) => s + (g.children || 0), 0);
-              const tableTotalVeg = rows.reduce((s, g) => s + (g.veg_adults || 0) + (g.veg_children || 0), 0);
-              const tableTotalVegan = rows.reduce((s, g) => s + (g.vegan_adults || 0) + (g.vegan_children || 0), 0);
-              const tableTotalGlatt = rows.reduce((s, g) => s + (g.glatt_adults || 0) + (g.glatt_children || 0), 0);
-              const tableTotalCeliac = rows.reduce((s, g) => s + (g.celiac_adults || 0) + (g.celiac_children || 0), 0);
-              const tableTotalAllergy = rows.reduce((s, g) => s + (g.allergy_adults || 0) + (g.allergy_children || 0), 0);
-              dataWithSummaries.push({ isSummary: true, table_number: table, summary_label: `סה"כ שולחן ${table}`, adults: tableTotalAdults, children: tableTotalChildren, total: tableTotalAdults + tableTotalChildren, veg: tableTotalVeg, vegan: tableTotalVegan, glatt: tableTotalGlatt, celiac: tableTotalCeliac, allergy: tableTotalAllergy });
-            });
-            setReportGuests(dataWithSummaries);
+          if (reportTitle === 'אורחים מגיעים ממוינים לפי שולחן') {
+            setReportGuests(buildApprovedGuestsByTableReportRows(guests));
           } else {
-            setReportGuests(data || []);
+            setReportGuests(filterGuestsByStatusBucket(guests, 'approved'));
           }
         } else if (reportTitle === 'אורחים לא מגיעים') {
-          const { data } = await supabase.from('invited_guests').select('*').eq('event_id', eventIdToUse).eq('status', 'rejected');
-          setReportGuests(data || []);
+          setReportGuests(filterGuestsByStatusBucket(guests, 'rejected'));
         } else if (reportTitle === 'אורחים שטרם הגיבו') {
-          const { data } = await supabase.from('invited_guests').select('*').eq('event_id', eventIdToUse);
-          setReportGuests(getPendingGuestsFromRows(data || []));
+          setReportGuests(filterGuestsByStatusBucket(guests, 'pending'));
         }
       } catch (e) {
-        console.error('Failed to refresh report data', e);
+        console.error('refresh report modal failed', e);
       }
     })();
   }, [showReportModal, guestSummaryRefreshKey, reportTitle, currentEventId, selectedEventForReport]);
@@ -7014,9 +6942,8 @@ React.useEffect(() => {
           setDbGuests((prev) => (prev.length ? [] : prev));
           setSentGuests((prev) => (prev.length ? [] : prev));
           setReportGuests((prev) => (prev.length ? [] : prev));
-          setApprovedGuests((prev) => (prev.length ? [] : prev));
-          setRejectedGuests((prev) => (prev.length ? [] : prev));
-          setPendingGuests((prev) => (prev.length ? [] : prev));
+          setEventGuestRows((prev) => (prev.length ? [] : prev));
+          setArchivedEventGuestRows((prev) => (prev.length ? [] : prev));
           setShowGuestListModal(false);
           setShowReportsOptions(false);
           setShowReportModal(false);
@@ -7049,9 +6976,8 @@ React.useEffect(() => {
       setGuestSummary({ approved: 0, adults: 0, children: 0 });
       resetCapacityWarningGuests();
       setGuestStatusSummary({ approved: 0, rejected: 0, pending: 0 });
-      setApprovedGuests([]);
-      setRejectedGuests([]);
-      setPendingGuests([]);
+          setEventGuestRows([]);
+          setArchivedEventGuestRows([]);
     }
   }, [currentEventId, newEventStarted]);
 
@@ -7297,6 +7223,7 @@ React.useEffect(()=>{
       try{
         const user = await resolveCurrentUserForSync();
         if(!user || !currentEventId) {
+          setEventGuestRows([]);
           setMobileSummaryGuests([]);
           return;
         }
@@ -7307,6 +7234,7 @@ React.useEffect(()=>{
           .eq('id', currentEventId)
           .maybeSingle();
         if (eventError || !eventRow || !isEventRecordActive(eventRow)) {
+          setEventGuestRows([]);
           setMobileSummaryGuests([]);
           setGuestSummary({ approved: 0, adults: 0, children: 0 });
           resetCapacityWarningGuests();
@@ -7316,18 +7244,20 @@ React.useEffect(()=>{
         
         const { data: guests, error: guestsError } = await supabase
           .from('invited_guests')
-          .select('first_name, last_name, phone, table_number, status, adults, children, veg_adults, veg_children, vegan_adults, vegan_children, glatt_adults, glatt_children, allergy_adults, allergy_children, invitation_channel')
+          .select('*')
           .eq('event_id', currentEventId);
 
         if(guestsError) console.error('StepButtons - guests fetch error:', guestsError);
 
         if(guests){
+          setEventGuestRows(guests);
           const { dedupedGuests, summary, statusSummary, specialMeals } = buildGuestRsvpStats(guests);
           setMobileSummaryGuests(dedupedGuests);
           setGuestSummary(summary);
           setGuestStatusSummary(statusSummary);
           setSpecialMealsSummary(specialMeals);
         } else {
+          setEventGuestRows([]);
           setMobileSummaryGuests([]);
           setGuestSummary({ approved: 0, adults: 0, children: 0 });
           setGuestStatusSummary({ approved: 0, rejected: 0, pending: 0 });
@@ -7448,68 +7378,6 @@ React.useEffect(()=>{
 
   // clear guests when switching to a new event
   React.useEffect(()=>{ setSentGuests([]); }, [currentEventId]);
-
-  // Load table summary data from approved guests
-  React.useEffect(()=>{
-    if(!currentEventId) {
-      setTableSummary([]);
-      return;
-    }
-    
-    (async ()=>{
-      try {
-        const user = await resolveCurrentUserForSync();
-        if (!user) return;
-        
-        const { data, error } = await supabase
-          .from('invited_guests')
-          .select('*')
-          .eq('event_id', currentEventId)
-          .eq('status', 'approved');
-        
-        if (error) throw error;
-        
-        // Group guests by table_number
-        const groupedByTable = {};
-        (data || []).forEach(guest => {
-          const table = guest.table_number || 'ללא שולחן';
-          if (!groupedByTable[table]) {
-            groupedByTable[table] = [];
-          }
-          groupedByTable[table].push(guest);
-        });
-        
-        // Calculate summary for each table
-        const summaries = Object.keys(groupedByTable)
-          .sort((a, b) => {
-            const numA = parseFloat(a);
-            const numB = parseFloat(b);
-            if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
-            if (!isNaN(numA)) return -1;
-            if (!isNaN(numB)) return 1;
-            if (a === 'ללא שולחן') return 1;
-            if (b === 'ללא שולחן') return -1;
-            return a.localeCompare(b, 'he');
-          })
-          .map(table => {
-            const guests = groupedByTable[table];
-            const adults = guests.reduce((sum, g) => sum + (g.adults || 0), 0);
-            const children = guests.reduce((sum, g) => sum + (g.children || 0), 0);
-            return {
-              table_number: table,
-              adults,
-              children,
-              total: adults + children
-            };
-          });
-        
-        setTableSummary(summaries);
-      } catch (e) {
-        console.error('Failed to load table summary', e);
-        setTableSummary([]);
-      }
-    })();
-  }, [currentEventId, guestStatusSummary.approved]);
 
   // Check for plan limit violation and show warning (only after DB data loaded)
   React.useEffect(() => {
@@ -10358,11 +10226,10 @@ React.useEffect(()=>{
                   const { data, error } = await supabase
                     .from('invited_guests')
                     .select('*')
-                    .eq('event_id', eventIdToUse)
-                    .eq('status', 'approved');
+                    .eq('event_id', eventIdToUse);
                   if (error) throw error;
 
-                  setReportGuests(data || []);
+                  setReportGuests(filterGuestsByStatusBucket(data || [], 'approved'));
                   setReportTitle('אורחים מגיעים');
                   setShowReportModal(true);
                 } catch (e) {
@@ -10402,11 +10269,10 @@ React.useEffect(()=>{
                   const { data, error } = await supabase
                     .from('invited_guests')
                     .select('*')
-                    .eq('event_id', eventIdToUse)
-                    .eq('status', 'rejected');
+                    .eq('event_id', eventIdToUse);
                   if (error) throw error;
 
-                  setReportGuests(data || []);
+                  setReportGuests(filterGuestsByStatusBucket(data || [], 'rejected'));
                   setReportTitle('אורחים לא מגיעים');
                   setShowReportModal(true);
                 } catch (e) {
@@ -11284,84 +11150,10 @@ React.useEffect(()=>{
                 const { data, error } = await supabase
                   .from('invited_guests')
                   .select('*')
-                  .eq('event_id', eventIdToUse)
-                  .eq('status', 'approved');
+                  .eq('event_id', eventIdToUse);
                 if (error) throw error;
 
-                // Sort by table_number
-                const sortedData = (data || []).sort((a, b) => {
-                  const tableA = a.table_number || '';
-                  const tableB = b.table_number || '';
-                  const numA = parseFloat(tableA);
-                  const numB = parseFloat(tableB);
-                  
-                  if (!isNaN(numA) && !isNaN(numB)) {
-                    return numA - numB;
-                  } else if (!isNaN(numA) && isNaN(numB)) {
-                    return -1;
-                  } else if (isNaN(numA) && !isNaN(numB)) {
-                    return 1;
-                  } else {
-                    if (tableA === '' && tableB !== '') return 1;
-                    if (tableA !== '' && tableB === '') return -1;
-                    return tableA.localeCompare(tableB, 'he');
-                  }
-                });
-
-                // Group guests by table and add summary rows
-                const groupedByTable = {};
-                sortedData.forEach(guest => {
-                  const table = guest.table_number || 'ללא שולחן';
-                  if (!groupedByTable[table]) {
-                    groupedByTable[table] = [];
-                  }
-                  groupedByTable[table].push(guest);
-                });
-
-                // Create array with guests and summary rows
-                const dataWithSummaries = [];
-                Object.keys(groupedByTable).sort((a, b) => {
-                  const numA = parseFloat(a);
-                  const numB = parseFloat(b);
-                  if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
-                  if (!isNaN(numA)) return -1;
-                  if (!isNaN(numB)) return 1;
-                  if (a === 'ללא שולחן') return 1;
-                  if (b === 'ללא שולחן') return -1;
-                  return a.localeCompare(b, 'he');
-                }).forEach(table => {
-                  const guests = groupedByTable[table];
-                  // Add all guests for this table
-                  guests.forEach(guest => {
-                    dataWithSummaries.push({ ...guest, isGuest: true });
-                  });
-                  
-                  // Calculate summary for this table
-                  const tableTotalAdults = guests.reduce((sum, g) => sum + (g.adults || 0), 0);
-                  const tableTotalChildren = guests.reduce((sum, g) => sum + (g.children || 0), 0);
-                  const tableTotalVeg = guests.reduce((sum, g) => sum + ((g.veg_adults||0)+(g.veg_children||0)), 0);
-                  const tableTotalVegan = guests.reduce((sum, g) => sum + ((g.vegan_adults||0)+(g.vegan_children||0)), 0);
-                  const tableTotalGlatt = guests.reduce((sum, g) => sum + ((g.glatt_adults||0)+(g.glatt_children||0)), 0);
-                  const tableTotalCeliac = guests.reduce((sum, g) => sum + ((g.celiac_adults||0)+(g.celiac_children||0)), 0);
-                  const tableTotalAllergy = guests.reduce((sum, g) => sum + ((g.allergy_adults||0)+(g.allergy_children||0)), 0);
-                  
-                  // Add summary row for this table
-                  dataWithSummaries.push({
-                    isSummary: true,
-                    table_number: table,
-                    summary_label: `סה"כ שולחן ${table}`,
-                    adults: tableTotalAdults,
-                    children: tableTotalChildren,
-                    total: tableTotalAdults + tableTotalChildren,
-                    veg: tableTotalVeg,
-                    vegan: tableTotalVegan,
-                    glatt: tableTotalGlatt,
-                    celiac: tableTotalCeliac,
-                    allergy: tableTotalAllergy
-                  });
-                });
-
-                setReportGuests(dataWithSummaries);
+                setReportGuests(buildApprovedGuestsByTableReportRows(data || []));
                 setReportTitle('אורחים מגיעים ממוינים לפי שולחן');
                 setShowReportModal(true);
               } catch (e) {
