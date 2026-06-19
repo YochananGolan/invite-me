@@ -237,6 +237,7 @@ const WIZARD_STEP_BLOCK_MESSAGES = {
   3: 'יש לבחור תחילה עיצוב להזמנה לפני המשך.',
   4: 'יש לשלוח הזמנות לאורחים לפני המשך לדוחות.',
 };
+const WIZARD_START_FIRST_MSG = 'יש תחילה ליצור אירוע ולבחור מסלול תשלום.';
 
 // Hebrew labels for form keys – used across component
 const fieldLabels = {
@@ -6452,6 +6453,32 @@ React.useEffect(() => {
     }
   }, [showStepError, stepErrorMsg]);
 
+  // נקה הודעת "צור אירוע" אם כבר יש אירוע/מסלול פעיל (למשל אחרי טעינה מאוחרת מ-DB)
+  React.useEffect(() => {
+    if (!showStepError || stepErrorMsg !== WIZARD_START_FIRST_MSG) return;
+    const hasActiveContext = Boolean(
+      currentEventId ||
+      planForDisplay ||
+      selectedPlan ||
+      userPlanSettings?.plan ||
+      (eventDataLoaded && (invitedCount > 0 || formDataHasMeaningfulValues))
+    );
+    if (hasActiveContext) {
+      setShowStepError(false);
+      setStepErrorMsg('');
+    }
+  }, [
+    currentEventId,
+    eventDataLoaded,
+    formDataHasMeaningfulValues,
+    invitedCount,
+    planForDisplay,
+    selectedPlan,
+    showStepError,
+    stepErrorMsg,
+    userPlanSettings?.plan,
+  ]);
+
   // Auto-save invitation text and styles to database when they change (with debounce)
   useEffect(() => {
     if (!currentEventId || !selectedDesign) return;
@@ -7246,6 +7273,9 @@ React.useEffect(() => {
           }
         }
         isInitialLoadRef.current = false;
+        if (!ev) {
+          setEventDataLoaded(true);
+        }
       }catch(e){ console.error('restore event failed', e);}  
     })();
   },[loadUserPlanSettings, syncFinishedStepsFromEvent]);
@@ -7882,15 +7912,21 @@ React.useEffect(()=>{
       resetWizardDismissForUserProgress();
     }
 
-    const wizardSessionActive = Boolean(
+    const hasEstablishedWizardContext = Boolean(
+      currentEventId ||
       newEventStarted ||
       userPlanSettings?.eventWizardStarted ||
-      planForDisplay
+      planForDisplay ||
+      selectedPlan ||
+      userPlanSettings?.plan ||
+      (eventDataLoaded && (invitedCount > 0 || formDataHasMeaningfulValues))
     );
-    const mustStartFirst = !currentEventId && !wizardSessionActive;
+    const mustStartFirst = !hasEstablishedWizardContext;
     if (stepNumber >= 1 && stepNumber <= 5 && mustStartFirst) {
-      setStepErrorMsg('\u05D9\u05E9 \u05EA\u05D7\u05D9\u05DC\u05D4 \u05DC\u05D9\u05E6\u05D5\u05E8 \u05D0\u05D9\u05E8\u05D5\u05E2 \u05D5\u05DC\u05D1\u05D7\u05D5\u05E8 \u05DE\u05E1\u05DC\u05D5\u05DC \u05EA\u05E9\u05DC\u05D5\u05DD.');
-      setShowStepError(true);
+      if (userInitiated) {
+        setStepErrorMsg(WIZARD_START_FIRST_MSG);
+        setShowStepError(true);
+      }
       return false;
     }
 
@@ -7899,8 +7935,10 @@ React.useEffect(()=>{
         if (requiredStep > 4) break;
         if (!wizardStepCompletion[requiredStep]) {
           if (mustStartFirst) {
-            setStepErrorMsg('\u05D9\u05E9 \u05EA\u05D7\u05D9\u05DC\u05D4 \u05DC\u05D9\u05E6\u05D5\u05E8 \u05D0\u05D9\u05E8\u05D5\u05E2 \u05D5\u05DC\u05D1\u05D7\u05D5\u05E8 \u05DE\u05E1\u05DC\u05D5\u05DC \u05EA\u05E9\u05DC\u05D5\u05DD.');
-            setShowStepError(true);
+            if (userInitiated) {
+              setStepErrorMsg(WIZARD_START_FIRST_MSG);
+              setShowStepError(true);
+            }
             return false;
           }
           setStepErrorMsg(WIZARD_STEP_BLOCK_MESSAGES[requiredStep]);
@@ -7918,9 +7956,14 @@ React.useEffect(()=>{
     return true;
   }, [
     currentEventId,
+    eventDataLoaded,
+    formDataHasMeaningfulValues,
+    invitedCount,
     newEventStarted,
-    userPlanSettings?.eventWizardStarted,
     planForDisplay,
+    selectedPlan,
+    userPlanSettings?.eventWizardStarted,
+    userPlanSettings?.plan,
     redirectToWizardStep,
     scrollToWizardSection,
     wizardStepCompletion,
@@ -7945,6 +7988,7 @@ React.useEffect(()=>{
       return undefined;
     }
     if (currentEventId && !eventDataLoaded) return undefined;
+    if (!userPlanSettingsHydratedRef.current) return undefined;
     if (showDesignChooser || showEventDetails || showGuestForm) return undefined;
 
     const flowStarted = Boolean(
@@ -7977,8 +8021,8 @@ React.useEffect(()=>{
         scrollToWizardSectionRef.current?.();
         setStepErrorMsg('');
         setShowStepError(false);
-        markWizardAutoResumeAttempted();
       }
+      markWizardAutoResumeAttempted();
     }, 450);
     return () => window.clearTimeout(timer);
   }, [
