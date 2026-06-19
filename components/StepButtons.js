@@ -2068,6 +2068,17 @@ const handleOpenAddonModal = React.useCallback(() => {
       return `${d}.${m}.${yy}`;
     };
 
+  const presentInvitationSendResult = React.useCallback((type, message) => {
+    setInvitationResult({ type, message });
+    setShowGuestForm(false);
+    setShowInvitationResultModal(true);
+    addToast?.(
+      message,
+      type === 'success' ? 'success' : type === 'warning' ? 'warning' : 'error',
+      type === 'error' ? 6000 : 5000,
+    );
+  }, [addToast]);
+
     const handleSendInvitation = async () => {
       setGuestSubmitAttempted(true);
       // Persist current event details so they survive any reloads after sending
@@ -2117,8 +2128,12 @@ const handleOpenAddonModal = React.useCallback(() => {
       if (totalLimitForSend > 0 && effectiveMessagesSentCount >= totalLimitForSend) {
         setIsSendingInvitation(false);
         setPendingAddonCount(1);
-        setShowPlanLimitWarning(true);
         setPlanAddOnMode(true);
+        setShowPlanLimitWarning(true);
+        presentInvitationSendResult(
+          'error',
+          'חרגת ממכסת ההודעות. נא לרכוש חבילת הרחבה כדי להמשיך לשלוח.',
+        );
         return;
       }
 
@@ -2179,36 +2194,33 @@ const handleOpenAddonModal = React.useCallback(() => {
 
         setIsSendingInvitation(false);
 
-        if (apiResult.ok) {
-          const results = apiResult.payload?.results || [];
-          const success = results.some((r) => r.ok);
-          if (success) {
-            await supabase
-              .from('invited_guests')
-              .update({ invitation_channel: 'whatsapp' })
-              .eq('id', newGuestRecord.id);
-            setGuestSummaryRefreshKey((key) => key + 1);
-            setSentGuests((prev) => [
-              ...prev,
-              {
-                guestId: newGuestRecord.id,
-                guestFirstName: guestData.guestFirstName,
-                guestLastName: guestData.guestLastName,
-                guestPhone: normalizedPhone,
-                guestPhoneOriginal: guestData.guestPhone,
-                guestTable: guestData.guestTable,
-                channel: 'whatsapp',
-              },
-            ]);
-            if (wasFirstSend) {
-              maybeShowMobileFirstSendSuccess();
-            }
-          }
+        const results = apiResult.payload?.results || [];
+        const queued = Number(apiResult.payload?.queued ?? apiResult.payload?.sent ?? 0);
+        const success = apiResult.ok && (queued > 0 || results.some((r) => r.ok));
+
+        if (success) {
+          await supabase
+            .from('invited_guests')
+            .update({ invitation_channel: 'whatsapp' })
+            .eq('id', newGuestRecord.id);
+          setGuestSummaryRefreshKey((key) => key + 1);
+          setSentGuests((prev) => [
+            ...prev,
+            {
+              guestId: newGuestRecord.id,
+              guestFirstName: guestData.guestFirstName,
+              guestLastName: guestData.guestLastName,
+              guestPhone: normalizedPhone,
+              guestPhoneOriginal: guestData.guestPhone,
+              guestTable: guestData.guestTable,
+              channel: 'whatsapp',
+            },
+          ]);
           setInvitationSent(true);
-          setInvitationResult({
-            type: 'success',
-            message: 'ההזמנה נשלחה בהצלחה בוואטסאפ!',
-          });
+          presentInvitationSendResult('success', 'ההזמנה נשלחה בהצלחה בוואטסאפ!');
+          if (wasFirstSend) {
+            maybeShowMobileFirstSendSuccess();
+          }
         } else {
           const failureEntry = Array.isArray(apiResult.payload?.failed) && apiResult.payload.failed.length > 0 ? apiResult.payload.failed[0] : null;
           const errMsg =
@@ -2222,12 +2234,8 @@ const handleOpenAddonModal = React.useCallback(() => {
             await cleanupGuestsAfterFailedSend([newGuestRecord.id]);
           }
           setInvitationSent(false);
-          setInvitationResult({
-            type: 'error',
-            message: errMsg,
-          });
+          presentInvitationSendResult('error', errMsg);
         }
-        setShowInvitationResultModal(true);
       } catch (err) {
         console.error('Failed to send invitation:', err);
         setIsSendingInvitation(false);
@@ -2235,11 +2243,7 @@ const handleOpenAddonModal = React.useCallback(() => {
           await cleanupGuestsAfterFailedSend([newGuestRecord.id]);
         }
         setInvitationSent(false);
-        setInvitationResult({ 
-          type: 'error', 
-          message: 'אירעה שגיאה בשליחת ההזמנה.' 
-        });
-        setShowInvitationResultModal(true);
+        presentInvitationSendResult('error', 'אירעה שגיאה בשליחת ההזמנה.');
       }
     } catch (err) {
       console.error('Failed to send invitation:', err);
@@ -2248,11 +2252,7 @@ const handleOpenAddonModal = React.useCallback(() => {
         await cleanupGuestsAfterFailedSend([newGuestRecord.id]);
       }
       setInvitationSent(false);
-      setInvitationResult({ 
-        type: 'error', 
-        message: 'אירעה שגיאה בשליחת ההזמנה.' 
-      });
-      setShowInvitationResultModal(true);
+      presentInvitationSendResult('error', 'אירעה שגיאה בשליחת ההזמנה.');
     }
   };
 
@@ -2269,11 +2269,7 @@ const handleOpenAddonModal = React.useCallback(() => {
     if (digitsOnly.length !== 10) {
       setIsSendingInvitation(false);
       setGuestErrors({ guestPhone: true });
-      setInvitationResult({ 
-        type: 'error', 
-        message: 'מספר טלפון לא תקין – יש להזין 10 ספרות.' 
-      });
-      setShowInvitationResultModal(true);
+      presentInvitationSendResult('error', 'מספר טלפון לא תקין – יש להזין 10 ספרות.');
       return;
     }
 
@@ -2282,11 +2278,7 @@ const handleOpenAddonModal = React.useCallback(() => {
       const user = await resolveCurrentUserForSync();
       if (!user) {
         setIsSendingInvitation(false);
-        setInvitationResult({ 
-          type: 'error', 
-          message: 'יש להתחבר כדי לשלוח הזמנות' 
-        });
-        setShowInvitationResultModal(true);
+        presentInvitationSendResult('error', 'יש להתחבר כדי לשלוח הזמנות');
         return;
       }
 
@@ -2332,12 +2324,11 @@ const handleOpenAddonModal = React.useCallback(() => {
         (getPlanBaseLimit(selectedPlan || planForDisplay || userPlanSettings?.plan || null) || 0) +
         addonCountForDisplay * (getPlanBaseLimit('addon') || 100);
       if (totalLimitSms > 0 && effectiveMessagesSentCount >= totalLimitSms) {
-        setInvitationResult({ type: 'error', message: 'אין מספיק הודעות במכסה. נא לרכוש חבילת הרחבה.' });
-        setShowInvitationResultModal(true);
+        setIsSendingInvitation(false);
         setPendingAddonCount(1);
         setShowPlanLimitWarning(true);
         setPlanAddOnMode(true);
-        setIsSendingInvitation(false);
+        presentInvitationSendResult('error', 'אין מספיק הודעות במכסה. נא לרכוש חבילת הרחבה.');
         return;
       }
       const wasFirstSend = invitedCount === 0 && effectiveMessagesSentCount === 0;
@@ -2380,43 +2371,26 @@ const handleOpenAddonModal = React.useCallback(() => {
           }
           setInvitationSent(true);
           setIsSendingInvitation(false);
+          presentInvitationSendResult('success', 'ההזמנה נשלחה בהצלחה ב-SMS!');
           if (wasFirstSend) {
             maybeShowMobileFirstSendSuccess();
           }
-          setInvitationResult({ 
-            type: 'success', 
-            message: 'ההזמנה נשלחה בהצלחה ב-SMS!' 
-          });
-          setShowInvitationResultModal(true);
         } else {
           setIsSendingInvitation(false);
-          // Show error modal
           const errorMsg = smsResult.failed > 0 
             ? `אירעה שגיאה בשליחת ההזמנה ב-SMS. ${smsResult.errors?.[0]?.error || ''}`
             : 'אירעה שגיאה בשליחת ההזמנה ב-SMS.';
-          setInvitationResult({ 
-            type: 'error', 
-            message: errorMsg
-          });
-          setShowInvitationResultModal(true);
+          presentInvitationSendResult('error', errorMsg);
         }
       } catch (smsError) {
         console.error('SMS sending error:', smsError);
         setIsSendingInvitation(false);
-        setInvitationResult({ 
-          type: 'error', 
-          message: 'אירעה שגיאה בשליחת ההזמנה ב-SMS.' 
-        });
-        setShowInvitationResultModal(true);
+        presentInvitationSendResult('error', 'אירעה שגיאה בשליחת ההזמנה ב-SMS.');
       }
     } catch (err) {
       console.error('Failed to send SMS invitation', err);
       setIsSendingInvitation(false);
-      setInvitationResult({ 
-        type: 'error', 
-        message: err.message || 'אירעה שגיאה בשליחת ההזמנה בסמס.' 
-      });
-      setShowInvitationResultModal(true);
+      presentInvitationSendResult('error', err.message || 'אירעה שגיאה בשליחת ההזמנה בסמס.');
     }
   };
 
@@ -8586,7 +8560,7 @@ React.useEffect(()=>{
   return (
     <>
       {/* Capacity Limit Warning Modal */}
-      <Modal open={showPlanLimitWarning} onClose={() => { setShowPlanLimitWarning(false); resetCapacityWarningGuests(); }} size="md">
+      <Modal open={showPlanLimitWarning} onClose={() => { setShowPlanLimitWarning(false); resetCapacityWarningGuests(); }} size="md" priority>
         <ModalHeader onClose={() => { setShowPlanLimitWarning(false); resetCapacityWarningGuests(); }}>חרגת ממכסת ההודעות!</ModalHeader>
         <ModalBody>
           {showPlanLimitWarning && (() => {
@@ -12129,7 +12103,7 @@ React.useEffect(()=>{
       {/* Invitation Send Loading Overlay */}
       {isSendingInvitation && (
         <div
-          className="fixed inset-0 z-[140] flex items-center justify-center bg-[#0a0b1e]/80 px-6 backdrop-blur-sm"
+          className="fixed inset-0 z-[170] flex items-center justify-center bg-[#0a0b1e]/80 px-6 backdrop-blur-sm"
           dir="rtl"
           role="alertdialog"
           aria-live="polite"
@@ -12146,7 +12120,7 @@ React.useEffect(()=>{
       )}
 
       {/* Invitation Send Result Modal */}
-      <Modal open={showInvitationResultModal} onClose={() => setShowInvitationResultModal(false)} size="sm">
+      <Modal open={showInvitationResultModal} onClose={() => setShowInvitationResultModal(false)} size="sm" priority>
         <ModalBody className="text-center py-8">
             {invitationResult.type === 'success' ? (
               <>

@@ -10,7 +10,7 @@ const SIZES = {
   screen: 'max-w-full w-full',
 };
 
-export default function Modal({ open, onClose, size = 'md', children, className = '', landscape = false }) {
+export default function Modal({ open, onClose, size = 'md', children, className = '', landscape = false, priority = false }) {
   useMobileOverlayBack(open, onClose);
 
   useEffect(() => {
@@ -29,11 +29,12 @@ export default function Modal({ open, onClose, size = 'md', children, className 
 
   const isMobilePortrait = typeof window !== 'undefined' && window.innerWidth < 640;
   const applyLandscape = landscape && isMobilePortrait;
+  const overlayZ = priority ? 'z-[160]' : 'z-50';
 
   return (
     <div
       dir="rtl"
-      className={`fixed inset-0 z-50 flex ${size === 'screen' ? 'items-stretch' : 'items-end sm:items-center'} justify-center bg-[#0a0b1e]/75 backdrop-blur-sm p-0 ${size === 'screen' ? '' : 'sm:p-4'}`}
+      className={`fixed inset-0 ${overlayZ} flex ${size === 'screen' ? 'items-stretch' : 'items-end sm:items-center'} justify-center bg-[#0a0b1e]/75 backdrop-blur-sm p-0 ${size === 'screen' ? '' : 'sm:p-4'}`}
       onClick={(e) => { if (e.target === e.currentTarget) onClose?.(); }}
     >
       <div
