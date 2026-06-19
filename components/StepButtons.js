@@ -88,6 +88,11 @@ function parseNonNegativeInt(value) {
   return Number.isFinite(parsed) ? Math.max(0, Math.floor(parsed)) : 0;
 }
 
+/** Use the highest addon count from event row, user_settings, and local UI state. */
+function resolveEffectiveAddonCount(...values) {
+  return values.reduce((max, value) => Math.max(max, parseNonNegativeInt(value)), 0);
+}
+
 function normalizePhoneForGuestSearch(rawDigits) {
   const digits = String(rawDigits || '').replace(/\D/g, '');
   if (!digits) return null;
@@ -1568,6 +1573,10 @@ const additionalPackagesRef = useRef(additionalPackages);
 useEffect(() => {
   additionalPackagesRef.current = additionalPackages;
 }, [additionalPackages]);
+const dbAddonCountRef = useRef(dbAddonCount);
+useEffect(() => {
+  dbAddonCountRef.current = dbAddonCount;
+}, [dbAddonCount]);
 
 const lastRestoredEventIdRef = useRef(null);
 const noEventLoggedRef = useRef(false);
@@ -5647,6 +5656,8 @@ React.useEffect(() => {
           setPaymentWasPlanPurchase(false);
           const basePlanForAddonPersist = selectedPlan || userPlanSettings?.plan || null;
           await persistUserPlanSettings(basePlanForAddonPersist, newAddonTotal);
+          setShowPlanLimitWarning(false);
+          setEventRefreshKey((k) => k + 1);
 
           // סגירת הודעת שגיאת מכסה אם הייתה פתוחה – כדי שלא תוצג אחרי התשלום
           setShowInvitationResultModal(false);
@@ -5900,8 +5911,12 @@ React.useEffect(() => {
         }
         setEventMessagesSentCount(messagesSent);
         setEventReminderSentAt(ev?.reminder_sent_at ?? null);
-        const settingsAddonCount = parseNonNegativeInt(userPlanSettingsRef.current?.addonCount);
-        const addonCount = settingsAddonCount;
+        const addonCount = resolveEffectiveAddonCount(
+          ev.additional_packages,
+          userPlanSettingsRef.current?.addonCount,
+          dbAddonCountRef.current,
+          additionalPackagesRef.current?.length,
+        );
         setDbAddonCount(addonCount);
         setAdditionalPackages((prev) => {
           const prevCount = prev ? prev.length : 0;
@@ -5997,13 +6012,22 @@ React.useEffect(() => {
             setEventReminderSentAt(ev.reminder_sent_at);
           }
           if (ev.additional_packages != null && ev.additional_packages !== '') {
-            const ap = parseNonNegativeInt(userPlanSettingsRef.current?.addonCount);
+            const ap = resolveEffectiveAddonCount(
+              ev.additional_packages,
+              userPlanSettingsRef.current?.addonCount,
+              dbAddonCountRef.current,
+              additionalPackagesRef.current?.length,
+            );
             setDbAddonCount(ap);
             setAdditionalPackages((prev) => {
               const prevCount = prev ? prev.length : 0;
               if (prevCount !== ap) return Array(ap).fill('addon');
               return prev;
             });
+            const planForAddonSync = derivePlanFromRecord(ev) || userPlanSettingsRef.current?.plan || selectedPlanRef.current || null;
+            if (planForAddonSync && ap > parseNonNegativeInt(userPlanSettingsRef.current?.addonCount)) {
+              void persistUserPlanSettings(planForAddonSync, ap);
+            }
           }
           if (ev.allowed_guests != null && ev.allowed_guests !== '') {
             const capRt = parseNonNegativeInt(ev.allowed_guests);
@@ -6013,7 +6037,13 @@ React.useEffect(() => {
           if (planFromEvent) {
             setSelectedPlan(planFromEvent);
             try { localStorage.setItem('selectedPlan', planFromEvent); } catch (_) {}
-            persistUserPlanSettings(planFromEvent, userPlanSettingsRef.current?.addonCount ?? 0);
+            const apForPlan = resolveEffectiveAddonCount(
+              ev.additional_packages,
+              userPlanSettingsRef.current?.addonCount,
+              dbAddonCountRef.current,
+              additionalPackagesRef.current?.length,
+            );
+            persistUserPlanSettings(planFromEvent, apForPlan);
           }
           setEventRefreshKey((k) => k + 1);
         }
@@ -6206,7 +6236,12 @@ React.useEffect(() => {
       plan = extractPlanFromEventRecord(ev);
       if (!plan) return null;
 
-      const addonCount = parseNonNegativeInt(ev?.additional_packages);
+      const addonCount = resolveEffectiveAddonCount(
+        ev?.additional_packages,
+        userPlanSettingsRef.current?.addonCount,
+        dbAddonCountRef.current,
+        additionalPackagesRef.current?.length,
+      );
       const draftWizard = isEventWizardDraft(ev);
       await persistUserPlanSettings(plan, addonCount, draftWizard ? true : undefined);
       if (draftWizard) {
@@ -6771,7 +6806,12 @@ React.useEffect(() => {
           }
           setEventMessagesSentCount(ev.messages_sent_count ?? 0);
           setEventReminderSentAt(ev.reminder_sent_at ?? null);
-          const restoreAddonCount = parseNonNegativeInt(userPlanSettingsRef.current?.addonCount);
+          const restoreAddonCount = resolveEffectiveAddonCount(
+            ev.additional_packages,
+            userPlanSettingsRef.current?.addonCount,
+            dbAddonCountRef.current,
+            additionalPackagesRef.current?.length,
+          );
           setDbAddonCount(restoreAddonCount);
           setAdditionalPackages((prev) => {
             const prevCount = prev ? prev.length : 0;
@@ -7143,7 +7183,12 @@ React.useEffect(() => {
           }
           setEventMessagesSentCount(messagesSent);
           setEventReminderSentAt(ev?.reminder_sent_at ?? null);
-          const addonCount = parseNonNegativeInt(userPlanSettingsRef.current?.addonCount);
+          const addonCount = resolveEffectiveAddonCount(
+            ev.additional_packages,
+            userPlanSettingsRef.current?.addonCount,
+            dbAddonCountRef.current,
+            additionalPackagesRef.current?.length,
+          );
           setDbAddonCount(addonCount);
           setAdditionalPackages((prev) => {
             const prevCount = prev ? prev.length : 0;
