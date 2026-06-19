@@ -2001,7 +2001,7 @@ const handleOpenAddonModal = React.useCallback(() => {
     resetWizardDismissForUserProgress();
     allowWizardProgrammaticOpen(() => setShowDesignChooser(true));
     try {
-      await saveEventToSupabase(null, selectedDesign);
+      await saveEventToSupabase(null);
     } catch (err) {
       console.error('Failed to save event details', err);
       addToast?.('שמירת פרטי האירוע נכשלה. נסו שוב.', 'error');
@@ -2472,9 +2472,10 @@ const handleOpenAddonModal = React.useCallback(() => {
   const defaultDesignTemplateSrc = designImages[0] || null;
 
   const [selectedDesign, setSelectedDesign] = useState(null);
+  const [chooserDraftDesign, setChooserDraftDesign] = useState(null);
   const isStep3Complete = React.useMemo(
-    () => Boolean(selectedDesign || finishedSteps.includes(2)),
-    [selectedDesign, finishedSteps]
+    () => finishedSteps.includes(2),
+    [finishedSteps]
   );
   const fontsOptions = [
     { key: 'assistant', label: 'Assistant',          css: "'Assistant', sans-serif" },
@@ -2691,11 +2692,12 @@ const handleOpenAddonModal = React.useCallback(() => {
         setLineStyles(defaultStyles);
       }
     }
-    if (!selectedDesign && defaultDesignTemplateSrc) {
-      setSelectedDesign(defaultDesignTemplateSrc);
-      try { localStorage.setItem('selectedDesign', defaultDesignTemplateSrc); } catch (_) {}
-    }
+    setChooserDraftDesign((prev) => prev || selectedDesign || defaultDesignTemplateSrc || null);
   }, [showDesignChooser, invitationTextDefault, customInvitationText, selectedEventType, selectedDesign, defaultDesignTemplateSrc]);
+
+  React.useEffect(() => {
+    if (!showDesignChooser) setChooserDraftDesign(null);
+  }, [showDesignChooser]);
 
   React.useEffect(()=>{
     (async () => {
@@ -3276,7 +3278,8 @@ const handleOpenAddonModal = React.useCallback(() => {
         return;
       }
 
-      const progress = templateSrc ? 3 : 2; // Progress based on design selection, not file
+      const savingDesign = Boolean(templateSrc);
+      const progress = savingDesign ? 3 : 2;
       
       // Determine which text to save - prefer customInvitationText if it exists
       const textToSave = customInvitationText || invitationText || '';
@@ -3298,8 +3301,7 @@ const handleOpenAddonModal = React.useCallback(() => {
         line_styles: lineStyles, // Save all line styles
         font: selectedFontKey,
         font_css: selectedFontCss, // Save font CSS for display
-        template_src: templateSrc || selectedDesign || null,
-        status: templateSrc ? 'active' : 'draft',
+        ...(savingDesign ? { template_src: templateSrc, status: 'active' } : {}),
         progress_step: progress,
         pricing_plan: selectedPlan || planForDisplay || userPlanSettings?.plan || formData.pricing_plan || null,
       };
@@ -3327,6 +3329,12 @@ const handleOpenAddonModal = React.useCallback(() => {
             eventDetailsForSave = {
               ...eventDetailsForSave,
               whatsapp_group: existingDetails.whatsapp_group,
+            };
+          }
+          if (!savingDesign && existingDetails?.template_src) {
+            eventDetailsForSave = {
+              ...eventDetailsForSave,
+              template_src: existingDetails.template_src,
             };
           }
         } catch (preserveGroupError) {
@@ -3490,7 +3498,7 @@ const handleOpenAddonModal = React.useCallback(() => {
         }
       }
 
-      markStepDone(2);
+      if (savingDesign) markStepDone(2);
     } catch (err) {
       console.error('Failed to save event', err);
       throw err;
@@ -6326,10 +6334,6 @@ React.useEffect(() => {
     if(eventDetailsCompleted) markStepDone(1);
   },[eventDetailsCompleted]);
 
-  React.useEffect(()=>{
-    if(selectedDesign) markStepDone(2);
-  },[selectedDesign]);
-
   const [showActiveError,setShowActiveError]=useState(false);
 
   // Handle payment failure from redirect (Apple Pay / Google Pay may redirect whole page to failure URL)
@@ -7922,6 +7926,7 @@ React.useEffect(()=>{
       return undefined;
     }
     if (currentEventId && !eventDataLoaded) return undefined;
+    if (showDesignChooser || showEventDetails || showGuestForm) return undefined;
 
     const flowStarted = Boolean(
       currentEventId ||
@@ -7970,6 +7975,9 @@ React.useEffect(()=>{
     userPlanSettings?.eventWizardStarted,
     selectedEventType,
     session,
+    showDesignChooser,
+    showEventDetails,
+    showGuestForm,
   ]);
 
   React.useEffect(() => {
@@ -10511,8 +10519,8 @@ React.useEffect(()=>{
                 className="relative rounded-2xl overflow-hidden shadow-[0_12px_48px_rgba(0,0,0,0.6)] ring-2 ring-indigo-400/20"
                 style={{ width: '100%', maxWidth: 480, aspectRatio: '3/4' }}
               >
-                {selectedDesign ? (
-                  <img src={selectedDesign} alt="תבנית נבחרת" className="absolute inset-0 w-full h-full object-cover object-top" />
+                {chooserDraftDesign ? (
+                  <img src={chooserDraftDesign} alt="תבנית נבחרת" className="absolute inset-0 w-full h-full object-cover object-top" />
                 ) : (
                   <div className="absolute inset-0 bg-gradient-to-br from-[#f0e8ff] to-[#fdf6ee]" />
                 )}
@@ -10561,13 +10569,13 @@ React.useEffect(()=>{
                     );
                   })}
                 </div>
-                {!selectedDesign && (
+                {!chooserDraftDesign && (
                   <div className="absolute bottom-3 inset-x-4 text-center text-[10px] text-slate-500 pointer-events-none">
                     בחר תבנית מהרשימה ←
                   </div>
                 )}
               </div>
-              {selectedDesign && (
+              {chooserDraftDesign && (
                 <p className="text-xs text-emerald-400 font-semibold shrink-0">✓ תבנית נבחרת</p>
               )}
             </div>
@@ -10593,9 +10601,9 @@ React.useEffect(()=>{
                     };
                     const getFilename = (path) => normalizePath(path).split('/').pop() || normalizePath(path);
                     const isSelected = (() => {
-                      if (!selectedDesign) return false;
-                      if (normalizePath(selectedDesign) === normalizePath(src)) return true;
-                      return getFilename(selectedDesign) === getFilename(src) && getFilename(src) !== '';
+                      if (!chooserDraftDesign) return false;
+                      if (normalizePath(chooserDraftDesign) === normalizePath(src)) return true;
+                      return getFilename(chooserDraftDesign) === getFilename(src) && getFilename(src) !== '';
                     })();
 
                     return (
@@ -10607,21 +10615,7 @@ React.useEffect(()=>{
                             : 'ring-1 ring-white/15 hover:ring-indigo-400/50 hover:scale-[1.01]'
                         }`}
                         onClick={() => { setLightboxSrc(src); setShowLightbox(true); }}
-                        onDoubleClick={async () => {
-                          setSelectedDesign(src);
-                          try { localStorage.setItem('selectedDesign', src); } catch {}
-                          if (currentEventId) {
-                            try {
-                              const { data: eventData, error: fetchError } = await supabase
-                                .from('events').select('event_details').eq('id', currentEventId).single();
-                              if (!fetchError && eventData?.event_details) {
-                                let details = {};
-                                try { details = typeof eventData.event_details === 'string' ? JSON.parse(eventData.event_details) : (eventData.event_details || {}); } catch {}
-                                await supabase.from('events').update({ event_details: { ...details, template_src: src } }).eq('id', currentEventId);
-                              }
-                            } catch (err) { console.error('Failed to save design selection:', err); }
-                          }
-                        }}
+                        onDoubleClick={() => setChooserDraftDesign(src)}
                       >
                         <div className="relative aspect-[3/4] w-full bg-white/5">
                           <img src={src} alt="Invitation design" className="absolute inset-0 w-full h-full object-cover object-top" />
@@ -10686,8 +10680,8 @@ React.useEffect(()=>{
           </button>
           <button
             type="button"
-            onClick={() => handleChooseDesign(selectedDesign || defaultDesignTemplateSrc)}
-            disabled={uploadingInvite || !(selectedDesign || defaultDesignTemplateSrc)}
+            onClick={() => handleChooseDesign(chooserDraftDesign || defaultDesignTemplateSrc)}
+            disabled={uploadingInvite || !(chooserDraftDesign || defaultDesignTemplateSrc)}
             className="w-full sm:flex-1 bg-emerald-600 text-white border border-emerald-400/50 rounded-full px-6 py-3 font-bold hover:bg-emerald-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {uploadingInvite ? 'שומר...' : 'שמור וסגור'}
