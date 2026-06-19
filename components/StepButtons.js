@@ -10675,6 +10675,24 @@ React.useEffect(()=>{
             </div>
           </div>
         </ModalBody>
+        <ModalFooter className="flex-col sm:flex-row gap-3 shrink-0">
+          <button
+            type="button"
+            onClick={closeDesignChooserModal}
+            disabled={uploadingInvite}
+            className="w-full sm:flex-1 bg-red-500 text-white border border-red-400/50 rounded-full px-6 py-3 font-bold hover:bg-red-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            ביטול
+          </button>
+          <button
+            type="button"
+            onClick={() => handleChooseDesign(selectedDesign || defaultDesignTemplateSrc)}
+            disabled={uploadingInvite || !(selectedDesign || defaultDesignTemplateSrc)}
+            className="w-full sm:flex-1 bg-emerald-600 text-white border border-emerald-400/50 rounded-full px-6 py-3 font-bold hover:bg-emerald-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {uploadingInvite ? 'שומר...' : 'שמור וסגור'}
+          </button>
+        </ModalFooter>
       </Modal>
       {/* Lightbox for design preview */}
       <Modal open={showLightbox} onClose={() => setShowLightbox(false)} size="lg">
