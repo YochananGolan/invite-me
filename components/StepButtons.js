@@ -22,6 +22,7 @@ import {
   getRsvpStatusLabel,
 } from '../lib/rsvpLabels';
 import { getGuestIdentityKey } from '../lib/guestIdentity';
+import { buildGuestRsvpStats, dedupeGuestsByIdentity } from '../lib/guestStats';
 import MobileQuickGuestsCard from './mobile/MobileQuickGuestsCard';
 import MobileQuickGuestListScreen, { MOBILE_GUEST_LIST_PAGE_SIZE } from './mobile/MobileQuickGuestListScreen';
 import MobileQuickGuestSearchOverlay from './mobile/MobileQuickGuestSearchOverlay';
@@ -145,28 +146,6 @@ function matchesGuestSearchTerm(guest, rawTerm) {
   if (searchDigits && String(guest.table_number || '').replace(/\D/g, '').includes(searchDigits)) return true;
 
   return false;
-}
-
-function dedupeGuestsByIdentity(guests = []) {
-  const byIdentity = new Map();
-
-  for (const guest of guests || []) {
-    const key = getGuestIdentityKey(guest);
-    const current = byIdentity.get(key);
-
-    if (!current) {
-      byIdentity.set(key, guest);
-      continue;
-    }
-
-    const currentStatus = getGuestStatusBucket(current.status);
-    const nextStatus = getGuestStatusBucket(guest.status);
-    if (currentStatus === 'pending' && nextStatus !== 'pending') {
-      byIdentity.set(key, guest);
-    }
-  }
-
-  return Array.from(byIdentity.values());
 }
 
 function getPendingGuestsFromRows(guests = []) {
@@ -610,7 +589,7 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick, trig
   const hasStatusData = statusChartData.some(item => item.value > 0);
   const mobileStatusFilteredGuests = React.useMemo(() => (
     mobileSummaryGuests.filter((guest) => {
-      const normalizedStatus = guest.status === 'approved' || guest.status === 'rejected' ? guest.status : 'pending';
+      const normalizedStatus = getGuestStatusBucket(guest.status);
       if (mobileSummaryFilter !== 'all' && normalizedStatus !== mobileSummaryFilter) return false;
       return true;
     })
@@ -7342,55 +7321,23 @@ React.useEffect(()=>{
 
         if(guestsError) console.error('StepButtons - guests fetch error:', guestsError);
 
-        let summary = { approved: 0, adults: 0, children: 0 };
-        let statusSummary = { approved: 0, rejected: 0, pending: 0 };
-        let specialMeals = { 
-          veg: { adults: 0, children: 0, total: 0 },
-          vegan: { adults: 0, children: 0, total: 0 },
-          glatt: { adults: 0, children: 0, total: 0 },
-          allergy: { adults: 0, children: 0, total: 0 }
-        };
-        
         if(guests){
-          const dedupedGuests = dedupeGuestsByIdentity(guests);
+          const { dedupedGuests, summary, statusSummary, specialMeals } = buildGuestRsvpStats(guests);
           setMobileSummaryGuests(dedupedGuests);
-          dedupedGuests.forEach(g => {
-            
-            // Count by status
-            if(g.status === 'approved') {
-              statusSummary.approved += 1;
-              // Only count adults/children for approved guests
-              summary.adults += g.adults || 0;
-              summary.children += g.children || 0;
-              
-              // Count special meals for approved guests only
-              specialMeals.veg.adults += g.veg_adults || 0;
-              specialMeals.veg.children += g.veg_children || 0;
-              specialMeals.vegan.adults += g.vegan_adults || 0;
-              specialMeals.vegan.children += g.vegan_children || 0;
-              specialMeals.glatt.adults += g.glatt_adults || 0;
-              specialMeals.glatt.children += g.glatt_children || 0;
-              specialMeals.allergy.adults += g.allergy_adults || 0;
-              specialMeals.allergy.children += g.allergy_children || 0;
-            } else if(g.status === 'rejected') {
-              statusSummary.rejected += 1;
-            } else {
-              statusSummary.pending += 1;
-            }
-          });
-          // "הודעות שנשלחו" comes from eventMessagesSentCount (DB), not from guest count
-          // Calculate totals
-          specialMeals.veg.total = specialMeals.veg.adults + specialMeals.veg.children;
-          specialMeals.vegan.total = specialMeals.vegan.adults + specialMeals.vegan.children;
-          specialMeals.glatt.total = specialMeals.glatt.adults + specialMeals.glatt.children;
-          specialMeals.allergy.total = specialMeals.allergy.adults + specialMeals.allergy.children;
+          setGuestSummary(summary);
+          setGuestStatusSummary(statusSummary);
+          setSpecialMealsSummary(specialMeals);
         } else {
           setMobileSummaryGuests([]);
+          setGuestSummary({ approved: 0, adults: 0, children: 0 });
+          setGuestStatusSummary({ approved: 0, rejected: 0, pending: 0 });
+          setSpecialMealsSummary({
+            veg: { adults: 0, children: 0, total: 0 },
+            vegan: { adults: 0, children: 0, total: 0 },
+            glatt: { adults: 0, children: 0, total: 0 },
+            allergy: { adults: 0, children: 0, total: 0 },
+          });
         }
-        
-        setGuestSummary(summary);
-        setGuestStatusSummary(statusSummary);
-        setSpecialMealsSummary(specialMeals);
       }catch(e){
         console.error('❌ Failed to load guest summary', e);
       }
@@ -7414,7 +7361,23 @@ React.useEffect(()=>{
     return () => document.removeEventListener('visibilitychange', onVisibility);
   }, [currentEventId, showPaymentModal]);
 
-  // Auto-refresh reports every 5s when reports/guest list are open (fallback when Realtime is unavailable)
+  React.useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const onFocus = () => {
+      if (currentEventId && !showPaymentModal) setGuestSummaryRefreshKey((k) => k + 1);
+    };
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
+  }, [currentEventId, showPaymentModal]);
+
+  // Keep RSVP stats in sync across devices when Realtime is delayed or unavailable.
+  React.useEffect(() => {
+    if (!currentEventId) return;
+    const id = setInterval(() => setGuestSummaryRefreshKey((k) => k + 1), 8000);
+    return () => clearInterval(id);
+  }, [currentEventId]);
+
+  // Extra refresh while report modals are open.
   React.useEffect(() => {
     if (!currentEventId) return;
     const reportsOpen = showReportsOptions || showReportModal || showGuestListModal;

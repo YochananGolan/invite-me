@@ -60,7 +60,7 @@ export default function MobileQuickGuestsCard({
       </div>
 
       <div className="mt-3">
-        <div className="mb-2 text-sm font-black text-indigo-200">סיכום כל האורחים</div>
+        <div className="mb-2 text-sm font-black text-indigo-200">סיכום מאושרים (מגיעים)</div>
         <div className="grid grid-cols-3 gap-2">
           {[
             [guestSummary.adults, 'מבוגרים', 'border-emerald-400/25 bg-emerald-500/10 text-emerald-300'],

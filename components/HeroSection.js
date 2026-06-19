@@ -1,30 +1,7 @@
 import { forwardRef, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { RSVP_STATUS_LABELS } from '../lib/rsvpLabels';
-
-function normalizePhoneNumber(phone = '') {
-  return String(phone).replace(/\D/g, '').replace(/^0/, '972');
-}
-function getGuestIdentityKey(guest = {}) {
-  const phone = guest.phone ?? '';
-  const normalized = normalizePhoneNumber(phone);
-  if (normalized) return `phone:${normalized}`;
-  const first = String(guest.first_name ?? '').trim().toLowerCase();
-  const last = String(guest.last_name ?? '').trim().toLowerCase();
-  return `name:${first}|${last}`;
-}
-function dedupeGuestsByIdentity(guests = []) {
-  const byIdentity = new Map();
-  for (const guest of guests) {
-    const key = getGuestIdentityKey(guest);
-    const current = byIdentity.get(key);
-    if (!current) { byIdentity.set(key, guest); continue; }
-    const cur = current.status === 'approved' || current.status === 'rejected' ? current.status : 'pending';
-    const nxt = guest.status === 'approved' || guest.status === 'rejected' ? guest.status : 'pending';
-    if (cur === 'pending' && nxt !== 'pending') byIdentity.set(key, guest);
-  }
-  return Array.from(byIdentity.values());
-}
+import { buildGuestRsvpStats } from '../lib/guestStats';
 
 const useTypewriter = (text, speed = 42, pauseDuration = 2600) => {
   const [displayedText, setDisplayedText] = useState('');
@@ -149,21 +126,8 @@ const isPastEvent = (eventRecord) => {
 };
 
 const buildActiveReportSummary = (eventRecord, guests = []) => {
-  const stats = dedupeGuestsByIdentity(guests).reduce(
-    (acc, guest) => {
-      if (guest.status === 'approved') {
-        acc.adults += toNonNegativeNumber(guest.adults);
-        acc.children += toNonNegativeNumber(guest.children);
-        acc.approved += 1;
-      } else if (guest.status === 'rejected') {
-        acc.rejected += 1;
-      } else {
-        acc.pending += 1;
-      }
-      return acc;
-    },
-    { adults: 0, children: 0, approved: 0, rejected: 0, pending: 0 }
-  );
+  const stats = buildGuestRsvpStats(guests);
+  const { statusSummary, summary, totalRsvp } = stats;
 
   const planBaseLimits = {
     free: 1, basic: 1, standard: 200, premium: 350,
@@ -172,14 +136,16 @@ const buildActiveReportSummary = (eventRecord, guests = []) => {
   const planBase = planBaseLimits[eventRecord?.selected_plan] ?? 1; // default 1 matches getPlanBaseLimit's default
   const addonCount = toNonNegativeNumber(eventRecord?.additional_packages);
   const invitationLimit = planBase + addonCount * 100;
-  const totalInvited = guests.length;
-  const invitationsSent = Math.max(toNonNegativeNumber(eventRecord?.messages_sent_count), totalInvited);
+  const invitationsSent = Math.max(toNonNegativeNumber(eventRecord?.messages_sent_count), totalRsvp);
   const invitationsRemaining = Math.max(0, invitationLimit - invitationsSent);
-  const totalRsvp = stats.approved + stats.rejected + stats.pending;
 
   return {
-    ...stats,
-    totalGuests: stats.adults + stats.children,
+    adults: summary.adults,
+    children: summary.children,
+    approved: statusSummary.approved,
+    rejected: statusSummary.rejected,
+    pending: statusSummary.pending,
+    totalGuests: summary.adults + summary.children,
     totalRsvp,
     invitationLimit,
     invitationsSent,
@@ -806,6 +772,26 @@ export default forwardRef(function HeroSection({ onStart, onPressCreateEvent, se
 
     return () => {
       supabase.removeChannel(channel);
+    };
+  }, [activeEventId]);
+
+  useEffect(() => {
+    if (!activeEventId) return undefined;
+    const id = window.setInterval(() => setReportRefreshKey((key) => key + 1), 8000);
+    return () => window.clearInterval(id);
+  }, [activeEventId]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+    const refresh = () => {
+      if (activeEventId) setReportRefreshKey((key) => key + 1);
+    };
+    window.addEventListener('focus', refresh);
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') refresh();
+    });
+    return () => {
+      window.removeEventListener('focus', refresh);
     };
   }, [activeEventId]);
 
