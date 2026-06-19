@@ -1043,6 +1043,22 @@ const [hasWhatsAppGroup, setHasWhatsAppGroup] = useState(false);
     wizardSuppressedStepsRef.current.has(stepNumber)
   ), []);
 
+  const returnToReportsMenu = React.useCallback(() => {
+    allowWizardProgrammaticOpen(() => {
+      unblockWizardAutoOpen();
+      wizardSuppressedStepsRef.current.delete(5);
+      writeWizardDismissedSteps(wizardSuppressedStepsRef.current);
+      setShowReportModal(false);
+      setShowApprovedReport(false);
+      setShowRejectedReport(false);
+      setShowPendingReport(false);
+      setShowSearchGuest(false);
+      setShowArchiveList(false);
+      setShowReportsOptions(true);
+      setStepErrorMsg('');
+    });
+  }, [allowWizardProgrammaticOpen, unblockWizardAutoOpen, writeWizardDismissedSteps]);
+
   const isWizardFlowProtected = React.useCallback(() => (
     isWizardAutoOpenBlocked() || wizardSuppressedStepsRef.current.size > 0
   ), [isWizardAutoOpenBlocked]);
@@ -4232,16 +4248,16 @@ React.useEffect(() => {
 
     const getActiveActions = () => {
       if (showReportModal) {
-        return { exportFn: exportReportXlsx, closeFn: () => setShowReportModal(false) };
+        return { exportFn: exportReportXlsx, closeFn: returnToReportsMenu };
       }
       if (showApprovedReport) {
-        return { exportFn: exportApprovedXlsx, closeFn: () => { setShowApprovedReport(false); if (!wizardAutoOpenBlockedRef.current && !wizardSuppressedStepsRef.current.has(5)) setShowReportsOptions(true); } };
+        return { exportFn: exportApprovedXlsx, closeFn: returnToReportsMenu };
       }
       if (showRejectedReport) {
-        return { exportFn: exportRejectedXlsx, closeFn: () => { setShowRejectedReport(false); if (!wizardAutoOpenBlockedRef.current && !wizardSuppressedStepsRef.current.has(5)) setShowReportsOptions(true); } };
+        return { exportFn: exportRejectedXlsx, closeFn: returnToReportsMenu };
       }
       if (showPendingReport) {
-        return { exportFn: exportPendingXlsx, closeFn: () => { setShowPendingReport(false); if (!wizardAutoOpenBlockedRef.current && !wizardSuppressedStepsRef.current.has(5)) setShowReportsOptions(true); } };
+        return { exportFn: exportPendingXlsx, closeFn: returnToReportsMenu };
       }
       return null;
     };
@@ -4274,7 +4290,7 @@ React.useEffect(() => {
     return () => {
       document.removeEventListener('click', handleNativeReportAction, true);
     };
-  }, [showReportModal, showApprovedReport, showRejectedReport, showPendingReport, reportGuests, approvedGuests, rejectedGuests, pendingGuests]);
+  }, [showReportModal, showApprovedReport, showRejectedReport, showPendingReport, reportGuests, approvedGuests, rejectedGuests, pendingGuests, returnToReportsMenu]);
 
   const handleExcelImport = (e) => {
     const file = e.target.files[0];
@@ -7790,19 +7806,24 @@ React.useEffect(()=>{
     }
   }, []);
 
+  const isWizardStepOpenBlocked = React.useCallback((stepNumber) => (
+    isWizardStepSuppressed(stepNumber)
+    || (isWizardAutoOpenBlocked() && !wizardProgrammaticOpenAllowedRef.current)
+  ), [isWizardAutoOpenBlocked, isWizardStepSuppressed]);
+
   const openEventDetailsModal = React.useCallback(() => {
     const type = resolveDisplayEventType(selectedEventTypeRef.current || selectedEventType);
     if (!type) {
       setShowEventDetails(false);
-      if (!isWizardAutoOpenBlocked() && !isWizardStepSuppressed(1)) {
+      if (!isWizardStepOpenBlocked(1)) {
         setShowEventTypes(true);
       }
       setStepErrorMsg('יש לבחור סוג אירוע לפני מילוי הפרטים.');
       return;
     }
-    if (isWizardAutoOpenBlocked() || isWizardStepSuppressed(2)) return;
+    if (isWizardStepOpenBlocked(2)) return;
     setShowEventDetails(true);
-  }, [selectedEventType, isWizardAutoOpenBlocked, isWizardStepSuppressed]);
+  }, [selectedEventType, isWizardStepOpenBlocked]);
 
   const closeEventDetailsModal = React.useCallback(() => {
     suppressWizardStep(2);
@@ -7819,16 +7840,16 @@ React.useEffect(()=>{
   }, [suppressWizardStep, scrollWizardHome]);
 
   const openEventTypesModal = React.useCallback(() => {
-    if (isWizardAutoOpenBlocked() || isWizardStepSuppressed(1)) return;
+    if (isWizardStepOpenBlocked(1)) return;
     setShowEventTypes(true);
     setStepErrorMsg('');
-  }, [isWizardAutoOpenBlocked, isWizardStepSuppressed]);
+  }, [isWizardStepOpenBlocked]);
 
   const openDesignChooserModal = React.useCallback(() => {
-    if (isWizardAutoOpenBlocked() || isWizardStepSuppressed(3)) return;
+    if (isWizardStepOpenBlocked(3)) return;
     setShowDesignChooser(true);
     setStepErrorMsg('');
-  }, [isWizardAutoOpenBlocked, isWizardStepSuppressed]);
+  }, [isWizardStepOpenBlocked]);
 
   const closeDesignChooserModal = React.useCallback(() => {
     suppressWizardStep(3);
@@ -7841,10 +7862,10 @@ React.useEffect(()=>{
   }, [suppressWizardStep, scrollWizardHome]);
 
   const openGuestFormModal = React.useCallback(() => {
-    if (isWizardAutoOpenBlocked() || isWizardStepSuppressed(4)) return;
+    if (isWizardStepOpenBlocked(4)) return;
     setShowGuestForm(true);
     setStepErrorMsg('');
-  }, [isWizardAutoOpenBlocked, isWizardStepSuppressed]);
+  }, [isWizardStepOpenBlocked]);
 
   const closeGuestFormModal = React.useCallback(() => {
     suppressWizardStep(4);
@@ -7854,16 +7875,17 @@ React.useEffect(()=>{
   }, [suppressWizardStep, scrollWizardHome]);
 
   const openReportsOptionsModal = React.useCallback(() => {
-    if (isWizardAutoOpenBlocked() || isWizardStepSuppressed(5)) return;
+    if (isWizardStepOpenBlocked(5)) return;
     setShowReportsOptions(true);
     setShowGuestListModal(false);
     setStepErrorMsg('');
-  }, [isWizardAutoOpenBlocked, isWizardStepSuppressed]);
+  }, [isWizardStepOpenBlocked]);
 
   const closeReportsOptionsModal = React.useCallback(() => {
     suppressWizardStep(5);
     setShowReportsOptions(false);
     setShowStep5Options(false);
+    setShowReportModal(false);
     setShowApprovedReport(false);
     setShowRejectedReport(false);
     setShowPendingReport(false);
@@ -7872,11 +7894,6 @@ React.useEffect(()=>{
     setStepErrorMsg('');
     scrollWizardHome();
   }, [suppressWizardStep, scrollWizardHome]);
-
-  const returnToReportsOptionsIfAllowed = React.useCallback(() => {
-    if (!shouldAllowWizardAutoOpen(5)) return;
-    setShowReportsOptions(true);
-  }, [shouldAllowWizardAutoOpen]);
 
   const redirectToWizardStep = React.useCallback((stepNumber, { force = false } = {}) => {
     if (!force && (isWizardAutoOpenBlocked() || isWizardStepSuppressed(stepNumber))) {
@@ -7888,6 +7905,12 @@ React.useEffect(()=>{
     setShowGuestForm(false);
     setShowReportsOptions(false);
     setShowStep5Options(false);
+    setShowReportModal(false);
+    setShowApprovedReport(false);
+    setShowRejectedReport(false);
+    setShowPendingReport(false);
+    setShowSearchGuest(false);
+    setShowArchiveList(false);
     if (stepNumber === 1) openEventTypesModal();
     else if (stepNumber === 2) openEventDetailsModal();
     else if (stepNumber === 3) openDesignChooserModal();
@@ -7909,6 +7932,7 @@ React.useEffect(()=>{
     }
     if (userInitiated) {
       unsuppressWizardStep(stepNumber);
+      unblockWizardAutoOpen();
       resetWizardDismissForUserProgress();
     }
 
@@ -7970,6 +7994,7 @@ React.useEffect(()=>{
     isWizardStepSuppressed,
     isWizardAutoOpenBlocked,
     unsuppressWizardStep,
+    unblockWizardAutoOpen,
     resetWizardDismissForUserProgress,
     allowWizardProgrammaticOpen,
   ]);
@@ -7989,7 +8014,19 @@ React.useEffect(()=>{
     }
     if (currentEventId && !eventDataLoaded) return undefined;
     if (!userPlanSettingsHydratedRef.current) return undefined;
-    if (showDesignChooser || showEventDetails || showGuestForm) return undefined;
+    if (
+      showDesignChooser
+      || showEventDetails
+      || showGuestForm
+      || showReportsOptions
+      || showStep5Options
+      || showReportModal
+      || showApprovedReport
+      || showRejectedReport
+      || showPendingReport
+      || showSearchGuest
+      || showArchiveList
+    ) return undefined;
 
     const flowStarted = Boolean(
       currentEventId ||
@@ -8012,6 +8049,22 @@ React.useEffect(()=>{
     }
 
     const timer = window.setTimeout(() => {
+      if (
+        showDesignChooser
+        || showEventDetails
+        || showGuestForm
+        || showReportsOptions
+        || showStep5Options
+        || showReportModal
+        || showApprovedReport
+        || showRejectedReport
+        || showPendingReport
+        || showSearchGuest
+        || showArchiveList
+      ) {
+        markWizardAutoResumeAttempted();
+        return;
+      }
       if (isWizardStepSuppressed(firstIncomplete) || isWizardAutoOpenBlocked()) {
         markWizardAutoResumeAttempted();
         return;
@@ -8041,6 +8094,14 @@ React.useEffect(()=>{
     showDesignChooser,
     showEventDetails,
     showGuestForm,
+    showReportsOptions,
+    showStep5Options,
+    showReportModal,
+    showApprovedReport,
+    showRejectedReport,
+    showPendingReport,
+    showSearchGuest,
+    showArchiveList,
   ]);
 
   React.useEffect(() => {
@@ -8055,9 +8116,10 @@ React.useEffect(()=>{
       setShowAdvancedEdit(null);
     }
     if (showGuestForm) setShowGuestForm(false);
-    if (showReportsOptions || showStep5Options || showApprovedReport || showRejectedReport || showPendingReport || showSearchGuest || showArchiveList) {
+    if (showReportsOptions || showStep5Options || showReportModal || showApprovedReport || showRejectedReport || showPendingReport || showSearchGuest || showArchiveList) {
       setShowReportsOptions(false);
       setShowStep5Options(false);
+      setShowReportModal(false);
       setShowApprovedReport(false);
       setShowRejectedReport(false);
       setShowPendingReport(false);
@@ -8073,6 +8135,7 @@ React.useEffect(()=>{
     showGuestForm,
     showPendingReport,
     showRejectedReport,
+    showReportModal,
     showReportsOptions,
     showSearchGuest,
     showStep5Options,
@@ -11126,8 +11189,8 @@ React.useEffect(()=>{
       )}
 
       {/* Report Modal */}
-      <Modal open={showReportModal} onClose={() => setShowReportModal(false)} size="full" landscape>
-        <ModalHeader onClose={() => setShowReportModal(false)}>{reportTitle}</ModalHeader>
+      <Modal open={showReportModal} onClose={returnToReportsMenu} size="full" landscape>
+        <ModalHeader onClose={returnToReportsMenu}>{reportTitle}</ModalHeader>
         <ModalBody>
           {showReportModal && (<>
             {reportGuests.length === 0 ? (
@@ -11217,7 +11280,7 @@ React.useEffect(()=>{
                 </div>
               </>
             )}
-            {renderReportActions(exportReportXlsx, () => setShowReportModal(false))}
+            {renderReportActions(exportReportXlsx, returnToReportsMenu)}
           </>)}
         </ModalBody>
       </Modal>
@@ -11443,8 +11506,8 @@ React.useEffect(()=>{
       </Modal>
 
       {/* Approved report modal */}
-      <Modal open={showApprovedReport} onClose={()=>{setShowApprovedReport(false);returnToReportsOptionsIfAllowed();}} size="full" landscape>
-        <ModalHeader onClose={()=>{setShowApprovedReport(false);returnToReportsOptionsIfAllowed();}}>דוח אורחים שאישרו הגעה</ModalHeader>
+      <Modal open={showApprovedReport} onClose={returnToReportsMenu} size="full" landscape>
+        <ModalHeader onClose={returnToReportsMenu}>דוח אורחים שאישרו הגעה</ModalHeader>
         <ModalBody className="overflow-x-auto">
               <table className="w-full text-right border border-collapse" style={{fontSize: '11px'}}>
                 <thead>
@@ -11500,13 +11563,13 @@ React.useEffect(()=>{
                   </tr>
                 </tfoot>
               </table>
-              {renderReportActions(exportApprovedXlsx, () => { setShowApprovedReport(false); returnToReportsOptionsIfAllowed(); })}
+              {renderReportActions(exportApprovedXlsx, returnToReportsMenu)}
         </ModalBody>
       </Modal>
 
       {/* Rejected report modal */}
-      <Modal open={showRejectedReport} onClose={()=>{setShowRejectedReport(false);returnToReportsOptionsIfAllowed();}} size="full" landscape>
-        <ModalHeader onClose={()=>{setShowRejectedReport(false);returnToReportsOptionsIfAllowed();}}>דוח אורחים שלא מגיעים</ModalHeader>
+      <Modal open={showRejectedReport} onClose={returnToReportsMenu} size="full" landscape>
+        <ModalHeader onClose={returnToReportsMenu}>דוח אורחים שלא מגיעים</ModalHeader>
         <ModalBody className="overflow-x-auto">
               <table className="w-full text-right border border-white/10 border-collapse" style={{fontSize: '11px'}}>
                 <thead>
@@ -11533,13 +11596,13 @@ React.useEffect(()=>{
                   </tr>
                 </tfoot>
               </table>
-              {renderReportActions(exportRejectedXlsx, () => { setShowRejectedReport(false); returnToReportsOptionsIfAllowed(); })}
+              {renderReportActions(exportRejectedXlsx, returnToReportsMenu)}
         </ModalBody>
       </Modal>
 
       {/* Pending report modal */}
-      <Modal open={showPendingReport} onClose={()=>{setShowPendingReport(false);returnToReportsOptionsIfAllowed();}} size="full" landscape>
-        <ModalHeader onClose={()=>{setShowPendingReport(false);returnToReportsOptionsIfAllowed();}}>דוח אורחים שטרם הגיבו</ModalHeader>
+      <Modal open={showPendingReport} onClose={returnToReportsMenu} size="full" landscape>
+        <ModalHeader onClose={returnToReportsMenu}>דוח אורחים שטרם הגיבו</ModalHeader>
         <ModalBody className="overflow-x-auto">
               <table className="w-full text-right border border-white/10 border-collapse" style={{fontSize: '11px'}}>
                 <thead>
@@ -11566,13 +11629,13 @@ React.useEffect(()=>{
                   </tr>
                 </tfoot>
               </table>
-              {renderReportActions(exportPendingXlsx, () => { setShowPendingReport(false); returnToReportsOptionsIfAllowed(); })}
+              {renderReportActions(exportPendingXlsx, returnToReportsMenu)}
         </ModalBody>
       </Modal>
 
       {/* Guest status query modal */}
-      <Modal open={showSearchGuest} onClose={()=>{setShowSearchGuest(false); returnToReportsOptionsIfAllowed();}} size="lg" landscape>
-        <ModalHeader onClose={()=>{setShowSearchGuest(false); returnToReportsOptionsIfAllowed();}}>חיפוש אורח</ModalHeader>
+      <Modal open={showSearchGuest} onClose={returnToReportsMenu} size="lg" landscape>
+        <ModalHeader onClose={returnToReportsMenu}>חיפוש אורח</ModalHeader>
         <ModalBody>
             <div className="flex justify-center gap-2 mb-4 px-1">
               <input
@@ -11613,7 +11676,7 @@ React.useEffect(()=>{
             )}
         </ModalBody>
         <ModalFooter>
-          <button onClick={()=>{setShowSearchGuest(false); returnToReportsOptionsIfAllowed();}} className="bg-primary text-white border border-primary rounded-full px-6 sm:px-8 py-2 sm:py-3 font-medium hover:bg-primary/90 transition-all text-sm sm:text-base">סגור</button>
+          <button onClick={returnToReportsMenu} className="bg-primary text-white border border-primary rounded-full px-6 sm:px-8 py-2 sm:py-3 font-medium hover:bg-primary/90 transition-all text-sm sm:text-base">סגור</button>
         </ModalFooter>
       </Modal>
 
@@ -12275,8 +12338,8 @@ React.useEffect(()=>{
       </Modal>
 
       {/* Archive events list modal */}
-      <Modal open={showArchiveList} onClose={()=>{setShowArchiveList(false);returnToReportsOptionsIfAllowed();}} size="xl" landscape>
-        <ModalHeader onClose={()=>{setShowArchiveList(false);returnToReportsOptionsIfAllowed();}}>אירועים מהעבר (ארכיון)</ModalHeader>
+      <Modal open={showArchiveList} onClose={returnToReportsMenu} size="xl" landscape>
+        <ModalHeader onClose={returnToReportsMenu}>אירועים מהעבר (ארכיון)</ModalHeader>
         <ModalBody className="text-center space-y-4">
             {archiveLoading ? (
               <p className="text-slate-400">טוען אירועים...</p>
