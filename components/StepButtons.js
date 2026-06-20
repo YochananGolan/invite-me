@@ -8276,9 +8276,28 @@ React.useEffect(()=>{
     </div>
   );
 
-  const renderDashboardDetailsCards = () => (
+  const renderDashboardDetailsCards = () => {
+    const eventDayStatus = (() => {
+      const rawDate = formData?.date || formData?.start_datetime;
+      if (!rawDate) return null;
+      const eventDate = new Date(rawDate);
+      if (Number.isNaN(eventDate.getTime())) return null;
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      eventDate.setHours(0, 0, 0, 0);
+      const diffDays = Math.round((eventDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+      if (diffDays > 0) return { tone: 'upcoming', text: `נותרו ${diffDays} ימים עד האירוע!` };
+      if (diffDays === 0) return { tone: 'today', text: 'האירוע היום!' };
+      return { tone: 'past', text: `האירוע היה לפני ${Math.abs(diffDays)} ימים` };
+    })();
+    const showActivePlanCard = Boolean(
+      (planForDisplay || selectedPlan || userPlanSettings?.plan)
+      && (isCurrentEventActive || newEventStarted || userPlanSettings?.eventWizardStarted)
+    );
+
+    return (
     <>
-      {currentEventId && (isCurrentEventActive || isWizardEventSessionProtected()) ? (
+      {currentEventId && isCurrentEventActive ? (
         <div className="bg-white/[0.055] border border-white/15 backdrop-blur-xl rounded-2xl p-4 sm:p-6 text-center shadow-[0_8px_40px_rgba(0,0,0,0.35)] ring-2 ring-indigo-400/30 w-full">
           <div className="flex items-center justify-center gap-2 mb-2">
             <span className="text-2xl">✅</span>
@@ -8291,22 +8310,50 @@ React.useEffect(()=>{
           {formData.hallName && (
             <p className="text-slate-300"><strong>אולם:</strong> {formData.hallName}</p>
           )}
-          {formData.date && (
+          {eventDayStatus && (
             <div className="bg-emerald-500/10 border border-emerald-400/30 rounded-lg p-3 mt-3 mb-2">
-              <p className="text-emerald-200 font-bold text-2xl text-center">
-                {(() => {
-                  const eventDate = new Date(formData.date);
-                  const today = new Date();
-                  const diffTime = eventDate.getTime() - today.getTime();
-                  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-                  if (diffDays > 0) return `נותרו ${diffDays} ימים עד האירוע!`;
-                  if (diffDays === 0) return 'האירוע היום!';
-                  return `האירוע היה לפני ${Math.abs(diffDays)} ימים`;
-                })()}
-              </p>
+              <p className="text-emerald-200 font-bold text-2xl text-center">{eventDayStatus.text}</p>
             </div>
           )}
           <p className="text-emerald-300 text-base mt-2 font-bold">האירוע מוכן לשליחת הזמנות ואישורי הגעה</p>
+        </div>
+      ) : currentEventId && !isCurrentEventActive ? (
+        <div className="bg-white/[0.055] border border-white/15 backdrop-blur-xl rounded-2xl p-4 sm:p-6 text-center shadow-[0_8px_40px_rgba(0,0,0,0.35)] ring-2 ring-amber-400/30 w-full">
+          <div className="flex items-center justify-center gap-2 mb-2">
+            <span className="text-2xl">⏱</span>
+            <h3 className="text-xl font-bold text-amber-300">האירוע הסתיים</h3>
+          </div>
+          <p className="text-slate-300"><strong>סוג האירוע:</strong> {selectedEventType || 'לא מוגדר'}</p>
+          {formData.date && (
+            <p className="text-slate-300"><strong>תאריך האירוע:</strong> {new Date(formData.date).toLocaleDateString('he-IL')}</p>
+          )}
+          {formData.hallName && (
+            <p className="text-slate-300"><strong>אולם:</strong> {formData.hallName}</p>
+          )}
+          {eventDayStatus && (
+            <div className="bg-amber-500/10 border border-amber-400/30 rounded-lg p-3 mt-3 mb-2">
+              <p className="text-amber-200 font-bold text-2xl text-center">{eventDayStatus.text}</p>
+            </div>
+          )}
+          <p className="text-slate-300 text-base mt-2">
+            המסלול וההודעות שייכים לאירוע זה בלבד. ניתן לצפות בדוחות, ולפתוח אירוע חדש רק לאחר בחירת מסלול.
+          </p>
+          <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:justify-center">
+            <button
+              type="button"
+              onClick={() => tryOpenWizardStep(5, { userInitiated: true })}
+              className="rounded-full border border-white/15 bg-white/[0.06] px-5 py-2 font-bold text-slate-100 hover:bg-indigo-500/15 hover:border-indigo-400/50 transition-all"
+            >
+              צפייה בדוחות
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowPricingPlan(true)}
+              className="rounded-full bg-gradient-to-br from-indigo-600 to-violet-600 px-5 py-2 font-bold text-white shadow-[0_6px_20px_rgba(99,70,230,0.45)] hover:opacity-90 transition-all"
+            >
+              פתח אירוע חדש
+            </button>
+          </div>
         </div>
       ) : (newEventStarted || userPlanSettings?.eventWizardStarted) ? (
         <div className="bg-white/[0.055] border border-white/15 backdrop-blur-xl rounded-2xl p-4 text-center shadow-[0_8px_40px_rgba(0,0,0,0.35)] ring-2 ring-indigo-400/30 flex-1">
@@ -8336,7 +8383,7 @@ React.useEffect(()=>{
           <p className="text-slate-300">אין אירוע פעיל במערכת. לחץ על &quot;צור אירוע חדש&quot; כדי להתחיל.</p>
         </div>
       )}
-      {(planForDisplay || currentEventId) && (
+      {showActivePlanCard && (
         <div className="bg-white/[0.055] border border-white/15 backdrop-blur-xl rounded-2xl p-4 sm:p-6 text-center shadow-[0_8px_40px_rgba(0,0,0,0.35)] ring-2 ring-amber-400/30 w-full" style={{ minHeight: 'min(280px, 50vh)' }}>
           <div className="flex items-center justify-center gap-2 mb-2">
             <span className="text-2xl">💰</span>
@@ -8402,7 +8449,8 @@ React.useEffect(()=>{
         </div>
       )}
     </>
-  );
+    );
+  };
 
   const renderMobileNextActionCard = ({
     stepLabel,
