@@ -382,11 +382,9 @@ function shouldRespectCarryPlanAfterManualDelete() {
   }
 }
 
-/** מסלול ששולם ואשף יצירת אירוע בתהליך — לא לאפס אחרי יציאה/רענון */
+/** מסלול ששולם — תמיד לשחזר מ-user_settings (סנכרון בין מכשירים) */
 function shouldRestorePaidPlanFromSettings(settings) {
-  if (!settings?.plan) return false;
-  if (settings.eventWizardStarted) return true;
-  return shouldRespectCarryPlanAfterManualDelete();
+  return Boolean(settings?.plan);
 }
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -1405,6 +1403,12 @@ const persistUserPlanSettings = React.useCallback(async (planCode, addonCount, e
       }
       return { plan: safePlan, addonCount: safeAddon, eventWizardStarted, activeEventId: activeEventId || null };
     });
+    userPlanSettingsRef.current = {
+      plan: safePlan,
+      addonCount: safeAddon,
+      eventWizardStarted,
+      activeEventId: activeEventId || null,
+    };
     if (safePlan) {
       clearCarryPlanAfterManualDelete();
     }
@@ -1488,28 +1492,35 @@ const loadUserPlanSettings = React.useCallback(async () => {
     const parsedAddon = Number(data.addon_balance);
     let addonCount = Number.isFinite(parsedAddon) ? Math.max(0, Math.floor(parsedAddon)) : 0;
     let eventWizardStarted = Boolean(data.event_wizard_started);
-    const activeEventId = data.active_event_id && String(data.active_event_id).trim()
+    let activeEventId = data.active_event_id && String(data.active_event_id).trim()
       ? String(data.active_event_id).trim()
       : null;
     if (plan && !eventWizardStarted) {
-      try {
-        const { data: latestEv } = await supabase
-          .from('events')
-          .select('id, event_type, event_details, status')
-          .eq('user_id', userId)
-          .or('status.neq.archived,status.is.null')
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-        if (isEventWizardDraft(latestEv)) {
-          eventWizardStarted = true;
-          await persistUserPlanSettings(plan, addonCount, true);
+      if (activeEventId) {
+        eventWizardStarted = true;
+        await persistUserPlanSettings(plan, addonCount, true, activeEventId);
+      } else {
+        try {
+          const { data: latestEv } = await supabase
+            .from('events')
+            .select('id, event_type, event_details, status')
+            .eq('user_id', userId)
+            .or('status.neq.archived,status.is.null')
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          if (isEventWizardDraft(latestEv)) {
+            eventWizardStarted = true;
+            activeEventId = latestEv.id;
+            await persistUserPlanSettings(plan, addonCount, true, latestEv.id);
+          }
+        } catch (repairErr) {
+          console.warn('wizard draft flag repair skipped', repairErr);
         }
-      } catch (repairErr) {
-        console.warn('wizard draft flag repair skipped', repairErr);
       }
     }
     const settings = { plan, addonCount, eventWizardStarted, activeEventId };
+    userPlanSettingsRef.current = settings;
     setUserPlanSettings((prev) => {
       if (
         prev
@@ -5936,7 +5947,7 @@ React.useEffect(() => {
       (Array.isArray(additionalPackages) && additionalPackages.length > 0) ||
       (dbAddonCount ?? 0) > 0;
     if (!hasPlanData) return;
-    if (userPlanSettings?.eventWizardStarted) return;
+    if (userPlanSettings?.eventWizardStarted || userPlanSettings?.activeEventId) return;
 
     if (!shouldRespectCarryPlanAfterManualDelete()) {
       void clearPlanState();
@@ -5964,14 +5975,15 @@ React.useEffect(() => {
       try{
         const user = await resolveCurrentUserForSync();
         if(!user) return;
+        const settings = await loadUserPlanSettings();
         let ev = null;
         let messagesSent = 0;
         const remoteWizardActive = Boolean(
-          userPlanSettingsRef.current?.plan && userPlanSettingsRef.current?.eventWizardStarted,
+          settings?.plan && settings?.eventWizardStarted,
         );
         let pinnedEventId = null;
-        if (remoteWizardActive && userPlanSettingsRef.current?.activeEventId) {
-          pinnedEventId = userPlanSettingsRef.current.activeEventId;
+        if (remoteWizardActive && settings?.activeEventId) {
+          pinnedEventId = settings.activeEventId;
         } else if (!remoteWizardActive) {
           pinnedEventId =
             wizardDismissedEventIdRef.current
@@ -6035,9 +6047,13 @@ React.useEffect(() => {
           }
           const settings = await loadUserPlanSettings();
           const fallbackAddon = settings?.addonCount ?? 0;
-          if ((settings?.plan || null) !== null) {
-            setSelectedPlan(settings?.plan || null);
-            try { localStorage.setItem('selectedPlan', settings?.plan || ''); } catch(e){}
+          if (settings?.plan) {
+            setSelectedPlan(settings.plan);
+            try { localStorage.setItem('selectedPlan', settings.plan); } catch(e){}
+            try { localStorage.setItem('user_plan_code', settings.plan); } catch(e){}
+            if (settings.eventWizardStarted) {
+              applyRemoteWizardSession(settings);
+            }
           }
           setDbAddonCount(fallbackAddon);
           setAdditionalPackages((prev) => {
@@ -6117,7 +6133,7 @@ React.useEffect(() => {
         }
       }catch(e){console.error('archive check failed',e);}  
     })();
-  },[eventRefreshKey, loadUserPlanSettings, derivePlanFromRecord, persistUserPlanSettings, getPlanBaseLimit, selectedEventType, syncFinishedStepsFromEvent]);
+  },[eventRefreshKey, loadUserPlanSettings, derivePlanFromRecord, persistUserPlanSettings, getPlanBaseLimit, selectedEventType, syncFinishedStepsFromEvent, applyRemoteWizardSession]);
 
   // Realtime sync: when current event or its guests change in Supabase, refresh state.
   React.useEffect(() => {
@@ -6345,8 +6361,11 @@ React.useEffect(() => {
     let plan = settings?.plan || selectedPlanRef.current || userPlanSettingsRef.current?.plan || null;
     if (plan) {
       if (settings?.eventWizardStarted) {
-        setNewEventStarted(true);
-        try { localStorage.setItem('newEventStarted', '1'); } catch (_) {}
+        applyRemoteWizardSession(settings);
+      } else {
+        setSelectedPlan(plan);
+        try { localStorage.setItem('selectedPlan', plan); } catch (_) {}
+        try { localStorage.setItem('user_plan_code', plan); } catch (_) {}
       }
       return plan;
     }
@@ -6379,14 +6398,14 @@ React.useEffect(() => {
         additionalPackagesRef.current?.length,
       );
       const draftWizard = isEventWizardDraft(ev);
-      await persistUserPlanSettings(plan, addonCount, draftWizard ? true : undefined);
+      await persistUserPlanSettings(plan, addonCount, draftWizard ? true : undefined, draftWizard ? ev?.id : undefined);
       if (draftWizard) {
-        setNewEventStarted(true);
-        try { localStorage.setItem('newEventStarted', '1'); } catch (_) {}
-        if (shouldAllowWizardAutoOpen(1)) {
-          setShowEventTypes(true);
-          setStepErrorMsg('');
-        }
+        applyRemoteWizardSession({
+          plan,
+          addonCount,
+          eventWizardStarted: true,
+          activeEventId: ev?.id || null,
+        });
       }
       setSelectedPlan(plan);
       try { localStorage.setItem('selectedPlan', plan); } catch (_) {}
@@ -6396,7 +6415,7 @@ React.useEffect(() => {
       console.error('syncPurchasedPlanFromServer threw', err);
       return null;
     }
-  }, [loadUserPlanSettings, persistUserPlanSettings, shouldAllowWizardAutoOpen]);
+  }, [loadUserPlanSettings, persistUserPlanSettings, applyRemoteWizardSession]);
 
   const beginCreateNewEventFlow = React.useCallback(async () => {
     setSelectedFlowStep(null);
@@ -6429,15 +6448,29 @@ React.useEffect(() => {
       return;
     }
 
+    const settings = await loadUserPlanSettings();
+    if (settings?.plan && settings?.eventWizardStarted) {
+      applyRemoteWizardSession(settings);
+      if (!currentEventIdRef.current) {
+        await ensureWizardDraftEvent(settings.plan, settings.addonCount ?? 0);
+      }
+      return;
+    }
+
     const planReady = await syncPurchasedPlanFromServer();
     if (!planReady) {
-      const settings = await loadUserPlanSettings();
-      if (settings?.plan && settings.eventWizardStarted) {
-        setShowExistingEventWarning(true);
+      if (settings?.plan) {
+        setSelectedPlan(settings.plan);
+        try { localStorage.setItem('selectedPlan', settings.plan); } catch (_) {}
+        await handleNewEvent();
         return;
       }
       setPlanAddOnMode(false);
       setShowPricingPlan(true);
+      return;
+    }
+
+    if (userPlanSettingsRef.current?.eventWizardStarted) {
       return;
     }
 
@@ -6447,6 +6480,8 @@ React.useEffect(() => {
     syncPurchasedPlanFromServer,
     loadUserPlanSettings,
     handleNewEvent,
+    applyRemoteWizardSession,
+    ensureWizardDraftEvent,
   ]);
 
   React.useEffect(() => {
@@ -6815,14 +6850,14 @@ React.useEffect(() => {
         const user = await resolveCurrentUserForSync();
         if (!user) return;
 
-        await loadUserPlanSettings();
+        const settings = await loadUserPlanSettings();
 
         const remoteWizardActive = Boolean(
-          userPlanSettingsRef.current?.plan && userPlanSettingsRef.current?.eventWizardStarted,
+          settings?.plan && settings?.eventWizardStarted,
         );
         let pinnedEventId = null;
-        if (remoteWizardActive && userPlanSettingsRef.current?.activeEventId) {
-          pinnedEventId = userPlanSettingsRef.current.activeEventId;
+        if (remoteWizardActive && settings?.activeEventId) {
+          pinnedEventId = settings.activeEventId;
         } else if (!remoteWizardActive) {
           pinnedEventId =
             wizardDismissedEventIdRef.current
@@ -6959,19 +6994,24 @@ React.useEffect(() => {
             setShowReportsOptions(false);
           }
 
-          const currentSelectedPlan = selectedPlanRef.current;
-          const currentUserSettings = userPlanSettingsRef.current;
-          const currentAdditionalPackages = additionalPackagesRef.current;
-
-          const carriedPlan = newEventStarted
-            ? (currentSelectedPlan || currentUserSettings?.plan || null)
-            : null;
-          const carriedAddon = newEventStarted
-              ? (() => {
-                const addonFromSettings = Number(currentUserSettings?.addonCount ?? 0);
-                return Number.isFinite(addonFromSettings) ? Math.max(0, addonFromSettings) : 0;
-              })()
-            : 0;
+          const serverSettings = settings || await loadUserPlanSettings();
+          if (serverSettings?.plan && shouldRestorePaidPlanFromSettings(serverSettings)) {
+            setSelectedPlan(serverSettings.plan);
+            try { localStorage.setItem('selectedPlan', serverSettings.plan); } catch (_) {}
+            try { localStorage.setItem('user_plan_code', serverSettings.plan); } catch (_) {}
+            setDbAddonCount(serverSettings.addonCount ?? 0);
+            setAdditionalPackages((prev) => {
+              const ac = serverSettings.addonCount ?? 0;
+              const prevCount = Array.isArray(prev) ? prev.length : 0;
+              if (prevCount === ac) return prev;
+              return Array(ac).fill('addon');
+            });
+            if (serverSettings.eventWizardStarted) {
+              applyRemoteWizardSession(serverSettings);
+              await ensureWizardDraftEvent(serverSettings.plan, serverSettings.addonCount ?? 0);
+            }
+            return;
+          }
 
           try {
             const { data: lastEvent } = await supabase
@@ -6999,64 +7039,32 @@ React.useEffect(() => {
             console.error('Failed to inspect last event for plan reset', inspectErr);
           }
 
-          if (newEventStarted) {
-            if (carriedPlan) {
-              setSelectedPlan(carriedPlan);
-              setDbAddonCount(carriedAddon);
-              setAdditionalPackages((prev) => {
-                const prevCount = Array.isArray(prev) ? prev.length : 0;
-                if (prevCount === carriedAddon) {
-                  return prev;
-                }
-                return Array(carriedAddon).fill('addon');
-              });
-            } else {
-              setSelectedPlan(null);
-              setDbAddonCount(0);
-              setAdditionalPackages((prev) => {
-                if (Array.isArray(prev) && prev.length === 0) {
-                  return prev;
-                }
-                return [];
-              });
+          const refreshedSettings = await loadUserPlanSettings();
+          if (refreshedSettings?.plan && shouldRestorePaidPlanFromSettings(refreshedSettings)) {
+            setSelectedPlan(refreshedSettings.plan);
+            try { localStorage.setItem('selectedPlan', refreshedSettings.plan); } catch (_) {}
+            if (refreshedSettings.eventWizardStarted) {
+              applyRemoteWizardSession(refreshedSettings);
+              await ensureWizardDraftEvent(refreshedSettings.plan, refreshedSettings.addonCount ?? 0);
             }
-            return;
-          }
-
-          const settings = await loadUserPlanSettings();
-          if (settings) {
-            const canRestorePlan = shouldRestorePaidPlanFromSettings(settings);
-            if (settings.plan && canRestorePlan) {
-              setSelectedPlan(settings.plan);
-              try { localStorage.setItem('selectedPlan', settings.plan); } catch(e){}
-              if (settings.eventWizardStarted) {
-                setNewEventStarted(true);
-                try { localStorage.setItem('newEventStarted', '1'); } catch(e){}
-                setShowGuestListModal(false);
-                setShowReportsOptions(false);
-                if (shouldAllowWizardAutoOpen(1)) {
-                  setShowEventTypes(true);
-                  setStepErrorMsg('');
-                }
-                await ensureWizardDraftEvent(settings.plan, settings.addonCount ?? 0);
-              }
-            } else if (settings.plan) {
-              await clearPlanState();
-            } else {
-              setSelectedPlan(null);
-              try { localStorage.removeItem('user_plan_code'); } catch(e){}
-              try { localStorage.removeItem('selectedPlan'); } catch(e){}
-            }
-            const addonToApply = settings.plan && canRestorePlan ? (settings.addonCount ?? 0) : 0;
+            const addonToApply = refreshedSettings.addonCount ?? 0;
             setDbAddonCount(addonToApply);
             setAdditionalPackages((prev) => {
               const prevCount = Array.isArray(prev) ? prev.length : 0;
-              if (prevCount === addonToApply) {
-                return prev;
-              }
+              if (prevCount === addonToApply) return prev;
               return Array(addonToApply).fill('addon');
             });
+            return;
           }
+
+          setSelectedPlan(null);
+          try { localStorage.removeItem('user_plan_code'); } catch (_) {}
+          try { localStorage.removeItem('selectedPlan'); } catch (_) {}
+          setDbAddonCount(0);
+          setAdditionalPackages((prev) => {
+            if (Array.isArray(prev) && prev.length === 0) return prev;
+            return [];
+          });
 
           setGuestSummary((prev) => {
             if ((prev.approved || prev.adults || prev.children)) {
@@ -7101,7 +7109,7 @@ React.useEffect(() => {
         isInitialLoadRef.current = false;
       }
     })();
-  }, [currentEventId, newEventStarted, eventRefreshKey, derivePlanFromRecord, persistUserPlanSettings, loadUserPlanSettings, syncFinishedStepsFromEvent, ensureWizardDraftEvent]);
+  }, [currentEventId, newEventStarted, eventRefreshKey, derivePlanFromRecord, persistUserPlanSettings, loadUserPlanSettings, syncFinishedStepsFromEvent, ensureWizardDraftEvent, applyRemoteWizardSession]);
 
   // ---- Close modals when no active event ----
   React.useEffect(() => {
