@@ -1657,6 +1657,11 @@ const noEventLoggedRef = useRef(false);
 
     const plan = userPlanSettings?.plan;
     if (!plan || !userPlanSettings?.eventWizardStarted) return;
+    if (currentEventId) {
+      if (!eventDataLoaded) return;
+      const rawDate = formData?.date || formData?.start_datetime;
+      if (rawDate && !isEventDateOnOrAfterToday(rawDate)) return;
+    }
 
     setNewEventStarted(true);
     try { localStorage.setItem('newEventStarted', '1'); } catch (_) {}
@@ -1676,7 +1681,7 @@ const noEventLoggedRef = useRef(false);
         setStepErrorMsg('');
       });
     }
-  }, [session, userPlanSettings?.plan, userPlanSettings?.eventWizardStarted, allowWizardProgrammaticOpen, isWizardAutoOpenBlocked]);
+  }, [session, userPlanSettings?.plan, userPlanSettings?.eventWizardStarted, currentEventId, eventDataLoaded, formData?.date, formData?.start_datetime, allowWizardProgrammaticOpen, isWizardAutoOpenBlocked]);
 
   React.useEffect(() => {
     if (currentEventId) return;
@@ -2820,11 +2825,11 @@ const handleOpenAddonModal = React.useCallback(() => {
           return;
         }
 
-        if (!isEventRecordActive(data) && !isEventWizardDraft(data) && !isWizardEventSessionProtected()) {
+        if (!isEventRecordActive(data) && !isEventWizardDraft(data)) {
           await clearEndedEvent(data.id);
           return;
         }
-        if (!isEventRecordActive(data) && (isEventWizardDraft(data) || isWizardEventSessionProtected())) {
+        if (!isEventRecordActive(data) && isEventWizardDraft(data)) {
           setCurrentEventId(data.id);
           setEventDataLoaded(true);
           const draftDetails = typeof data.event_details === 'string'
@@ -4870,8 +4875,22 @@ React.useEffect(() => {
 
   const clearEndedEvent = async (eventId) => {
     if (!eventId) return;
-    if (isWizardEventSessionProtected()) return;
     if (clearEndedEventInFlightRef.current === eventId) return;
+
+    if (isWizardEventSessionProtected()) {
+      try {
+        const { data: ev } = await supabase
+          .from('events')
+          .select('event_details, status')
+          .eq('id', eventId)
+          .maybeSingle();
+        const rawDate = getRawEventDateFromDetails(getEventDetailsFromRecord(ev));
+        if (rawDate && isEventDateOnOrAfterToday(rawDate)) return;
+      } catch (_) {
+        return;
+      }
+    }
+
     clearEndedEventInFlightRef.current = eventId;
     try {
       try {
@@ -5906,10 +5925,6 @@ React.useEffect(() => {
           });
           return;
         }
-        if (hasEventEnded(ev) && !isEventWizardDraft(ev) && !isWizardEventSessionProtected()) {
-          await clearEndedEvent(ev.id);
-          return;
-        }
         if (currentEventId !== ev.id) {
           setCurrentEventId(ev.id);
         }
@@ -5971,17 +5986,6 @@ React.useEffect(() => {
         const retentionDate = computePlanRetentionDate(dateStr);
         if (retentionDate) {
           planRetentionUntilRef.current = retentionDate;
-        }
-        const parsedDate = parseEventDate(dateStr);
-        if (parsedDate) {
-          const today = new Date();
-          today.setHours(0, 0, 0, 0);
-          const eventDate = new Date(parsedDate);
-          eventDate.setHours(0, 0, 0, 0);
-          if (eventDate < today && !isWizardEventSessionProtected()) {
-            await clearEndedEvent(ev.id);
-            return;
-          }
         }
       }catch(e){console.error('archive check failed',e);}  
     })();
@@ -6642,8 +6646,6 @@ React.useEffect(() => {
 
         if (eventDate >= today) return;
 
-        if (isWizardEventSessionProtected()) return;
-
         await clearEndedEvent(currentEventId);
       } catch (err) {
         console.error('auto-archive fetch failed', err);
@@ -6716,7 +6718,7 @@ React.useEffect(() => {
         if (ev) {
           noEventLoggedRef.current = false;
 
-          if (!isEventRecordActive(ev) && !isEventWizardDraft(ev) && !isWizardEventSessionProtected()) {
+          if (!isEventRecordActive(ev) && !isEventWizardDraft(ev)) {
             if (lastRestoredEventIdRef.current !== 'ended') {
               console.log('Event found but has ended, clearing active event');
               lastRestoredEventIdRef.current = 'ended';
@@ -6735,8 +6737,9 @@ React.useEffect(() => {
           }
           setCurrentEventId(ev.id);
           const isDraftWizard = isEventWizardDraft(ev);
-          if (ev.event_type && !isWizardPlaceholderEventType(ev.event_type)) {
-            setSelectedEventType(ev.event_type);
+          const resolvedEventType = resolveDisplayEventType(ev.event_type);
+          if (resolvedEventType) {
+            setSelectedEventType(resolvedEventType);
           } else if (isDraftWizard) {
             setSelectedEventType('');
             setNewEventStarted(true);
@@ -7110,16 +7113,11 @@ React.useEffect(() => {
           isInitialLoadRef.current = false;
           return;
         }
-        if (ev && !isEventRecordActive(ev) && !isEventWizardDraft(ev) && !isWizardEventSessionProtected()) {
-          await clearEndedEvent(ev.id);
-          isInitialLoadRef.current = false;
-          return;
-        }
-        if (ev && (isEventRecordActive(ev) || isEventWizardDraft(ev))) {
+        if (ev && (isEventRecordActive(ev) || isEventWizardDraft(ev) || hasEventEnded(ev))) {
           const isDraftWizard = isEventWizardDraft(ev);
           setCurrentEventId(ev.id);
           if (ev.event_type && !isWizardPlaceholderEventType(ev.event_type)) {
-            setSelectedEventType(ev.event_type);
+            setSelectedEventType(resolveDisplayEventType(ev.event_type));
           } else if (isDraftWizard) {
             setSelectedEventType('');
             setNewEventStarted(true);
@@ -7543,14 +7541,6 @@ React.useEffect(()=>{
   ]);
 
   React.useEffect(() => {
-    if (!currentEventId || isCurrentEventActive) return;
-    if (isWizardEventSessionProtected()) return;
-    const rawDate = formData?.date || formData?.start_datetime;
-    if (!rawDate) return;
-    clearEndedEvent(currentEventId);
-  }, [currentEventId, formData?.date, formData?.start_datetime, isCurrentEventActive, isWizardEventSessionProtected]);
-
-  React.useEffect(() => {
     if (!onMobileNavMetaChange) return;
     onMobileNavMetaChange({
       send: messageCapacityChartModel?.remainingMessages ?? 0,
@@ -7845,6 +7835,13 @@ React.useEffect(()=>{
     }
     if (currentEventId && !eventDataLoaded) return undefined;
     if (!userPlanSettingsHydratedRef.current) return undefined;
+    if (currentEventId && eventDataLoaded) {
+      const rawDate = formData?.date || formData?.start_datetime;
+      if (rawDate && !isEventDateOnOrAfterToday(rawDate)) {
+        markWizardAutoResumeAttempted();
+        return undefined;
+      }
+    }
     if (
       showDesignChooser
       || showEventDetails
@@ -7860,11 +7857,10 @@ React.useEffect(()=>{
     ) return undefined;
 
     const flowStarted = Boolean(
-      currentEventId ||
+      isCurrentEventActive ||
       newEventStarted ||
       userPlanSettings?.eventWizardStarted ||
-      selectedEventType ||
-      finishedSteps.length > 0
+      (!currentEventId && (selectedEventType || finishedSteps.length > 0))
     );
     if (!flowStarted) return undefined;
 
@@ -7914,7 +7910,10 @@ React.useEffect(()=>{
     currentEventId,
     eventDataLoaded,
     finishedSteps.length,
+    formData?.date,
+    formData?.start_datetime,
     hasWizardAutoResumeAttempted,
+    isCurrentEventActive,
     isWizardAutoOpenBlocked,
     isWizardStepSuppressed,
     markWizardAutoResumeAttempted,
@@ -8292,8 +8291,9 @@ React.useEffect(()=>{
     })();
     const showActivePlanCard = Boolean(
       (planForDisplay || selectedPlan || userPlanSettings?.plan)
-      && (isCurrentEventActive || newEventStarted || userPlanSettings?.eventWizardStarted)
+      && isCurrentEventActive
     );
+    const displayEventTypeLabel = resolveDisplayEventType(selectedEventType);
 
     return (
     <>
@@ -8303,7 +8303,7 @@ React.useEffect(()=>{
             <span className="text-2xl">✅</span>
             <h3 className="text-xl font-bold text-emerald-300">יש אירוע פעיל במערכת</h3>
           </div>
-          <p className="text-slate-300"><strong>סוג האירוע:</strong> {selectedEventType || 'לא מוגדר'}</p>
+          <p className="text-slate-300"><strong>סוג האירוע:</strong> {displayEventTypeLabel || 'לא מוגדר'}</p>
           {formData.date && (
             <p className="text-slate-300"><strong>תאריך האירוע:</strong> {new Date(formData.date).toLocaleDateString('he-IL')}</p>
           )}
@@ -8323,7 +8323,9 @@ React.useEffect(()=>{
             <span className="text-2xl">⏱</span>
             <h3 className="text-xl font-bold text-amber-300">האירוע הסתיים</h3>
           </div>
-          <p className="text-slate-300"><strong>סוג האירוע:</strong> {selectedEventType || 'לא מוגדר'}</p>
+          {displayEventTypeLabel ? (
+            <p className="text-slate-300"><strong>סוג האירוע:</strong> {displayEventTypeLabel}</p>
+          ) : null}
           {formData.date && (
             <p className="text-slate-300"><strong>תאריך האירוע:</strong> {new Date(formData.date).toLocaleDateString('he-IL')}</p>
           )}
@@ -8854,7 +8856,45 @@ React.useEffect(()=>{
         </div>
       )}
 
-      {hasSession && !isCurrentEventActive && !newEventStarted && !userPlanSettings?.eventWizardStarted && (
+      {hasSession && currentEventId && !isCurrentEventActive && (
+        <section className="mx-auto mb-4 w-full max-w-md rounded-[1.75rem] border border-amber-400/30 bg-amber-500/10 p-4 text-center shadow-[0_14px_44px_rgba(0,0,0,0.36)] ring-1 ring-amber-400/20 backdrop-blur-2xl sm:hidden" dir="rtl">
+          <div className="flex items-center justify-center gap-2">
+            <span className="text-2xl">⏱</span>
+            <h3 className="text-lg font-bold text-amber-200">האירוע הסתיים</h3>
+          </div>
+          {resolveDisplayEventType(selectedEventType) ? (
+            <p className="mt-2 text-sm font-semibold text-slate-300">
+              <strong>סוג האירוע:</strong> {resolveDisplayEventType(selectedEventType)}
+            </p>
+          ) : null}
+          {formData?.date && (
+            <p className="mt-1 text-sm font-semibold text-slate-300">
+              <strong>תאריך האירוע:</strong> {new Date(formData.date).toLocaleDateString('he-IL')}
+            </p>
+          )}
+          <p className="mt-2 text-sm font-semibold text-slate-300">
+            ניתן לצפות בדוחות או לפתוח אירוע חדש לאחר בחירת מסלול.
+          </p>
+          <div className="mt-4 flex flex-col gap-2">
+            <button
+              type="button"
+              onClick={() => tryOpenWizardStep(5, { userInitiated: true })}
+              className="w-full rounded-2xl border border-white/12 bg-white/[0.05] px-4 py-3 text-base font-black text-slate-100 transition-colors active:bg-white/[0.10]"
+            >
+              צפייה בדוחות
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowPricingPlan(true)}
+              className="w-full rounded-2xl bg-gradient-to-br from-indigo-600 to-violet-600 px-4 py-3 text-base font-black text-white shadow hover:opacity-90 transition-all"
+            >
+              פתח אירוע חדש
+            </button>
+          </div>
+        </section>
+      )}
+
+      {hasSession && !currentEventId && !isCurrentEventActive && !newEventStarted && !userPlanSettings?.eventWizardStarted && (
         <section className="mx-auto mb-4 w-full max-w-md rounded-[1.75rem] border border-white/15 bg-white/[0.06] p-4 text-center shadow-[0_14px_44px_rgba(0,0,0,0.36)] ring-1 ring-white/10 backdrop-blur-2xl sm:hidden" dir="rtl">
           <div className="flex items-center justify-center gap-2">
             <span className="text-2xl">📅</span>
@@ -9121,7 +9161,7 @@ React.useEffect(()=>{
           </div>
 
           {/* Second Column - Guest Summary + Table Report */}
-          {currentEventId && (
+          {currentEventId && isCurrentEventActive && (
             <div className="w-full flex flex-col gap-6">
               <div className="hidden sm:block" data-testid="desktop-guest-summary-chart">
                 {renderGuestSummaryChartCard()}
