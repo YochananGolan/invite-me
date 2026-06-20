@@ -1660,7 +1660,8 @@ const noEventLoggedRef = useRef(false);
     if (currentEventId) {
       if (!eventDataLoaded) return;
       const rawDate = formData?.date || formData?.start_datetime;
-      if (!rawDate || !isEventDateOnOrAfterToday(rawDate)) return;
+      // אין תאריך = טיוטת אשף (אחרי תשלום) — לא לחסום פתיחת שלב 1
+      if (rawDate && !isEventDateOnOrAfterToday(rawDate)) return;
     }
 
     setNewEventStarted(true);
@@ -1803,10 +1804,7 @@ const shouldShowWhatsAppGroupUpdateButton = Boolean(currentEventId && (hasWhatsA
   /** נתוני גרף יתרת הודעות — useMemo כדי שלא ייווצר מערך חדש בכל רינדור (Recharts + הבהוב) */
   const messageCapacityChartModel = React.useMemo(() => {
     const rawEventDate = formData?.date || formData?.start_datetime;
-    const eventActiveForChart = Boolean(
-      currentEventId && rawEventDate && isEventDateOnOrAfterToday(rawEventDate),
-    );
-    if (currentEventId && !eventActiveForChart) return null;
+    if (currentEventId && rawEventDate && !isEventDateOnOrAfterToday(rawEventDate)) return null;
     if (!displayPlanCode && !currentEventId) return null;
     const messagesSent = effectiveMessagesSentCount;
     const basePlanLimitForDisplay = getPlanBaseLimit(displayPlanCode);
@@ -4887,19 +4885,20 @@ React.useEffect(() => {
     if (!eventId) return;
     if (clearEndedEventInFlightRef.current === eventId) return;
 
-    if (isWizardEventSessionProtected()) {
-      try {
-        const { data: ev } = await supabase
-          .from('events')
-          .select('event_details, status')
-          .eq('id', eventId)
-          .maybeSingle();
-        const rawDate = getRawEventDateFromDetails(getEventDetailsFromRecord(ev));
-        if (rawDate && isEventDateOnOrAfterToday(rawDate)) return;
-      } catch (_) {
-        const clientDate = formData?.date || formData?.start_datetime;
-        if (clientDate && isEventDateOnOrAfterToday(clientDate)) return;
-      }
+    try {
+      const { data: ev } = await supabase
+        .from('events')
+        .select('event_details, status, event_type')
+        .eq('id', eventId)
+        .maybeSingle();
+      if (isEventWizardDraft(ev)) return;
+      const rawDate = getRawEventDateFromDetails(getEventDetailsFromRecord(ev));
+      if (!rawDate) return;
+      if (isEventDateOnOrAfterToday(rawDate)) return;
+    } catch (_) {
+      const clientDate = formData?.date || formData?.start_datetime;
+      if (!clientDate) return;
+      if (isEventDateOnOrAfterToday(clientDate)) return;
     }
 
     clearEndedEventInFlightRef.current = eventId;
@@ -6479,6 +6478,8 @@ React.useEffect(() => {
     if (!showStepError || stepErrorMsg !== WIZARD_START_FIRST_MSG) return;
     const hasActiveContext = Boolean(
       currentEventId ||
+      newEventStarted ||
+      userPlanSettings?.eventWizardStarted ||
       planForDisplay ||
       selectedPlan ||
       userPlanSettings?.plan ||
@@ -6493,10 +6494,12 @@ React.useEffect(() => {
     eventDataLoaded,
     formDataHasMeaningfulValues,
     invitedCount,
+    newEventStarted,
     planForDisplay,
     selectedPlan,
     showStepError,
     stepErrorMsg,
+    userPlanSettings?.eventWizardStarted,
     userPlanSettings?.plan,
   ]);
 
@@ -7532,6 +7535,14 @@ React.useEffect(()=>{
     return isEventDateOnOrAfterToday(rawDate);
   }, [currentEventId, formData?.date, formData?.start_datetime]);
 
+  /** אירוע עם תאריך שעבר — שונה מטיוטת אשף (ללא תאריך אחרי תשלום) */
+  const isEndedPastEvent = React.useMemo(() => {
+    if (!currentEventId) return false;
+    const rawDate = formData?.date || formData?.start_datetime;
+    if (!rawDate) return false;
+    return !isEventDateOnOrAfterToday(rawDate);
+  }, [currentEventId, formData?.date, formData?.start_datetime]);
+
   const mobileDashboardModel = React.useMemo(() => {
     const dashboardActive = Boolean(
       (currentEventId && isCurrentEventActive) ||
@@ -7560,7 +7571,7 @@ React.useEffect(()=>{
   ]);
 
   React.useEffect(() => {
-    if (!session || !eventDataLoaded || !currentEventId || isCurrentEventActive) return;
+    if (!session || !eventDataLoaded || !currentEventId || !isEndedPastEvent) return;
     blockWizardAutoOpen();
     markWizardAutoResumeAttempted();
     setShowEventTypes(false);
@@ -7574,7 +7585,7 @@ React.useEffect(()=>{
     session,
     eventDataLoaded,
     currentEventId,
-    isCurrentEventActive,
+    isEndedPastEvent,
     blockWizardAutoOpen,
     markWizardAutoResumeAttempted,
     clearEndedEvent,
@@ -7788,7 +7799,7 @@ React.useEffect(()=>{
   ]);
 
   const tryOpenWizardStep = React.useCallback((stepNumber, { userInitiated = false } = {}) => {
-    if (currentEventId && !isCurrentEventActive && stepNumber !== 5) {
+    if (isEndedPastEvent && stepNumber !== 5) {
       if (userInitiated) {
         setStepErrorMsg('אין אירוע פעיל במערכת. לחץ על "צור אירוע חדש" כדי להתחיל.');
         setShowStepError(true);
@@ -7848,7 +7859,7 @@ React.useEffect(()=>{
     return true;
   }, [
     currentEventId,
-    isCurrentEventActive,
+    isEndedPastEvent,
     eventDataLoaded,
     formDataHasMeaningfulValues,
     invitedCount,
@@ -7883,7 +7894,7 @@ React.useEffect(()=>{
     }
     if (currentEventId && !eventDataLoaded) return undefined;
     if (!userPlanSettingsHydratedRef.current) return undefined;
-    if (currentEventId && eventDataLoaded && !isCurrentEventActive) {
+    if (currentEventId && eventDataLoaded && isEndedPastEvent) {
       markWizardAutoResumeAttempted();
       return undefined;
     }
@@ -7959,6 +7970,7 @@ React.useEffect(()=>{
     formData?.start_datetime,
     hasWizardAutoResumeAttempted,
     isCurrentEventActive,
+    isEndedPastEvent,
     isWizardAutoOpenBlocked,
     isWizardStepSuppressed,
     markWizardAutoResumeAttempted,
