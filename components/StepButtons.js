@@ -1660,7 +1660,7 @@ const noEventLoggedRef = useRef(false);
     if (currentEventId) {
       if (!eventDataLoaded) return;
       const rawDate = formData?.date || formData?.start_datetime;
-      if (rawDate && !isEventDateOnOrAfterToday(rawDate)) return;
+      if (!rawDate || !isEventDateOnOrAfterToday(rawDate)) return;
     }
 
     setNewEventStarted(true);
@@ -1802,6 +1802,11 @@ const shouldShowWhatsAppGroupUpdateButton = Boolean(currentEventId && (hasWhatsA
 
   /** נתוני גרף יתרת הודעות — useMemo כדי שלא ייווצר מערך חדש בכל רינדור (Recharts + הבהוב) */
   const messageCapacityChartModel = React.useMemo(() => {
+    const rawEventDate = formData?.date || formData?.start_datetime;
+    const eventActiveForChart = Boolean(
+      currentEventId && rawEventDate && isEventDateOnOrAfterToday(rawEventDate),
+    );
+    if (currentEventId && !eventActiveForChart) return null;
     if (!displayPlanCode && !currentEventId) return null;
     const messagesSent = effectiveMessagesSentCount;
     const basePlanLimitForDisplay = getPlanBaseLimit(displayPlanCode);
@@ -1833,6 +1838,8 @@ const shouldShowWhatsAppGroupUpdateButton = Boolean(currentEventId && (hasWhatsA
   }, [
     displayPlanCode,
     currentEventId,
+    formData?.date,
+    formData?.start_datetime,
     effectiveMessagesSentCount,
     additionalCapacity,
     isMobileView,
@@ -4827,6 +4834,9 @@ React.useEffect(() => {
     setInvitationSent(false);
     setRsvpConfirmed(false);
     setShowGuestForm(false);
+    setShowDesignChooser(false);
+    setShowEventTypes(false);
+    setShowEventDetails(false);
     setShowReportsOptions(false);
     setStepErrorMsg('');
     setErrorMsg('');
@@ -4887,7 +4897,8 @@ React.useEffect(() => {
         const rawDate = getRawEventDateFromDetails(getEventDetailsFromRecord(ev));
         if (rawDate && isEventDateOnOrAfterToday(rawDate)) return;
       } catch (_) {
-        return;
+        const clientDate = formData?.date || formData?.start_datetime;
+        if (clientDate && isEventDateOnOrAfterToday(clientDate)) return;
       }
     }
 
@@ -4914,7 +4925,6 @@ React.useEffect(() => {
       clearCarryPlanAfterManualDelete();
       await clearPlanState();
       await resetWizardStateForNoEvent();
-      setShowEventEndedNotice(true);
     } finally {
       if (clearEndedEventInFlightRef.current === eventId) {
         clearEndedEventInFlightRef.current = null;
@@ -5923,6 +5933,10 @@ React.useEffect(() => {
             }
             return Array(fallbackAddon).fill('addon');
           });
+          return;
+        }
+        if (hasEventEnded(ev) && !isEventWizardDraft(ev)) {
+          await clearEndedEvent(ev.id);
           return;
         }
         if (currentEventId !== ev.id) {
@@ -7113,7 +7127,12 @@ React.useEffect(() => {
           isInitialLoadRef.current = false;
           return;
         }
-        if (ev && (isEventRecordActive(ev) || isEventWizardDraft(ev) || hasEventEnded(ev))) {
+        if (ev && hasEventEnded(ev) && !isEventWizardDraft(ev)) {
+          await clearEndedEvent(ev.id);
+          isInitialLoadRef.current = false;
+          return;
+        }
+        if (ev && (isEventRecordActive(ev) || isEventWizardDraft(ev))) {
           const isDraftWizard = isEventWizardDraft(ev);
           setCurrentEventId(ev.id);
           if (ev.event_type && !isWizardPlaceholderEventType(ev.event_type)) {
@@ -7541,6 +7560,27 @@ React.useEffect(()=>{
   ]);
 
   React.useEffect(() => {
+    if (!session || !eventDataLoaded || !currentEventId || isCurrentEventActive) return;
+    blockWizardAutoOpen();
+    markWizardAutoResumeAttempted();
+    setShowEventTypes(false);
+    setShowEventDetails(false);
+    setShowDesignChooser(false);
+    setShowGuestForm(false);
+    setShowReportsOptions(false);
+    setShowStep5Options(false);
+    clearEndedEvent(currentEventId);
+  }, [
+    session,
+    eventDataLoaded,
+    currentEventId,
+    isCurrentEventActive,
+    blockWizardAutoOpen,
+    markWizardAutoResumeAttempted,
+    clearEndedEvent,
+  ]);
+
+  React.useEffect(() => {
     if (!onMobileNavMetaChange) return;
     onMobileNavMetaChange({
       send: messageCapacityChartModel?.remainingMessages ?? 0,
@@ -7748,6 +7788,13 @@ React.useEffect(()=>{
   ]);
 
   const tryOpenWizardStep = React.useCallback((stepNumber, { userInitiated = false } = {}) => {
+    if (currentEventId && !isCurrentEventActive && stepNumber !== 5) {
+      if (userInitiated) {
+        setStepErrorMsg('אין אירוע פעיל במערכת. לחץ על "צור אירוע חדש" כדי להתחיל.');
+        setShowStepError(true);
+      }
+      return false;
+    }
     if (!userInitiated && (isWizardAutoOpenBlocked() || isWizardStepSuppressed(stepNumber))) {
       return false;
     }
@@ -7801,6 +7848,7 @@ React.useEffect(()=>{
     return true;
   }, [
     currentEventId,
+    isCurrentEventActive,
     eventDataLoaded,
     formDataHasMeaningfulValues,
     invitedCount,
@@ -7835,12 +7883,9 @@ React.useEffect(()=>{
     }
     if (currentEventId && !eventDataLoaded) return undefined;
     if (!userPlanSettingsHydratedRef.current) return undefined;
-    if (currentEventId && eventDataLoaded) {
-      const rawDate = formData?.date || formData?.start_datetime;
-      if (rawDate && !isEventDateOnOrAfterToday(rawDate)) {
-        markWizardAutoResumeAttempted();
-        return undefined;
-      }
+    if (currentEventId && eventDataLoaded && !isCurrentEventActive) {
+      markWizardAutoResumeAttempted();
+      return undefined;
     }
     if (
       showDesignChooser
@@ -8317,47 +8362,7 @@ React.useEffect(()=>{
           )}
           <p className="text-emerald-300 text-base mt-2 font-bold">האירוע מוכן לשליחת הזמנות ואישורי הגעה</p>
         </div>
-      ) : currentEventId && !isCurrentEventActive ? (
-        <div className="bg-white/[0.055] border border-white/15 backdrop-blur-xl rounded-2xl p-4 sm:p-6 text-center shadow-[0_8px_40px_rgba(0,0,0,0.35)] ring-2 ring-amber-400/30 w-full">
-          <div className="flex items-center justify-center gap-2 mb-2">
-            <span className="text-2xl">⏱</span>
-            <h3 className="text-xl font-bold text-amber-300">האירוע הסתיים</h3>
-          </div>
-          {displayEventTypeLabel ? (
-            <p className="text-slate-300"><strong>סוג האירוע:</strong> {displayEventTypeLabel}</p>
-          ) : null}
-          {formData.date && (
-            <p className="text-slate-300"><strong>תאריך האירוע:</strong> {new Date(formData.date).toLocaleDateString('he-IL')}</p>
-          )}
-          {formData.hallName && (
-            <p className="text-slate-300"><strong>אולם:</strong> {formData.hallName}</p>
-          )}
-          {eventDayStatus && (
-            <div className="bg-amber-500/10 border border-amber-400/30 rounded-lg p-3 mt-3 mb-2">
-              <p className="text-amber-200 font-bold text-2xl text-center">{eventDayStatus.text}</p>
-            </div>
-          )}
-          <p className="text-slate-300 text-base mt-2">
-            המסלול וההודעות שייכים לאירוע זה בלבד. ניתן לצפות בדוחות, ולפתוח אירוע חדש רק לאחר בחירת מסלול.
-          </p>
-          <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:justify-center">
-            <button
-              type="button"
-              onClick={() => tryOpenWizardStep(5, { userInitiated: true })}
-              className="rounded-full border border-white/15 bg-white/[0.06] px-5 py-2 font-bold text-slate-100 hover:bg-indigo-500/15 hover:border-indigo-400/50 transition-all"
-            >
-              צפייה בדוחות
-            </button>
-            <button
-              type="button"
-              onClick={() => setShowPricingPlan(true)}
-              className="rounded-full bg-gradient-to-br from-indigo-600 to-violet-600 px-5 py-2 font-bold text-white shadow-[0_6px_20px_rgba(99,70,230,0.45)] hover:opacity-90 transition-all"
-            >
-              פתח אירוע חדש
-            </button>
-          </div>
-        </div>
-      ) : (newEventStarted || userPlanSettings?.eventWizardStarted) ? (
+      ) : (!currentEventId && (newEventStarted || userPlanSettings?.eventWizardStarted)) ? (
         <div className="bg-white/[0.055] border border-white/15 backdrop-blur-xl rounded-2xl p-4 text-center shadow-[0_8px_40px_rgba(0,0,0,0.35)] ring-2 ring-indigo-400/30 flex-1">
           <div className="flex items-center justify-center gap-2 mb-2">
             <span className="text-2xl">🚀</span>
@@ -8383,6 +8388,15 @@ React.useEffect(()=>{
             <h3 className="text-lg font-bold text-slate-100">אין אירוע פעיל</h3>
           </div>
           <p className="text-slate-300">אין אירוע פעיל במערכת. לחץ על &quot;צור אירוע חדש&quot; כדי להתחיל.</p>
+          <div className="mt-4 flex justify-center">
+            <button
+              type="button"
+              onClick={() => setShowPricingPlan(true)}
+              className="rounded-full bg-gradient-to-br from-indigo-600 to-violet-600 px-5 py-2 font-bold text-white shadow-[0_6px_20px_rgba(99,70,230,0.45)] hover:opacity-90 transition-all"
+            >
+              צור אירוע חדש
+            </button>
+          </div>
         </div>
       )}
       {showActivePlanCard && (
@@ -8856,45 +8870,7 @@ React.useEffect(()=>{
         </div>
       )}
 
-      {hasSession && currentEventId && !isCurrentEventActive && (
-        <section className="mx-auto mb-4 w-full max-w-md rounded-[1.75rem] border border-amber-400/30 bg-amber-500/10 p-4 text-center shadow-[0_14px_44px_rgba(0,0,0,0.36)] ring-1 ring-amber-400/20 backdrop-blur-2xl sm:hidden" dir="rtl">
-          <div className="flex items-center justify-center gap-2">
-            <span className="text-2xl">⏱</span>
-            <h3 className="text-lg font-bold text-amber-200">האירוע הסתיים</h3>
-          </div>
-          {resolveDisplayEventType(selectedEventType) ? (
-            <p className="mt-2 text-sm font-semibold text-slate-300">
-              <strong>סוג האירוע:</strong> {resolveDisplayEventType(selectedEventType)}
-            </p>
-          ) : null}
-          {formData?.date && (
-            <p className="mt-1 text-sm font-semibold text-slate-300">
-              <strong>תאריך האירוע:</strong> {new Date(formData.date).toLocaleDateString('he-IL')}
-            </p>
-          )}
-          <p className="mt-2 text-sm font-semibold text-slate-300">
-            ניתן לצפות בדוחות או לפתוח אירוע חדש לאחר בחירת מסלול.
-          </p>
-          <div className="mt-4 flex flex-col gap-2">
-            <button
-              type="button"
-              onClick={() => tryOpenWizardStep(5, { userInitiated: true })}
-              className="w-full rounded-2xl border border-white/12 bg-white/[0.05] px-4 py-3 text-base font-black text-slate-100 transition-colors active:bg-white/[0.10]"
-            >
-              צפייה בדוחות
-            </button>
-            <button
-              type="button"
-              onClick={() => setShowPricingPlan(true)}
-              className="w-full rounded-2xl bg-gradient-to-br from-indigo-600 to-violet-600 px-4 py-3 text-base font-black text-white shadow hover:opacity-90 transition-all"
-            >
-              פתח אירוע חדש
-            </button>
-          </div>
-        </section>
-      )}
-
-      {hasSession && !currentEventId && !isCurrentEventActive && !newEventStarted && !userPlanSettings?.eventWizardStarted && (
+      {hasSession && !isCurrentEventActive && !newEventStarted && !userPlanSettings?.eventWizardStarted && (
         <section className="mx-auto mb-4 w-full max-w-md rounded-[1.75rem] border border-white/15 bg-white/[0.06] p-4 text-center shadow-[0_14px_44px_rgba(0,0,0,0.36)] ring-1 ring-white/10 backdrop-blur-2xl sm:hidden" dir="rtl">
           <div className="flex items-center justify-center gap-2">
             <span className="text-2xl">📅</span>
@@ -8903,6 +8879,13 @@ React.useEffect(()=>{
           <p className="mt-2 text-sm font-semibold text-slate-300">
             אין אירוע פעיל במערכת. לחץ על &quot;צור אירוע חדש&quot; כדי להתחיל.
           </p>
+          <button
+            type="button"
+            onClick={() => setShowPricingPlan(true)}
+            className="mt-4 w-full rounded-2xl bg-gradient-to-br from-indigo-600 to-violet-600 px-4 py-3 text-base font-black text-white shadow hover:opacity-90 transition-all"
+          >
+            צור אירוע חדש
+          </button>
         </section>
       )}
 
