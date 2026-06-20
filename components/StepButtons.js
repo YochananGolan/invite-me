@@ -897,6 +897,7 @@ const [hasWhatsAppGroup, setHasWhatsAppGroup] = useState(false);
   const wizardSuppressedStepsRef = useRef(new Set());
   const wizardDismissedEventIdRef = useRef(null);
   const currentEventIdRef = useRef(null);
+  const remoteWizardSessionFingerprintRef = useRef(null);
 
   const WIZARD_AUTO_RESUME_KEY = 'wizardAutoResumeAttempted';
   const WIZARD_DISMISSED_EVENT_KEY = 'wizardDismissedEventId';
@@ -1028,6 +1029,46 @@ const [hasWhatsAppGroup, setHasWhatsAppGroup] = useState(false);
       }
     }
   }, []);
+
+  /** סנכרון אשף ממכשיר אחר — מנקה חסימות מקומיות (X) ופותח שלב 1 */
+  const applyRemoteWizardSession = React.useCallback((settings) => {
+    if (!settings?.plan || !settings.eventWizardStarted) return false;
+
+    const fingerprint = `${settings.plan}:${settings.activeEventId || ''}:wizard`;
+    const sessionChanged = remoteWizardSessionFingerprintRef.current !== fingerprint;
+    remoteWizardSessionFingerprintRef.current = fingerprint;
+
+    resetWizardDismissForUserProgress();
+    wizardSuppressedStepsRef.current.delete(1);
+    writeWizardDismissedSteps(wizardSuppressedStepsRef.current);
+    setNewEventStarted(true);
+    try { localStorage.setItem('newEventStarted', '1'); } catch (_) {}
+    try { localStorage.setItem('selectedPlan', settings.plan); } catch (_) {}
+    setShowGuestListModal(false);
+    setShowReportsOptions(false);
+    setShowReportModal(false);
+    setStepErrorMsg('');
+
+    if (settings.activeEventId && settings.activeEventId !== currentEventIdRef.current) {
+      setCurrentEventId(settings.activeEventId);
+      setEventDataLoaded(false);
+      if (sessionChanged) {
+        setEventRefreshKey((key) => key + 1);
+      }
+    }
+
+    if (!finishedStepsRef.current.includes(0)) {
+      allowWizardProgrammaticOpen(() => {
+        setShowEventTypes(true);
+        setStepErrorMsg('');
+      });
+    }
+    return true;
+  }, [
+    allowWizardProgrammaticOpen,
+    resetWizardDismissForUserProgress,
+    writeWizardDismissedSteps,
+  ]);
 
   const isWizardAutoOpenBlocked = React.useCallback(() => (
     wizardAutoOpenBlockedRef.current || readWizardAutoOpenBlocked()
@@ -1308,10 +1349,10 @@ const derivePlanFromRecord = React.useCallback((record) => {
   }
   return derivedPlan;
 }, [computePlanFromCapacity]);
-const [userPlanSettings, setUserPlanSettings] = useState({ plan: null, addonCount: 0, eventWizardStarted: false });
+const [userPlanSettings, setUserPlanSettings] = useState({ plan: null, addonCount: 0, eventWizardStarted: false, activeEventId: null });
 /** נכון אחרי ש־loadUserPlanSettings סיים (כולל שגיאה) — לא לאפס מסלול מ-localStorage לפני כן */
 const userPlanSettingsHydratedRef = useRef(false);
-const persistUserPlanSettings = React.useCallback(async (planCode, addonCount, eventWizardStartedOverride = undefined) => {
+const persistUserPlanSettings = React.useCallback(async (planCode, addonCount, eventWizardStartedOverride = undefined, activeEventIdOverride = undefined) => {
   try {
     const user = await resolveCurrentUserForSync();
     if (!user) return;
@@ -1321,12 +1362,18 @@ const persistUserPlanSettings = React.useCallback(async (planCode, addonCount, e
     const eventWizardStarted = eventWizardStartedOverride !== undefined
       ? Boolean(eventWizardStartedOverride)
       : Boolean(userPlanSettingsRef.current?.eventWizardStarted);
+    const activeEventId = activeEventIdOverride !== undefined
+      ? (activeEventIdOverride || null)
+      : (userPlanSettingsRef.current?.activeEventId || null);
     const upsertPayload = {
       user_id: user.id,
       plan_code: safePlan,
       addon_balance: safeAddon,
       event_wizard_started: eventWizardStarted,
     };
+    if (activeEventIdOverride !== undefined || activeEventId) {
+      upsertPayload.active_event_id = activeEventId;
+    }
     let { error } = await supabase
       .from('user_settings')
       .upsert(upsertPayload, { onConflict: 'user_id' });
@@ -1352,10 +1399,11 @@ const persistUserPlanSettings = React.useCallback(async (planCode, addonCount, e
         && prev.plan === safePlan
         && (prev.addonCount ?? 0) === safeAddon
         && Boolean(prev.eventWizardStarted) === eventWizardStarted
+        && (prev.activeEventId || null) === (activeEventId || null)
       ) {
         return prev;
       }
-      return { plan: safePlan, addonCount: safeAddon, eventWizardStarted };
+      return { plan: safePlan, addonCount: safeAddon, eventWizardStarted, activeEventId: activeEventId || null };
     });
     if (safePlan) {
       clearCarryPlanAfterManualDelete();
@@ -1390,20 +1438,26 @@ const loadUserPlanSettings = React.useCallback(async () => {
         if (prev && prev.plan === null && (prev.addonCount ?? 0) === 0 && !prev.eventWizardStarted) {
           return prev;
         }
-        return { plan: null, addonCount: 0, eventWizardStarted: false };
+        return { plan: null, addonCount: 0, eventWizardStarted: false, activeEventId: null };
       });
       setSelectedPlan(null);
-      return { plan: null, addonCount: 0, eventWizardStarted: false };
+      return { plan: null, addonCount: 0, eventWizardStarted: false, activeEventId: null };
     }
     let { data, error } = await supabase
       .from('user_settings')
-      .select('plan_code, addon_balance, event_wizard_started')
+      .select('plan_code, addon_balance, event_wizard_started, active_event_id')
       .eq('user_id', userId)
       .maybeSingle();
     if (error && String(error.message || '').includes('event_wizard_started')) {
       ({ data, error } = await supabase
         .from('user_settings')
-        .select('plan_code, addon_balance')
+        .select('plan_code, addon_balance, active_event_id')
+        .eq('user_id', userId)
+        .maybeSingle());
+    } else if (error && String(error.message || '').includes('active_event_id')) {
+      ({ data, error } = await supabase
+        .from('user_settings')
+        .select('plan_code, addon_balance, event_wizard_started')
         .eq('user_id', userId)
         .maybeSingle());
     }
@@ -1423,9 +1477,9 @@ const loadUserPlanSettings = React.useCallback(async () => {
         if (prev && prev.plan === null && (prev.addonCount ?? 0) === 0 && !prev.eventWizardStarted) {
           return prev;
         }
-        return { plan: null, addonCount: 0, eventWizardStarted: false };
+        return { plan: null, addonCount: 0, eventWizardStarted: false, activeEventId: null };
       });
-      return { plan: null, addonCount: 0, eventWizardStarted: false };
+      return { plan: null, addonCount: 0, eventWizardStarted: false, activeEventId: null };
     }
     let plan =
       typeof data.plan_code === 'string'
@@ -1434,6 +1488,9 @@ const loadUserPlanSettings = React.useCallback(async () => {
     const parsedAddon = Number(data.addon_balance);
     let addonCount = Number.isFinite(parsedAddon) ? Math.max(0, Math.floor(parsedAddon)) : 0;
     let eventWizardStarted = Boolean(data.event_wizard_started);
+    const activeEventId = data.active_event_id && String(data.active_event_id).trim()
+      ? String(data.active_event_id).trim()
+      : null;
     if (plan && !eventWizardStarted) {
       try {
         const { data: latestEv } = await supabase
@@ -1452,13 +1509,14 @@ const loadUserPlanSettings = React.useCallback(async () => {
         console.warn('wizard draft flag repair skipped', repairErr);
       }
     }
-    const settings = { plan, addonCount, eventWizardStarted };
+    const settings = { plan, addonCount, eventWizardStarted, activeEventId };
     setUserPlanSettings((prev) => {
       if (
         prev
         && prev.plan === settings.plan
         && (prev.addonCount ?? 0) === settings.addonCount
         && Boolean(prev.eventWizardStarted) === eventWizardStarted
+        && (prev.activeEventId || null) === (activeEventId || null)
       ) {
         return prev;
       }
@@ -1480,13 +1538,7 @@ const loadUserPlanSettings = React.useCallback(async () => {
     }
     selectionSourceRef.current = plan ? 'persistent' : 'manual';
     if (plan && eventWizardStarted) {
-      setNewEventStarted(true);
-      try { localStorage.setItem('newEventStarted', '1'); } catch (e) {}
-      try { localStorage.setItem('selectedPlan', plan); } catch (e) {}
-      setShowGuestListModal(false);
-      setShowReportsOptions(false);
-      setShowReportModal(false);
-      setStepErrorMsg('');
+      applyRemoteWizardSession(settings);
     }
     return settings;
   } catch (err) {
@@ -1495,7 +1547,7 @@ const loadUserPlanSettings = React.useCallback(async () => {
   } finally {
     userPlanSettingsHydratedRef.current = true;
   }
-}, [persistUserPlanSettings]);
+}, [persistUserPlanSettings, applyRemoteWizardSession]);
 
 const [additionalPackages, setAdditionalPackages] = useState([]);
 const [dbAddonCount, setDbAddonCount] = useState(null);
@@ -1606,7 +1658,7 @@ const noEventLoggedRef = useRef(false);
         if (prev && prev.plan === null && (prev.addonCount ?? 0) === 0 && !prev.eventWizardStarted) {
           return prev;
         }
-        return { plan: null, addonCount: 0, eventWizardStarted: false };
+        return { plan: null, addonCount: 0, eventWizardStarted: false, activeEventId: null };
       });
       return;
     }
@@ -1650,6 +1702,54 @@ const noEventLoggedRef = useRef(false);
       document.removeEventListener('visibilitychange', handleVisibility);
     };
   }, [session, loadUserPlanSettings]);
+
+  // סנכרון בזמן אמת בין מכשירים — תשלום/פתיחת אשף במחשב מתעדכן בנייד
+  React.useEffect(() => {
+    const userId = session?.user?.id;
+    if (!userId) return undefined;
+
+    const channel = supabase
+      .channel(`user_settings_sync:${userId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'user_settings',
+          filter: `user_id=eq.${userId}`,
+        },
+        () => {
+          loadUserPlanSettings().then((settings) => {
+            if (settings?.eventWizardStarted) {
+              applyRemoteWizardSession(settings);
+            }
+            setEventRefreshKey((key) => key + 1);
+          });
+        },
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'events',
+          filter: `user_id=eq.${userId}`,
+        },
+        () => {
+          loadUserPlanSettings().then((settings) => {
+            if (settings?.eventWizardStarted) {
+              applyRemoteWizardSession(settings);
+            }
+          });
+          setEventRefreshKey((key) => key + 1);
+        },
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [session?.user?.id, loadUserPlanSettings, applyRemoteWizardSession]);
 
   React.useEffect(() => {
     if (!session) return;
@@ -4808,7 +4908,7 @@ React.useEffect(() => {
       setEventAllowedGuests(null);
       setAdditionalPackages([]);
       setDbAddonCount(0);
-      setUserPlanSettings({ plan: null, addonCount: 0, eventWizardStarted: false });
+      setUserPlanSettings({ plan: null, addonCount: 0, eventWizardStarted: false, activeEventId: null });
       setNewEventStarted(false);
     planRetentionUntilRef.current = null;
       try { localStorage.removeItem('selectedPlan'); } catch (_) {}
@@ -5524,8 +5624,12 @@ React.useEffect(() => {
             Array.isArray(additionalPackages) ? additionalPackages.filter((p) => p === 'addon').length : 0
           );
           await persistUserPlanSettings(effectivePlan, currentAddonBalance, !eventIdForPlan);
-          if (!eventIdForPlan) {
-            await ensureWizardDraftEvent(effectivePlan, currentAddonBalance);
+          let draftEventId = eventIdForPlan || null;
+          if (!draftEventId) {
+            draftEventId = await ensureWizardDraftEvent(effectivePlan, currentAddonBalance);
+          }
+          if (draftEventId) {
+            await persistUserPlanSettings(effectivePlan, currentAddonBalance, true, draftEventId);
           }
           if (eventIdForPlan) {
             supabase.from('events').update({ selected_plan: effectivePlan }).eq('id', eventIdForPlan).then(({ error }) => {
@@ -5862,10 +5966,18 @@ React.useEffect(() => {
         if(!user) return;
         let ev = null;
         let messagesSent = 0;
-        const pinnedEventId =
-          wizardDismissedEventIdRef.current
-          || readWizardDismissedEventId()
-          || (isWizardEventSessionProtected() && currentEventId ? currentEventId : null);
+        const remoteWizardActive = Boolean(
+          userPlanSettingsRef.current?.plan && userPlanSettingsRef.current?.eventWizardStarted,
+        );
+        let pinnedEventId = null;
+        if (remoteWizardActive && userPlanSettingsRef.current?.activeEventId) {
+          pinnedEventId = userPlanSettingsRef.current.activeEventId;
+        } else if (!remoteWizardActive) {
+          pinnedEventId =
+            wizardDismissedEventIdRef.current
+            || readWizardDismissedEventId()
+            || (isWizardEventSessionProtected() && currentEventId ? currentEventId : null);
+        }
         if (pinnedEventId) {
           const { data: pinnedEv, error: pinnedErr } = await supabase
             .from('events')
@@ -5906,7 +6018,10 @@ React.useEffect(() => {
           if (currentEventId && isWizardEventSessionProtected()) {
             return;
           }
-          if (wizardDismissedEventIdRef.current || readWizardDismissedEventId()) {
+          if (
+            !remoteWizardActive
+            && (wizardDismissedEventIdRef.current || readWizardDismissedEventId())
+          ) {
             return;
           }
           setEventAllowedGuests(null);
@@ -6702,9 +6817,17 @@ React.useEffect(() => {
 
         await loadUserPlanSettings();
 
-        const pinnedEventId =
-          wizardDismissedEventIdRef.current
-          || readWizardDismissedEventId();
+        const remoteWizardActive = Boolean(
+          userPlanSettingsRef.current?.plan && userPlanSettingsRef.current?.eventWizardStarted,
+        );
+        let pinnedEventId = null;
+        if (remoteWizardActive && userPlanSettingsRef.current?.activeEventId) {
+          pinnedEventId = userPlanSettingsRef.current.activeEventId;
+        } else if (!remoteWizardActive) {
+          pinnedEventId =
+            wizardDismissedEventIdRef.current
+            || readWizardDismissedEventId();
+        }
         let ev = null;
         if (pinnedEventId) {
           const { data: pinnedEv } = await supabase
