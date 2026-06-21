@@ -23,6 +23,24 @@ import {
 } from '../lib/rsvpLabels';
 import { getGuestIdentityKey } from '../lib/guestIdentity';
 import { buildGuestRsvpStats, buildApprovedGuestsByTableReportRows, buildTableSummaryFromGuests, dedupeGuestsByIdentity, filterGuestsByStatusBucket } from '../lib/guestStats';
+import {
+  WIZARD_DRAFT_EVENT_TYPE,
+  parseEventDate,
+  isEventDateOnOrAfterToday,
+  getRawEventDateFromDetails,
+  getEventDetailsFromRecord,
+  isEventRecordActive,
+  isWizardPlaceholderEventType,
+  resolveDisplayEventType,
+  isEventWizardDraft,
+  shouldKeepEventWizardStarted,
+  hasEventEnded,
+  shouldRestorePaidPlanFromSettings,
+  isPaidWizardInProgress as computePaidWizardInProgress,
+  shouldAllowWizardAutoResume,
+  clearStaleWizardLocalStorage,
+  validateActiveEventPointer,
+} from '../lib/eventLifecycle';
 import MobileQuickGuestsCard from './mobile/MobileQuickGuestsCard';
 import MobileQuickGuestListScreen, { MOBILE_GUEST_LIST_PAGE_SIZE } from './mobile/MobileQuickGuestListScreen';
 import MobileQuickGuestSearchOverlay from './mobile/MobileQuickGuestSearchOverlay';
@@ -247,98 +265,11 @@ const DEFAULT_CUSTOM_DESCRIPTION = 'תיאור האירוע';
 const STEP_BAR_SETTLE_DELAY_MS = 90;
 const STEP_BAR_SETTLE_DURATION_MS = 180;
 
-const parseEventDate = (str) => {
-  if (!str) return null;
-  const dateOnly = String(str).split(/[T ]/)[0];
-  const isoMatch = dateOnly.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  if (isoMatch) {
-    const [, year, month, day] = isoMatch;
-    return new Date(Number(year), Number(month) - 1, Number(day));
-  }
-  const match = dateOnly.match(/^(\d{1,2})[.\/-](\d{1,2})[.\/-](\d{4})$/);
-  if (match) {
-    const [, day, month, year] = match;
-    return new Date(Number(year), Number(month) - 1, Number(day));
-  }
-  const native = new Date(dateOnly);
-  if (!Number.isNaN(native.getTime())) return native;
-  return null;
-};
-
-const isEventDateOnOrAfterToday = (rawDate) => {
-  const eventDate = parseEventDate(rawDate);
-  if (!eventDate) return false;
-  eventDate.setHours(0, 0, 0, 0);
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  return eventDate.getTime() >= today.getTime();
-};
-
-const getRawEventDateFromDetails = (details) => {
-  if (!details || typeof details !== 'object') return null;
-  return details.date || details.event_date || details.start_datetime || details.end_datetime || null;
-};
-
-const getEventDetailsFromRecord = (record) => {
-  if (!record) return {};
-  if (typeof record.event_details === 'string') {
-    try {
-      return JSON.parse(record.event_details);
-    } catch (_) {
-      return {};
-    }
-  }
-  return record.event_details || {};
-};
-
-const isEventRecordActive = (record) => {
-  if (!record) return false;
-  const status = typeof record.status === 'string' ? record.status.toLowerCase() : '';
-  if (status === 'archived') return false;
-  const rawDate = getRawEventDateFromDetails(getEventDetailsFromRecord(record));
-  if (!rawDate) return false;
-  return isEventDateOnOrAfterToday(rawDate);
-};
-
-/** סוג אירוע זמני ב-DB עד שהמשתמש בוחר סוג אמיתי בשלב 1 */
-const WIZARD_DRAFT_EVENT_TYPE = 'טיוטה';
-
-const isWizardPlaceholderEventType = (eventType) => (
-  typeof eventType === 'string' && eventType.trim() === WIZARD_DRAFT_EVENT_TYPE
-);
-
-const resolveDisplayEventType = (eventType) => {
-  if (eventType == null || eventType === '') return '';
-  const normalized = typeof eventType === 'string' ? eventType.trim() : String(eventType).trim();
-  if (!normalized || isWizardPlaceholderEventType(normalized)) return '';
-  return normalized;
-};
-
 const shouldApplyEventTypeFromRecord = (recordType, currentType) => {
   const fromRecord = resolveDisplayEventType(recordType);
   if (!fromRecord) return false;
   const current = resolveDisplayEventType(currentType);
   return !current || current === fromRecord;
-};
-
-/** אירוע בתהליך יצירה (ללא תאריך עדיין) — לא למחוק בארכיון */
-const isEventWizardDraft = (record) => {
-  if (!record) return false;
-  const status = typeof record.status === 'string' ? record.status.toLowerCase() : '';
-  if (status === 'archived') return false;
-  if (isEventRecordActive(record)) return false;
-  const details = getEventDetailsFromRecord(record);
-  if (details?.wizard_draft === true) return true;
-  if (isWizardPlaceholderEventType(record.event_type)) return true;
-  const rawDate = getRawEventDateFromDetails(details);
-  return !rawDate;
-};
-
-/** שמירת דגל אשף בשרת — לא לאפס אחרי שחזור טיוטה או מעבר מכשיר */
-const shouldKeepEventWizardStarted = (record, settings = null) => {
-  if (isEventWizardDraft(record)) return true;
-  if (settings?.eventWizardStarted) return true;
-  return false;
 };
 
 const computePlanRetentionDate = (rawDate) => {
@@ -380,11 +311,6 @@ function shouldRespectCarryPlanAfterManualDelete() {
   } catch (_) {
     return false;
   }
-}
-
-/** מסלול ששולם — תמיד לשחזר מ-user_settings (סנכרון בין מכשירים) */
-function shouldRestorePaidPlanFromSettings(settings) {
-  return Boolean(settings?.plan);
 }
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -1516,9 +1442,24 @@ const loadUserPlanSettings = React.useCallback(async () => {
       : null;
     if (plan && !eventWizardStarted) {
       if (activeEventId) {
-        eventWizardStarted = true;
-        await persistUserPlanSettings(plan, addonCount, true, activeEventId);
-      } else {
+        try {
+          const { data: linkedEv } = await supabase
+            .from('events')
+            .select('id, status, event_type, event_details')
+            .eq('id', activeEventId)
+            .maybeSingle();
+          const pointer = validateActiveEventPointer(linkedEv);
+          if (pointer.valid) {
+            eventWizardStarted = true;
+            await persistUserPlanSettings(plan, addonCount, true, activeEventId);
+          } else {
+            activeEventId = null;
+          }
+        } catch (_) {
+          activeEventId = null;
+        }
+      }
+      if (!activeEventId) {
         try {
           const { data: latestEv } = await supabase
             .from('events')
@@ -1577,15 +1518,24 @@ const loadUserPlanSettings = React.useCallback(async () => {
       try {
         const { data: activeEv } = await supabase
           .from('events')
-          .select('id, status')
+          .select('id, status, event_type, event_details')
           .eq('id', activeEventId)
           .maybeSingle();
-        const activeStatus = typeof activeEv?.status === 'string' ? activeEv.status.toLowerCase() : '';
-        if (!activeEv || activeStatus === 'archived') {
+        const pointer = validateActiveEventPointer(activeEv);
+        if (!pointer.valid) {
           activeEventId = null;
+          eventWizardStarted = false;
+          if (pointer.reason === 'ended' || pointer.reason === 'archived' || pointer.reason === 'missing') {
+            plan = null;
+            addonCount = 0;
+            await persistUserPlanSettings(null, 0, false, null);
+          } else {
+            await persistUserPlanSettings(plan, addonCount, false, null);
+          }
         }
       } catch (_) {
         activeEventId = null;
+        eventWizardStarted = false;
       }
     }
     const settings = { plan, addonCount, eventWizardStarted, activeEventId };
@@ -1644,6 +1594,33 @@ const [currentEventId,setCurrentEventId]=useState(null);
 React.useEffect(() => {
   currentEventIdRef.current = currentEventId;
 }, [currentEventId]);
+
+const isCurrentEventActive = React.useMemo(() => {
+  if (!currentEventId) return false;
+  const rawDate = formData?.date || formData?.start_datetime;
+  if (!rawDate) return false;
+  return isEventDateOnOrAfterToday(rawDate);
+}, [currentEventId, formData?.date, formData?.start_datetime]);
+
+const isEndedPastEvent = React.useMemo(() => {
+  if (!currentEventId) return false;
+  const rawDate = formData?.date || formData?.start_datetime;
+  if (!rawDate) return false;
+  return !isEventDateOnOrAfterToday(rawDate);
+}, [currentEventId, formData?.date, formData?.start_datetime]);
+
+const isPaidWizardInProgress = React.useMemo(() => computePaidWizardInProgress({
+  plan: userPlanSettings?.plan,
+  eventWizardStarted: userPlanSettings?.eventWizardStarted,
+  currentEventId,
+  isEndedPastEvent,
+}), [
+  userPlanSettings?.plan,
+  userPlanSettings?.eventWizardStarted,
+  currentEventId,
+  isEndedPastEvent,
+]);
+
 const [eventRefreshKey, setEventRefreshKey] = useState(0);
 /** מכסת הודעות כפי שנשמרה ב־DB (allowed_guests) — לזיהוי מסלול תצוגה כש־selected_plan חסר */
 const [eventAllowedGuests, setEventAllowedGuests] = useState(null);
@@ -1974,7 +1951,11 @@ const additionalPackageCounts = React.useMemo(() => {
   }
   return counts;
 }, [additionalPackages, addonCountForDisplay]);
-const canRenderCharts = Boolean(currentEventId && (eventDataLoaded || isWizardEventSessionProtected()));
+const canRenderCharts = Boolean(
+  currentEventId &&
+  (isCurrentEventActive || isPaidWizardInProgress) &&
+  (eventDataLoaded || isWizardEventSessionProtected()),
+);
 const [chartsReady, setChartsReady] = useState(false);
 useEffect(() => {
   if (!canRenderCharts) {
@@ -1999,6 +1980,7 @@ const shouldShowWhatsAppGroupUpdateButton = Boolean(currentEventId && (hasWhatsA
   const messageCapacityChartModel = React.useMemo(() => {
     const rawEventDate = formData?.date || formData?.start_datetime;
     if (currentEventId && rawEventDate && !isEventDateOnOrAfterToday(rawEventDate)) return null;
+    if (!isCurrentEventActive && !isPaidWizardInProgress) return null;
     if (!displayPlanCode && !currentEventId) return null;
     const messagesSent = effectiveMessagesSentCount;
     const basePlanLimitForDisplay = getPlanBaseLimit(displayPlanCode);
@@ -2032,6 +2014,8 @@ const shouldShowWhatsAppGroupUpdateButton = Boolean(currentEventId && (hasWhatsA
     currentEventId,
     formData?.date,
     formData?.start_datetime,
+    isCurrentEventActive,
+    isPaidWizardInProgress,
     effectiveMessagesSentCount,
     additionalCapacity,
     isMobileView,
@@ -5032,7 +5016,7 @@ React.useEffect(() => {
       try { localStorage.removeItem('user_plan_code'); } catch (_) {}
       try { localStorage.removeItem('additionalPackages_global'); } catch (_) {}
       try { localStorage.removeItem('newEventStarted'); } catch (_) {}
-      await persistUserPlanSettings(null, 0, false);
+      await persistUserPlanSettings(null, 0, false, null);
     } finally {
       isClearingPlanRef.current = false;
     }
@@ -5096,8 +5080,6 @@ React.useEffect(() => {
     return parseEventDate(getRawEventDateFromDetails(getEventDetailsFromRecord(record)));
   };
 
-  const hasEventEnded = (record) => !isEventRecordActive(record);
-
   const clearEndedEvent = async (eventId) => {
     if (!eventId) return;
     if (clearEndedEventInFlightRef.current === eventId) return;
@@ -5139,6 +5121,7 @@ React.useEffect(() => {
       }
 
       clearCarryPlanAfterManualDelete();
+      clearStaleWizardLocalStorage();
       await clearPlanState();
       await resetWizardStateForNoEvent();
     } finally {
@@ -5411,7 +5394,7 @@ React.useEffect(() => {
       try { localStorage.removeItem('additionalPackages_global'); } catch (_) {}
       if (archivedByRetention) {
         try {
-          await persistUserPlanSettings(null, 0, false);
+          await persistUserPlanSettings(null, 0, false, null);
         } catch (_) {}
         setUserPlanSettings((prev) => {
           if (prev && prev.plan === null && (prev.addonCount ?? 0) === 0) {
@@ -7789,30 +7772,8 @@ React.useEffect(()=>{
     };
   }, [currentEventId, eventReminderSentAt, formData?.date, formData?.start_datetime]);
 
-  const isCurrentEventActive = React.useMemo(() => {
-    if (!currentEventId) return false;
-    const rawDate = formData?.date || formData?.start_datetime;
-    if (!rawDate) return false;
-    return isEventDateOnOrAfterToday(rawDate);
-  }, [currentEventId, formData?.date, formData?.start_datetime]);
-
-  /** אירוע עם תאריך שעבר — שונה מטיוטת אשף (ללא תאריך אחרי תשלום) */
-  const isEndedPastEvent = React.useMemo(() => {
-    if (!currentEventId) return false;
-    const rawDate = formData?.date || formData?.start_datetime;
-    if (!rawDate) return false;
-    return !isEventDateOnOrAfterToday(rawDate);
-  }, [currentEventId, formData?.date, formData?.start_datetime]);
-
   const mobileDashboardModel = React.useMemo(() => {
-    const dashboardActive = Boolean(
-      (currentEventId && isCurrentEventActive) ||
-      newEventStarted ||
-      userPlanSettings?.eventWizardStarted ||
-      selectedEventType ||
-      formDataHasMeaningfulValues ||
-      selectedDesign
-    );
+    const dashboardActive = Boolean(isCurrentEventActive || isPaidWizardInProgress);
     if (!dashboardActive) {
       return { showGuestPrimary: false };
     }
@@ -7821,14 +7782,9 @@ React.useEffect(()=>{
       showGuestPrimary: Boolean(isCurrentEventActive && invitedCount > 0),
     };
   }, [
-    formDataHasMeaningfulValues,
-    guestStatusSummary.pending,
     invitedCount,
     isCurrentEventActive,
-    newEventStarted,
-    userPlanSettings?.eventWizardStarted,
-    selectedDesign,
-    selectedEventType,
+    isPaidWizardInProgress,
   ]);
 
   React.useEffect(() => {
@@ -7850,6 +7806,53 @@ React.useEffect(()=>{
     blockWizardAutoOpen,
     markWizardAutoResumeAttempted,
     clearEndedEvent,
+  ]);
+
+  React.useEffect(() => {
+    if (!session || !userPlanSettingsHydratedRef.current) return;
+    if (currentEventId && !eventDataLoaded) return;
+
+    const sessionValid = shouldAllowWizardAutoResume({
+      isCurrentEventActive,
+      isPaidWizardInProgress,
+    });
+    if (sessionValid) return;
+
+    blockWizardAutoOpen();
+    markWizardAutoResumeAttempted();
+
+    let hasStale = finishedSteps.length > 0 || Boolean(selectedEventType) || newEventStarted;
+    if (!hasStale && typeof window !== 'undefined') {
+      try {
+        hasStale = Boolean(
+          localStorage.getItem('finishedSteps')
+          || localStorage.getItem('selectedEventType')
+          || localStorage.getItem('newEventStarted') === '1',
+        );
+      } catch (_) {}
+    }
+    if (!hasStale) return;
+
+    clearStaleWizardLocalStorage();
+    setFinishedSteps([]);
+    setSelectedEventType('');
+    setNewEventStarted(false);
+    setShowEventTypes(false);
+    setShowEventDetails(false);
+    setShowDesignChooser(false);
+    setShowGuestForm(false);
+    setShowReportsOptions(false);
+  }, [
+    session,
+    currentEventId,
+    eventDataLoaded,
+    finishedSteps.length,
+    selectedEventType,
+    newEventStarted,
+    isCurrentEventActive,
+    isPaidWizardInProgress,
+    blockWizardAutoOpen,
+    markWizardAutoResumeAttempted,
   ]);
 
   React.useEffect(() => {
@@ -8173,12 +8176,10 @@ React.useEffect(()=>{
       || showArchiveList
     ) return undefined;
 
-    const flowStarted = Boolean(
-      isCurrentEventActive ||
-      newEventStarted ||
-      userPlanSettings?.eventWizardStarted ||
-      (!currentEventId && (selectedEventType || finishedSteps.length > 0))
-    );
+    const flowStarted = shouldAllowWizardAutoResume({
+      isCurrentEventActive,
+      isPaidWizardInProgress,
+    });
     if (!flowStarted) return undefined;
 
     const firstIncomplete = getFirstIncompleteWizardStepRef.current?.();
@@ -8232,12 +8233,10 @@ React.useEffect(()=>{
     hasWizardAutoResumeAttempted,
     isCurrentEventActive,
     isEndedPastEvent,
+    isPaidWizardInProgress,
     isWizardAutoOpenBlocked,
     isWizardStepSuppressed,
     markWizardAutoResumeAttempted,
-    newEventStarted,
-    userPlanSettings?.eventWizardStarted,
-    selectedEventType,
     session,
     showDesignChooser,
     showEventDetails,
@@ -8609,7 +8608,7 @@ React.useEffect(()=>{
     })();
     const showActivePlanCard = Boolean(
       (planForDisplay || selectedPlan || userPlanSettings?.plan)
-      && isCurrentEventActive
+      && (isCurrentEventActive || isPaidWizardInProgress)
     );
     const displayEventTypeLabel = resolveDisplayEventType(selectedEventType);
 

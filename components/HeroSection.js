@@ -2,6 +2,7 @@ import { forwardRef, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { RSVP_STATUS_LABELS } from '../lib/rsvpLabels';
 import { buildGuestRsvpStats } from '../lib/guestStats';
+import { shouldShowEventReports } from '../lib/eventLifecycle';
 
 const useTypewriter = (text, speed = 42, pauseDuration = 2600) => {
   const [displayedText, setDisplayedText] = useState('');
@@ -108,21 +109,6 @@ const parseEventDetails = (details) => {
     }
   }
   return details;
-};
-
-const isPastEvent = (eventRecord) => {
-  const details = parseEventDetails(eventRecord?.event_details);
-  const dateValue = details.end_datetime || details.date || details.start_datetime;
-  if (!dateValue) return false;
-
-  const eventDate = new Date(dateValue);
-  if (Number.isNaN(eventDate.getTime())) return false;
-
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  eventDate.setHours(0, 0, 0, 0);
-
-  return eventDate < today;
 };
 
 const buildActiveReportSummary = (eventRecord, guests = []) => {
@@ -700,7 +686,7 @@ export default forwardRef(function HeroSection({ onStart, onPressCreateEvent, se
 
         if (eventError) throw eventError;
 
-        if (!eventRecord || isPastEvent(eventRecord)) {
+        if (!eventRecord || !shouldShowEventReports(eventRecord)) {
           if (!cancelled) {
             setActiveReportSummary(null);
             setActiveEventId(null);
