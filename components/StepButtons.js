@@ -5461,7 +5461,6 @@ React.useEffect(() => {
     setPendingPlan(plan);
     setPaymentAmount(price);
     setPaymentPlanName(getPlanDisplayName(plan));
-    setShowPricingPlan(false);
     try {
       localStorage.setItem('payment_pending_plan', plan);
       localStorage.setItem('payment_pending_amount', String(price));
@@ -5637,6 +5636,7 @@ React.useEffect(() => {
           setPaymentResultMessage(`התשלום בוצע בהצלחה! ${planDisplayName} הופעל`);
           setPaymentWasPlanPurchase(true);
           setShowPaymentModal(false);
+          setShowPricingPlan(false);
           setShowPaymentResultModal(true);
           // Prepare wizard for brand new event creation
           setFinishedSteps([]);

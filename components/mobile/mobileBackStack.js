@@ -60,10 +60,7 @@ export function pushMobileBackStack(onClose) {
 
   const entry = { onClose };
   stack.push(entry);
-
-  if (overlayDepth === 0) {
-    window.history.pushState({ invitemeMobileOverlay: true }, '', currentUrl());
-  }
+  window.history.pushState({ invitemeMobileOverlay: true }, '', currentUrl());
   overlayDepth += 1;
 
   queueMicrotask(() => {
@@ -75,6 +72,11 @@ export function pushMobileBackStack(onClose) {
     if (idx === -1) return;
     stack.splice(idx, 1);
     overlayDepth = Math.max(0, overlayDepth - 1);
+
+    if (typeof window !== 'undefined' && window.history.state?.invitemeMobileOverlay) {
+      programmaticBack = true;
+      window.history.back();
+    }
 
     queueMicrotask(() => {
       queueMicrotask(() => {

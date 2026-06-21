@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useMobileOverlayBack } from './mobile/useMobileOverlayBack';
 
 // Load Tranzila Apple Pay JS when payment modal opens (required for Apple Pay in iframe)
 // טרנזילה: יש להשתמש ב-jQuery שלהם כדי למנוע התנגשויות עם ספריות קיימות
@@ -46,6 +47,7 @@ export default function TranzilaPayment({
   onSuccess,
   onFailure
 }) {
+  useMobileOverlayBack(isOpen, onClose);
   useTranzilaApplePayScript(isOpen);
   const [isIframeLoading, setIsIframeLoading] = useState(true);
   const [isHandshakeLoading, setIsHandshakeLoading] = useState(false);
@@ -523,7 +525,7 @@ export default function TranzilaPayment({
   const notifyUrl = `${baseUrl || 'https://invite-me-two.vercel.app'}/api/tranzila/notify`;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4">
+    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4">
       <div className="payment-modal-shell relative bg-[#12143a] border border-white/15 w-full h-[100dvh] sm:h-auto sm:rounded-2xl sm:max-w-4xl sm:max-h-[calc(100dvh-2rem)] overflow-hidden shadow-[0_4px_32px_rgba(0,0,0,0.3)] flex flex-col">
         {/* Header - single compact line on mobile */}
         <div className="bg-gradient-to-r from-indigo-700 to-violet-700 text-white px-3 py-2 sm:p-6 flex justify-between items-center flex-shrink-0">
