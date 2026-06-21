@@ -1619,13 +1619,13 @@ const isPaidWizardInProgress = React.useMemo(() => computePaidWizardInProgress({
   currentEventId,
   activeEventId: userPlanSettings?.activeEventId,
   isEndedPastEvent,
-  eventIsWizardDraft: currentEventIsWizardDraft,
+  isCurrentEventActive,
 }), [
   userPlanSettings?.plan,
   userPlanSettings?.eventWizardStarted,
   userPlanSettings?.activeEventId,
   currentEventId,
-  currentEventIsWizardDraft,
+  isCurrentEventActive,
   isEndedPastEvent,
 ]);
 
@@ -2228,6 +2228,22 @@ const handleOpenAddonModal = React.useCallback(() => {
         }
       })();
     }
+    allowWizardProgrammaticOpen(() => {
+      wizardSuppressedStepsRef.current.delete(1);
+      wizardSuppressedStepsRef.current.delete(2);
+      writeWizardDismissedSteps(wizardSuppressedStepsRef.current);
+      unblockWizardAutoOpen();
+      resetWizardDismissForUserProgress();
+      setShowEventTypes(false);
+      if (!currentEventId) {
+        setFormData(initialFormState);
+        setFormErrors({});
+        try { localStorage.removeItem('savedEventDetails'); } catch (e) {}
+        eventDetailsOpenedRef.current = true;
+      }
+      setShowEventDetails(true);
+      setStepErrorMsg('');
+    });
   };
 
       // Helper to format ISO date (YYYY-MM-DD) to Hebrew format (DD/MM/YYYY)
@@ -6222,6 +6238,7 @@ React.useEffect(() => {
             })
             .eq('id', ev.id);
           setCurrentEventId(ev.id);
+          setCurrentEventIsWizardDraft(true);
           setEventDataLoaded(true);
           lastRestoredEventIdRef.current = ev.id;
           await supabase
@@ -6262,6 +6279,7 @@ React.useEffect(() => {
       }
       if (inserted?.id) {
         setCurrentEventId(inserted.id);
+        setCurrentEventIsWizardDraft(true);
         setEventDataLoaded(true);
         lastRestoredEventIdRef.current = inserted.id;
         await supabase
@@ -7707,6 +7725,7 @@ React.useEffect(()=>{
   React.useEffect(() => {
     if (!session || !userPlanSettingsHydratedRef.current) return;
     if (currentEventId && !eventDataLoaded) return;
+    if (showEventTypes || showEventDetails || showDesignChooser || showGuestForm) return;
 
     const sessionValid = shouldAllowWizardAutoResume({
       isCurrentEventActive,
@@ -7752,6 +7771,10 @@ React.useEffect(()=>{
     newEventStarted,
     isCurrentEventActive,
     isPaidWizardInProgress,
+    showEventTypes,
+    showEventDetails,
+    showDesignChooser,
+    showGuestForm,
     blockWizardAutoOpen,
     markWizardAutoResumeAttempted,
     persistUserPlanSettings,
