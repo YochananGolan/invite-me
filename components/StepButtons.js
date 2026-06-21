@@ -1494,19 +1494,14 @@ const loadUserPlanSettings = React.useCallback(async () => {
           .order('created_at', { ascending: false })
           .limit(1)
           .maybeSingle();
-        if (latestEv && (isEventWizardDraft(latestEv) || isEventRecordActive(latestEv))) {
+        if (latestEv && isEventRecordActive(latestEv)) {
           const recoveredPlan = derivePlanFromRecord(latestEv);
           if (recoveredPlan) {
             plan = recoveredPlan;
             addonCount = resolveEffectiveAddonCount(latestEv.additional_packages, addonCount);
             activeEventId = latestEv.id;
-            eventWizardStarted = isEventWizardDraft(latestEv);
-            await persistUserPlanSettings(
-              plan,
-              addonCount,
-              eventWizardStarted,
-              activeEventId,
-            );
+            eventWizardStarted = false;
+            await persistUserPlanSettings(plan, addonCount, false, latestEv.id);
           }
         }
       } catch (recoverErr) {
@@ -1521,22 +1516,27 @@ const loadUserPlanSettings = React.useCallback(async () => {
           .select('id, status, event_type, event_details')
           .eq('id', activeEventId)
           .maybeSingle();
-        const pointer = validateActiveEventPointer(activeEv);
-        if (!pointer.valid) {
-          activeEventId = null;
+        if (!shouldRestorePaidPlanFromSettings(
+          { plan, addonCount, eventWizardStarted, activeEventId },
+          { eventRecord: activeEv },
+        )) {
+          plan = null;
+          addonCount = 0;
           eventWizardStarted = false;
-          if (pointer.reason === 'ended' || pointer.reason === 'archived' || pointer.reason === 'missing') {
-            plan = null;
-            addonCount = 0;
-            await persistUserPlanSettings(null, 0, false, null);
-          } else {
-            await persistUserPlanSettings(plan, addonCount, false, null);
-          }
+          activeEventId = null;
+          await persistUserPlanSettings(null, 0, false, null);
         }
       } catch (_) {
         activeEventId = null;
         eventWizardStarted = false;
+        plan = null;
+        addonCount = 0;
       }
+    } else if (plan) {
+      plan = null;
+      addonCount = 0;
+      eventWizardStarted = false;
+      await persistUserPlanSettings(null, 0, false, null);
     }
     const settings = { plan, addonCount, eventWizardStarted, activeEventId };
     userPlanSettingsRef.current = settings;
@@ -1567,7 +1567,7 @@ const loadUserPlanSettings = React.useCallback(async () => {
       try { localStorage.setItem('additionalPackages_global', String(addonCount)); } catch (e) {}
     }
     selectionSourceRef.current = plan ? 'persistent' : 'manual';
-    if (plan) {
+    if (plan && eventWizardStarted) {
       applyRemoteWizardSession(settings);
     }
     return settings;
@@ -1609,15 +1609,21 @@ const isEndedPastEvent = React.useMemo(() => {
   return !isEventDateOnOrAfterToday(rawDate);
 }, [currentEventId, formData?.date, formData?.start_datetime]);
 
+const [currentEventIsWizardDraft, setCurrentEventIsWizardDraft] = useState(false);
+
 const isPaidWizardInProgress = React.useMemo(() => computePaidWizardInProgress({
   plan: userPlanSettings?.plan,
   eventWizardStarted: userPlanSettings?.eventWizardStarted,
   currentEventId,
+  activeEventId: userPlanSettings?.activeEventId,
   isEndedPastEvent,
+  eventIsWizardDraft: currentEventIsWizardDraft,
 }), [
   userPlanSettings?.plan,
   userPlanSettings?.eventWizardStarted,
+  userPlanSettings?.activeEventId,
   currentEventId,
+  currentEventIsWizardDraft,
   isEndedPastEvent,
 ]);
 
@@ -1797,9 +1803,19 @@ const noEventLoggedRef = useRef(false);
         },
         () => {
           loadUserPlanSettings().then((settings) => {
-            if (settings?.plan) {
-              applyRemoteWizardSession(settings);
-            }
+            if (!settings?.plan) return;
+            const linkedEventId = settings.activeEventId;
+            if (!linkedEventId) return;
+            supabase
+              .from('events')
+              .select('id, status, event_type, event_details')
+              .eq('id', linkedEventId)
+              .maybeSingle()
+              .then(({ data: eventRecord }) => {
+                if (shouldRestorePaidPlanFromSettings(settings, { eventRecord })) {
+                  applyRemoteWizardSession(settings);
+                }
+              });
           });
           setEventRefreshKey((key) => key + 1);
         },
@@ -1812,76 +1828,28 @@ const noEventLoggedRef = useRef(false);
   }, [session?.user?.id, loadUserPlanSettings, applyRemoteWizardSession]);
 
   React.useEffect(() => {
-    if (!session) return;
-    if (!userPlanSettingsHydratedRef.current) return;
-
-    const plan = userPlanSettings?.plan;
-    if (!plan) return;
-    const wizardFlow = Boolean(userPlanSettings?.eventWizardStarted || userPlanSettings?.activeEventId);
-    if (!wizardFlow) return;
-    if (currentEventId) {
-      if (!eventDataLoaded) return;
-      const rawDate = formData?.date || formData?.start_datetime;
-      // אין תאריך = טיוטת אשף (אחרי תשלום) — לא לחסום פתיחת שלב 1
-      if (rawDate && !isEventDateOnOrAfterToday(rawDate)) return;
-    }
-
-    setNewEventStarted(true);
-    try { localStorage.setItem('newEventStarted', '1'); } catch (_) {}
-    try { localStorage.setItem('selectedPlan', plan); } catch (_) {}
-    setShowGuestListModal(false);
-    setShowReportsOptions(false);
-    setShowReportModal(false);
-    setStepErrorMsg('');
-
-    if (
-      !wizardSuppressedStepsRef.current.has(1) &&
-      !finishedStepsRef.current.includes(0) &&
-      !isWizardAutoOpenBlocked()
-    ) {
-      allowWizardProgrammaticOpen(() => {
-        setShowEventTypes(true);
-        setStepErrorMsg('');
-      });
-    }
-  }, [session, userPlanSettings?.plan, userPlanSettings?.eventWizardStarted, userPlanSettings?.activeEventId, currentEventId, eventDataLoaded, formData?.date, formData?.start_datetime, allowWizardProgrammaticOpen, isWizardAutoOpenBlocked]);
-
-  React.useEffect(() => {
     if (currentEventId) return;
     if (!userPlanSettingsHydratedRef.current) return;
-    let persistedPlan = userPlanSettings?.plan ?? null;
-    let persistedAddonCount = Number.isFinite(userPlanSettings?.addonCount)
-      ? Math.max(0, Math.floor(userPlanSettings.addonCount))
-      : 0;
 
-  if (persistedPlan) {
-    setSelectedPlan(persistedPlan);
-    setDbAddonCount(persistedAddonCount);
-    setAdditionalPackages((prev) => {
-      const prevCount = Array.isArray(prev) ? prev.length : 0;
-      if (prevCount === persistedAddonCount) {
-        return prev;
-      }
-      return Array(persistedAddonCount).fill('addon');
-    });
-    return;
-  }
-
-  const localPlan = (() => {
-    try {
-      return localStorage.getItem('user_plan_code') || localStorage.getItem('selectedPlan') || null;
-    } catch (_) {
-      return null;
+    const settings = userPlanSettings;
+    if (!settings?.plan) {
+      setSelectedPlan(null);
+      setDbAddonCount(0);
+      setAdditionalPackages([]);
+      try { localStorage.removeItem('selectedPlan'); } catch (_) {}
+      try { localStorage.removeItem('user_plan_code'); } catch (_) {}
+      try { localStorage.removeItem('additionalPackages_global'); } catch (_) {}
+      return;
     }
-  })();
-  if (localPlan) return;
 
-  setSelectedPlan(null);
-  setDbAddonCount(0);
-  setAdditionalPackages([]);
-  try { localStorage.removeItem('selectedPlan'); } catch (_) {}
-  try { localStorage.removeItem('user_plan_code'); } catch (_) {}
-  try { localStorage.removeItem('additionalPackages_global'); } catch (_) {}
+    if (!shouldRestorePaidPlanFromSettings(settings)) {
+      setSelectedPlan(null);
+      setDbAddonCount(0);
+      setAdditionalPackages([]);
+      setUserPlanSettings({ plan: null, addonCount: 0, eventWizardStarted: false, activeEventId: null });
+      void persistUserPlanSettings(null, 0, false, null);
+      clearStaleWizardLocalStorage();
+    }
   }, [currentEventId, userPlanSettings, persistUserPlanSettings]);
 
 const totalGuestsCount = guestSummary.adults + guestSummary.children;
@@ -5041,6 +5009,7 @@ React.useEffect(() => {
     setErrorMsg('');
     setFinishedSteps([]);
     setCurrentEventId(null);
+    setCurrentEventIsWizardDraft(false);
     lastRestoredEventIdRef.current = null;
     noEventLoggedRef.current = false;
     setEventDataLoaded(false);
@@ -5142,38 +5111,7 @@ React.useEffect(() => {
     let deletionCompleted = false;
     let deletionErrorAlertShown = false;
     let eventIdToDelete = currentEventId;
-    const addonCountFromSettings = Number.isFinite(userPlanSettings?.addonCount)
-      ? Math.max(0, userPlanSettings.addonCount)
-      : 0;
-    let addonCountBeforeReset = addonCountFromSettings;
-    let planToCarryForward = selectedPlanRef.current || userPlanSettings?.plan || null;
-    if (!planToCarryForward && typeof window !== 'undefined') {
-      try {
-        const storedPlan =
-          localStorage.getItem('selectedPlan') ||
-          localStorage.getItem('user_plan_code') ||
-          null;
-        if (storedPlan) {
-          planToCarryForward = storedPlan;
-        }
-      } catch (storageErr) {
-        console.warn('Failed to recover plan from storage during deletion', storageErr);
-      }
-    }
-    if (!planToCarryForward) {
-      try {
-        const settingsSnapshot = await loadUserPlanSettings();
-        if (settingsSnapshot?.plan) {
-          planToCarryForward = settingsSnapshot.plan;
-          const addonFromSettingsSnapshot = Number(settingsSnapshot.addonCount);
-          if (Number.isFinite(addonFromSettingsSnapshot) && addonFromSettingsSnapshot > 0) {
-            addonCountBeforeReset = Math.max(addonCountBeforeReset, addonFromSettingsSnapshot);
-          }
-        }
-      } catch (settingsErr) {
-        console.warn('Failed to recover plan from Supabase during deletion', settingsErr);
-      }
-    }
+    let addonCountBeforeReset = 0;
     let eventDateForRetention = null;
     let archivedByRetention = false;
     let fetchedEventRow = null;
@@ -5307,23 +5245,7 @@ React.useEffect(() => {
       }
     }
 
-    // מחיקה ידנית: לשחזר מסלול מרשומת האירוע ב-DB אם חסר ב-state. ארכוב אחרי סיום: לא לשמור מסלול.
-    if (archivedByRetention) {
-      planToCarryForward = null;
-      addonCountBeforeReset = 0;
-    } else if (fetchedEventRow) {
-      if (!planToCarryForward) {
-        const fromDb = derivePlanFromRecord(fetchedEventRow);
-        const rawSelected =
-          typeof fetchedEventRow.selected_plan === 'string'
-            ? fetchedEventRow.selected_plan.trim()
-            : fetchedEventRow.selected_plan
-              ? String(fetchedEventRow.selected_plan).trim()
-              : '';
-        // derivePlanFromRecord מחזיר null במצב draft/pending גם כש-selected_plan מלא (לפני "פרסום") — במחיקה נשמרים מה ששולם
-        planToCarryForward = fromDb || (rawSelected ? rawSelected : null);
-      }
-    }
+    // אירוע חדש דורש תשלום מחדש — לא מעבירים מסלול מאירוע קודם
 
     // Now reset the state for new event
     eventDetailsOpenedRef.current = false; // Allow reset when opening event details for this new event
@@ -5385,67 +5307,22 @@ React.useEffect(() => {
     setShowGuestListModal(false);
     setShowReportModal(false);
     setSelectedEventForReport(null);
-    setSelectedPlan(planToCarryForward);
-    if (!planToCarryForward) {
-      setAdditionalPackages([]);
-      setDbAddonCount(0);
-      selectionSourceRef.current = 'manual';
-      try { localStorage.removeItem('selectedPlan'); } catch (_) {}
-      try { localStorage.removeItem('additionalPackages_global'); } catch (_) {}
-      if (archivedByRetention) {
-        try {
-          await persistUserPlanSettings(null, 0, false, null);
-        } catch (_) {}
-        setUserPlanSettings((prev) => {
-          if (prev && prev.plan === null && (prev.addonCount ?? 0) === 0) {
-            return prev;
-          }
-          return { plan: null, addonCount: 0 };
-        });
-      }
-      await resetWizardStateForNoEvent();
-      setNewEventStarted(false);
-      setShowEventTypes(false);
-      setShowPricingPlan(false);
-      setShowPlanLimitWarning(false);
-      setPlanAddOnMode(false);
-      return;
-    }
-
-    selectionSourceRef.current = 'persistent';
-    try { localStorage.setItem('selectedPlan', planToCarryForward); } catch (_) {}
-    const addonsArray =
-      addonCountBeforeReset > 0 ? Array(addonCountBeforeReset).fill('addon') : [];
-    setAdditionalPackages(addonsArray);
-    setDbAddonCount(addonCountBeforeReset);
-    try { localStorage.setItem('additionalPackages_global', String(addonCountBeforeReset)); } catch (_) {}
-    
-    try{ localStorage.removeItem('selectedDesign'); }catch{}
-    try{ localStorage.removeItem('finishedSteps'); }catch{}
-    try{ localStorage.removeItem('selectedEventType'); }catch{}
-    try{ localStorage.removeItem('savedEventDetails'); }catch{}
-    try{ localStorage.removeItem('additionalPackages'); }catch{}
-    try{ localStorage.removeItem('additionalPackagesEventId'); }catch{}
-    try{ if (currentEventId) localStorage.removeItem(`additionalPackages:${currentEventId}`); }catch{}
-
-    // Check if user has a plan - if not, show pricing modal
-    if (!planToCarryForward) {
-      setShowPricingPlan(true);
-      setPlanAddOnMode(false); // Ensure we're in plan selection mode, not addon mode
-    }
-    await persistUserPlanSettings(planToCarryForward, addonCountBeforeReset, Boolean(planToCarryForward));
+    setSelectedPlan(null);
+    setAdditionalPackages([]);
+    setDbAddonCount(0);
+    selectionSourceRef.current = 'manual';
+    try { localStorage.removeItem('selectedPlan'); } catch (_) {}
+    try { localStorage.removeItem('user_plan_code'); } catch (_) {}
+    try { localStorage.removeItem('additionalPackages_global'); } catch (_) {}
+    await persistUserPlanSettings(null, 0, false, null);
+    setUserPlanSettings({ plan: null, addonCount: 0, eventWizardStarted: false, activeEventId: null });
+    clearStaleWizardLocalStorage();
+    await resetWizardStateForNoEvent();
+    setNewEventStarted(false);
+    setShowEventTypes(false);
+    setShowPricingPlan(true);
+    setPlanAddOnMode(false);
     setEventRefreshKey((key) => key + 1);
-
-    if (planToCarryForward && !(showDeletionMessage && (eventWasDeleted || deletionCompleted))) {
-      setNewEventStarted(true);
-      try { localStorage.setItem('newEventStarted', '1'); } catch (_) {}
-      setShowGuestListModal(false);
-      setShowReportsOptions(false);
-      if (shouldAllowWizardAutoOpen(1)) {
-        setShowEventTypes(true);
-        setStepErrorMsg('');
-      }
-    }
 
     if (showDeletionMessage && (eventWasDeleted || deletionCompleted)) {
       // סימון ש"ניקינו" את האירוע הקודם – כדי לא לבקש מחיקה שוב בכל לחיצה על "צור אירוע חדש"
@@ -6399,15 +6276,6 @@ React.useEffect(() => {
     }
   }, [getPlanBaseLimit]);
 
-  React.useEffect(() => {
-    if (!session) return;
-    if (!userPlanSettingsHydratedRef.current) return;
-    const plan = userPlanSettings?.plan;
-    if (!plan || (!userPlanSettings?.eventWizardStarted && !userPlanSettings?.activeEventId)) return;
-    if (currentEventId) return;
-    void ensureWizardDraftEvent(plan, userPlanSettings?.addonCount ?? 0);
-  }, [session, userPlanSettings, currentEventId, ensureWizardDraftEvent]);
-
   const checkActiveEventExists = async () => {
     try{
       if (currentEventId || newEventStarted) return true;
@@ -6453,10 +6321,7 @@ React.useEffect(() => {
       }
       if(!ev) return false;
       if (isEventRecordActive(ev)) return true;
-      const status = typeof ev.status === 'string' ? ev.status.toLowerCase() : '';
-      if (status === 'archived') return false;
-      const rawDate = getRawEventDateFromDetails(getEventDetailsFromRecord(ev));
-      if (!rawDate) return true;
+      if (isEventWizardDraft(ev)) return true;
       return false;
     }catch(e){ console.error('checkActiveEventExists err', e); return false; }
   }
@@ -6545,57 +6410,15 @@ React.useEffect(() => {
       return;
     }
 
-    if (hasClearedExistingEvent) {
-      await handleNewEvent();
-      resetWizardDismissForUserProgress();
-      allowWizardProgrammaticOpen(() => {
-        setShowEventTypes(true);
-        setStepErrorMsg('');
-      });
-      return;
-    }
-
     const hasActive = await checkActiveEventExists();
     if (hasActive) {
       setShowExistingEventWarning(true);
       return;
     }
 
-    const settings = await loadUserPlanSettings();
-    if (settings?.plan && settings?.eventWizardStarted) {
-      applyRemoteWizardSession(settings);
-      if (!currentEventIdRef.current) {
-        await ensureWizardDraftEvent(settings.plan, settings.addonCount ?? 0);
-      }
-      return;
-    }
-
-    const planReady = await syncPurchasedPlanFromServer();
-    if (!planReady) {
-      if (settings?.plan) {
-        setSelectedPlan(settings.plan);
-        try { localStorage.setItem('selectedPlan', settings.plan); } catch (_) {}
-        await handleNewEvent();
-        return;
-      }
-      setPlanAddOnMode(false);
-      setShowPricingPlan(true);
-      return;
-    }
-
-    if (userPlanSettingsRef.current?.eventWizardStarted) {
-      return;
-    }
-
-    await handleNewEvent();
-  }, [
-    hasClearedExistingEvent,
-    syncPurchasedPlanFromServer,
-    loadUserPlanSettings,
-    handleNewEvent,
-    applyRemoteWizardSession,
-    ensureWizardDraftEvent,
-  ]);
+    setPlanAddOnMode(false);
+    setShowPricingPlan(true);
+  }, [checkActiveEventExists]);
 
   React.useEffect(() => {
     if (!triggerCreateEvent) return;
@@ -7025,10 +6848,15 @@ React.useEffect(() => {
           }
           setCurrentEventId(ev.id);
           const isDraftWizard = isEventWizardDraft(ev);
+          setCurrentEventIsWizardDraft(isDraftWizard);
           const resolvedEventType = resolveDisplayEventType(ev.event_type);
+          const canResumePaidWizard = shouldRestorePaidPlanFromSettings(
+            userPlanSettingsRef.current,
+            { eventRecord: ev },
+          );
           if (resolvedEventType) {
             setSelectedEventType(resolvedEventType);
-          } else if (isDraftWizard) {
+          } else if (isDraftWizard && canResumePaidWizard) {
             setSelectedEventType('');
             setNewEventStarted(true);
             try { localStorage.setItem('newEventStarted', '1'); } catch (e) {}
@@ -7036,6 +6864,10 @@ React.useEffect(() => {
               setShowEventTypes(true);
               setStepErrorMsg('');
             }
+          } else if (isDraftWizard && !canResumePaidWizard) {
+            await clearEndedEvent(ev.id);
+            setCurrentEventIsWizardDraft(false);
+            return;
           }
           syncFinishedStepsFromEvent(
             isWizardPlaceholderEventType(ev.event_type) ? '' : (ev.event_type || ''),
@@ -7108,20 +6940,26 @@ React.useEffect(() => {
           }
 
           const serverSettings = settings || await loadUserPlanSettings();
-          if (serverSettings?.plan && shouldRestorePaidPlanFromSettings(serverSettings)) {
-            setSelectedPlan(serverSettings.plan);
-            try { localStorage.setItem('selectedPlan', serverSettings.plan); } catch (_) {}
-            try { localStorage.setItem('user_plan_code', serverSettings.plan); } catch (_) {}
-            setDbAddonCount(serverSettings.addonCount ?? 0);
-            setAdditionalPackages((prev) => {
-              const ac = serverSettings.addonCount ?? 0;
-              const prevCount = Array.isArray(prev) ? prev.length : 0;
-              if (prevCount === ac) return prev;
-              return Array(ac).fill('addon');
-            });
-            if (serverSettings.eventWizardStarted) {
-              applyRemoteWizardSession(serverSettings);
-              await ensureWizardDraftEvent(serverSettings.plan, serverSettings.addonCount ?? 0);
+          if (serverSettings?.plan && serverSettings.activeEventId) {
+            const { data: linkedEv } = await supabase
+              .from('events')
+              .select('id, status, event_type, event_details')
+              .eq('id', serverSettings.activeEventId)
+              .maybeSingle();
+            if (shouldRestorePaidPlanFromSettings(serverSettings, { eventRecord: linkedEv })) {
+              setSelectedPlan(serverSettings.plan);
+              try { localStorage.setItem('selectedPlan', serverSettings.plan); } catch (_) {}
+              try { localStorage.setItem('user_plan_code', serverSettings.plan); } catch (_) {}
+              setDbAddonCount(serverSettings.addonCount ?? 0);
+              setAdditionalPackages((prev) => {
+                const ac = serverSettings.addonCount ?? 0;
+                const prevCount = Array.isArray(prev) ? prev.length : 0;
+                if (prevCount === ac) return prev;
+                return Array(ac).fill('addon');
+              });
+              if (serverSettings.eventWizardStarted) {
+                applyRemoteWizardSession(serverSettings);
+              }
             }
             return;
           }
@@ -7153,20 +6991,26 @@ React.useEffect(() => {
           }
 
           const refreshedSettings = await loadUserPlanSettings();
-          if (refreshedSettings?.plan && shouldRestorePaidPlanFromSettings(refreshedSettings)) {
-            setSelectedPlan(refreshedSettings.plan);
-            try { localStorage.setItem('selectedPlan', refreshedSettings.plan); } catch (_) {}
-            if (refreshedSettings.eventWizardStarted) {
-              applyRemoteWizardSession(refreshedSettings);
-              await ensureWizardDraftEvent(refreshedSettings.plan, refreshedSettings.addonCount ?? 0);
+          if (refreshedSettings?.plan && refreshedSettings.activeEventId) {
+            const { data: linkedEv } = await supabase
+              .from('events')
+              .select('id, status, event_type, event_details')
+              .eq('id', refreshedSettings.activeEventId)
+              .maybeSingle();
+            if (shouldRestorePaidPlanFromSettings(refreshedSettings, { eventRecord: linkedEv })) {
+              setSelectedPlan(refreshedSettings.plan);
+              try { localStorage.setItem('selectedPlan', refreshedSettings.plan); } catch (_) {}
+              if (refreshedSettings.eventWizardStarted) {
+                applyRemoteWizardSession(refreshedSettings);
+              }
+              const addonToApply = refreshedSettings.addonCount ?? 0;
+              setDbAddonCount(addonToApply);
+              setAdditionalPackages((prev) => {
+                const prevCount = Array.isArray(prev) ? prev.length : 0;
+                if (prevCount === addonToApply) return prev;
+                return Array(addonToApply).fill('addon');
+              });
             }
-            const addonToApply = refreshedSettings.addonCount ?? 0;
-            setDbAddonCount(addonToApply);
-            setAdditionalPackages((prev) => {
-              const prevCount = Array.isArray(prev) ? prev.length : 0;
-              if (prevCount === addonToApply) return prev;
-              return Array(addonToApply).fill('addon');
-            });
             return;
           }
 
@@ -7834,6 +7678,11 @@ React.useEffect(()=>{
     if (!hasStale) return;
 
     clearStaleWizardLocalStorage();
+    setSelectedPlan(null);
+    setDbAddonCount(0);
+    setAdditionalPackages([]);
+    setUserPlanSettings({ plan: null, addonCount: 0, eventWizardStarted: false, activeEventId: null });
+    void persistUserPlanSettings(null, 0, false, null);
     setFinishedSteps([]);
     setSelectedEventType('');
     setNewEventStarted(false);
@@ -7853,6 +7702,7 @@ React.useEffect(()=>{
     isPaidWizardInProgress,
     blockWizardAutoOpen,
     markWizardAutoResumeAttempted,
+    persistUserPlanSettings,
   ]);
 
   React.useEffect(() => {
@@ -8634,7 +8484,7 @@ React.useEffect(()=>{
           )}
           <p className="text-emerald-300 text-base mt-2 font-bold">האירוע מוכן לשליחת הזמנות ואישורי הגעה</p>
         </div>
-      ) : (!currentEventId && (newEventStarted || userPlanSettings?.eventWizardStarted)) ? (
+      ) : (isPaidWizardInProgress && !currentEventId) ? (
         <div className="bg-white/[0.055] border border-white/15 backdrop-blur-xl rounded-2xl p-4 text-center shadow-[0_8px_40px_rgba(0,0,0,0.35)] ring-2 ring-indigo-400/30 flex-1">
           <div className="flex items-center justify-center gap-2 mb-2">
             <span className="text-2xl">🚀</span>
@@ -9142,7 +8992,7 @@ React.useEffect(()=>{
         </div>
       )}
 
-      {hasSession && !isCurrentEventActive && !newEventStarted && !userPlanSettings?.eventWizardStarted && (
+      {hasSession && !isCurrentEventActive && !isPaidWizardInProgress && (
         <section className="mx-auto mb-4 w-full max-w-md rounded-[1.75rem] border border-white/15 bg-white/[0.06] p-4 text-center shadow-[0_14px_44px_rgba(0,0,0,0.36)] ring-1 ring-white/10 backdrop-blur-2xl sm:hidden" dir="rtl">
           <div className="flex items-center justify-center gap-2">
             <span className="text-2xl">📅</span>
@@ -9161,7 +9011,7 @@ React.useEffect(()=>{
         </section>
       )}
 
-      {hasSession && !currentEventId && (newEventStarted || userPlanSettings?.eventWizardStarted) && (
+      {hasSession && isPaidWizardInProgress && !currentEventId && (
         <section className="mx-auto mb-4 w-full max-w-md rounded-[1.75rem] border border-indigo-400/30 bg-indigo-500/10 p-4 text-center shadow-[0_14px_44px_rgba(0,0,0,0.36)] ring-1 ring-indigo-400/20 backdrop-blur-2xl sm:hidden" dir="rtl">
           <div className="flex items-center justify-center gap-2">
             <span className="text-2xl">🚀</span>
