@@ -7867,6 +7867,24 @@ React.useEffect(()=>{
     }
   }, []);
 
+  const returnToExistingEventHome = React.useCallback(() => {
+    setShowExistingEventWarning(false);
+    setShowArchiveConfirm(false);
+    setShowPricingPlan(false);
+    setShowPaymentModal(false);
+    setSelectedFlowStep(null);
+    setShowEventTypes(false);
+    setShowEventDetails(false);
+    setShowDesignChooser(false);
+    setShowGuestForm(false);
+    setShowReportsOptions(false);
+    setShowStep5Options(false);
+    setStepErrorMsg('');
+    setShowStepError(false);
+    markWizardAutoResumeAttempted();
+    scrollWizardHome();
+  }, [markWizardAutoResumeAttempted, scrollWizardHome]);
+
   const isWizardStepOpenBlocked = React.useCallback((stepNumber) => (
     isWizardStepSuppressed(stepNumber)
     || (isWizardAutoOpenBlocked() && !wizardProgrammaticOpenAllowedRef.current)
@@ -11727,21 +11745,7 @@ React.useEffect(()=>{
         </ModalBody>
         <ModalFooter className="flex-col">
               <button
-                onClick={() => {
-                  setShowExistingEventWarning(false);
-                  if (userPlanSettings?.eventWizardStarted || newEventStarted) {
-                    tryOpenWizardStepRef.current?.(1, { userInitiated: true });
-                    scrollToWizardSectionRef.current?.();
-                    return;
-                  }
-                  if (currentEventId) {
-                    scrollToWizardSectionRef.current?.();
-                    const firstIncomplete = getFirstIncompleteWizardStepRef.current?.();
-                    if (firstIncomplete) {
-                      tryOpenWizardStepRef.current?.(firstIncomplete, { userInitiated: true });
-                    }
-                  }
-                }}
+                onClick={returnToExistingEventHome}
                 className="w-full bg-emerald-600 text-white border border-emerald-400/50 rounded-full px-6 py-3 font-bold hover:bg-emerald-700 transition-all"
               >
                 חזור לאירוע הקיים
@@ -11787,7 +11791,7 @@ React.useEffect(()=>{
         </ModalBody>
         <ModalFooter>
               <button
-                onClick={() => setShowArchiveConfirm(false)}
+                onClick={returnToExistingEventHome}
                 className="flex-1 bg-emerald-600 text-white border border-emerald-400/50 rounded-full px-6 py-3 font-bold text-lg hover:bg-emerald-700 transition-all"
               >
                 חזור לאירוע הקיים
