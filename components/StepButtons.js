@@ -40,6 +40,8 @@ import {
   shouldAllowWizardAutoResume,
   clearStaleWizardLocalStorage,
   validateActiveEventPointer,
+  hasOperableEventSession,
+  shouldArchiveOrphanedEvent,
 } from '../lib/eventLifecycle';
 import MobileQuickGuestsCard from './mobile/MobileQuickGuestsCard';
 import MobileQuickGuestListScreen, { MOBILE_GUEST_LIST_PAGE_SIZE } from './mobile/MobileQuickGuestListScreen';
@@ -1626,6 +1628,13 @@ const isPaidWizardInProgress = React.useMemo(() => computePaidWizardInProgress({
   currentEventIsWizardDraft,
   isEndedPastEvent,
 ]);
+
+const isCurrentEventActiveRef = useRef(false);
+const isPaidWizardInProgressRef = useRef(false);
+useEffect(() => {
+  isCurrentEventActiveRef.current = isCurrentEventActive;
+  isPaidWizardInProgressRef.current = isPaidWizardInProgress;
+}, [isCurrentEventActive, isPaidWizardInProgress]);
 
 const [eventRefreshKey, setEventRefreshKey] = useState(0);
 /** מכסת הודעות כפי שנשמרה ב־DB (allowed_guests) — לזיהוי מסלול תצוגה כש־selected_plan חסר */
@@ -6276,55 +6285,97 @@ React.useEffect(() => {
     }
   }, [getPlanBaseLimit]);
 
-  const checkActiveEventExists = async () => {
-    try{
-      if (currentEventId || newEventStarted) return true;
-      if (userPlanSettingsRef.current?.plan && (
-        userPlanSettingsRef.current?.eventWizardStarted || userPlanSettingsRef.current?.activeEventId
-      )) {
+  const checkActiveEventExists = React.useCallback(async () => {
+    try {
+      if (isCurrentEventActiveRef.current || isPaidWizardInProgressRef.current) {
         return true;
       }
+
       const user = await resolveCurrentUserForSync();
-      if(!user) return false;
-      const { data: userSettingsRow, error: userSettingsError } = await supabase
-        .from('user_settings')
-        .select('plan_code, event_wizard_started')
-        .eq('user_id', user.id)
-        .maybeSingle();
-      if (
-        !userSettingsError
-        && userSettingsRow?.plan_code
-        && userSettingsRow.event_wizard_started
-      ) {
-        return true;
-      }
-      let ev = null;
-      const { data: evData, error: evError } = await supabase
+      if (!user) return false;
+
+      const { data: ev, error: evError } = await supabase
         .from('events')
-        .select('id,event_details,status,allowed_guests,messages_sent_count')
-        .eq('user_id',user.id)
+        .select('id, event_type, event_details, status, allowed_guests, messages_sent_count, additional_packages, selected_plan')
+        .eq('user_id', user.id)
         .or('status.neq.archived,status.is.null')
-        .order('created_at',{ascending:false})
+        .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle();
-      if (evError && (evError.message || '').toLowerCase().includes('column')) {
-        const { data: evF } = await supabase
-          .from('events')
-          .select('id,event_details,status,allowed_guests')
-          .eq('user_id',user.id)
-          .order('created_at',{ascending:false})
-          .limit(1)
-          .maybeSingle();
-        ev = evF;
-      } else {
-        ev = evData;
-      }
-      if(!ev) return false;
-      if (isEventRecordActive(ev)) return true;
-      if (isEventWizardDraft(ev)) return true;
+
+      if (evError || !ev) return false;
+
+      const settings = userPlanSettingsRef.current;
+      return hasOperableEventSession({
+        eventRecord: ev,
+        settings: {
+          plan: settings?.plan,
+          addonCount: settings?.addonCount,
+          eventWizardStarted: settings?.eventWizardStarted,
+          activeEventId: settings?.activeEventId,
+        },
+        isCurrentEventActive: false,
+        isPaidWizardInProgress: false,
+      });
+    } catch (e) {
+      console.error('checkActiveEventExists err', e);
       return false;
-    }catch(e){ console.error('checkActiveEventExists err', e); return false; }
-  }
+    }
+  }, []);
+
+  const archiveStaleUnmanagedEvent = React.useCallback(async () => {
+    try {
+      const user = await resolveCurrentUserForSync();
+      if (!user) return;
+
+      const { data: ev } = await supabase
+        .from('events')
+        .select('id, event_type, event_details, status, selected_plan, additional_packages')
+        .eq('user_id', user.id)
+        .or('status.neq.archived,status.is.null')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (!ev) return;
+
+      const settings = userPlanSettingsRef.current;
+      if (!shouldArchiveOrphanedEvent(ev, {
+        plan: settings?.plan,
+        eventWizardStarted: settings?.eventWizardStarted,
+        activeEventId: settings?.activeEventId,
+      })) {
+        return;
+      }
+
+      let { error } = await supabase
+        .from('events')
+        .update({ status: 'archived', selected_plan: null, additional_packages: 0 })
+        .eq('id', ev.id);
+      if (error && (error.message || '').toLowerCase().includes('column')) {
+        ({ error } = await supabase
+          .from('events')
+          .update({ status: 'archived' })
+          .eq('id', ev.id));
+      }
+      if (error) {
+        console.error('archiveStaleUnmanagedEvent failed', error);
+        return;
+      }
+
+      clearStaleWizardLocalStorage();
+      setCurrentEventIsWizardDraft(false);
+      await persistUserPlanSettings(null, 0, false, null);
+      setUserPlanSettings({ plan: null, addonCount: 0, eventWizardStarted: false, activeEventId: null });
+      setSelectedPlan(null);
+      setDbAddonCount(0);
+      setAdditionalPackages([]);
+      setCurrentEventId(null);
+      setEventDataLoaded(false);
+    } catch (err) {
+      console.error('archiveStaleUnmanagedEvent threw', err);
+    }
+  }, [persistUserPlanSettings]);
 
   const extractPlanFromEventRecord = (record) => {
     if (!record) return null;
@@ -6416,9 +6467,10 @@ React.useEffect(() => {
       return;
     }
 
+    await archiveStaleUnmanagedEvent();
     setPlanAddOnMode(false);
     setShowPricingPlan(true);
-  }, [checkActiveEventExists]);
+  }, [archiveStaleUnmanagedEvent, checkActiveEventExists]);
 
   React.useEffect(() => {
     if (!triggerCreateEvent) return;
@@ -8513,7 +8565,7 @@ React.useEffect(()=>{
           <div className="mt-4 flex justify-center">
             <button
               type="button"
-              onClick={() => setShowPricingPlan(true)}
+              onClick={() => beginCreateNewEventFlowRef.current?.()}
               className="rounded-full bg-gradient-to-br from-indigo-600 to-violet-600 px-5 py-2 font-bold text-white shadow-[0_6px_20px_rgba(99,70,230,0.45)] hover:opacity-90 transition-all"
             >
               צור אירוע חדש
@@ -9003,7 +9055,7 @@ React.useEffect(()=>{
           </p>
           <button
             type="button"
-            onClick={() => setShowPricingPlan(true)}
+            onClick={() => beginCreateNewEventFlowRef.current?.()}
             className="mt-4 w-full rounded-2xl bg-gradient-to-br from-indigo-600 to-violet-600 px-4 py-3 text-base font-black text-white shadow hover:opacity-90 transition-all"
           >
             צור אירוע חדש
