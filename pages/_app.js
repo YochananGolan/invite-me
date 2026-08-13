@@ -24,20 +24,8 @@ const parseEventDateLocal = (str) => {
 
 const getEventDateFromDetails = (details) => {
   if (!details || typeof details !== 'object') return null;
-  const raw = details.end_datetime || details.date || details.start_datetime || details.event_date || null;
+  const raw = details.date || details.start_datetime || details.event_date || details.end_datetime || null;
   return parseEventDateLocal(raw);
-};
-
-const isEventPast = (ev) => {
-  const details = typeof ev?.event_details === 'string'
-    ? (() => { try { return JSON.parse(ev.event_details); } catch (_) { return {}; } })()
-    : (ev?.event_details || {});
-  const eventDate = getEventDateFromDetails(details);
-  if (!eventDate) return false;
-  eventDate.setHours(0, 0, 0, 0);
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  return eventDate.getTime() < today.getTime();
 };
 
 function MyApp({ Component, pageProps }) {
@@ -153,49 +141,10 @@ function MyApp({ Component, pageProps }) {
     };
   }, []);
 
-  // --- Auto archive past events ---
+  // Keep a single primary event marked active. Never auto-archive by date —
+  // users must still be able to open reports for the current event.
   useEffect(() => {
     if (!session) return;
-
-    const archivePastEvents = async () => {
-      try {
-        console.log('[auto-archive] Starting archive check for user:', session.user.id);
-        const { data, error: evErr } = await supabase
-          .from('events')
-          .select('id, status, event_details')
-          .eq('user_id', session.user.id)
-          .or('status.eq.draft,status.eq.active,status.is.null');
-        if (evErr) {
-          console.error('[auto-archive] Error fetching events:', evErr);
-          throw evErr;
-        }
-        console.log('[auto-archive] Fetched', data?.length || 0, 'active/draft events');
-
-        const today = new Date();
-        // Get local date string (YYYY-MM-DD format)
-        const todayStr = today.toLocaleDateString('en-CA'); // This gives YYYY-MM-DD format
-        
-        console.log('[auto-archive] Raw date:', new Date().toISOString());
-        console.log('[auto-archive] Today local string:', todayStr);
-
-        const toArchive = (data || []).filter((ev) => {
-          const status = typeof ev?.status === 'string' ? ev.status.toLowerCase() : '';
-          if (status === 'archived') return false;
-          return isEventPast(ev);
-        }).map((ev) => ev.id);
-
-        if (toArchive.length === 0) return;
-
-        const { error: updErr } = await supabase
-          .from('events')
-          .update({ status: 'archived' })
-          .in('id', toArchive);
-        if (updErr) throw updErr;
-        console.debug(`[auto-archive] Archived ${toArchive.length} past events`);
-      } catch (e) {
-        console.error('[auto-archive] Failed', e);
-      }
-    };
 
     const enforceSingleActive = async () => {
       try {
@@ -255,10 +204,7 @@ function MyApp({ Component, pageProps }) {
       }
     };
 
-    (async () => {
-      await archivePastEvents();
-      await enforceSingleActive();
-    })();
+    enforceSingleActive();
   }, [session]);
 
   // --- Route guard ---

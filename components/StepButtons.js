@@ -669,6 +669,10 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick, trig
 
   // Reports menu visibility
   const [showReportsOptions, setShowReportsOptions] = useState(false);
+  const isReportsUiOpenRef = useRef(false);
+  const openingChildReportRef = useRef(false);
+  const reportsViewActiveRef = useRef(false);
+  const reportsSessionLockRef = useRef(false);
   const [showApprovedReport, setShowApprovedReport] = useState(false);
   const [showRejectedReport, setShowRejectedReport] = useState(false);
   const [showPendingReport, setShowPendingReport] = useState(false);
@@ -978,15 +982,19 @@ const [hasWhatsAppGroup, setHasWhatsAppGroup] = useState(false);
     const wizardFlow = Boolean(settings.eventWizardStarted || settings.activeEventId);
     if (!wizardFlow) return true;
 
+    if (isReportsUiOpenRef.current || reportsViewActiveRef.current) {
+      return true;
+    }
+    if (currentEventIdRef.current) {
+      return true;
+    }
+
     resetWizardDismissForUserProgress();
     wizardSuppressedStepsRef.current.delete(1);
     writeWizardDismissedSteps(wizardSuppressedStepsRef.current);
     setNewEventStarted(true);
     try { localStorage.setItem('newEventStarted', '1'); } catch (_) {}
     try { localStorage.setItem('selectedPlan', settings.plan); } catch (_) {}
-    setShowGuestListModal(false);
-    setShowReportsOptions(false);
-    setShowReportModal(false);
     setStepErrorMsg('');
 
     if (settings.activeEventId && settings.activeEventId !== currentEventIdRef.current) {
@@ -1019,6 +1027,9 @@ const [hasWhatsAppGroup, setHasWhatsAppGroup] = useState(false);
   ), []);
 
   const returnToReportsMenu = React.useCallback(() => {
+    reportsSessionLockRef.current = true;
+    reportsViewActiveRef.current = true;
+    isReportsUiOpenRef.current = true;
     allowWizardProgrammaticOpen(() => {
       unblockWizardAutoOpen();
       wizardSuppressedStepsRef.current.delete(5);
@@ -1762,7 +1773,9 @@ const noEventLoggedRef = useRef(false);
       if (settings?.plan) {
         applyRemoteWizardSession(settings);
       }
-      setEventRefreshKey((key) => key + 1);
+      if (!isReportsUiOpenRef.current && !reportsViewActiveRef.current) {
+        setEventRefreshKey((key) => key + 1);
+      }
     };
     const handleVisibility = () => {
       if (document.visibilityState === 'visible') {
@@ -1797,7 +1810,9 @@ const noEventLoggedRef = useRef(false);
             if (settings?.plan) {
               applyRemoteWizardSession(settings);
             }
-            setEventRefreshKey((key) => key + 1);
+            if (!isReportsUiOpenRef.current && !reportsViewActiveRef.current) {
+              setEventRefreshKey((key) => key + 1);
+            }
           });
         },
       )
@@ -1825,7 +1840,9 @@ const noEventLoggedRef = useRef(false);
                 }
               });
           });
-          setEventRefreshKey((key) => key + 1);
+          if (!isReportsUiOpenRef.current && !reportsViewActiveRef.current) {
+            setEventRefreshKey((key) => key + 1);
+          }
         },
       )
       .subscribe();
@@ -1929,7 +1946,6 @@ const additionalPackageCounts = React.useMemo(() => {
 }, [additionalPackages, addonCountForDisplay]);
 const canRenderCharts = Boolean(
   currentEventId &&
-  (isCurrentEventActive || isPaidWizardInProgress) &&
   (eventDataLoaded || isWizardEventSessionProtected()),
 );
 const [chartsReady, setChartsReady] = useState(false);
@@ -2916,8 +2932,20 @@ const handleOpenAddonModal = React.useCallback(() => {
           data = latestRes.data;
           error = latestRes.error;
         }
+        if (!data) {
+          const anyRes = await supabase
+            .from('events')
+            .select('id, event_type, event_details, invitation_path, status, allowed_guests')
+            .eq('user_id', user.id)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          data = anyRes.data;
+          error = anyRes.error;
+        }
 
         const clearEventDetails = () => {
+          if (isReportsUiOpenRef.current || reportsViewActiveRef.current) return;
           setSelectedEventType('');
           setFormData(() => ({ ...initialFormState }));
           setEventDetailsCompleted(false);
@@ -2976,6 +3004,7 @@ const handleOpenAddonModal = React.useCallback(() => {
             || showEventTypes
             || showGuestForm
             || showReportsOptions
+            || isReportsUiOpenRef.current
             || (typeof window !== 'undefined' && localStorage.getItem('newEventStarted') === '1')
             || resolveDisplayEventType(selectedEventTypeRef.current)
             || (finishedStepsRef.current && finishedStepsRef.current.length > 0)
@@ -2984,14 +3013,6 @@ const handleOpenAddonModal = React.useCallback(() => {
             return;
           }
           clearEventDetails();
-          return;
-        }
-
-        if (
-          typeof data.status === 'string'
-          && data.status.toLowerCase() === 'archived'
-          && isWizardEventSessionProtected()
-        ) {
           return;
         }
 
@@ -3011,10 +3032,8 @@ const handleOpenAddonModal = React.useCallback(() => {
         }
 
         if (!isEventRecordActive(data) && !isEventWizardDraft(data)) {
-          await clearEndedEvent(data.id);
-          return;
-        }
-        if (!isEventRecordActive(data) && isEventWizardDraft(data)) {
+          // Keep the current event loaded so reports stay visible.
+        } else if (!isEventRecordActive(data) && isEventWizardDraft(data)) {
           setCurrentEventId(data.id);
           setEventDataLoaded(true);
           const draftDetails = typeof data.event_details === 'string'
@@ -3051,7 +3070,7 @@ const handleOpenAddonModal = React.useCallback(() => {
         console.error('Failed to restore latest event details', err);
       }
     })();
-  }, [eventRefreshKey, resetCapacityWarningGuests, syncFinishedStepsFromEvent, showEventDetails, showDesignChooser, showGuestForm, showReportsOptions]);
+  }, [eventRefreshKey, resetCapacityWarningGuests, syncFinishedStepsFromEvent]);
 
   // restore details
   React.useEffect(()=>{
@@ -3794,6 +3813,27 @@ const handleOpenAddonModal = React.useCallback(() => {
   const [reportTitle, setReportTitle] = useState('');
   const [showReportExcelSuccess, setShowReportExcelSuccess] = useState(false);
   const reportExcelSuccessTimeoutRef = useRef(null);
+
+  const isReportsUiOpen = Boolean(
+    showReportsOptions
+    || showStep5Options
+    || showReportModal
+    || showApprovedReport
+    || showRejectedReport
+    || showPendingReport
+    || showSearchGuest
+    || showArchiveList
+    || showGuestListModal
+    || selectedEventForReport
+  );
+  React.useEffect(() => {
+    if (isReportsUiOpen || openingChildReportRef.current || reportsViewActiveRef.current) {
+      isReportsUiOpenRef.current = true;
+      reportsViewActiveRef.current = true;
+      return;
+    }
+    isReportsUiOpenRef.current = false;
+  }, [isReportsUiOpen]);
   
   const cleanupGuestsAfterFailedSend = useCallback(async (guestIds = []) => {
     const ids = (guestIds || []).filter(Boolean);
@@ -5032,6 +5072,7 @@ React.useEffect(() => {
   // איפוס מסלול מותר רק בתוך זרימת מחיקת אירוע לאחר סיום האירוע.
 
   const resetWizardStateForNoEvent = async () => {
+    if (reportsViewActiveRef.current || isReportsUiOpenRef.current) return;
     setSelectedEventType('');
     setFormData(initialFormState);
     setEventDetailsCompleted(false);
@@ -5089,6 +5130,7 @@ React.useEffect(() => {
 
   const clearEndedEvent = async (eventId) => {
     if (!eventId) return;
+    if (reportsViewActiveRef.current || isReportsUiOpenRef.current) return;
     if (clearEndedEventInFlightRef.current === eventId) return;
 
     try {
@@ -6035,8 +6077,19 @@ React.useEffect(() => {
             messagesSent = ev?.messages_sent_count ?? 0;
           }
         }
-        if (!ev || (typeof ev.status === 'string' && ev.status.toLowerCase() === 'archived')) {
-          if (currentEventId && isWizardEventSessionProtected()) {
+        if (!ev) {
+          const { data: anyEv } = await supabase
+            .from('events')
+            .select('id,event_type,event_details,allowed_guests,messages_sent_count,reminder_sent_at,additional_packages,selected_plan,status')
+            .eq('user_id', user.id)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          ev = anyEv;
+          messagesSent = anyEv?.messages_sent_count ?? 0;
+        }
+        if (!ev) {
+          if (currentEventId && (isWizardEventSessionProtected() || isReportsUiOpenRef.current || reportsViewActiveRef.current)) {
             return;
           }
           if (
@@ -6046,7 +6099,7 @@ React.useEffect(() => {
             return;
           }
           setEventAllowedGuests(null);
-          if (currentEventId) {
+          if (currentEventId && !isReportsUiOpenRef.current && !reportsViewActiveRef.current) {
             setCurrentEventId(null);
             setGuestStatusSummary({ approved: 0, rejected: 0, pending: 0 });
             setGuestSummary({ approved: 0, adults: 0, children: 0 });
@@ -6072,10 +6125,6 @@ React.useEffect(() => {
             }
             return Array(fallbackAddon).fill('addon');
           });
-          return;
-        }
-        if (hasEventEnded(ev) && !isEventWizardDraft(ev)) {
-          await clearEndedEvent(ev.id);
           return;
         }
         if (currentEventId !== ev.id) {
@@ -6782,65 +6831,6 @@ React.useEffect(() => {
     })();
   }, [showGuestListModal, currentEventId, guestSummaryRefreshKey]);
 
-  // ---- Auto-archive when event ends (after date has passed) ----
-  // אחרי שהאירוע הסתיים בפועל, המסלול שנרכש לא ממשיך לאירוע הבא.
-
-  React.useEffect(() => {
-    if (!currentEventId) return;
-
-    const archiveIfPast = async () => {
-      try {
-        let dbEvent = null;
-        let error = null;
-        const res1 = await supabase
-          .from('events')
-          .select('event_details, selected_plan, additional_packages, status')
-          .eq('id', currentEventId)
-          .maybeSingle();
-        if (res1.error && (res1.error.message || '').toLowerCase().includes('column')) {
-          const res2 = await supabase
-            .from('events')
-            .select('event_details, selected_plan, additional_packages')
-            .eq('id', currentEventId)
-            .maybeSingle();
-          dbEvent = res2.data;
-          error = res2.error;
-        } else {
-          dbEvent = res1.data;
-          error = res1.error;
-        }
-
-        if (error || !dbEvent) return;
-
-        const rowStatus = typeof dbEvent.status === 'string' ? dbEvent.status.toLowerCase() : '';
-        if (rowStatus === 'archived') {
-          await resetWizardStateForNoEvent();
-          return;
-        }
-
-        const details = typeof dbEvent.event_details === 'string'
-          ? JSON.parse(dbEvent.event_details)
-          : dbEvent.event_details || {};
-        const dbDate = details.date || details.start_datetime;
-        if (!dbDate) return;
-
-        const eventDate = parseEventDate(dbDate);
-        if (!eventDate) return;
-        eventDate.setHours(0, 0, 0, 0);
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-
-        if (eventDate >= today) return;
-
-        await clearEndedEvent(currentEventId);
-      } catch (err) {
-        console.error('auto-archive fetch failed', err);
-      }
-    };
-
-    archiveIfPast();
-  }, [currentEventId]);
-
   // Fetch Tranzila terminal info
   React.useEffect(() => {
     (async () => {
@@ -6890,10 +6880,7 @@ React.useEffect(() => {
             .eq('user_id', user.id)
             .eq('id', pinnedEventId)
             .maybeSingle();
-          if (
-            pinnedEv
-            && !(typeof pinnedEv.status === 'string' && pinnedEv.status.toLowerCase() === 'archived')
-          ) {
+          if (pinnedEv) {
             ev = pinnedEv;
           }
         }
@@ -6908,18 +6895,19 @@ React.useEffect(() => {
             .maybeSingle();
           ev = latestEv;
         }
+        if (!ev) {
+          const { data: anyEv } = await supabase
+            .from('events')
+            .select('id, event_type, event_details, allowed_guests, messages_sent_count, reminder_sent_at, additional_packages, selected_plan, status')
+            .eq('user_id', user.id)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          ev = anyEv;
+        }
 
         if (ev) {
           noEventLoggedRef.current = false;
-
-          if (!isEventRecordActive(ev) && !isEventWizardDraft(ev)) {
-            if (lastRestoredEventIdRef.current !== 'ended') {
-              console.log('Event found but has ended, clearing active event');
-              lastRestoredEventIdRef.current = 'ended';
-            }
-            await clearEndedEvent(ev.id);
-            return;
-          }
 
           const details = typeof ev.event_details === 'string'
             ? JSON.parse(ev.event_details)
@@ -7017,7 +7005,7 @@ React.useEffect(() => {
             noEventLoggedRef.current = true;
           }
           lastRestoredEventIdRef.current = null;
-          if (!newEventStarted) {
+          if (!newEventStarted && !isReportsUiOpenRef.current && !reportsViewActiveRef.current) {
             setShowGuestListModal(false);
             setShowReportsOptions(false);
           }
@@ -7135,10 +7123,12 @@ React.useEffect(() => {
           setReportGuests((prev) => (prev.length ? [] : prev));
           setEventGuestRows((prev) => (prev.length ? [] : prev));
           setArchivedEventGuestRows((prev) => (prev.length ? [] : prev));
-          setShowGuestListModal(false);
-          setShowReportsOptions(false);
-          setShowReportModal(false);
-          setSelectedEventForReport(null);
+          if (!isReportsUiOpenRef.current && !reportsViewActiveRef.current) {
+            setShowGuestListModal(false);
+            setShowReportsOptions(false);
+            setShowReportModal(false);
+            setSelectedEventForReport(null);
+          }
           setInvitedGuestsCount((prev) => (prev ? 0 : prev));
           setEventMessagesSentCount((prev) => (prev ? 0 : prev));
           setGuestSummaryRefreshKey((prev) => prev + 1);
@@ -7154,6 +7144,7 @@ React.useEffect(() => {
   // ---- Close modals when no active event ----
   React.useEffect(() => {
     if (!currentEventId && !newEventStarted) {
+      if (reportsViewActiveRef.current || isReportsUiOpenRef.current) return;
       // Close all modals when no active event
       setShowGuestListModal(false);
       setShowReportModal(false);
@@ -7226,10 +7217,7 @@ React.useEffect(() => {
             .eq('user_id', user.id)
             .eq('id', pinnedEventId)
             .maybeSingle();
-          if (
-            pinnedEv
-            && !(typeof pinnedEv.status === 'string' && pinnedEv.status.toLowerCase() === 'archived')
-          ) {
+          if (pinnedEv) {
             ev = pinnedEv;
             messagesSent = pinnedEv?.messages_sent_count ?? 0;
           }
@@ -7259,54 +7247,18 @@ React.useEffect(() => {
             messagesSent = ev?.messages_sent_count ?? 0;
           }
         }
-        const evIsArchived =
-          ev &&
-          typeof ev.status === 'string' &&
-          ev.status.toLowerCase() === 'archived';
-        if (evIsArchived) {
-          if (isWizardEventSessionProtected() || wizardDismissedEventIdRef.current || readWizardDismissedEventId()) {
-            isInitialLoadRef.current = false;
-            return;
-          }
-          setCurrentEventId(null);
-          setGuestStatusSummary({ approved: 0, rejected: 0, pending: 0 });
-          setGuestSummary({ approved: 0, adults: 0, children: 0 });
-          setMobileSummaryGuests([]);
-          setInvitedGuestsCount(0);
-          setEventDataLoaded(false);
-          setEventAllowedGuests(null);
-          const settings = await loadUserPlanSettings();
-          if (settings?.plan) {
-            setSelectedPlan(settings.plan);
-            try { localStorage.setItem('selectedPlan', settings.plan); } catch (e) {}
-            try { localStorage.setItem('user_plan_code', settings.plan); } catch (e) {}
-          }
-          if (settings?.eventWizardStarted && settings?.plan) {
-            setNewEventStarted(true);
-            try { localStorage.setItem('newEventStarted', '1'); } catch (e) {}
-            if (shouldAllowWizardAutoOpen(1)) {
-              setShowEventTypes(true);
-              setStepErrorMsg('');
-            }
-            await ensureWizardDraftEvent(settings.plan, settings.addonCount ?? 0);
-          }
-          const ac = settings?.addonCount ?? 0;
-          setDbAddonCount(ac);
-          setAdditionalPackages((prev) => {
-            const prevCount = Array.isArray(prev) ? prev.length : 0;
-            if (prevCount === ac) return prev;
-            return Array(ac).fill('addon');
-          });
-          try { localStorage.setItem('additionalPackages_global', String(ac)); } catch (e) {}
-          isInitialLoadRef.current = false;
-          return;
+        if (!ev) {
+          const { data: anyEv } = await supabase
+            .from('events')
+            .select('id,event_type,status,event_details,allowed_guests,messages_sent_count,reminder_sent_at,additional_packages,selected_plan')
+            .eq('user_id', user.id)
+            .order('created_at',{ascending:false})
+            .limit(1)
+            .maybeSingle();
+          ev = anyEv;
+          messagesSent = anyEv?.messages_sent_count ?? 0;
         }
-        if (ev && hasEventEnded(ev) && !isEventWizardDraft(ev)) {
-          await clearEndedEvent(ev.id);
-          isInitialLoadRef.current = false;
-          return;
-        }
-        if (ev && (isEventRecordActive(ev) || isEventWizardDraft(ev))) {
+        if (ev && (isEventRecordActive(ev) || isEventWizardDraft(ev) || hasEventEnded(ev))) {
           const isDraftWizard = isEventWizardDraft(ev);
           setCurrentEventId(ev.id);
           if (ev.event_type && !isWizardPlaceholderEventType(ev.event_type)) {
@@ -7424,7 +7376,7 @@ React.useEffect(()=>{
           .select('id, status, event_details')
           .eq('id', currentEventId)
           .maybeSingle();
-        if (eventError || !eventRow || !isEventRecordActive(eventRow)) {
+        if (eventError || !eventRow) {
           setEventGuestRows([]);
           setMobileSummaryGuests([]);
           setGuestSummary({ approved: 0, adults: 0, children: 0 });
@@ -7700,45 +7652,37 @@ React.useEffect(()=>{
   }, [currentEventId, eventReminderSentAt, formData?.date, formData?.start_datetime]);
 
   const mobileDashboardModel = React.useMemo(() => {
-    const dashboardActive = Boolean(isCurrentEventActive || isPaidWizardInProgress);
+    const dashboardActive = Boolean(currentEventId || isPaidWizardInProgress);
     if (!dashboardActive) {
       return { showGuestPrimary: false };
     }
 
     return {
-      showGuestPrimary: Boolean(isCurrentEventActive && invitedCount > 0),
+      showGuestPrimary: Boolean(currentEventId && invitedCount > 0),
     };
   }, [
     invitedCount,
-    isCurrentEventActive,
+    currentEventId,
     isPaidWizardInProgress,
   ]);
 
   React.useEffect(() => {
     if (!session || !eventDataLoaded || !currentEventId || !isEndedPastEvent) return;
-    blockWizardAutoOpen();
+    if (isReportsUiOpen || reportsViewActiveRef.current || isReportsUiOpenRef.current) return;
     markWizardAutoResumeAttempted();
-    setShowEventTypes(false);
-    setShowEventDetails(false);
-    setShowDesignChooser(false);
-    setShowGuestForm(false);
-    setShowReportsOptions(false);
-    setShowStep5Options(false);
-    clearEndedEvent(currentEventId);
   }, [
     session,
     eventDataLoaded,
     currentEventId,
     isEndedPastEvent,
-    blockWizardAutoOpen,
+    isReportsUiOpen,
     markWizardAutoResumeAttempted,
-    clearEndedEvent,
   ]);
 
   React.useEffect(() => {
     if (!session || !userPlanSettingsHydratedRef.current) return;
-    if (currentEventId && !eventDataLoaded) return;
-    if (showEventTypes || showEventDetails || showDesignChooser || showGuestForm) return;
+    if (currentEventId) return;
+    if (showEventTypes || showEventDetails || showDesignChooser || showGuestForm || isReportsUiOpen || reportsViewActiveRef.current) return;
 
     const sessionValid = shouldAllowWizardAutoResume({
       isCurrentEventActive,
@@ -7774,7 +7718,6 @@ React.useEffect(()=>{
     setShowEventDetails(false);
     setShowDesignChooser(false);
     setShowGuestForm(false);
-    setShowReportsOptions(false);
   }, [
     session,
     currentEventId,
@@ -7784,6 +7727,7 @@ React.useEffect(()=>{
     newEventStarted,
     isCurrentEventActive,
     isPaidWizardInProgress,
+    isReportsUiOpen,
     showEventTypes,
     showEventDetails,
     showDesignChooser,
@@ -7967,13 +7911,40 @@ React.useEffect(()=>{
   }, [suppressWizardStep, scrollWizardHome]);
 
   const openReportsOptionsModal = React.useCallback(() => {
-    if (isWizardStepOpenBlocked(5)) return;
+    openingChildReportRef.current = false;
+    reportsViewActiveRef.current = true;
+    isReportsUiOpenRef.current = true;
+    reportsSessionLockRef.current = true;
     setShowReportsOptions(true);
     setShowGuestListModal(false);
     setStepErrorMsg('');
-  }, [isWizardStepOpenBlocked]);
+  }, []);
 
   const closeReportsOptionsModal = React.useCallback(() => {
+    const stayingInReports = Boolean(
+      openingChildReportRef.current
+      || showApprovedReport
+      || showRejectedReport
+      || showPendingReport
+      || showReportModal
+      || showSearchGuest
+      || showArchiveList
+      || showGuestListModal
+      || selectedEventForReport
+    );
+    if (openingChildReportRef.current || stayingInReports) {
+      openingChildReportRef.current = false;
+      reportsViewActiveRef.current = true;
+      isReportsUiOpenRef.current = true;
+      reportsSessionLockRef.current = true;
+      setShowReportsOptions(false);
+      setShowStep5Options(false);
+      return;
+    }
+    reportsViewActiveRef.current = false;
+    isReportsUiOpenRef.current = false;
+    openingChildReportRef.current = false;
+    reportsSessionLockRef.current = false;
     suppressWizardStep(5);
     setShowReportsOptions(false);
     setShowStep5Options(false);
@@ -7984,11 +7955,62 @@ React.useEffect(()=>{
     setShowSearchGuest(false);
     setShowArchiveList(false);
     setStepErrorMsg('');
-    scrollWizardHome();
-  }, [suppressWizardStep, scrollWizardHome]);
+  }, [
+    suppressWizardStep,
+    showApprovedReport,
+    showRejectedReport,
+    showPendingReport,
+    showReportModal,
+    showSearchGuest,
+    showArchiveList,
+    showGuestListModal,
+    selectedEventForReport,
+  ]);
+
+  const leaveReportsMenuForChild = React.useCallback(() => {
+    openingChildReportRef.current = true;
+    reportsViewActiveRef.current = true;
+    isReportsUiOpenRef.current = true;
+    reportsSessionLockRef.current = true;
+    setShowReportsOptions(false);
+    setShowStep5Options(false);
+  }, []);
+
+  React.useEffect(() => {
+    if (!reportsSessionLockRef.current) return;
+    if (showReportsOptions || showStep5Options) return;
+    if (
+      showApprovedReport
+      || showRejectedReport
+      || showPendingReport
+      || showReportModal
+      || showSearchGuest
+      || showArchiveList
+      || showGuestListModal
+      || openingChildReportRef.current
+    ) return;
+    setShowReportsOptions(true);
+  }, [
+    showReportsOptions,
+    showStep5Options,
+    showApprovedReport,
+    showRejectedReport,
+    showPendingReport,
+    showReportModal,
+    showSearchGuest,
+    showArchiveList,
+    showGuestListModal,
+  ]);
 
   const redirectToWizardStep = React.useCallback((stepNumber, { force = false } = {}) => {
     if (!force && (isWizardAutoOpenBlocked() || isWizardStepSuppressed(stepNumber))) {
+      return;
+    }
+    if (stepNumber === 5) {
+      openReportsOptionsModal();
+      return;
+    }
+    if (reportsSessionLockRef.current || isReportsUiOpenRef.current || reportsViewActiveRef.current) {
       return;
     }
     setShowEventTypes(false);
@@ -8045,7 +8067,7 @@ React.useEffect(()=>{
       (eventDataLoaded && (invitedCount > 0 || formDataHasMeaningfulValues))
     );
     const mustStartFirst = !hasEstablishedWizardContext;
-    if (stepNumber >= 1 && stepNumber <= 5 && mustStartFirst) {
+    if (stepNumber >= 1 && stepNumber <= 4 && mustStartFirst) {
       if (userInitiated) {
         setStepErrorMsg(WIZARD_START_FIRST_MSG);
         setShowStepError(true);
@@ -8053,7 +8075,7 @@ React.useEffect(()=>{
       return false;
     }
 
-    if (stepNumber >= 1 && stepNumber <= 5) {
+    if (stepNumber >= 1 && stepNumber <= 4) {
       for (let requiredStep = 1; requiredStep < stepNumber; requiredStep += 1) {
         if (requiredStep > 4) break;
         if (!wizardStepCompletion[requiredStep]) {
@@ -8130,6 +8152,7 @@ React.useEffect(()=>{
       || showPendingReport
       || showSearchGuest
       || showArchiveList
+      || reportsViewActiveRef.current
     ) return undefined;
 
     const flowStarted = shouldAllowWizardAutoResume({
@@ -8219,16 +8242,6 @@ React.useEffect(()=>{
       setShowAdvancedEdit(null);
     }
     if (showGuestForm) setShowGuestForm(false);
-    if (showReportsOptions || showStep5Options || showReportModal || showApprovedReport || showRejectedReport || showPendingReport || showSearchGuest || showArchiveList) {
-      setShowReportsOptions(false);
-      setShowStep5Options(false);
-      setShowReportModal(false);
-      setShowApprovedReport(false);
-      setShowRejectedReport(false);
-      setShowPendingReport(false);
-      setShowSearchGuest(false);
-      setShowArchiveList(false);
-    }
   }, [
     showApprovedReport,
     showArchiveList,
@@ -8569,11 +8582,11 @@ React.useEffect(()=>{
 
     return (
     <>
-      {currentEventId && isCurrentEventActive ? (
+      {currentEventId ? (
         <div className="bg-white/[0.055] border border-white/15 backdrop-blur-xl rounded-2xl p-4 sm:p-6 text-center shadow-[0_8px_40px_rgba(0,0,0,0.35)] ring-2 ring-indigo-400/30 w-full">
           <div className="flex items-center justify-center gap-2 mb-2">
             <span className="text-2xl">✅</span>
-            <h3 className="text-xl font-bold text-emerald-300">יש אירוע פעיל במערכת</h3>
+            <h3 className="text-xl font-bold text-emerald-300">{isCurrentEventActive ? 'יש אירוע פעיל במערכת' : 'האירוע במערכת'}</h3>
           </div>
           <p className="text-slate-300"><strong>סוג האירוע:</strong> {displayEventTypeLabel || 'לא מוגדר'}</p>
           {formData.date && (
@@ -8587,7 +8600,7 @@ React.useEffect(()=>{
               <p className="text-emerald-200 font-bold text-2xl text-center">{eventDayStatus.text}</p>
             </div>
           )}
-          <p className="text-emerald-300 text-base mt-2 font-bold">האירוע מוכן לשליחת הזמנות ואישורי הגעה</p>
+          <p className="text-emerald-300 text-base mt-2 font-bold">{isCurrentEventActive ? 'האירוע מוכן לשליחת הזמנות ואישורי הגעה' : 'אפשר לצפות בדוחות האירוע בכל עת'}</p>
         </div>
       ) : (isPaidWizardInProgress && !currentEventId) ? (
         <div className="bg-white/[0.055] border border-white/15 backdrop-blur-xl rounded-2xl p-4 text-center shadow-[0_8px_40px_rgba(0,0,0,0.35)] ring-2 ring-indigo-400/30 flex-1">
@@ -8965,7 +8978,7 @@ React.useEffect(()=>{
         </>
       ) : null}
 
-      {hasSession && isCurrentEventActive && mobileDashboardModel.showGuestPrimary && (
+      {hasSession && currentEventId && mobileDashboardModel.showGuestPrimary && (
         <MobileQuickGuestsCard
           guestStatusSummary={guestStatusSummary}
           guestSummary={guestSummary}
@@ -8979,7 +8992,7 @@ React.useEffect(()=>{
           onQuickGuestSearchClear={handleMobileQuickGuestSearchClear}
           onOpenGuestList={openMobileQuickGuestListScreen}
           onOpenCharts={() => setShowMobileChartsScreen(true)}
-          showChartsButton={Boolean(currentEventId && isCurrentEventActive)}
+          showChartsButton={Boolean(currentEventId)}
           onOpenFullReports={() => openMobileResumeStep(5)}
           showFullReportsButton={mobileSummaryGuests.length > 4}
         />
@@ -9097,7 +9110,7 @@ React.useEffect(()=>{
         </div>
       )}
 
-      {hasSession && !isCurrentEventActive && !isPaidWizardInProgress && (
+      {hasSession && !currentEventId && !isPaidWizardInProgress && (
         <section className="mx-auto mb-4 w-full max-w-md rounded-[1.75rem] border border-white/15 bg-white/[0.06] p-4 text-center shadow-[0_14px_44px_rgba(0,0,0,0.36)] ring-1 ring-white/10 backdrop-blur-2xl sm:hidden" dir="rtl">
           <div className="flex items-center justify-center gap-2">
             <span className="text-2xl">📅</span>
@@ -9371,7 +9384,7 @@ React.useEffect(()=>{
           </div>
 
           {/* Second Column - Guest Summary + Table Report */}
-          {currentEventId && isCurrentEventActive && (
+          {currentEventId && (
             <div className="w-full flex flex-col gap-6">
               <div className="hidden sm:block" data-testid="desktop-guest-summary-chart">
                 {renderGuestSummaryChartCard()}
@@ -9416,7 +9429,7 @@ React.useEffect(()=>{
           )}
 
           {/* Third Column - Guest Status Summary */}
-          {currentEventId && isCurrentEventActive && (
+          {currentEventId && (
             <div className="w-full flex flex-col gap-6">
               {!mobileDashboardModel.showGuestPrimary && (
               <div className="sm:hidden rounded-3xl border border-white/15 bg-white/[0.055] p-4 text-center shadow-[0_8px_40px_rgba(0,0,0,0.35)] backdrop-blur-xl ring-2 ring-violet-400/25">
@@ -10462,7 +10475,7 @@ React.useEffect(()=>{
 
       {/* Step 5 - choose action modal */}
       {showStep5Options && (
-        <Modal open={showStep5Options} onClose={closeReportsOptionsModal} size="sm">
+        <Modal open={showStep5Options} onClose={closeReportsOptionsModal} size="sm" closeOnBack={false}>
           <ModalHeader onClose={closeReportsOptionsModal}>בחר דוח</ModalHeader>
           <ModalBody>
             <div className="space-y-4">
@@ -10495,6 +10508,7 @@ React.useEffect(()=>{
             {/* Reports buttons */}
             <button
               onClick={async () => {
+                leaveReportsMenuForChild();
                 try {
                   const user = await resolveCurrentUserForSync();
                   if (!user) {
@@ -10538,6 +10552,7 @@ React.useEffect(()=>{
             </button>
             <button
               onClick={async () => {
+                leaveReportsMenuForChild();
                 try {
                   const user = await resolveCurrentUserForSync();
                   if (!user) {
@@ -10581,6 +10596,7 @@ React.useEffect(()=>{
             </button>
             <button
               onClick={async () => {
+                leaveReportsMenuForChild();
                 try {
                   const user = await resolveCurrentUserForSync();
                   if (!user) {
@@ -11305,7 +11321,7 @@ React.useEffect(()=>{
       )}
 
       {/* Report Modal */}
-      <Modal open={showReportModal} onClose={returnToReportsMenu} size="full" landscape>
+      <Modal open={showReportModal} onClose={returnToReportsMenu} size="full" landscape closeOnBack={false}>
         <ModalHeader onClose={returnToReportsMenu}>{reportTitle}</ModalHeader>
         <ModalBody>
           {showReportModal && (<>
@@ -11401,7 +11417,7 @@ React.useEffect(()=>{
         </ModalBody>
       </Modal>
       {/* Reports menu modal */}
-      <Modal open={typeof showReportsOptions !== 'undefined' && showReportsOptions} onClose={closeReportsOptionsModal} size="lg">
+      <Modal open={typeof showReportsOptions !== 'undefined' && showReportsOptions} onClose={closeReportsOptionsModal} size="lg" closeOnBack={false}>
         <ModalHeader onClose={closeReportsOptionsModal}>בחר דו"ח להצגה</ModalHeader>
         <ModalBody className="text-center space-y-4">
             {renderMobileNextActionCard({
@@ -11416,9 +11432,9 @@ React.useEffect(()=>{
                 אירוע מהעבר: {selectedEventForReport.event_type || 'אירוע'} – {selectedEventForReport._eventDate?format(selectedEventForReport._eventDate,'dd/MM/yyyy',{locale:he}):''}
               </p>
             )}
-            <button onClick={()=>{setShowReportsOptions(false);setShowApprovedReport(true);}} className="w-full bg-white/[0.06] text-slate-100 border border-white/15 rounded-full px-4 py-2 text-lg font-medium hover:bg-indigo-500/15 hover:border-indigo-400/50 transition-all">{RSVP_STATUS_LABELS.approved}</button>
+            <button onClick={()=>{leaveReportsMenuForChild();setShowApprovedReport(true);}} className="w-full bg-white/[0.06] text-slate-100 border border-white/15 rounded-full px-4 py-2 text-lg font-medium hover:bg-indigo-500/15 hover:border-indigo-400/50 transition-all">{RSVP_STATUS_LABELS.approved}</button>
             <button onClick={async () => {
-              setShowReportsOptions(false);
+              leaveReportsMenuForChild();
               try {
                 const user = await resolveCurrentUserForSync();
                 if (!user) {
@@ -11448,12 +11464,12 @@ React.useEffect(()=>{
                 alert('שגיאה בטעינת הדוח');
               }
             }} className="w-full bg-white/[0.06] text-slate-100 border border-white/15 rounded-full px-4 py-2 text-lg font-medium hover:bg-indigo-500/15 hover:border-indigo-400/50 transition-all">אישרו הגעה ממוינים לפי שולחן</button>
-            <button onClick={()=>{setShowReportsOptions(false);setShowRejectedReport(true);}} className="w-full bg-white/[0.06] text-slate-100 border border-white/15 rounded-full px-4 py-2 text-lg font-medium hover:bg-indigo-500/15 hover:border-indigo-400/50 transition-all">{RSVP_STATUS_LABELS.rejected}</button>
-            <button onClick={()=>{setShowReportsOptions(false);setShowPendingReport(true);}} className="w-full bg-white/[0.06] text-slate-100 border border-white/15 rounded-full px-4 py-2 text-lg font-medium hover:bg-indigo-500/15 hover:border-indigo-400/50 transition-all">{RSVP_STATUS_LABELS.pending}</button>
+            <button onClick={()=>{leaveReportsMenuForChild();setShowRejectedReport(true);}} className="w-full bg-white/[0.06] text-slate-100 border border-white/15 rounded-full px-4 py-2 text-lg font-medium hover:bg-indigo-500/15 hover:border-indigo-400/50 transition-all">{RSVP_STATUS_LABELS.rejected}</button>
+            <button onClick={()=>{leaveReportsMenuForChild();setShowPendingReport(true);}} className="w-full bg-white/[0.06] text-slate-100 border border-white/15 rounded-full px-4 py-2 text-lg font-medium hover:bg-indigo-500/15 hover:border-indigo-400/50 transition-all">{RSVP_STATUS_LABELS.pending}</button>
             {/* Guest status query button */}
-            <button onClick={()=>{setShowReportsOptions(false);setShowSearchGuest(true);}} className="w-full bg-white/[0.06] text-slate-100 border border-white/15 rounded-full px-4 py-2 text-lg font-medium hover:bg-indigo-500/15 hover:border-indigo-400/50 transition-all">שאילתת סטטוס אורח</button>
+            <button onClick={()=>{leaveReportsMenuForChild();setShowSearchGuest(true);}} className="w-full bg-white/[0.06] text-slate-100 border border-white/15 rounded-full px-4 py-2 text-lg font-medium hover:bg-indigo-500/15 hover:border-indigo-400/50 transition-all">שאילתת סטטוס אורח</button>
             <button onClick={async ()=>{
-              setShowReportsOptions(false);
+              leaveReportsMenuForChild();
               try{
                 const user = await resolveCurrentUserForSync();
                 if(!user){alert('יש להתחבר כדי להציג.');return;}
@@ -11548,7 +11564,7 @@ React.useEffect(()=>{
       </Modal>
 
       {/* Approved report modal */}
-      <Modal open={showApprovedReport} onClose={returnToReportsMenu} size="full" landscape>
+      <Modal open={showApprovedReport} onClose={returnToReportsMenu} size="full" landscape closeOnBack={false}>
         <ModalHeader onClose={returnToReportsMenu}>דוח אורחים שאישרו הגעה</ModalHeader>
         <ModalBody className="overflow-x-auto">
               <table className="w-full text-right border border-collapse" style={{fontSize: '11px'}}>
@@ -11610,7 +11626,7 @@ React.useEffect(()=>{
       </Modal>
 
       {/* Rejected report modal */}
-      <Modal open={showRejectedReport} onClose={returnToReportsMenu} size="full" landscape>
+      <Modal open={showRejectedReport} onClose={returnToReportsMenu} size="full" landscape closeOnBack={false}>
         <ModalHeader onClose={returnToReportsMenu}>דוח אורחים שלא מגיעים</ModalHeader>
         <ModalBody className="overflow-x-auto">
               <table className="w-full text-right border border-white/10 border-collapse" style={{fontSize: '11px'}}>
@@ -11643,7 +11659,7 @@ React.useEffect(()=>{
       </Modal>
 
       {/* Pending report modal */}
-      <Modal open={showPendingReport} onClose={returnToReportsMenu} size="full" landscape>
+      <Modal open={showPendingReport} onClose={returnToReportsMenu} size="full" landscape closeOnBack={false}>
         <ModalHeader onClose={returnToReportsMenu}>דוח אורחים שטרם הגיבו</ModalHeader>
         <ModalBody className="overflow-x-auto">
               <table className="w-full text-right border border-white/10 border-collapse" style={{fontSize: '11px'}}>
@@ -11676,7 +11692,7 @@ React.useEffect(()=>{
       </Modal>
 
       {/* Guest status query modal */}
-      <Modal open={showSearchGuest} onClose={returnToReportsMenu} size="lg" landscape>
+      <Modal open={showSearchGuest} onClose={returnToReportsMenu} size="lg" landscape closeOnBack={false}>
         <ModalHeader onClose={returnToReportsMenu}>חיפוש אורח</ModalHeader>
         <ModalBody>
             <div className="flex justify-center gap-2 mb-4 px-1">
@@ -12380,7 +12396,7 @@ React.useEffect(()=>{
       </Modal>
 
       {/* Archive events list modal */}
-      <Modal open={showArchiveList} onClose={returnToReportsMenu} size="xl" landscape>
+      <Modal open={showArchiveList} onClose={returnToReportsMenu} size="xl" landscape closeOnBack={false}>
         <ModalHeader onClose={returnToReportsMenu}>אירועים מהעבר (ארכיון)</ModalHeader>
         <ModalBody className="text-center space-y-4">
             {archiveLoading ? (

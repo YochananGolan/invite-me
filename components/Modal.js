@@ -10,8 +10,8 @@ const SIZES = {
   screen: 'max-w-full w-full',
 };
 
-export default function Modal({ open, onClose, size = 'md', children, className = '', landscape = false, priority = false }) {
-  useMobileOverlayBack(open, onClose);
+export default function Modal({ open, onClose, size = 'md', children, className = '', landscape = false, priority = false, closeOnBack = true }) {
+  useMobileOverlayBack(Boolean(closeOnBack && open), onClose);
 
   useEffect(() => {
     if (!open) return;

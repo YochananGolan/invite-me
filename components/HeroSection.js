@@ -686,7 +686,19 @@ export default forwardRef(function HeroSection({ onStart, onPressCreateEvent, se
 
         if (eventError) throw eventError;
 
-        if (!eventRecord || !shouldShowEventReports(eventRecord)) {
+        let reportEvent = eventRecord;
+        if (!reportEvent || !shouldShowEventReports(reportEvent)) {
+          const { data: anyEvent } = await supabase
+            .from('events')
+            .select('id, event_details, status, allowed_guests, messages_sent_count, selected_plan, additional_packages')
+            .eq('user_id', userId)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          reportEvent = anyEvent;
+        }
+
+        if (!reportEvent || !shouldShowEventReports(reportEvent)) {
           if (!cancelled) {
             setActiveReportSummary(null);
             setActiveEventId(null);
@@ -697,13 +709,13 @@ export default forwardRef(function HeroSection({ onStart, onPressCreateEvent, se
         const { data: guests, error: guestsError } = await supabase
           .from('invited_guests')
           .select('status, adults, children, phone, first_name, last_name')
-          .eq('event_id', eventRecord.id);
+          .eq('event_id', reportEvent.id);
 
         if (guestsError) throw guestsError;
 
         if (!cancelled) {
-          setActiveReportSummary(buildActiveReportSummary(eventRecord, guests || []));
-          setActiveEventId(eventRecord.id);
+          setActiveReportSummary(buildActiveReportSummary(reportEvent, guests || []));
+          setActiveEventId(reportEvent.id);
         }
       } catch (error) {
         console.error('Failed to load active hero report summary', error);
