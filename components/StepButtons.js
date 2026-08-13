@@ -21,7 +21,7 @@ import {
   getGuestStatusMeta,
   getRsvpStatusLabel,
 } from '../lib/rsvpLabels';
-import { getGuestIdentityKey } from '../lib/guestIdentity';
+import { getGuestIdentityKey, joinFullName, splitFullName } from '../lib/guestIdentity';
 import { buildGuestRsvpStats, buildApprovedGuestsByTableReportRows, buildTableSummaryFromGuests, dedupeGuestsByIdentity, filterGuestsByStatusBucket } from '../lib/guestStats';
 import {
   WIZARD_DRAFT_EVENT_TYPE,
@@ -732,8 +732,7 @@ const StepButtons = forwardRef(function StepButtons({ session, onAuthClick, trig
   // --- Guest invitation state ---
   const [showGuestForm, setShowGuestForm] = useState(false);
   const [guestData, setGuestData] = useState({
-    guestFirstName: '',
-    guestLastName: '',
+    guestFullName: '',
     guestPhone: '',
     guestTable: '',
   });
@@ -2285,15 +2284,17 @@ const handleOpenAddonModal = React.useCallback(() => {
       // Persist current event details so they survive any reloads after sending
       try{ localStorage.setItem('savedEventDetails', JSON.stringify(formData)); }catch{}
 
-      const required = ['guestFirstName', 'guestLastName', 'guestPhone', 'guestTable'];
+    const required = ['guestFullName', 'guestPhone', 'guestTable'];
     const missingFields = required.filter((key) => !guestData[key].toString().trim());
 
     if (missingFields.length) {
       const errs = missingFields.reduce((acc, key) => ({ ...acc, [key]: true }), {});
       setGuestErrors(errs);
-      setGuestErrorMsg('נא למלא שם פרטי, שם משפחה, מספר טלפון ומספר שולחן תקינים.');
+      setGuestErrorMsg('נא למלא שם מלא, מספר טלפון ומספר שולחן תקינים.');
       return;
     }
+
+    const { firstName, lastName } = splitFullName(guestData.guestFullName);
 
     // Validate phone - must contain exactly 10 digits (Israeli format e.g., 05XXXXXXXX)
     const digitsOnly = guestData.guestPhone.replace(/\D/g, '');
@@ -2358,8 +2359,8 @@ const handleOpenAddonModal = React.useCallback(() => {
           {
             user_id: user.id,
             event_id: eventIdForInvite,
-            first_name: guestData.guestFirstName,
-            last_name: guestData.guestLastName,
+            first_name: firstName,
+            last_name: lastName,
             phone: normalizedPhone,
             email: null,
             total_guests: 1,
@@ -2385,9 +2386,6 @@ const handleOpenAddonModal = React.useCallback(() => {
 
       // Send via Green API only. Do not use browser share here because it cannot confirm provider acceptance.
       try {
-        // #region agent log
-        fetch('http://127.0.0.1:7780/ingest/b5f4ac25-b263-42d9-8749-29626868bbeb',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'dcd254'},body:JSON.stringify({sessionId:'dcd254',runId:'initial',hypothesisId:'H3',location:'components/StepButtons.js:1103',message:'Single guest WhatsApp send invoked',data:{eventIdForInvite,guestId:newGuestRecord.id},timestamp:Date.now()})}).catch(()=>{});
-        // #endregion
         const apiResult = await sendWhatsAppInviteViaApi({
           eventId: eventIdForInvite,
           guestIds: newGuestRecord?.id ? [newGuestRecord.id] : [],
@@ -2409,8 +2407,7 @@ const handleOpenAddonModal = React.useCallback(() => {
             ...prev,
             {
               guestId: newGuestRecord.id,
-              guestFirstName: guestData.guestFirstName,
-              guestLastName: guestData.guestLastName,
+              guestFullName: guestData.guestFullName,
               guestPhone: normalizedPhone,
               guestPhoneOriginal: guestData.guestPhone,
               guestTable: guestData.guestTable,
@@ -2466,6 +2463,18 @@ const handleOpenAddonModal = React.useCallback(() => {
     // Persist event details before SMS flow (may trigger navigation)
     try{ localStorage.setItem('savedEventDetails', JSON.stringify(formData)); }catch{}
 
+    const required = ['guestFullName', 'guestPhone', 'guestTable'];
+    const missingFields = required.filter((key) => !String(guestData[key] || '').trim());
+    if (missingFields.length) {
+      setIsSendingInvitation(false);
+      const errs = missingFields.reduce((acc, key) => ({ ...acc, [key]: true }), {});
+      setGuestErrors(errs);
+      presentInvitationSendResult('error', 'נא למלא שם מלא, מספר טלפון ומספר שולחן תקינים.');
+      return;
+    }
+
+    const { firstName, lastName } = splitFullName(guestData.guestFullName);
+
     const digitsOnly = guestData.guestPhone.replace(/\D/g, '');
     if (digitsOnly.length !== 10) {
       setIsSendingInvitation(false);
@@ -2501,8 +2510,8 @@ const handleOpenAddonModal = React.useCallback(() => {
           {
             user_id: user.id,
             event_id: eventIdForInvite,
-            first_name: guestData.guestFirstName,
-            last_name: guestData.guestLastName,
+            first_name: firstName,
+            last_name: lastName,
             phone: guestData.guestPhone,
             email: null,
             total_guests: 1,
@@ -2542,8 +2551,8 @@ const handleOpenAddonModal = React.useCallback(() => {
             guests: [{
               id: newGuest.id,
               phone: guestData.guestPhone,
-              firstName: guestData.guestFirstName,
-              lastName: guestData.guestLastName,
+              firstName,
+              lastName,
               inviteLink: inviteLink,
             }],
             message: smsMessage,
@@ -3103,9 +3112,6 @@ const handleOpenAddonModal = React.useCallback(() => {
   }));
 
   const sendWhatsAppInviteViaApi = useCallback(async ({ eventId, guestIds }) => {
-    // #region agent log
-    fetch('http://127.0.0.1:7780/ingest/b5f4ac25-b263-42d9-8749-29626868bbeb',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'dcd254'},body:JSON.stringify({sessionId:'dcd254',runId:'initial',hypothesisId:'H2',location:'components/StepButtons.js:1686',message:'sendWhatsAppInviteViaApi entry',data:{eventId,guestIdsLength:Array.isArray(guestIds)?guestIds.length:null},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
     if (!eventId) {
       addToast?.('לא ניתן לשלוח הודעת וואטסאפ לפני שמירת האירוע', 'error');
       return { ok: false, reason: 'missing_event' };
@@ -3133,10 +3139,6 @@ const handleOpenAddonModal = React.useCallback(() => {
       } catch (err) {
         // ignore
       }
-
-      // #region agent log
-      fetch('http://127.0.0.1:7780/ingest/b5f4ac25-b263-42d9-8749-29626868bbeb',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'dcd254'},body:JSON.stringify({sessionId:'dcd254',runId:'initial',hypothesisId:'H2',location:'components/StepButtons.js:1706',message:'sendWhatsAppInviteViaApi response',data:{status:response.status,ok:response.ok,sent:payload?.sent||0,failedCount:Array.isArray(payload?.failed)?payload.failed.length:null},timestamp:Date.now()})}).catch(()=>{});
-      // #endregion
 
       const updatedCount = typeof payload?.updatedMessagesSentCount === 'number'
         ? payload.updatedMessagesSentCount
@@ -4105,7 +4107,7 @@ React.useEffect(() => {
       [`סה"כ אורחים ברשימה: ${reportGuests.filter((g) => !g.isSummary).length}`],
       [`הופק בתאריך: ${generatedAt}`],
       [],
-      ['#','שם פרטי','שם משפחה','מספר שולחן','טלפון','בוגרים','ילדים','סה"כ','צמחוני','טבעוני','גלאט','צליאקים','אלרגיה','סוג אלרגיה'],
+      ['#','שם מלא','מספר שולחן','טלפון','בוגרים','ילדים','סה"כ','צמחוני','טבעוני','גלאט','צליאקים','אלרגיה','סוג אלרגיה'],
     ];
 
     // Add guest rows and summary rows
@@ -4117,7 +4119,6 @@ React.useEffect(() => {
         data.push([
           '',
           g.summary_label,
-          '',
           g.table_number || '',
           '',
           g.adults || 0,
@@ -4135,8 +4136,7 @@ React.useEffect(() => {
         rowNum++;
         data.push([
           rowNum,
-          g.first_name || '',
-          g.last_name || '',
+          joinFullName(g.first_name, g.last_name),
           g.table_number || '-',
           g.phone || '',
           g.adults || 0,
@@ -4153,12 +4153,11 @@ React.useEffect(() => {
     });
 
     // Totals row
-    data.push(['','סה"כ','','','',totalReportAdults,totalReportChildren,totalReportAdults+totalReportChildren,totalVeg,totalVegan,totalGlatt,totalCeliac,totalAllergy,'']);
+    data.push(['','סה"כ','','',totalReportAdults,totalReportChildren,totalReportAdults+totalReportChildren,totalVeg,totalVegan,totalGlatt,totalCeliac,totalAllergy,'']);
 
     const columns = [
       {wch:5}, // #
-      {wch:18}, // שם פרטי
-      {wch:18}, // שם משפחה
+      {wch:28}, // שם מלא
       {wch:22}, // מספר שולחן
       {wch:22}, // phone
       {wch:14}, // בוגרים
@@ -4198,11 +4197,10 @@ React.useEffect(() => {
       [`סה"כ רשומות: ${approvedGuests.length}`],
       [`הופק בתאריך: ${generatedAt}`],
       [],
-      ['#','שם פרטי','שם משפחה','מספר שולחן','טלפון','בוגרים','ילדים','סה"כ','צמחוני','טבעוני','גלאט','צליאקים','אלרגיות','הערות'],
+      ['#','שם מלא','מספר שולחן','טלפון','בוגרים','ילדים','סה"כ','צמחוני','טבעוני','גלאט','צליאקים','אלרגיות','הערות'],
       ...approvedGuests.map((g,idx)=>[
         idx+1,
-        g.first_name,
-        g.last_name,
+        joinFullName(g.first_name, g.last_name),
         g.table_number || '-',
         g.phone,
         g.adults||0,
@@ -4226,12 +4224,11 @@ React.useEffect(() => {
     const totalCeliac = approvedGuests.reduce((s,g)=>s+(g.celiac_adults||0)+(g.celiac_children||0),0);
     const totalAllergy = approvedGuests.reduce((s,g)=>s+(g.allergy_adults||0)+(g.allergy_children||0),0);
 
-    data.push(['','סה"כ','','','',totalAdults,totalChildren,totalAdults+totalChildren,totalVeg,totalVegan,totalGlatt,totalCeliac,totalAllergy,'']);
+    data.push(['','סה"כ','','',totalAdults,totalChildren,totalAdults+totalChildren,totalVeg,totalVegan,totalGlatt,totalCeliac,totalAllergy,'']);
 
     const columns = [
       {wch:5}, // #
-      {wch:18}, // שם פרטי
-      {wch:18}, // שם משפחה
+      {wch:28}, // שם מלא
       {wch:22}, // מספר שולחן
       {wch:22}, // phone
       {wch:14}, // בוגרים
@@ -4270,21 +4267,19 @@ React.useEffect(() => {
       [`סה"כ רשומות: ${safeRows.length}`],
       [`הופק בתאריך: ${generatedAt}`],
       [],
-      ['#', 'שם פרטי', 'שם משפחה', 'טלפון'],
+      ['#', 'שם מלא', 'טלפון'],
       ...safeRows.map((g, idx) => [
         idx + 1,
-        g.first_name || '',
-        g.last_name || '',
+        joinFullName(g.first_name, g.last_name),
         g.phone || '',
       ]),
     ];
 
-    data.push(['', totalLabel, '', safeRows.length]);
+    data.push(['', totalLabel, safeRows.length]);
 
     const columns = [
       { wch: 5 },
-      { wch: 18 },
-      { wch: 18 },
+      { wch: 28 },
       { wch: 22 },
     ];
     const wb = createReportWorkbook(reportName, data, columns, {
@@ -4471,12 +4466,25 @@ React.useEffect(() => {
       const ws = wb.Sheets[wb.SheetNames[0]];
       const rows = XLSX.utils.sheet_to_json(ws, { header: 1 });
 
-      // Column positions are fixed: A=שם פרטי, B=שם משפחה, C=מס׳ שולחן, D=טלפון
-      // First row is header (skipped), data starts from row 2
-      const firstNameIdx = 0; // Column A
-      const lastNameIdx = 1;  // Column B
-      const tableIdx = 2;     // Column C (optional)
-      const phoneIdx = 3;     // Column D
+      // New format: A=שם מלא, B=מס׳ שולחן, C=טלפון
+      // Legacy format (still supported): A=שם פרטי, B=שם משפחה, C=מס׳ שולחן, D=טלפון
+      const headerCells = (rows[0] || []).map((cell) => String(cell || '').trim());
+      const sampleRow = rows.slice(1).find((r) =>
+        Array.isArray(r) && r.some((cell) => cell !== undefined && cell !== null && String(cell).trim() !== ''),
+      ) || [];
+      const samplePhoneCol3 = String(sampleRow[3] || '').replace(/\D/g, '');
+      const samplePhoneCol2 = String(sampleRow[2] || '').replace(/\D/g, '');
+      const headerSuggestsLegacy = headerCells.some((h) => h.includes('שם פרטי') || h.includes('שם משפחה'));
+      const headerSuggestsFullName = headerCells.some((h) => h.includes('שם מלא'));
+      const isLegacyFormat = headerSuggestsLegacy
+        || (!headerSuggestsFullName && (samplePhoneCol3.length === 9 || samplePhoneCol3.length === 10)
+          && !(samplePhoneCol2.length === 9 || samplePhoneCol2.length === 10));
+
+      const fullNameIdx = 0;
+      const tableIdx = isLegacyFormat ? 2 : 1;
+      const phoneIdx = isLegacyFormat ? 3 : 2;
+      const firstNameIdx = 0;
+      const lastNameIdx = 1;
 
       const imported = [];
       const errors = [];
@@ -4497,9 +4505,15 @@ React.useEffect(() => {
           digitsOnly = '0' + digitsOnly;
         }
 
+        const guestFullName = isLegacyFormat
+          ? joinFullName(
+            (r[firstNameIdx] || '').toString().trim(),
+            (r[lastNameIdx] || '').toString().trim(),
+          )
+          : (r[fullNameIdx] || '').toString().trim();
+
         const guest = {
-          guestFirstName: (r[firstNameIdx] || '').toString().trim(),
-          guestLastName: (r[lastNameIdx] || '').toString().trim(),
+          guestFullName,
           guestPhone: digitsOnly,
           guestTable: (r[tableIdx] || '').toString().trim(),
           rowNumber: i + 1,
@@ -4507,11 +4521,14 @@ React.useEffect(() => {
 
         // Validate guest data
         const rowErrors = [];
-        if (!guest.guestFirstName) rowErrors.push('שם פרטי חסר (עמודה A)');
-        if (!guest.guestLastName) rowErrors.push('שם משפחה חסר (עמודה B)');
-        if (!guest.guestTable) rowErrors.push('מס׳ שולחן חסר (עמודה C)');
+        if (!guest.guestFullName) {
+          rowErrors.push(isLegacyFormat ? 'שם חסר (עמודות A-B)' : 'שם מלא חסר (עמודה A)');
+        }
+        if (!guest.guestTable) {
+          rowErrors.push(isLegacyFormat ? 'מס׳ שולחן חסר (עמודה C)' : 'מס׳ שולחן חסר (עמודה B)');
+        }
         if (!guest.guestPhone) {
-          rowErrors.push('טלפון חסר (עמודה D)');
+          rowErrors.push(isLegacyFormat ? 'טלפון חסר (עמודה D)' : 'טלפון חסר (עמודה C)');
         } else if (guest.guestPhone.length !== 10) {
           rowErrors.push(`טלפון לא תקין (${guest.guestPhone.length} ספרות במקום 10)`);
         }
@@ -4632,11 +4649,12 @@ React.useEffect(() => {
       // Prepare guests for bulk insert
       const guestsToInsert = guestsToSave.map(g => {
         const normalizedBulkPhone = normalizePhoneNumber(g.guestPhone);
+        const { firstName, lastName } = splitFullName(g.guestFullName);
         return {
           user_id: user.id,
           event_id: bulkEventId,
-          first_name: g.guestFirstName.trim(),
-          last_name: g.guestLastName.trim(),
+          first_name: firstName,
+          last_name: lastName,
           phone: normalizedBulkPhone || g.guestPhone.toString().trim(),
           email: null,
           total_guests: 1,
@@ -4756,8 +4774,7 @@ React.useEffect(() => {
                 .filter(Boolean)
                 .map(({ inserted, original }) => ({
                   guestId: inserted.id,
-                  guestFirstName: original?.guestFirstName || inserted.first_name || '',
-                  guestLastName: original?.guestLastName || inserted.last_name || '',
+                  guestFullName: original?.guestFullName || joinFullName(inserted.first_name, inserted.last_name),
                   guestPhone: inserted.phone || original?.guestPhone || '',
                   guestTable: original?.guestTable || inserted.table_number || '',
                   channel: 'sms',
@@ -4810,9 +4827,6 @@ React.useEffect(() => {
         }
       } else if (sendWhatsApp && insertedGuests && insertedGuests.length > 0) {
         // Save + send WhatsApp via Meta API for inserted guests
-        // #region agent log
-        fetch('http://127.0.0.1:7780/ingest/b5f4ac25-b263-42d9-8749-29626868bbeb',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'dcd254'},body:JSON.stringify({sessionId:'dcd254',runId:'initial',hypothesisId:'H1',location:'components/StepButtons.js:2512',message:'Bulk WhatsApp branch triggered',data:{bulkEventId,insertedGuestsCount:insertedGuests.length},timestamp:Date.now()})}).catch(()=>{});
-        // #endregion
         setShowExcelPreview(false);
         setExcelPreviewData([]);
         setExcelErrors([]);
@@ -4854,8 +4868,7 @@ React.useEffect(() => {
                 .filter(Boolean)
                 .map(({ inserted, original }) => ({
                   guestId: inserted.id,
-                  guestFirstName: original?.guestFirstName || inserted.first_name || '',
-                  guestLastName: original?.guestLastName || inserted.last_name || '',
+                  guestFullName: original?.guestFullName || joinFullName(inserted.first_name, inserted.last_name),
                   guestPhone: inserted.phone || original?.guestPhone || '',
                   guestTable: original?.guestTable || inserted.table_number || '',
                   channel: 'whatsapp',
@@ -4936,8 +4949,8 @@ React.useEffect(() => {
       // Re-validate the row
       const guest = updated[index];
       const rowErrors = [];
-      if (!guest.guestFirstName.trim()) rowErrors.push('שם פרטי חסר');
-      if (!guest.guestLastName.trim()) rowErrors.push('שם משפחה חסר');
+      if (!String(guest.guestFullName || '').trim()) rowErrors.push('שם מלא חסר');
+      if (!String(guest.guestTable || '').trim()) rowErrors.push('מספר שולחן חסר');
       if (!guest.guestPhone.toString().trim()) {
         rowErrors.push('טלפון חסר');
       } else {
@@ -8266,8 +8279,7 @@ React.useEffect(()=>{
   const openMobileReminderForGuest = React.useCallback((guest) => {
     if (guest) {
       setGuestData({
-        guestFirstName: guest.first_name || '',
-        guestLastName: guest.last_name || '',
+        guestFullName: joinFullName(guest.first_name, guest.last_name),
         guestPhone: guest.phone || '',
         guestTable: guest.table_number || '',
       });
@@ -9893,12 +9905,8 @@ React.useEffect(()=>{
           {guestSubmitAttempted && guestErrorMsg && <p className="mb-3 rounded-xl border border-red-400/30 bg-red-500/10 p-3 text-red-300 text-base font-semibold text-center">{guestErrorMsg}</p>}
           <form className="space-y-4 rounded-3xl border border-white/15 bg-white/[0.045] p-4 sm:rounded-none sm:border-0 sm:bg-transparent sm:p-0">
             <div>
-              <label className="block mb-1.5 text-sm font-bold text-slate-300 sm:mb-1 sm:font-medium sm:text-white">שם פרטי</label>
-              <input type="text" placeholder="שם פרטי" value={guestData.guestFirstName} onChange={(e) => setGuestData({ ...guestData, guestFirstName: e.target.value })} className={`w-full bg-white/10 border border-white/20 text-white placeholder-slate-400 rounded-xl focus:border-indigo-400 p-3.5 pr-4 sm:p-2 sm:pr-2 outline-none ${visibleGuestErrors.guestFirstName ? 'border-red-400 ring-2 ring-red-400/20' : ''}`} />
-            </div>
-            <div>
-              <label className="block mb-1.5 text-sm font-bold text-slate-300 sm:mb-1 sm:font-medium sm:text-white">שם משפחה</label>
-              <input type="text" placeholder="שם משפחה" value={guestData.guestLastName} onChange={(e) => setGuestData({ ...guestData, guestLastName: e.target.value })} className={`w-full bg-white/10 border border-white/20 text-white placeholder-slate-400 rounded-xl focus:border-indigo-400 p-3.5 pr-4 sm:p-2 sm:pr-2 outline-none ${visibleGuestErrors.guestLastName ? 'border-red-400 ring-2 ring-red-400/20' : ''}`} />
+              <label className="block mb-1.5 text-sm font-bold text-slate-300 sm:mb-1 sm:font-medium sm:text-white">שם מלא</label>
+              <input type="text" placeholder="שם מלא" value={guestData.guestFullName} onChange={(e) => setGuestData({ ...guestData, guestFullName: e.target.value })} className={`w-full bg-white/10 border border-white/20 text-white placeholder-slate-400 rounded-xl focus:border-indigo-400 p-3.5 pr-4 sm:p-2 sm:pr-2 outline-none ${visibleGuestErrors.guestFullName ? 'border-red-400 ring-2 ring-red-400/20' : ''}`} />
             </div>
             <div>
               <label className="block mb-1.5 text-sm font-bold text-slate-300 sm:mb-1 sm:font-medium sm:text-white">מספר שולחן</label>
@@ -10047,7 +10055,7 @@ React.useEffect(()=>{
         <ModalBody>
           <div className="space-y-4 text-right">
               <p className="text-slate-300">
-                הקובץ צריך להכיל <strong>4 עמודות</strong> בסדר הבא:
+                הקובץ צריך להכיל <strong>3 עמודות</strong> בסדר הבא:
               </p>
 
               <div className="bg-white/5 border border-white/10 rounded-xl p-3 overflow-x-auto">
@@ -10057,25 +10065,21 @@ React.useEffect(()=>{
                       <th className="border border-white/10 px-3 py-2 text-center font-bold text-primary">A</th>
                       <th className="border border-white/10 px-3 py-2 text-center font-bold text-primary">B</th>
                       <th className="border border-white/10 px-3 py-2 text-center font-bold text-primary">C</th>
-                      <th className="border border-white/10 px-3 py-2 text-center font-bold text-primary">D</th>
                     </tr>
                   </thead>
                   <tbody>
                     <tr className="bg-white/5">
-                      <td className="border border-white/10 px-3 py-2 text-center font-medium text-slate-300">שם פרטי</td>
-                      <td className="border border-white/10 px-3 py-2 text-center font-medium text-slate-300">שם משפחה</td>
+                      <td className="border border-white/10 px-3 py-2 text-center font-medium text-slate-300">שם מלא</td>
                       <td className="border border-white/10 px-3 py-2 text-center font-medium text-slate-300">מס׳ שולחן</td>
                       <td className="border border-white/10 px-3 py-2 text-center font-medium text-slate-300">טלפון</td>
                     </tr>
                     <tr>
-                      <td className="border border-white/10 px-3 py-2 text-center text-slate-400">ישראל</td>
-                      <td className="border border-white/10 px-3 py-2 text-center text-slate-400">ישראלי</td>
+                      <td className="border border-white/10 px-3 py-2 text-center text-slate-400">ישראל ישראלי</td>
                       <td className="border border-white/10 px-3 py-2 text-center text-slate-400">1</td>
                       <td className="border border-white/10 px-3 py-2 text-center text-slate-400">0501234567</td>
                     </tr>
                     <tr>
-                      <td className="border border-white/10 px-3 py-2 text-center text-slate-400">שרה</td>
-                      <td className="border border-white/10 px-3 py-2 text-center text-slate-400">כהן</td>
+                      <td className="border border-white/10 px-3 py-2 text-center text-slate-400">שרה כהן</td>
                       <td className="border border-white/10 px-3 py-2 text-center text-slate-400">2</td>
                       <td className="border border-white/10 px-3 py-2 text-center text-slate-400">0529876543</td>
                     </tr>
@@ -10086,6 +10090,12 @@ React.useEffect(()=>{
               <div className="bg-indigo-500/10 border border-indigo-400/30 rounded-lg p-3 text-sm">
                 <p className="text-indigo-200">
                   <strong>שם העמודות לא משנה</strong> - רק הסדר חשוב. השורה הראשונה היא שורת כותרות.
+                </p>
+              </div>
+
+              <div className="bg-slate-500/10 border border-white/15 rounded-lg p-3 text-sm">
+                <p className="text-slate-300">
+                  <strong>תמיכה לאחור:</strong> קובץ ישן עם 4 עמודות (שם פרטי, שם משפחה, מס׳ שולחן, טלפון) עדיין נתמך.
                 </p>
               </div>
 
@@ -10153,8 +10163,7 @@ React.useEffect(()=>{
                 <thead className="bg-primary text-white sticky top-0">
                   <tr>
                     <th className="p-2 border-b border-white/10">#</th>
-                    <th className="p-2 border-b border-white/10">שם פרטי</th>
-                    <th className="p-2 border-b border-white/10">שם משפחה</th>
+                    <th className="p-2 border-b border-white/10">שם מלא</th>
                     <th className="p-2 border-b border-white/10">מספר שולחן</th>
                     <th className="p-2 border-b border-white/10">טלפון</th>
                     <th className="p-2 border-b border-white/10">סטטוס</th>
@@ -10171,16 +10180,8 @@ React.useEffect(()=>{
                       <td className="p-2">
                         <input
                           type="text"
-                          value={guest.guestFirstName}
-                          onChange={(e) => handleEditExcelRow(idx, 'guestFirstName', e.target.value)}
-                          className="w-full bg-white/10 border border-white/20 text-white placeholder-slate-400 rounded-lg px-2 py-1 outline-none focus:border-indigo-400"
-                        />
-                      </td>
-                      <td className="p-2">
-                        <input
-                          type="text"
-                          value={guest.guestLastName}
-                          onChange={(e) => handleEditExcelRow(idx, 'guestLastName', e.target.value)}
+                          value={guest.guestFullName}
+                          onChange={(e) => handleEditExcelRow(idx, 'guestFullName', e.target.value)}
                           className="w-full bg-white/10 border border-white/20 text-white placeholder-slate-400 rounded-lg px-2 py-1 outline-none focus:border-indigo-400"
                         />
                       </td>
@@ -12038,7 +12039,7 @@ React.useEffect(()=>{
                   <div className="space-y-3">
                     <p className="text-slate-300 leading-relaxed">בשלב זה תשלח את ההזמנות לאורחים:</p>
                     <ul className="list-disc list-inside space-y-2 mr-4">
-                      <li><strong>מילוי פרטי אורח</strong> - שם פרטי, שם משפחה וטלפון</li>
+                      <li><strong>מילוי פרטי אורח</strong> - שם מלא, מספר שולחן וטלפון</li>
                       <li><strong>שליחה בוואטסאפ</strong> - הזמנה מעוצבת + קישור RSVP ייחודי</li>
                       <li><strong>שליחה ב-SMS</strong> - הודעת טקסט + קישור RSVP</li>
                       <li><strong>קישור RSVP ייחודי</strong> - כל אורח מקבל קישור אישי לאישור הגעה</li>
@@ -12332,8 +12333,7 @@ React.useEffect(()=>{
                     setShowInvitationResultModal(false);
                     // Reset guest form
                     setGuestData({
-                      guestFirstName: '',
-                      guestLastName: '',
+                      guestFullName: '',
                       guestPhone: '',
                       guestTable: '',
                     });
