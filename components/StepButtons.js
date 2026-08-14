@@ -34,7 +34,6 @@ import {
   resolveDisplayEventType,
   isEventWizardDraft,
   shouldKeepEventWizardStarted,
-  hasEventEnded,
   shouldRestorePaidPlanFromSettings,
   isPaidWizardInProgress as computePaidWizardInProgress,
   shouldAllowWizardAutoResume,
@@ -42,6 +41,9 @@ import {
   validateActiveEventPointer,
   hasOperableEventSession,
   shouldArchiveOrphanedEvent,
+  shouldAutoCloseEndedEvent,
+  isEventArchived,
+  isEventDateBeforeToday,
 } from '../lib/eventLifecycle';
 import MobileQuickGuestsCard from './mobile/MobileQuickGuestsCard';
 import MobileQuickGuestListScreen, { MOBILE_GUEST_LIST_PAGE_SIZE } from './mobile/MobileQuickGuestListScreen';
@@ -810,6 +812,7 @@ const [hasWhatsAppGroup, setHasWhatsAppGroup] = useState(false);
   const [stepBarHeight, setStepBarHeight] = useState(null);
   const stepBarAnchorRef = useRef(null);
   const tryOpenWizardStepRef = useRef(null);
+  const openPastEventsArchiveRef = useRef(null);
   const syncPurchasedPlanFromServerRef = useRef(null);
   const beginCreateNewEventFlowRef = useRef(null);
   const scrollToWizardSectionRef = useRef(null);
@@ -1945,6 +1948,7 @@ const additionalPackageCounts = React.useMemo(() => {
   return counts;
 }, [additionalPackages, addonCountForDisplay]);
 const canRenderCharts = Boolean(
+  isCurrentEventActive &&
   currentEventId &&
   (eventDataLoaded || isWizardEventSessionProtected()),
 );
@@ -1966,7 +1970,7 @@ useEffect(() => {
   };
 }, [canRenderCharts, currentEventId]);
 const shouldShowCharts = canRenderCharts && chartsReady;
-const shouldShowWhatsAppGroupUpdateButton = Boolean(currentEventId && (hasWhatsAppGroup || eventDataLoaded));
+const shouldShowWhatsAppGroupUpdateButton = Boolean(isCurrentEventActive && (hasWhatsAppGroup || eventDataLoaded));
 
   /** נתוני גרף יתרת הודעות — useMemo כדי שלא ייווצר מערך חדש בכל רינדור (Recharts + הבהוב) */
   const messageCapacityChartModel = React.useMemo(() => {
@@ -3092,7 +3096,7 @@ const handleOpenAddonModal = React.useCallback(() => {
 
   // Helper function to check if there's an active event
   const hasActiveEvent = () => {
-    return Boolean(currentEventId);
+    return Boolean(isCurrentEventActive);
   };
 
   // Expose imperative methods to parent components
@@ -5130,7 +5134,6 @@ React.useEffect(() => {
 
   const clearEndedEvent = async (eventId) => {
     if (!eventId) return;
-    if (reportsViewActiveRef.current || isReportsUiOpenRef.current) return;
     if (clearEndedEventInFlightRef.current === eventId) return;
 
     try {
@@ -5140,9 +5143,11 @@ React.useEffect(() => {
         .eq('id', eventId)
         .maybeSingle();
       if (isEventWizardDraft(ev)) return;
-      const rawDate = getRawEventDateFromDetails(getEventDetailsFromRecord(ev));
-      if (!rawDate) return;
-      if (isEventDateOnOrAfterToday(rawDate)) return;
+      if (!shouldAutoCloseEndedEvent(ev) && !isEventArchived(ev)) {
+        const rawDate = getRawEventDateFromDetails(getEventDetailsFromRecord(ev));
+        if (!rawDate) return;
+        if (!isEventDateBeforeToday(rawDate)) return;
+      }
     } catch (_) {
       const clientDate = formData?.date || formData?.start_datetime;
       if (!clientDate) return;
@@ -5169,6 +5174,10 @@ React.useEffect(() => {
         console.error('Failed to clear ended event:', err);
       }
 
+      if (reportsViewActiveRef.current || isReportsUiOpenRef.current) {
+        return;
+      }
+
       clearCarryPlanAfterManualDelete();
       clearStaleWizardLocalStorage();
       await clearPlanState();
@@ -5179,6 +5188,32 @@ React.useEffect(() => {
       }
     }
   };
+
+  React.useEffect(() => {
+    if (!currentEventId) return undefined;
+    const maybeClose = () => {
+      const raw = formData?.date || formData?.start_datetime;
+      if (raw && isEventDateBeforeToday(raw)) {
+        clearEndedEvent(currentEventId);
+      }
+    };
+    maybeClose();
+    const intervalId = setInterval(maybeClose, 60 * 1000);
+    const onVisibility = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        maybeClose();
+      }
+    };
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', onVisibility);
+    }
+    return () => {
+      clearInterval(intervalId);
+      if (typeof document !== 'undefined') {
+        document.removeEventListener('visibilitychange', onVisibility);
+      }
+    };
+  }, [currentEventId, formData?.date, formData?.start_datetime]);
 
   const handleNewEvent = async (showDeletionMessage = false) => {
     setShowExistingEventWarning(false);
@@ -6907,6 +6942,13 @@ React.useEffect(() => {
         }
 
         if (ev) {
+          if (isEventArchived(ev) || shouldAutoCloseEndedEvent(ev) || (!isEventRecordActive(ev) && !isEventWizardDraft(ev))) {
+            if (shouldAutoCloseEndedEvent(ev)) {
+              await clearEndedEvent(ev.id);
+            }
+            return;
+          }
+
           noEventLoggedRef.current = false;
 
           const details = typeof ev.event_details === 'string'
@@ -7258,7 +7300,18 @@ React.useEffect(() => {
           ev = anyEv;
           messagesSent = anyEv?.messages_sent_count ?? 0;
         }
-        if (ev && (isEventRecordActive(ev) || isEventWizardDraft(ev) || hasEventEnded(ev))) {
+        if (ev && shouldAutoCloseEndedEvent(ev)) {
+          await clearEndedEvent(ev.id);
+          setEventDataLoaded(true);
+          isInitialLoadRef.current = false;
+          return;
+        }
+        if (ev && isEventArchived(ev)) {
+          setEventDataLoaded(true);
+          isInitialLoadRef.current = false;
+          return;
+        }
+        if (ev && (isEventRecordActive(ev) || isEventWizardDraft(ev))) {
           const isDraftWizard = isEventWizardDraft(ev);
           setCurrentEventId(ev.id);
           if (ev.event_type && !isWizardPlaceholderEventType(ev.event_type)) {
@@ -7910,6 +7963,65 @@ React.useEffect(()=>{
     scrollWizardHome();
   }, [suppressWizardStep, scrollWizardHome]);
 
+  const openPastEventsArchive = React.useCallback(async () => {
+    try {
+      const user = await resolveCurrentUserForSync();
+      if (!user) {
+        alert('יש להתחבר כדי להציג.');
+        return;
+      }
+
+      setArchiveLoading(true);
+      setArchiveEvents([]);
+      setShowArchiveList(true);
+
+      const { data: allEv, error } = await supabase
+        .from('events')
+        .select('id,event_type,event_details,status')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(500);
+
+      if (error) throw error;
+
+      const pastEvMap = new Map();
+
+      (allEv || []).forEach((ev) => {
+        try {
+          if (isWizardPlaceholderEventType(ev.event_type)) return;
+          const details = getEventDetailsFromRecord(ev);
+          const dateStr = getRawEventDateFromDetails(details);
+          if (!dateStr || !String(dateStr).trim()) return;
+          const eventDate = parseEventDate(dateStr);
+          if (!eventDate) return;
+          eventDate.setHours(0, 0, 0, 0);
+          if (!isEventDateBeforeToday(dateStr)) return;
+          pastEvMap.set(ev.id, {
+            ...ev,
+            event_type: resolveDisplayEventType(ev.event_type) || ev.event_type || 'אירוע',
+            event_details: details,
+            _eventDate: eventDate,
+          });
+        } catch (e) {
+          console.error('Error processing event:', e);
+        }
+      });
+
+      const pastEvArray = Array.from(pastEvMap.values());
+      pastEvArray.sort((a, b) => {
+        if (!a._eventDate || !b._eventDate) return 0;
+        return b._eventDate - a._eventDate;
+      });
+      setArchiveEvents(pastEvArray);
+      setArchiveLoading(false);
+    } catch (e) {
+      console.error(e);
+      setArchiveLoading(false);
+      alert('שגיאה בטעינת אירועי ארכיון');
+      setShowArchiveList(false);
+    }
+  }, []);
+
   const openReportsOptionsModal = React.useCallback(() => {
     openingChildReportRef.current = false;
     reportsViewActiveRef.current = true;
@@ -8123,9 +8235,10 @@ React.useEffect(()=>{
 
   React.useEffect(() => {
     tryOpenWizardStepRef.current = tryOpenWizardStep;
+    openPastEventsArchiveRef.current = openPastEventsArchive;
     scrollToWizardSectionRef.current = scrollToWizardSection;
     getFirstIncompleteWizardStepRef.current = getFirstIncompleteWizardStep;
-  }, [getFirstIncompleteWizardStep, tryOpenWizardStep, scrollToWizardSection]);
+  }, [getFirstIncompleteWizardStep, tryOpenWizardStep, scrollToWizardSection, openPastEventsArchive]);
 
   React.useEffect(() => {
     if (!session) return undefined;
@@ -8978,7 +9091,7 @@ React.useEffect(()=>{
         </>
       ) : null}
 
-      {hasSession && currentEventId && mobileDashboardModel.showGuestPrimary && (
+      {hasSession && isCurrentEventActive && currentEventId && mobileDashboardModel.showGuestPrimary && (
         <MobileQuickGuestsCard
           guestStatusSummary={guestStatusSummary}
           guestSummary={guestSummary}
@@ -9362,8 +9475,7 @@ React.useEffect(()=>{
       </div>
       )}
 
-      {/* Error message is now displayed in HeroSection instead */}
-      {/* Status and Summary Tables */}
+      {isCurrentEventActive && (
       <div ref={reportsSectionRef} className="w-full px-4 mb-0 mt-4 pb-16">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 w-full">
           
@@ -9567,6 +9679,7 @@ React.useEffect(()=>{
 
         </div>
       </div>
+      )}
 
       <Modal open={showEventTypes} onClose={closeEventTypesModal} size="md">
         <ModalHeader onClose={closeEventTypesModal}>בחר סוג אירוע</ModalHeader>
@@ -11468,88 +11581,9 @@ React.useEffect(()=>{
             <button onClick={()=>{leaveReportsMenuForChild();setShowPendingReport(true);}} className="w-full bg-white/[0.06] text-slate-100 border border-white/15 rounded-full px-4 py-2 text-lg font-medium hover:bg-indigo-500/15 hover:border-indigo-400/50 transition-all">{RSVP_STATUS_LABELS.pending}</button>
             {/* Guest status query button */}
             <button onClick={()=>{leaveReportsMenuForChild();setShowSearchGuest(true);}} className="w-full bg-white/[0.06] text-slate-100 border border-white/15 rounded-full px-4 py-2 text-lg font-medium hover:bg-indigo-500/15 hover:border-indigo-400/50 transition-all">שאילתת סטטוס אורח</button>
-            <button onClick={async ()=>{
+            <button onClick={()=>{
               leaveReportsMenuForChild();
-              try{
-                const user = await resolveCurrentUserForSync();
-                if(!user){alert('יש להתחבר כדי להציג.');return;}
-                
-                // Show loading indicator
-                setArchiveLoading(true);
-                setArchiveEvents([]);
-                setShowArchiveList(true);
-                
-                // Fetch all events (including invalid types) to show all past events, then filter client-side
-                const {data: allEv, error} = await supabase
-                  .from('events')
-                  .select('id,event_type,event_details')
-                  .eq('user_id',user.id)
-                  .order('created_at',{ascending:false})
-                  .limit(100); // Limit to prevent loading too many events
-                
-                if(error) throw error;
-                
-                const today = new Date();
-                today.setHours(0, 0, 0, 0);
-                
-                // Process events efficiently - include all past events with valid event_type
-                // Deduplicate by event_type + date combination to prevent same event appearing multiple times
-                const pastEvMap = new Map(); // Use Map keyed by event_type + date to ensure uniqueness
-                
-                (allEv || []).forEach(ev => {
-                  try {
-                    // Only include events with valid event_type
-                    if (!ev.event_type || !eventTypes.includes(ev.event_type)) return;
-                    
-                    const details = typeof ev.event_details === 'string' 
-                      ? JSON.parse(ev.event_details) 
-                      : ev.event_details || {};
-                    const dateStr = details.date || details.start_datetime;
-                    if (!dateStr) return;
-                    
-                    const dt = parseEventDate(dateStr);
-                    if (!dt) return;
-                    
-                    const eventDate = new Date(dt);
-                    eventDate.setHours(0, 0, 0, 0);
-                    
-                    // Only include past events (not today)
-                    if (eventDate >= today) return;
-                    
-                    // Create unique key for deduplication: type + date (not id, as same event can have multiple ids)
-                    const eventKey = `${ev.event_type}-${eventDate.toISOString().slice(0,10)}`;
-                    
-                    // Only add if we haven't seen this exact type+date combination
-                    // If we've seen it, keep the one with the most recent created_at (already sorted descending)
-                    if (!pastEvMap.has(eventKey)) {
-                      pastEvMap.set(eventKey, {
-                        ...ev,
-                        event_details: details,
-                        _eventDate: eventDate
-                      });
-                    }
-                  } catch (e) {
-                    console.error('Error processing event:', e);
-                  }
-                });
-                
-                // Convert map values to array - each event will appear only once
-                const pastEvArray = Array.from(pastEvMap.values());
-                
-                // Sort by date descending (most recent first)
-                pastEvArray.sort((a, b) => {
-                  if (!a._eventDate || !b._eventDate) return 0;
-                  return b._eventDate - a._eventDate;
-                });
-                
-                setArchiveEvents(pastEvArray);
-                setArchiveLoading(false);
-              }catch(e){
-                console.error(e);
-                setArchiveLoading(false);
-                alert('שגיאה בטעינת אירועי ארכיון');
-                setShowArchiveList(false);
-              }
+              openPastEventsArchive();
             }} className="w-full bg-white/[0.06] text-slate-100 border border-white/15 rounded-full px-4 py-2 text-lg font-medium hover:bg-indigo-500/15 hover:border-indigo-400/50 transition-all">אירועים מהעבר</button>
 
             {/* Exit archive event button */}
@@ -12410,11 +12444,9 @@ React.useEffect(()=>{
                   const date=dateObj?format(dateObj,'dd/MM/yyyy',{locale:he}):'-';
                   return (
                     <li key={ev.id} className="border border-white/15 rounded-lg p-4 bg-white/[0.055] hover:bg-indigo-500/15 hover:border-indigo-400/50 cursor-pointer flex flex-col items-center justify-center text-center shadow-md hover:shadow-lg transition-all transform hover:scale-105" onClick={()=>{
-                      // IMPORTANT: Don't set currentEventId for archive events - this would reset the active event!
-                      // Only use selectedEventForReport for viewing reports from archive
                       setShowArchiveList(false);
                       setSelectedEventForReport(ev);
-                      tryOpenWizardStep(5, { userInitiated: true });
+                      openReportsOptionsModal();
                     }}>
                       <span className="font-bold text-lg text-primary mb-1">{ev.event_type||'אירוע'}</span>
                       <span className="text-sm font-medium text-slate-300">{date}</span>

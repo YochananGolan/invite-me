@@ -7,6 +7,7 @@
  */
 
 import { createClient } from '@supabase/supabase-js';
+import { archiveEndedEvents } from '../../lib/archiveEndedEvents';
 import { sendSmsToGuests } from '../../lib/activeTrailSms';
 import { getInviteBaseUrl } from '../../lib/inviteUrl';
 import { normalizePhoneNumber, sendWhatsAppTextMessage } from '../../lib/whatsappClient';
@@ -75,6 +76,12 @@ export default async function handler(req, res) {
   }
 
   const supabase = createClient(supabaseUrl, supabaseKey);
+
+  try {
+    await archiveEndedEvents(supabase);
+  } catch (archiveErr) {
+    console.error('[send-reminders] archive ended events failed', archiveErr);
+  }
 
   const REMINDER_DAYS_BEFORE = parseInt(process.env.REMINDER_DAYS_BEFORE || '5', 10);
   const now = new Date();
