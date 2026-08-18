@@ -33,10 +33,12 @@ import {
   isWizardPlaceholderEventType,
   resolveDisplayEventType,
   isEventWizardDraft,
+  hasEventEnded,
   shouldKeepEventWizardStarted,
   shouldRestorePaidPlanFromSettings,
   isPaidWizardInProgress as computePaidWizardInProgress,
   shouldAllowWizardAutoResume,
+  hasPaidWizardAccess as computeHasPaidWizardAccess,
   clearStaleWizardLocalStorage,
   validateActiveEventPointer,
   hasOperableEventSession,
@@ -1642,6 +1644,18 @@ const isPaidWizardInProgress = React.useMemo(() => computePaidWizardInProgress({
   isEndedPastEvent,
 ]);
 
+const hasPaidWizardAccess = React.useMemo(() => computeHasPaidWizardAccess({
+  isCurrentEventActive,
+  isPaidWizardInProgress,
+  plan: userPlanSettings?.plan,
+  eventWizardStarted: userPlanSettings?.eventWizardStarted,
+}), [
+  isCurrentEventActive,
+  isPaidWizardInProgress,
+  userPlanSettings?.plan,
+  userPlanSettings?.eventWizardStarted,
+]);
+
 const isCurrentEventActiveRef = useRef(false);
 const isPaidWizardInProgressRef = useRef(false);
 useEffect(() => {
@@ -2215,6 +2229,14 @@ const handleOpenAddonModal = React.useCallback(() => {
   };
 
   const handleSelectEvent = (type) => {
+    if (!hasPaidWizardAccess) {
+      setShowEventTypes(false);
+      setStepErrorMsg(WIZARD_START_FIRST_MSG);
+      setShowStepError(true);
+      setPlanAddOnMode(false);
+      setShowPricingPlan(true);
+      return;
+    }
     const normalizedType = normalizeType(type);
     selectedEventTypeRef.current = normalizedType;
     setSelectedEventType(normalizedType);
@@ -3036,7 +3058,9 @@ const handleOpenAddonModal = React.useCallback(() => {
         }
 
         if (!isEventRecordActive(data) && !isEventWizardDraft(data)) {
-          // Keep the current event loaded so reports stay visible.
+          // אירוע שהסתיים/אורכב לא נשאר טעון — clearEventDetails מדלג כשהמשתמש נמצא בתוך דוח
+          clearEventDetails();
+          return;
         } else if (!isEventRecordActive(data) && isEventWizardDraft(data)) {
           setCurrentEventId(data.id);
           setEventDataLoaded(true);
@@ -3831,12 +3855,13 @@ const handleOpenAddonModal = React.useCallback(() => {
     || selectedEventForReport
   );
   React.useEffect(() => {
-    if (isReportsUiOpen || openingChildReportRef.current || reportsViewActiveRef.current) {
+    if (isReportsUiOpen || openingChildReportRef.current || reportsSessionLockRef.current) {
       isReportsUiOpenRef.current = true;
       reportsViewActiveRef.current = true;
       return;
     }
     isReportsUiOpenRef.current = false;
+    reportsViewActiveRef.current = false;
   }, [isReportsUiOpen]);
   
   const cleanupGuestsAfterFailedSend = useCallback(async (guestIds = []) => {
@@ -5213,7 +5238,8 @@ React.useEffect(() => {
         document.removeEventListener('visibilitychange', onVisibility);
       }
     };
-  }, [currentEventId, formData?.date, formData?.start_datetime]);
+    // isReportsUiOpen בתלויות: ברגע שיוצאים מהדוחות מנקים מיד, בלי להמתין לטיק הבא
+  }, [currentEventId, formData?.date, formData?.start_datetime, isReportsUiOpen]);
 
   const handleNewEvent = async (showDeletionMessage = false) => {
     setShowExistingEventWarning(false);
@@ -6123,6 +6149,16 @@ React.useEffect(() => {
           ev = anyEv;
           messagesSent = anyEv?.messages_sent_count ?? 0;
         }
+        // אירוע שהסתיים/אורכב לא חוזר להיות האירוע הנוכחי — אחרת הדוחות השוטפים מתאחזרים אחרי כל רענון
+        if (ev && (isEventArchived(ev) || hasEventEnded(ev))) {
+          if (shouldAutoCloseEndedEvent(ev)) {
+            await clearEndedEvent(ev.id);
+          } else {
+            clearWizardDismissedEvent();
+            await resetWizardStateForNoEvent();
+          }
+          return;
+        }
         if (!ev) {
           if (currentEventId && (isWizardEventSessionProtected() || isReportsUiOpenRef.current || reportsViewActiveRef.current)) {
             return;
@@ -6726,34 +6762,17 @@ React.useEffect(() => {
     }
   }, [showStepError, stepErrorMsg]);
 
-  // נקה הודעת "צור אירוע" אם כבר יש אירוע/מסלול פעיל (למשל אחרי טעינה מאוחרת מ-DB)
+  // נקה הודעת "צור אירוע" רק אחרי תשלום אמיתי / אירוע פעיל, לא לפי שאריות מקומיות
   React.useEffect(() => {
     if (!showStepError || stepErrorMsg !== WIZARD_START_FIRST_MSG) return;
-    const hasActiveContext = Boolean(
-      currentEventId ||
-      newEventStarted ||
-      userPlanSettings?.eventWizardStarted ||
-      planForDisplay ||
-      selectedPlan ||
-      userPlanSettings?.plan ||
-      (eventDataLoaded && (invitedCount > 0 || formDataHasMeaningfulValues))
-    );
-    if (hasActiveContext) {
+    if (hasPaidWizardAccess) {
       setShowStepError(false);
       setStepErrorMsg('');
     }
   }, [
-    currentEventId,
-    eventDataLoaded,
-    formDataHasMeaningfulValues,
-    invitedCount,
-    newEventStarted,
-    planForDisplay,
-    selectedPlan,
+    hasPaidWizardAccess,
     showStepError,
     stepErrorMsg,
-    userPlanSettings?.eventWizardStarted,
-    userPlanSettings?.plan,
   ]);
 
   // Auto-save invitation text and styles to database when they change (with debounce)
@@ -7317,6 +7336,17 @@ React.useEffect(() => {
           if (ev.event_type && !isWizardPlaceholderEventType(ev.event_type)) {
             setSelectedEventType(resolveDisplayEventType(ev.event_type));
           } else if (isDraftWizard) {
+            const canResumePaidWizard = shouldRestorePaidPlanFromSettings(
+              userPlanSettingsRef.current,
+              { eventRecord: ev },
+            );
+            if (!canResumePaidWizard) {
+              await clearEndedEvent(ev.id);
+              setCurrentEventIsWizardDraft(false);
+              setEventDataLoaded(true);
+              isInitialLoadRef.current = false;
+              return;
+            }
             setSelectedEventType('');
             setNewEventStarted(true);
             try { localStorage.setItem('newEventStarted', '1'); } catch (e) {}
@@ -7901,6 +7931,15 @@ React.useEffect(()=>{
   ), [isWizardAutoOpenBlocked, isWizardStepSuppressed]);
 
   const openEventDetailsModal = React.useCallback(() => {
+    if (!hasPaidWizardAccess) {
+      setShowEventDetails(false);
+      setShowEventTypes(false);
+      setStepErrorMsg(WIZARD_START_FIRST_MSG);
+      setShowStepError(true);
+      setPlanAddOnMode(false);
+      setShowPricingPlan(true);
+      return;
+    }
     const type = resolveDisplayEventType(selectedEventTypeRef.current || selectedEventType);
     if (!type) {
       setShowEventDetails(false);
@@ -7912,7 +7951,7 @@ React.useEffect(()=>{
     }
     if (isWizardStepOpenBlocked(2)) return;
     setShowEventDetails(true);
-  }, [selectedEventType, isWizardStepOpenBlocked]);
+  }, [hasPaidWizardAccess, selectedEventType, isWizardStepOpenBlocked]);
 
   const closeEventDetailsModal = React.useCallback(() => {
     suppressWizardStep(2);
@@ -7930,9 +7969,17 @@ React.useEffect(()=>{
 
   const openEventTypesModal = React.useCallback(() => {
     if (isWizardStepOpenBlocked(1)) return;
+    if (!hasPaidWizardAccess) {
+      setShowEventTypes(false);
+      setStepErrorMsg(WIZARD_START_FIRST_MSG);
+      setShowStepError(true);
+      setPlanAddOnMode(false);
+      setShowPricingPlan(true);
+      return;
+    }
     setShowEventTypes(true);
     setStepErrorMsg('');
-  }, [isWizardStepOpenBlocked]);
+  }, [hasPaidWizardAccess, isWizardStepOpenBlocked]);
 
   const openDesignChooserModal = React.useCallback(() => {
     if (isWizardStepOpenBlocked(3)) return;
@@ -8169,20 +8216,13 @@ React.useEffect(()=>{
       resetWizardDismissForUserProgress();
     }
 
-    const hasEstablishedWizardContext = Boolean(
-      currentEventId ||
-      newEventStarted ||
-      userPlanSettings?.eventWizardStarted ||
-      planForDisplay ||
-      selectedPlan ||
-      userPlanSettings?.plan ||
-      (eventDataLoaded && (invitedCount > 0 || formDataHasMeaningfulValues))
-    );
-    const mustStartFirst = !hasEstablishedWizardContext;
+    const mustStartFirst = !hasPaidWizardAccess;
     if (stepNumber >= 1 && stepNumber <= 4 && mustStartFirst) {
       if (userInitiated) {
         setStepErrorMsg(WIZARD_START_FIRST_MSG);
         setShowStepError(true);
+        setPlanAddOnMode(false);
+        setShowPricingPlan(true);
       }
       return false;
     }
@@ -8195,6 +8235,8 @@ React.useEffect(()=>{
             if (userInitiated) {
               setStepErrorMsg(WIZARD_START_FIRST_MSG);
               setShowStepError(true);
+              setPlanAddOnMode(false);
+              setShowPricingPlan(true);
             }
             return false;
           }
@@ -8212,16 +8254,8 @@ React.useEffect(()=>{
     allowWizardProgrammaticOpen(() => redirectToWizardStep(stepNumber, { force: userInitiated }));
     return true;
   }, [
-    currentEventId,
     isEndedPastEvent,
-    eventDataLoaded,
-    formDataHasMeaningfulValues,
-    invitedCount,
-    newEventStarted,
-    planForDisplay,
-    selectedPlan,
-    userPlanSettings?.eventWizardStarted,
-    userPlanSettings?.plan,
+    hasPaidWizardAccess,
     redirectToWizardStep,
     scrollToWizardSection,
     wizardStepCompletion,
@@ -11875,11 +11909,13 @@ React.useEffect(()=>{
               onClick={() => {
                 setShowDeletionSuccess(false);
                 setSelectedFlowStep(null);
-                tryOpenWizardStep(1, { userInitiated: true });
+                setShowEventTypes(false);
+                setPlanAddOnMode(false);
+                setShowPricingPlan(true);
               }}
               className="bg-emerald-600 text-white border border-emerald-400/50 rounded-full px-8 py-3 font-bold text-lg hover:bg-emerald-700 transition-all"
             >
-              בחר סוג אירוע חדש
+              המשך לבחירת מסלול תשלום
             </button>
         </ModalFooter>
       </Modal>
