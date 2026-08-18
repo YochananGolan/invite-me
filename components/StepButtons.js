@@ -1035,6 +1035,8 @@ const [hasWhatsAppGroup, setHasWhatsAppGroup] = useState(false);
     reportsSessionLockRef.current = true;
     reportsViewActiveRef.current = true;
     isReportsUiOpenRef.current = true;
+    // חזרנו לתפריט הדוחות ולא פותחים דוח — בלי איפוס הדגל, ה-X בתפריט היה נבלע בלחיצה הראשונה
+    openingChildReportRef.current = false;
     allowWizardProgrammaticOpen(() => {
       unblockWizardAutoOpen();
       wizardSuppressedStepsRef.current.delete(5);
@@ -8089,7 +8091,6 @@ React.useEffect(()=>{
       || showSearchGuest
       || showArchiveList
       || showGuestListModal
-      || selectedEventForReport
     );
     if (openingChildReportRef.current || stayingInReports) {
       openingChildReportRef.current = false;
@@ -8113,6 +8114,8 @@ React.useEffect(()=>{
     setShowPendingReport(false);
     setShowSearchGuest(false);
     setShowArchiveList(false);
+    // אירוע ארכיון נבחר משאיר את isReportsUiOpen דלוק ומונע יציאה מהדוחות
+    setSelectedEventForReport(null);
     setStepErrorMsg('');
   }, [
     suppressWizardStep,
@@ -8123,7 +8126,6 @@ React.useEffect(()=>{
     showSearchGuest,
     showArchiveList,
     showGuestListModal,
-    selectedEventForReport,
   ]);
 
   const leaveReportsMenuForChild = React.useCallback(() => {
