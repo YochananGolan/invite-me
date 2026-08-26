@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import { supabase } from '../lib/supabaseClient';
 import { ToastProvider } from '../components/Toast';
+import { shouldAutoCloseEndedEvent } from '../lib/eventLifecycle';
 
 const parseEventDateLocal = (str) => {
   if (!str) return null;
@@ -24,20 +25,8 @@ const parseEventDateLocal = (str) => {
 
 const getEventDateFromDetails = (details) => {
   if (!details || typeof details !== 'object') return null;
-  const raw = details.end_datetime || details.date || details.start_datetime || details.event_date || null;
+  const raw = details.date || details.start_datetime || details.event_date || details.end_datetime || null;
   return parseEventDateLocal(raw);
-};
-
-const isEventPast = (ev) => {
-  const details = typeof ev?.event_details === 'string'
-    ? (() => { try { return JSON.parse(ev.event_details); } catch (_) { return {}; } })()
-    : (ev?.event_details || {});
-  const eventDate = getEventDateFromDetails(details);
-  if (!eventDate) return false;
-  eventDate.setHours(0, 0, 0, 0);
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  return eventDate.getTime() < today.getTime();
 };
 
 function MyApp({ Component, pageProps }) {
@@ -153,56 +142,15 @@ function MyApp({ Component, pageProps }) {
     };
   }, []);
 
-  // --- Auto archive past events ---
+  // Keep a single primary event marked active. Auto-archive events after their calendar day in Israel.
   useEffect(() => {
     if (!session) return;
 
-    const archivePastEvents = async () => {
-      try {
-        console.log('[auto-archive] Starting archive check for user:', session.user.id);
-        const { data, error: evErr } = await supabase
-          .from('events')
-          .select('id, status, event_details')
-          .eq('user_id', session.user.id)
-          .or('status.eq.draft,status.eq.active,status.is.null');
-        if (evErr) {
-          console.error('[auto-archive] Error fetching events:', evErr);
-          throw evErr;
-        }
-        console.log('[auto-archive] Fetched', data?.length || 0, 'active/draft events');
-
-        const today = new Date();
-        // Get local date string (YYYY-MM-DD format)
-        const todayStr = today.toLocaleDateString('en-CA'); // This gives YYYY-MM-DD format
-        
-        console.log('[auto-archive] Raw date:', new Date().toISOString());
-        console.log('[auto-archive] Today local string:', todayStr);
-
-        const toArchive = (data || []).filter((ev) => {
-          const status = typeof ev?.status === 'string' ? ev.status.toLowerCase() : '';
-          if (status === 'archived') return false;
-          return isEventPast(ev);
-        }).map((ev) => ev.id);
-
-        if (toArchive.length === 0) return;
-
-        const { error: updErr } = await supabase
-          .from('events')
-          .update({ status: 'archived' })
-          .in('id', toArchive);
-        if (updErr) throw updErr;
-        console.debug(`[auto-archive] Archived ${toArchive.length} past events`);
-      } catch (e) {
-        console.error('[auto-archive] Failed', e);
-      }
-    };
-
     const enforceSingleActive = async () => {
       try {
-        // Fetch all non-archived events for the user
         const { data, error } = await supabase
           .from('events')
-          .select('id, status, event_details, created_at')
+          .select('id, status, event_details, event_type, created_at')
           .eq('user_id', session.user.id)
           .or('status.neq.archived,status.is.null')
           .order('created_at', { ascending: false });
@@ -210,7 +158,22 @@ function MyApp({ Component, pageProps }) {
 
         if (!data || data.length === 0) return;
 
-        // Choose the primary active event: the most recently created event that is today or future.
+        const endedIds = data.filter((ev) => shouldAutoCloseEndedEvent(ev)).map((ev) => ev.id);
+        if (endedIds.length > 0) {
+          let { error: archiveErr } = await supabase
+            .from('events')
+            .update({ status: 'archived', selected_plan: null, additional_packages: 0 })
+            .in('id', endedIds);
+          if (archiveErr && String(archiveErr.message || '').toLowerCase().includes('column')) {
+            ({ error: archiveErr } = await supabase
+              .from('events')
+              .update({ status: 'archived' })
+              .in('id', endedIds));
+          }
+          if (archiveErr) throw archiveErr;
+        }
+
+        const remaining = data.filter((ev) => !endedIds.includes(ev.id));
         const today = new Date();
         today.setHours(0, 0, 0, 0);
 
@@ -219,7 +182,7 @@ function MyApp({ Component, pageProps }) {
           return getEventDateFromDetails(details);
         };
 
-        let primary = data.find((ev) => {
+        let primary = remaining.find((ev) => {
           const dt = parseDate(ev);
           if (!dt) return false;
           dt.setHours(0, 0, 0, 0);
@@ -228,7 +191,7 @@ function MyApp({ Component, pageProps }) {
 
         if (!primary) return;
 
-        const demoteIds = data.filter((ev) => ev.id !== primary.id && ev.status === 'active').map((e) => e.id);
+        const demoteIds = remaining.filter((ev) => ev.id !== primary.id && ev.status === 'active').map((e) => e.id);
         const promoteNeeded = primary.status !== 'active';
 
         if (demoteIds.length > 0) {
@@ -255,10 +218,7 @@ function MyApp({ Component, pageProps }) {
       }
     };
 
-    (async () => {
-      await archivePastEvents();
-      await enforceSingleActive();
-    })();
+    enforceSingleActive();
   }, [session]);
 
   // --- Route guard ---

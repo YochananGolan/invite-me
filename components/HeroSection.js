@@ -2,7 +2,7 @@ import { forwardRef, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { RSVP_STATUS_LABELS } from '../lib/rsvpLabels';
 import { buildGuestRsvpStats } from '../lib/guestStats';
-import { shouldShowEventReports } from '../lib/eventLifecycle';
+import { shouldShowEventReports, shouldAutoCloseEndedEvent } from '../lib/eventLifecycle';
 
 const useTypewriter = (text, speed = 42, pauseDuration = 2600) => {
   const [displayedText, setDisplayedText] = useState('');
@@ -685,6 +685,28 @@ export default forwardRef(function HeroSection({ onStart, onPressCreateEvent, se
           .maybeSingle();
 
         if (eventError) throw eventError;
+
+        if (eventRecord && shouldAutoCloseEndedEvent(eventRecord)) {
+          try {
+            let { error: archiveError } = await supabase
+              .from('events')
+              .update({ status: 'archived', selected_plan: null, additional_packages: 0 })
+              .eq('id', eventRecord.id);
+            if (archiveError && String(archiveError.message || '').toLowerCase().includes('column')) {
+              ({ error: archiveError } = await supabase
+                .from('events')
+                .update({ status: 'archived' })
+                .eq('id', eventRecord.id));
+            }
+          } catch (archiveErr) {
+            console.error('Failed to archive ended event from hero', archiveErr);
+          }
+          if (!cancelled) {
+            setActiveReportSummary(null);
+            setActiveEventId(null);
+          }
+          return;
+        }
 
         if (!eventRecord || !shouldShowEventReports(eventRecord)) {
           if (!cancelled) {

@@ -10,51 +10,11 @@ export default function EventSummary() {
   const [stats, setStats] = useState({ approved: 0, rejected: 0, pending: 0, adults:0, children:0 });
   const [refreshKey, setRefreshKey] = useState(0);
 
-  // Auto-archive past events
-  const autoArchivePastEvents = async (user) => {
-    try {
-      const { data, error: evErr } = await supabase
-        .from('events')
-        .select('id, status, event_details')
-        .eq('user_id', user.id)
-        .in('status', ['draft', 'active'])
-        .order('created_at', { ascending: false })
-        .limit(100);
-
-      if (evErr) throw evErr;
-
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-
-      const toArchive = (data || []).filter(ev => {
-        const d = ev?.event_details || {};
-        const endStr = d.end_datetime || d.date || d.start_datetime;
-        if (!endStr) return false;
-        const end = new Date(endStr);
-        end.setHours(0, 0, 0, 0);
-        return end < today;
-      }).map(ev => ev.id);
-
-      if (toArchive.length > 0) {
-        await supabase
-          .from('events')
-          .update({ status: 'archived' })
-          .in('id', toArchive);
-        console.log(`🗄️ אורכבו אוטומטית ${toArchive.length} אירועים שעברו`);
-      }
-    } catch (e) {
-      console.error('Auto-archive failed:', e);
-    }
-  };
-
   useEffect(() => {
     (async () => {
       try {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
-
-        // Auto-archive past events first
-        await autoArchivePastEvents(user);
 
         const { data, error } = await supabase
           .from('events')
