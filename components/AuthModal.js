@@ -55,19 +55,13 @@ export default function AuthModal({ initialMode = 'sign_in', open = false, onClo
     show: false,
     email: '',
   });
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
+  const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
-  const [showSignUpPassword, setShowSignUpPassword] = useState(false);
-  const [showSignUpConfirmPassword, setShowSignUpConfirmPassword] = useState(false);
   const [signInEmail, setSignInEmail] = useState('');
-  const [signInPassword, setSignInPassword] = useState('');
-  const [showSignInPassword, setShowSignInPassword] = useState(false);
   const [signInLoading, setSignInLoading] = useState(false);
   const [signInError, setSignInError] = useState({ code: '', message: '' });
-  const [passwordResetSent, setPasswordResetSent] = useState(false);
   const [existingEmailNotice, setExistingEmailNotice] = useState({
     show: false,
     email: '',
@@ -82,12 +76,6 @@ export default function AuthModal({ initialMode = 'sign_in', open = false, onClo
     try {
       const emailInput = e.target.email.value;
       const emailNormalized = emailInput.trim().toLowerCase();
-      const password = e.target.password.value;
-      const confirmPassword = e.target.confirmPassword.value;
-
-      if (password !== confirmPassword) {
-        throw new Error('הסיסמאות אינן תואמות');
-      }
 
       try {
         const checkResponse = await fetch('/api/auth/check-email', {
@@ -122,28 +110,51 @@ export default function AuthModal({ initialMode = 'sign_in', open = false, onClo
         ? window.location.origin
         : (process.env.NEXT_PUBLIC_APP_URL || '').replace(/\/$/, '');
       const redirectUrl = `${siteUrl.replace(/\/$/, '')}/verify-email`;
-      const { data, error } = await supabase.auth.signUp({
-        email: emailInput,
-        password: password,
+      const trimmedFullName = fullName.trim();
+      const nameParts = trimmedFullName.split(/\s+/);
+      const firstName = nameParts[0] || '';
+      const lastName = nameParts.slice(1).join(' ') || '';
+
+      let authResult = await supabase.auth.signInWithOtp({
+        email: emailNormalized,
         options: {
           data: {
+            full_name: trimmedFullName,
             first_name: firstName,
             last_name: lastName,
             phone: phone
           },
-          emailRedirectTo: redirectUrl
+          emailRedirectTo: redirectUrl,
+          shouldCreateUser: true
         }
       });
 
-      if (error) throw error;
+      if (authResult.error) {
+        // Fallback to signUp with generated secure token if signInWithOtp is restricted
+        const generatedPassword = typeof crypto !== 'undefined' && crypto.randomUUID ? `P@ss_${crypto.randomUUID()}` : `P@ss_${Math.random().toString(36).slice(2)}${Date.now()}`;
+        authResult = await supabase.auth.signUp({
+          email: emailNormalized,
+          password: generatedPassword,
+          options: {
+            data: {
+              full_name: trimmedFullName,
+              first_name: firstName,
+              last_name: lastName,
+              phone: phone
+            },
+            emailRedirectTo: redirectUrl
+          }
+        });
+      }
+
+      if (authResult.error) throw authResult.error;
 
       setEmailVerificationNotice({
         show: true,
         email: emailInput,
       });
       setSuccessMsg('');
-      setFirstName('');
-      setLastName('');
+      setFullName('');
       setPhone('');
       e.target.reset();
     } catch (error) {
@@ -174,15 +185,13 @@ export default function AuthModal({ initialMode = 'sign_in', open = false, onClo
 
   const handleSignIn = async (e) => {
     e.preventDefault();
-    setPasswordResetSent(false);
 
     const email = signInEmail.trim().toLowerCase();
-    const password = signInPassword;
 
-    if (!email || !password) {
+    if (!email) {
       setSignInError({
         code: 'missing_credentials',
-        message: 'הזן אימייל וסיסמה כדי להיכנס',
+        message: 'הזן אימייל כדי לקבל קישור כניסה',
       });
       return;
     }
@@ -199,15 +208,6 @@ export default function AuthModal({ initialMode = 'sign_in', open = false, onClo
 
       if (checkResponse.ok) {
         const emailData = await checkResponse.json();
-        if (emailData?.skipped) {
-          setSignInError({
-            code: 'unknown',
-            message: 'לא ניתן לבדוק את האימייל כרגע. נסה שוב מאוחר יותר.',
-          });
-          setSignInLoading(false);
-          return;
-        }
-
         if (emailData && emailData.exists === false) {
           setSignInError({
             code: 'user_not_found',
@@ -216,29 +216,32 @@ export default function AuthModal({ initialMode = 'sign_in', open = false, onClo
           setSignInLoading(false);
           return;
         }
-      } else {
-        console.warn('check-email failed, skipping pre-check:', checkResponse.status);
-        setSignInError({
-          code: 'unknown',
-          message: 'לא ניתן לבדוק את האימייל כרגע. נסה שוב מאוחר יותר.',
-        });
-        setSignInLoading(false);
-        return;
       }
 
-      const { error } = await supabase.auth.signInWithPassword({
+      const siteUrl = typeof window !== 'undefined'
+        ? window.location.origin
+        : (process.env.NEXT_PUBLIC_APP_URL || '').replace(/\/$/, '');
+      const redirectUrl = `${siteUrl.replace(/\/$/, '')}/verify-email`;
+
+      const { data, error } = await supabase.auth.signInWithOtp({
         email,
-        password,
+        options: {
+          emailRedirectTo: redirectUrl,
+          shouldCreateUser: false
+        }
       });
 
       if (error) {
         const errMsg = (error.message || '').toLowerCase();
-        if (errMsg.includes('invalid login credentials')) {
-          setSignInError({ code: 'invalid_password', message: 'סיסמה שגויה' });
-        } else if (errMsg.includes('email not confirmed')) {
+        if (errMsg.includes('signups not allowed') || errMsg.includes('user not found')) {
           setSignInError({
-            code: 'email_not_confirmed',
-            message: 'האימייל קיים אבל טרם אומת. בדוק את תיבת הדואר שלך. אם מייל האימות מ-Supabase לא מופיע, בדוק בכל המיילים (All Mail).',
+            code: 'user_not_found',
+            message: 'האימייל לא רשום במערכת. ניתן להירשם כעת.',
+          });
+        } else if (errMsg.includes('rate limit') || errMsg.includes('rate_limit')) {
+          setSignInError({
+            code: 'rate_limit',
+            message: 'נשלחו יותר מדי בקשות לאחרונה. אנא נסה שוב בעוד כשעה.',
           });
         } else {
           setSignInError({
@@ -246,13 +249,16 @@ export default function AuthModal({ initialMode = 'sign_in', open = false, onClo
             message: error.message || 'שגיאה בהתחברות',
           });
         }
-
         setSignInLoading(false);
         return;
       }
 
+      setEmailVerificationNotice({
+        show: true,
+        email: email,
+      });
+      setSignInEmail('');
       setSignInLoading(false);
-      onClose();
     } catch (err) {
       console.error('signIn error:', err);
       setSignInError({
@@ -260,55 +266,6 @@ export default function AuthModal({ initialMode = 'sign_in', open = false, onClo
         message: err?.message || 'שגיאה בהתחברות',
       });
       setSignInLoading(false);
-    }
-  };
-
-  const handlePasswordReset = async () => {
-    setPasswordResetSent(false);
-    const email = signInEmail.trim().toLowerCase();
-
-    if (!email) {
-      setSignInError({
-        code: 'missing_email',
-        message: 'הזן אימייל כדי לקבל קישור לאיפוס סיסמה',
-      });
-      return false;
-    }
-
-    try {
-      const response = await fetch('/api/auth/reset-password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
-      });
-
-      if (!response.ok) {
-        if (response.status === 500) {
-          const body = await response.json().catch(() => ({}));
-          if (body?.error?.toLowerCase().includes('missing supabase configuration')) {
-            console.warn('reset-password: missing server configuration, falling back to Supabase client.');
-            const supabaseResp = await supabase.auth.resetPasswordForEmail(email);
-            if (supabaseResp.error) {
-              throw supabaseResp.error;
-            }
-            setPasswordResetSent(true);
-            return true;
-          }
-        }
-
-        const body = await response.json().catch(() => ({}));
-        throw new Error(body?.error || `reset-password failed (${response.status})`);
-      }
-
-      setPasswordResetSent(true);
-      return true;
-    } catch (error) {
-      console.error('reset password error:', error);
-      setSignInError({
-        code: 'reset_error',
-        message: error?.message || 'שגיאה בשליחת קישור לאיפוס סיסמה',
-      });
-      return false;
     }
   };
 
@@ -326,26 +283,20 @@ export default function AuthModal({ initialMode = 'sign_in', open = false, onClo
     return () => subscription.unsubscribe();
   }, [open, onClose]);
 
-  // Reset all form data when modal opens - clean screen every time (including passwords)
+  // Reset all form data when modal opens - clean screen every time
   useEffect(() => {
     if (open) {
       setView(initialMode);
       setFormKey((k) => k + 1);
       setSuccessMsg('');
       setEmailVerificationNotice({ show: false, email: '' });
-      setFirstName('');
-      setLastName('');
+      setFullName('');
       setPhone('');
       setErrorMsg('');
       setLoading(false);
-      setShowSignUpPassword(false);
-      setShowSignUpConfirmPassword(false);
       setSignInEmail('');
-      setSignInPassword('');
-      setShowSignInPassword(false);
       setSignInError({ code: '', message: '' });
       setSignInLoading(false);
-      setPasswordResetSent(false);
       setExistingEmailNotice({ show: false, email: '' });
     }
   }, [open, initialMode]);
@@ -383,7 +334,6 @@ export default function AuthModal({ initialMode = 'sign_in', open = false, onClo
               setExistingEmailNotice({ show: false, email: '' });
               setView('sign_in');
               setSignInEmail(existingEmailNotice.email.trim());
-              setSignInPassword('');
               setSignInError({ code: '', message: '' });
             }}
             className="w-full bg-gradient-to-br from-indigo-600 to-violet-600 shadow-[0_5px_22px_rgba(99,70,230,0.45)] text-white font-bold rounded-xl py-2 hover:opacity-90 transition-opacity"
@@ -477,14 +427,8 @@ export default function AuthModal({ initialMode = 'sign_in', open = false, onClo
   }
 
   if (open && signInError.code) {
-    const isInvalidPassword = signInError.code === 'invalid_password';
     const isUserNotFound = signInError.code === 'user_not_found';
-
-    const overlayTitle = isInvalidPassword
-      ? 'סיסמה שגויה'
-      : isUserNotFound
-      ? 'האימייל לא קיים'
-      : 'שגיאה בהתחברות';
+    const overlayTitle = isUserNotFound ? 'האימייל לא קיים' : 'שגיאה בהתחברות';
 
     return (
       <Modal size="sm" open={open} onClose={onClose}>
@@ -499,35 +443,12 @@ export default function AuthModal({ initialMode = 'sign_in', open = false, onClo
           </div>
         </ModalBody>
         <ModalFooter className="flex-col">
-          {isInvalidPassword ? (
-            <>
-              <button
-                type="button"
-                onClick={() => setSignInError({ code: '', message: '' })}
-                className="w-full bg-gradient-to-br from-red-600 to-rose-600 text-white font-bold rounded-xl py-2 hover:opacity-90 transition-opacity"
-              >
-                נסה שוב
-              </button>
-              <button
-                type="button"
-                onClick={async () => {
-                  const success = await handlePasswordReset();
-                  if (success) {
-                    setSignInError({ code: '', message: '' });
-                  }
-                }}
-                className="w-full border border-white/15 bg-transparent text-white hover:border-indigo-300 hover:text-indigo-200 font-semibold rounded-xl py-2 transition-colors"
-              >
-                שלח אימייל לאיפוס סיסמה
-              </button>
-            </>
-          ) : isUserNotFound ? (
+          {isUserNotFound ? (
             <>
               <button
                 type="button"
                 onClick={() => {
                   setSignInEmail('');
-                  setSignInPassword('');
                   setSignInError({ code: '', message: '' });
                 }}
                 className="w-full border border-amber-400/30 bg-transparent text-amber-300 hover:bg-amber-400/10 font-semibold rounded-xl py-2 transition-colors"
@@ -579,35 +500,19 @@ export default function AuthModal({ initialMode = 'sign_in', open = false, onClo
           <div className="border border-white/15 rounded-2xl p-6 bg-white/[0.03] shadow-sm">
             {view === 'sign_up' ? (
               <form key={formKey} onSubmit={handleSignUp} className="space-y-4" autoComplete="off">
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-base font-medium text-slate-300 mb-2">
-                      שם פרטי *
-                    </label>
-                    <input
-                      type="text"
-                      name="firstName"
-                      value={firstName}
-                      onChange={(e) => setFirstName(e.target.value)}
-                      required
-                      className="w-full h-12 rounded-xl bg-white/10 border border-white/20 text-white placeholder-slate-400 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400/40 text-base px-3 font-medium outline-none"
-                      placeholder="הכנס שם פרטי"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-base font-medium text-slate-300 mb-2">
-                      שם משפחה *
-                    </label>
-                    <input
-                      type="text"
-                      name="lastName"
-                      value={lastName}
-                      onChange={(e) => setLastName(e.target.value)}
-                      required
-                      className="w-full h-12 rounded-xl bg-white/10 border border-white/20 text-white placeholder-slate-400 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400/40 text-base px-3 font-medium outline-none"
-                      placeholder="הכנס שם משפחה"
-                    />
-                  </div>
+                <div>
+                  <label className="block text-base font-medium text-slate-300 mb-2">
+                    שם מלא *
+                  </label>
+                  <input
+                    type="text"
+                    name="fullName"
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    required
+                    className="w-full h-12 rounded-xl bg-white/10 border border-white/20 text-white placeholder-slate-400 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400/40 text-base px-3 font-medium outline-none"
+                    placeholder="הכנס שם מלא"
+                  />
                 </div>
 
                 <div>
@@ -640,52 +545,6 @@ export default function AuthModal({ initialMode = 'sign_in', open = false, onClo
                   />
                 </div>
 
-                <div>
-                  <label className="block text-base font-medium text-slate-300 mb-2">
-                    סיסמה *
-                  </label>
-                  <div className="relative">
-                    <input
-                      type={showSignUpPassword ? 'text' : 'password'}
-                      name="password"
-                      required
-                      autoComplete="new-password"
-                      readOnly
-                      onFocus={(e) => e.target.removeAttribute('readOnly')}
-                      className="w-full h-12 rounded-xl bg-white/10 border border-white/20 text-white placeholder-slate-400 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400/40 text-base px-3 font-medium outline-none"
-                      placeholder="הכנס סיסמה"
-                    />
-                    <VisibilityToggle
-                      isVisible={showSignUpPassword}
-                      onToggle={() => setShowSignUpPassword((prev) => !prev)}
-                      label="סיסמה"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-base font-medium text-slate-300 mb-2">
-                    אימות סיסמה *
-                  </label>
-                  <div className="relative">
-                    <input
-                      type={showSignUpConfirmPassword ? 'text' : 'password'}
-                      name="confirmPassword"
-                      required
-                      autoComplete="new-password"
-                      readOnly
-                      onFocus={(e) => e.target.removeAttribute('readOnly')}
-                      className="w-full h-12 rounded-xl bg-white/10 border border-white/20 text-white placeholder-slate-400 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400/40 text-base px-3 font-medium outline-none"
-                      placeholder="הכנס שוב את הסיסמה"
-                    />
-                    <VisibilityToggle
-                      isVisible={showSignUpConfirmPassword}
-                      onToggle={() => setShowSignUpConfirmPassword((prev) => !prev)}
-                      label="אימות סיסמה"
-                    />
-                  </div>
-                </div>
-
                 {errorMsg && (
                   <div className="bg-red-500/10 border border-red-400/30 text-red-400 rounded-xl px-4 py-2 text-base font-medium">{errorMsg}</div>
                 )}
@@ -704,55 +563,17 @@ export default function AuthModal({ initialMode = 'sign_in', open = false, onClo
                   <form onSubmit={handleSignIn} className="space-y-4" autoComplete="off">
                     <div>
                       <label className="block text-base font-medium text-slate-300 mb-2">
-                        אימייל
+                        אימייל *
                       </label>
                       <input
                         type="email"
                         value={signInEmail}
                         onChange={(e) => setSignInEmail(e.target.value)}
                         className="w-full h-12 rounded-xl bg-white/10 border border-white/20 text-white placeholder-slate-400 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400/40 text-base px-3 font-medium outline-none"
-                        placeholder="הכנס אימייל"
+                        placeholder="הכנס כתובת אימייל"
                         autoComplete="email"
                         required
                       />
-                    </div>
-
-                    <div>
-                      <label className="block text-base font-medium text-slate-300 mb-2">
-                        סיסמה
-                      </label>
-                      <div className="relative">
-                        <input
-                          type={showSignInPassword ? 'text' : 'password'}
-                          value={signInPassword}
-                          onChange={(e) => setSignInPassword(e.target.value)}
-                          className="w-full h-12 rounded-xl bg-white/10 border border-white/20 text-white placeholder-slate-400 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400/40 text-base px-3 font-medium outline-none"
-                          placeholder="הכנס סיסמה"
-                          autoComplete="current-password"
-                          required
-                        />
-                        <VisibilityToggle
-                          isVisible={showSignInPassword}
-                          onToggle={() => setShowSignInPassword((prev) => !prev)}
-                          label="סיסמה"
-                        />
-                      </div>
-                    </div>
-
-                    {passwordResetSent && (
-                      <div className="bg-emerald-500/20 border border-emerald-400/30 text-emerald-300 rounded-xl px-4 py-2 text-base font-medium">
-                        שלחנו אליך אימייל לאיפוס הסיסמה
-                      </div>
-                    )}
-
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-sm font-medium">
-                      <button
-                        type="button"
-                        onClick={handlePasswordReset}
-                        className="text-indigo-300 hover:text-indigo-200 text-base text-left"
-                      >
-                        שכחת סיסמה?
-                      </button>
                     </div>
 
                     <button
@@ -760,7 +581,7 @@ export default function AuthModal({ initialMode = 'sign_in', open = false, onClo
                       disabled={signInLoading}
                       className="w-full h-12 rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 shadow-[0_5px_22px_rgba(99,70,230,0.45)] text-white font-bold disabled:opacity-50 text-base transition-opacity hover:opacity-90"
                     >
-                      {signInLoading ? 'מתחבר...' : 'התחבר'}
+                      {signInLoading ? 'מעבד...' : 'לחץ לקבלת קישור כניסה לאימייל'}
                     </button>
                   </form>
                 </div>
