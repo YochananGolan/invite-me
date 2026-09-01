@@ -4537,25 +4537,10 @@ React.useEffect(() => {
       const ws = wb.Sheets[wb.SheetNames[0]];
       const rows = XLSX.utils.sheet_to_json(ws, { header: 1 });
 
-      // New format: A=שם מלא, B=מס׳ שולחן, C=טלפון
-      // Legacy format (still supported): A=שם פרטי, B=שם משפחה, C=מס׳ שולחן, D=טלפון
-      const headerCells = (rows[0] || []).map((cell) => String(cell || '').trim());
-      const sampleRow = rows.slice(1).find((r) =>
-        Array.isArray(r) && r.some((cell) => cell !== undefined && cell !== null && String(cell).trim() !== ''),
-      ) || [];
-      const samplePhoneCol3 = String(sampleRow[3] || '').replace(/\D/g, '');
-      const samplePhoneCol2 = String(sampleRow[2] || '').replace(/\D/g, '');
-      const headerSuggestsLegacy = headerCells.some((h) => h.includes('שם פרטי') || h.includes('שם משפחה'));
-      const headerSuggestsFullName = headerCells.some((h) => h.includes('שם מלא'));
-      const isLegacyFormat = headerSuggestsLegacy
-        || (!headerSuggestsFullName && (samplePhoneCol3.length === 9 || samplePhoneCol3.length === 10)
-          && !(samplePhoneCol2.length === 9 || samplePhoneCol2.length === 10));
-
+      // Format: A=שם מלא, B=מס׳ שולחן, C=טלפון
       const fullNameIdx = 0;
-      const tableIdx = isLegacyFormat ? 2 : 1;
-      const phoneIdx = isLegacyFormat ? 3 : 2;
-      const firstNameIdx = 0;
-      const lastNameIdx = 1;
+      const tableIdx = 1;
+      const phoneIdx = 2;
 
       const imported = [];
       const errors = [];
@@ -4576,12 +4561,7 @@ React.useEffect(() => {
           digitsOnly = '0' + digitsOnly;
         }
 
-        const guestFullName = isLegacyFormat
-          ? joinFullName(
-            (r[firstNameIdx] || '').toString().trim(),
-            (r[lastNameIdx] || '').toString().trim(),
-          )
-          : (r[fullNameIdx] || '').toString().trim();
+        const guestFullName = (r[fullNameIdx] || '').toString().trim();
 
         const guest = {
           guestFullName,
@@ -4593,13 +4573,13 @@ React.useEffect(() => {
         // Validate guest data
         const rowErrors = [];
         if (!guest.guestFullName) {
-          rowErrors.push(isLegacyFormat ? 'שם חסר (עמודות A-B)' : 'שם מלא חסר (עמודה A)');
+          rowErrors.push('שם מלא חסר (עמודה A)');
         }
         if (!guest.guestTable) {
-          rowErrors.push(isLegacyFormat ? 'מס׳ שולחן חסר (עמודה C)' : 'מס׳ שולחן חסר (עמודה B)');
+          rowErrors.push('מס׳ שולחן חסר (עמודה B)');
         }
         if (!guest.guestPhone) {
-          rowErrors.push(isLegacyFormat ? 'טלפון חסר (עמודה D)' : 'טלפון חסר (עמודה C)');
+          rowErrors.push('טלפון חסר (עמודה C)');
         } else if (guest.guestPhone.length !== 10) {
           rowErrors.push(`טלפון לא תקין (${guest.guestPhone.length} ספרות במקום 10)`);
         }
@@ -10252,12 +10232,6 @@ React.useEffect(()=>{
               <div className="bg-indigo-500/10 border border-indigo-400/30 rounded-lg p-3 text-sm">
                 <p className="text-indigo-200">
                   <strong>שם העמודות לא משנה</strong> - רק הסדר חשוב. השורה הראשונה היא שורת כותרות.
-                </p>
-              </div>
-
-              <div className="bg-slate-500/10 border border-white/15 rounded-lg p-3 text-sm">
-                <p className="text-slate-300">
-                  <strong>תמיכה לאחור:</strong> קובץ ישן עם 4 עמודות (שם פרטי, שם משפחה, מס׳ שולחן, טלפון) עדיין נתמך.
                 </p>
               </div>
 
