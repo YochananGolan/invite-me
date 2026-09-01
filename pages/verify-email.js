@@ -26,12 +26,20 @@ export default function VerifyEmailPage() {
           return;
         }
         if (session && mounted) {
-          setStatus('האימייל אומת בהצלחה! מפנה...');
+          const isSignup = router.query?.type === 'signup';
           localStorage.setItem('user_id', session.user.id);
           localStorage.setItem('user_email', session.user.email);
           localStorage.removeItem('pendingCreateEvent');
-          localStorage.setItem('showRegistrationSuccess', 'true');
-          router.replace('/?registration=success'); // גם query param למקרה ש-localStorage מתנקה
+
+          if (isSignup) {
+            setStatus('האימייל אומת בהצלחה! מפנה...');
+            localStorage.setItem('showRegistrationSuccess', 'true');
+            router.replace('/?registration=success');
+          } else {
+            setStatus('התחברת בהצלחה! מפנה...');
+            localStorage.removeItem('showRegistrationSuccess');
+            router.replace('/');
+          }
           return;
         }
         if (mounted) {
@@ -50,18 +58,31 @@ export default function VerifyEmailPage() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (!mounted) return;
       if ((event === 'SIGNED_IN' || event === 'USER_UPDATED') && session) {
-        setStatus('האימייל אומת בהצלחה! מפנה...');
+        const isSignup = router.query?.type === 'signup';
         localStorage.setItem('user_id', session.user.id);
         localStorage.setItem('user_email', session.user.email);
         localStorage.removeItem('pendingCreateEvent');
-        localStorage.setItem('showRegistrationSuccess', 'true');
-        router.replace('/?registration=success');
+
+        if (isSignup) {
+          setStatus('האימייל אומת בהצלחה! מפנה...');
+          localStorage.setItem('showRegistrationSuccess', 'true');
+          router.replace('/?registration=success');
+        } else {
+          setStatus('התחברת בהצלחה! מפנה...');
+          localStorage.removeItem('showRegistrationSuccess');
+          router.replace('/');
+        }
       }
     });
 
     const fallback = setTimeout(() => {
       if (mounted && !error) {
-        router.replace('/?registration=success');
+        const isSignup = router.query?.type === 'signup';
+        if (isSignup) {
+          router.replace('/?registration=success');
+        } else {
+          router.replace('/');
+        }
       }
     }, 5000);
 

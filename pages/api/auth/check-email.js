@@ -42,41 +42,41 @@ export default async function handler(req, res) {
 
         if (error && error.message && !/user not found/i.test(error.message)) {
           console.error('check-email admin error:', error);
-          return res
-            .status(200)
-            .json({ exists: false, skipped: true, error: error.message });
         }
 
-        return res.status(200).json({ exists: !!data });
+        const user = data?.user || (data?.id ? data : null);
+        if (user) {
+          return res.status(200).json({ exists: true, user: { id: user.id, email: user.email } });
+        }
       }
 
-      console.warn(
-        'check-email: admin.getUserByEmail unavailable – falling back to RPC email_exists'
-      );
-      const { data: rpcData, error } = await supabaseAdmin.rpc('email_exists', {
+      // Fallback check via RPC or public tables
+      const { data: rpcData } = await supabaseAdmin.rpc('email_exists', {
         p_email: normalizedEmail,
       });
 
-      if (error) {
-        console.error('check-email service RPC error:', error);
-        return res
-          .status(200)
-          .json({ exists: false, skipped: true, error: error.message });
+      if (rpcData) {
+        return res.status(200).json({ exists: true });
       }
 
-      return res.status(200).json({ exists: !!rpcData });
+      const { data: publicUser } = await supabaseAdmin
+        .from('users')
+        .select('id, email')
+        .eq('email', normalizedEmail)
+        .maybeSingle();
+
+      if (publicUser) {
+        return res.status(200).json({ exists: true, user: publicUser });
+      }
+
+      return res.status(200).json({ exists: false });
     }
 
     if (!SUPABASE_ANON_KEY) {
-      console.warn(
-        'check-email: missing anon key – defaulting to exists=false'
-      );
+      console.warn('check-email: missing anon key – defaulting to exists=false');
       return res.status(200).json({ exists: false, skipped: true });
     }
 
-    console.warn(
-      'check-email: service key missing, falling back to RPC email_exists'
-    );
     const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
       auth: {
         autoRefreshToken: false,
@@ -84,7 +84,7 @@ export default async function handler(req, res) {
       },
     });
 
-    const { data, error } = await supabaseClient.rpc('email_exists', {
+    const { data: rpcExists, error } = await supabaseClient.rpc('email_exists', {
       p_email: normalizedEmail,
     });
 
@@ -95,7 +95,7 @@ export default async function handler(req, res) {
         .json({ exists: false, skipped: true, error: error.message });
     }
 
-    return res.status(200).json({ exists: !!data });
+    return res.status(200).json({ exists: !!rpcExists });
   } catch (err) {
     console.error('check-email unexpected error:', err);
     return res

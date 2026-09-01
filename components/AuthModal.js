@@ -3,49 +3,6 @@ import { useRouter } from 'next/router';
 import { supabase } from '../lib/supabaseClient';
 import Modal, { ModalHeader, ModalBody, ModalFooter } from './Modal';
 
-const EyeIcon = ({ isOpen }) => (
-  <svg
-    className="w-5 h-5"
-    viewBox="0 0 24 24"
-    fill="none"
-    xmlns="http://www.w3.org/2000/svg"
-  >
-    <path
-      d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
-      stroke="currentColor"
-      strokeWidth="1.6"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-    <path
-      d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-      stroke="currentColor"
-      strokeWidth="1.6"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-    {!isOpen && (
-      <path
-        d="M4 4l16 16"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinecap="round"
-      />
-    )}
-  </svg>
-);
-
-const VisibilityToggle = ({ isVisible, onToggle, label }) => (
-  <button
-    type="button"
-    onClick={onToggle}
-    aria-label={isVisible ? `הסתר ${label}` : `הצג ${label}`}
-    className="absolute inset-y-0 -left-10 flex items-center text-slate-400 hover:text-slate-200 focus:outline-none"
-  >
-    <EyeIcon isOpen={isVisible} />
-  </button>
-);
-
 export default function AuthModal({ initialMode = 'sign_in', open = false, onClose = () => {} }) {
   const router = useRouter();
   const [view, setView] = useState(initialMode);
@@ -67,7 +24,7 @@ export default function AuthModal({ initialMode = 'sign_in', open = false, onClo
     email: '',
   });
 
-  // Handle custom registration with additional fields
+  // Handle registration for new users
   const handleSignUp = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -109,7 +66,7 @@ export default function AuthModal({ initialMode = 'sign_in', open = false, onClo
       const siteUrl = typeof window !== 'undefined'
         ? window.location.origin
         : (process.env.NEXT_PUBLIC_APP_URL || '').replace(/\/$/, '');
-      const redirectUrl = `${siteUrl.replace(/\/$/, '')}/verify-email`;
+      const redirectUrl = `${siteUrl.replace(/\/$/, '')}/verify-email?type=signup`;
       const trimmedFullName = fullName.trim();
       const nameParts = trimmedFullName.split(/\s+/);
       const firstName = nameParts[0] || '';
@@ -122,16 +79,19 @@ export default function AuthModal({ initialMode = 'sign_in', open = false, onClo
             full_name: trimmedFullName,
             first_name: firstName,
             last_name: lastName,
-            phone: phone
+            phone: phone,
           },
           emailRedirectTo: redirectUrl,
-          shouldCreateUser: true
-        }
+          shouldCreateUser: true,
+        },
       });
 
       if (authResult.error) {
         // Fallback to signUp with generated secure token if signInWithOtp is restricted
-        const generatedPassword = typeof crypto !== 'undefined' && crypto.randomUUID ? `P@ss_${crypto.randomUUID()}` : `P@ss_${Math.random().toString(36).slice(2)}${Date.now()}`;
+        const generatedPassword =
+          typeof crypto !== 'undefined' && crypto.randomUUID
+            ? `P@ss_${crypto.randomUUID()}`
+            : `P@ss_${Math.random().toString(36).slice(2)}${Date.now()}`;
         authResult = await supabase.auth.signUp({
           email: emailNormalized,
           password: generatedPassword,
@@ -140,10 +100,10 @@ export default function AuthModal({ initialMode = 'sign_in', open = false, onClo
               full_name: trimmedFullName,
               first_name: firstName,
               last_name: lastName,
-              phone: phone
+              phone: phone,
             },
-            emailRedirectTo: redirectUrl
-          }
+            emailRedirectTo: redirectUrl,
+          },
         });
       }
 
@@ -176,13 +136,14 @@ export default function AuthModal({ initialMode = 'sign_in', open = false, onClo
       if (msg.toLowerCase().includes('rate limit') || msg.toLowerCase().includes('rate_limit')) {
         setErrorMsg('נשלחו יותר מדי מיילי אימות לאחרונה. אנא נסה שוב בעוד כשעה, או צור קשר לתמיכה.');
       } else {
-        setErrorMsg('שגיאה בהרשמה: ' + msg);
+        setErrorMsg('שגיאה בההרשמה: ' + msg);
       }
     } finally {
       setLoading(false);
     }
   };
 
+  // Handle direct login for registered users without sending confirmation emails
   const handleSignIn = async (e) => {
     e.preventDefault();
 
@@ -191,7 +152,7 @@ export default function AuthModal({ initialMode = 'sign_in', open = false, onClo
     if (!email) {
       setSignInError({
         code: 'missing_credentials',
-        message: 'הזן אימייל כדי לקבל קישור כניסה',
+        message: 'הזן אימייל כדי להיכנס',
       });
       return;
     }
@@ -200,65 +161,64 @@ export default function AuthModal({ initialMode = 'sign_in', open = false, onClo
     setSignInError({ code: '', message: '' });
 
     try {
-      const checkResponse = await fetch('/api/auth/check-email', {
+      const response = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email }),
       });
 
-      if (checkResponse.ok) {
-        const emailData = await checkResponse.json();
-        if (emailData && emailData.exists === false) {
-          setSignInError({
-            code: 'user_not_found',
-            message: 'האימייל לא רשום במערכת. ניתן להירשם כעת.',
-          });
-          setSignInLoading(false);
-          return;
-        }
+      if (!response.ok) {
+        throw new Error('שגיאה בחיבור לשרת');
       }
 
-      const siteUrl = typeof window !== 'undefined'
-        ? window.location.origin
-        : (process.env.NEXT_PUBLIC_APP_URL || '').replace(/\/$/, '');
-      const redirectUrl = `${siteUrl.replace(/\/$/, '')}/verify-email`;
+      const data = await response.json();
 
-      const { data, error } = await supabase.auth.signInWithOtp({
-        email,
-        options: {
-          emailRedirectTo: redirectUrl,
-          shouldCreateUser: false
-        }
-      });
-
-      if (error) {
-        const errMsg = (error.message || '').toLowerCase();
-        if (errMsg.includes('signups not allowed') || errMsg.includes('user not found')) {
+      if (!data.success || !data.exists) {
+        if (data.code === 'user_not_found' || data.exists === false) {
           setSignInError({
             code: 'user_not_found',
             message: 'האימייל לא רשום במערכת. ניתן להירשם כעת.',
-          });
-        } else if (errMsg.includes('rate limit') || errMsg.includes('rate_limit')) {
-          setSignInError({
-            code: 'rate_limit',
-            message: 'נשלחו יותר מדי בקשות לאחרונה. אנא נסה שוב בעוד כשעה.',
           });
         } else {
           setSignInError({
             code: 'unknown',
-            message: error.message || 'שגיאה בהתחברות',
+            message: data.message || data.error || 'שגיאה בהתחברות',
           });
         }
         setSignInLoading(false);
         return;
       }
 
-      setEmailVerificationNotice({
-        show: true,
-        email: email,
-      });
-      setSignInEmail('');
+      // Registered user: establish authenticated session directly
+      if (data.tokenHash) {
+        try {
+          await supabase.auth.verifyOtp({
+            token_hash: data.tokenHash,
+            type: 'magiclink',
+          });
+        } catch (otpErr) {
+          console.warn('verifyOtp notice:', otpErr);
+        }
+      }
+
+      const userId = data.user?.id || email;
+      const userEmail = data.user?.email || email;
+
+      localStorage.setItem('user_id', userId);
+      localStorage.setItem('user_email', userEmail);
+      localStorage.removeItem('showRegistrationSuccess');
+      localStorage.removeItem('pendingCreateEvent');
+
+      // Dispatch events so session state updates immediately
+      window.dispatchEvent(new Event('storage'));
+      window.dispatchEvent(
+        new CustomEvent('authSessionUpdated', {
+          detail: { id: userId, email: userEmail },
+        })
+      );
+
       setSignInLoading(false);
+      onClose();
     } catch (err) {
       console.error('signIn error:', err);
       setSignInError({
@@ -301,8 +261,6 @@ export default function AuthModal({ initialMode = 'sign_in', open = false, onClo
     }
   }, [open, initialMode]);
 
-  // Parent component will hide/show modal based on session state.
-
   if (open && existingEmailNotice.show) {
     return (
       <Modal size="sm" open={open} onClose={onClose}>
@@ -321,17 +279,6 @@ export default function AuthModal({ initialMode = 'sign_in', open = false, onClo
             type="button"
             onClick={() => {
               setExistingEmailNotice({ show: false, email: '' });
-              onClose();
-              router.push('/').catch(() => {});
-            }}
-            className="w-full border border-white/15 bg-transparent text-white hover:border-indigo-300 hover:text-indigo-200 font-semibold py-2 rounded-xl transition-colors"
-          >
-            חזרה לדף הבית
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setExistingEmailNotice({ show: false, email: '' });
               setView('sign_in');
               setSignInEmail(existingEmailNotice.email.trim());
               setSignInError({ code: '', message: '' });
@@ -339,6 +286,17 @@ export default function AuthModal({ initialMode = 'sign_in', open = false, onClo
             className="w-full bg-gradient-to-br from-indigo-600 to-violet-600 shadow-[0_5px_22px_rgba(99,70,230,0.45)] text-white font-bold rounded-xl py-2 hover:opacity-90 transition-opacity"
           >
             כניסה למערכת
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setExistingEmailNotice({ show: false, email: '' });
+              onClose();
+              router.push('/').catch(() => {});
+            }}
+            className="w-full border border-white/15 bg-transparent text-white hover:border-indigo-300 hover:text-indigo-200 font-semibold py-2 rounded-xl transition-colors"
+          >
+            חזרה לדף הבית
           </button>
         </ModalFooter>
       </Modal>
@@ -581,7 +539,7 @@ export default function AuthModal({ initialMode = 'sign_in', open = false, onClo
                       disabled={signInLoading}
                       className="w-full h-12 rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 shadow-[0_5px_22px_rgba(99,70,230,0.45)] text-white font-bold disabled:opacity-50 text-base transition-opacity hover:opacity-90"
                     >
-                      {signInLoading ? 'מעבד...' : 'לחץ לקבלת קישור כניסה לאימייל'}
+                      {signInLoading ? 'מתחבר...' : 'כניסה למערכת'}
                     </button>
                   </form>
                 </div>

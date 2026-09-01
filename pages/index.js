@@ -22,26 +22,29 @@ export default function Home({ session }) {
   const [showRegistrationSuccess, setShowRegistrationSuccess] = useState(false);
   const stepRef = useRef();
 
-  // Capture hash early (Supabase may clear it) - for direct redirect to / from email
+  // Capture signup hash early (Supabase may clear it) - only for signup confirmation
   useEffect(() => {
     if (typeof window !== 'undefined' && window.location.hash?.includes('access_token')) {
-      sessionStorage.setItem('fromEmailConfirmation', 'true');
+      if (window.location.hash.includes('type=signup')) {
+        sessionStorage.setItem('fromEmailConfirmation', 'true');
+      }
     }
   }, []);
-
 
   useEffect(() => {
     if (!session) return;
     const fromStorage = typeof window !== 'undefined' && localStorage.getItem('showRegistrationSuccess') === 'true';
     const fromQuery = router.query?.registration === 'success' ||
       (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('registration') === 'success');
-    // Supabase may redirect directly to / with hash (bypassing verify-email)
+    // Supabase may redirect directly to / with hash for signup confirmation
     const fromHash = typeof window !== 'undefined' && window.location.hash &&
-      (window.location.hash.includes('access_token') || window.location.hash.includes('type='));
+      window.location.hash.includes('type=signup');
     const fromSessionStorage = typeof window !== 'undefined' && sessionStorage.getItem('fromEmailConfirmation') === 'true';
     if (fromStorage || fromQuery || fromHash || fromSessionStorage) {
       setShowRegistrationSuccess(true);
-      // Do NOT clear storage/URL here - only when user clicks. Keeps popup visible until user dismisses.
+      try {
+        sessionStorage.removeItem('fromEmailConfirmation');
+      } catch (e) {}
     }
   }, [session, router.query?.registration, router.isReady]);
 

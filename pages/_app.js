@@ -122,14 +122,15 @@ function MyApp({ Component, pageProps }) {
       // Don't update on other events to prevent unnecessary refreshes
     });
 
-    // Listen for storage changes (e.g., when user logs in from another tab)
+    // Listen for storage / direct login changes
     const handleStorageChange = (e) => {
-      // Only react to user_id or user_email changes
-      if (e.key === 'user_id' || e.key === 'user_email') {
+      // React to user_id or user_email changes, or direct authSessionUpdated events
+      if (!e || !e.key || e.key === 'user_id' || e.key === 'user_email') {
         checkSession();
       }
     };
     window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('authSessionUpdated', handleStorageChange);
 
     // Re-sync session on route change (e.g. after verify-email redirect)
     const handleRouteChange = () => checkAndSyncSupabaseAuth();
@@ -138,6 +139,7 @@ function MyApp({ Component, pageProps }) {
     return () => {
       subscription.unsubscribe();
       window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('authSessionUpdated', handleStorageChange);
       router.events.off('routeChangeComplete', handleRouteChange);
     };
   }, []);
